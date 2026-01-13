@@ -1,67 +1,112 @@
 # Technical Specifications
 
-# 1. Introduction
+## 1. Introduction
 
-## 1.1 Executive Summary
+### 1.1 Executive Summary
 
-### 1.1.1 Brief Overview of the Project
+#### 1.1.1 Brief Overview of the Project
 
-Corbusier is an innovative AI agent orchestration platform designed to serve as the "best room" rather than the smartest agent. The platform coordinates multiple specialized AI agents to accomplish complex workflows that single agents struggle with, enabling teams of intelligent agents to work together seamlessly and transforming complex workflows into coordinated, outcome-driven processes. Built on hexagonal architecture principles, Corbusier owns the workflow, conversations, tool surface, hooks, and version control system (VCS) primitives while hosting pluggable agent engines such as Codex CLI App Server and Claude Code via SDK as backend adapters.
+Corbusier is an innovative AI agent orchestration platform designed to serve as
+the "best room" rather than the smartest agent. The platform coordinates
+multiple specialized AI agents to accomplish complex workflows that single
+agents struggle with, enabling teams of intelligent agents to work together
+seamlessly and transforming complex workflows into coordinated, outcome-driven
+processes. Built on hexagonal architecture principles, Corbusier owns the
+workflow, conversations, tool surface, hooks, and version control system (VCS)
+primitives while hosting pluggable agent engines such as Codex CLI App Server
+and Claude Code via SDK as backend adapters.
 
-### 1.1.2 Core Business Problem Being Solved
+#### 1.1.2 Core Business Problem Being Solved
 
-The traditional approach of cramming more tools and writing more complex system prompts isn't ideal. As LLM token usage increases, organizations need the most capable (expensive) models to handle complexity, and there's a practical limit to how many tasks a single agent can effectively manage. Most organizations today aren't just experimenting with a single AI model; they're working across multiple LLMs, legacy systems, and newer AI agents simultaneously. Without orchestration, that ecosystem risks quickly becoming fragmented, redundant, and inefficient.
+The traditional approach of cramming more tools and writing more complex system
+prompts isn't ideal. As LLM token usage increases, organizations need the most
+capable (expensive) models to handle complexity, and there's a practical limit
+to how many tasks a single agent can effectively manage. Most organizations
+today aren't just experimenting with a single AI model; they're working across
+multiple LLMs, legacy systems, and newer AI agents simultaneously. Without
+orchestration, that ecosystem risks quickly becoming fragmented, redundant, and
+inefficient.
 
-Corbusier addresses this challenge by providing a unified orchestration layer that enables consistent governance, safety policies, and workflow management across different AI agent backends, eliminating the brittleness and complexity of managing multiple disparate AI systems.
+Corbusier addresses this challenge by providing a unified orchestration layer
+that enables consistent governance, safety policies, and workflow management
+across different AI agent backends, eliminating the brittleness and complexity
+of managing multiple disparate AI systems.
 
-### 1.1.3 Key Stakeholders and Users
+#### 1.1.3 Key Stakeholders and Users
 
-| Stakeholder Group | Primary Interests | Usage Patterns |
-|---|---|---|
+| Stakeholder Group          | Primary Interests                                     | Usage Patterns                                             |
+| -------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
 | Software Development Teams | Code generation, review automation, testing workflows | Daily development tasks, PR management, code quality gates |
-| DevOps Engineers | Infrastructure automation, deployment orchestration | CI/CD pipeline integration, infrastructure management |
-| Engineering Managers | Team productivity, code quality oversight | Workflow monitoring, team performance metrics |
+| DevOps Engineers           | Infrastructure automation, deployment orchestration   | CI/CD pipeline integration, infrastructure management      |
+| Engineering Managers       | Team productivity, code quality oversight             | Workflow monitoring, team performance metrics              |
 
-### 1.1.4 Expected Business Impact and Value Proposition
+#### 1.1.4 Expected Business Impact and Value Proposition
 
-Industry estimates suggest AI agent orchestration can reduce operational costs by up to 30% when sales and operations tasks are automated effectively. Early adopters are already witnessing remarkable results, including a 30-45% boost in productivity in customer care functions, with some organizations reporting up to 50% efficiency gains in functions like customer service, sales, and HR operations.
+Industry estimates suggest AI agent orchestration can reduce operational costs
+by up to 30% when sales and operations tasks are automated effectively. Early
+adopters are already witnessing remarkable results, including a 30-45% boost in
+productivity in customer care functions, with some organizations reporting up
+to 50% efficiency gains in functions like customer service, sales, and HR
+operations.
 
 For software development specifically, Corbusier delivers value through:
+
 - Consistent code quality enforcement across different AI agents
 - Reduced context switching between tools and platforms
 - Automated workflow governance and safety checks
 - Seamless integration with existing development infrastructure
 
-## 1.2 System Overview
+### 1.2 System Overview
 
-### 1.2.1 Project Context
+#### 1.2.1 Project Context
 
-#### Business Context and Market Positioning
+##### Business Context and Market Positioning
 
-By 2028, 70% of organizations building multi-LLM applications and AI agents will use integration platforms to optimize and orchestrate connectivity and data access, compared to less than 5% of similar organizations using AI integration platforms in 2024. Over 50% of companies are expected to adopt AI orchestration platforms by 2025, with the AI orchestration market projected to grow at a CAGR of 23% from 2023 to 2028.
+By 2028, 70% of organizations building multi-LLM applications and AI agents
+will use integration platforms to optimize and orchestrate connectivity and
+data access, compared to less than 5% of similar organizations using AI
+integration platforms in 2024. Over 50% of companies are expected to adopt AI
+orchestration platforms by 2025, with the AI orchestration market projected to
+grow at a CAGR of 23% from 2023 to 2028.
 
-Corbusier positions itself in the emerging "orchestrator" niche, differentiating from both single-agent solutions and complex multi-agent frameworks by focusing on workflow ownership and governance rather than agent intelligence.
+Corbusier positions itself in the emerging "orchestrator" niche,
+differentiating from both single-agent solutions and complex multi-agent
+frameworks by focusing on workflow ownership and governance rather than agent
+intelligence.
 
-#### Current System Limitations
+##### Current System Limitations
 
 Existing solutions in the market suffer from several key limitations:
-- **Agent Fragmentation**: Managing state across multiple agents, handling handoffs between specialized systems, and ensuring context doesn't get lost as tasks flow between agents
-- **Inconsistent Governance**: Different agent backends apply different safety and quality policies
-- **Tool Surface Inconsistency**: Each agent exposes different capabilities and interfaces
-- **Workflow Brittleness**: Manual coordination between agents leads to dropped tasks and lost context
 
-#### Integration with Existing Enterprise Landscape
+- **Agent Fragmentation**: Managing state across multiple agents, handling
+  handoffs between specialized systems, and ensuring context doesn't get lost
+  as tasks flow between agents
+- **Inconsistent Governance**: Different agent backends apply different safety
+  and quality policies
+- **Tool Surface Inconsistency**: Each agent exposes different capabilities and
+  interfaces
+- **Workflow Brittleness**: Manual coordination between agents leads to dropped
+  tasks and lost context
 
-Hexagonal architecture aims at creating loosely coupled application components that can be easily connected to their software environment by means of ports and adapters, making components exchangeable at any level and facilitating test automation. Corbusier leverages this architectural approach to integrate seamlessly with:
+##### Integration with Existing Enterprise Landscape
+
+Hexagonal architecture aims at creating loosely coupled application components
+that can be easily connected to their software environment by means of ports
+and adapters, making components exchangeable at any level and facilitating test
+automation. Corbusier leverages this architectural approach to integrate
+seamlessly with:
 
 - **Version Control Systems**: GitHub, GitLab, and other Git-based platforms
-- **Development Tools**: Existing IDE integrations, testing frameworks, and build systems
-- **Infrastructure**: Container orchestration platforms, cloud services, and on-premises systems
-- **Communication Platforms**: Slack, Microsoft Teams, and other collaboration tools
+- **Development Tools**: Existing IDE integrations, testing frameworks, and
+  build systems
+- **Infrastructure**: Container orchestration platforms, cloud services, and
+  on-premises systems
+- **Communication Platforms**: Slack, Microsoft Teams, and other collaboration
+  tools
 
-### 1.2.2 High-Level Description
+#### 1.2.2 High-Level Description
 
-#### Primary System Capabilities
+##### Primary System Capabilities
 
 Corbusier provides three core capabilities:
 
@@ -76,11 +121,12 @@ Corbusier provides three core capabilities:
    - Weaver-first file editing with agent-native editing disabled/redirected
 
 3. **Safety, Policy, and Workflow Governance**
-   - Consistent hook execution (commit gates, lint/test, policy checks) regardless of agent engine
+   - Consistent hook execution (commit gates, lint/test, policy checks)
+     regardless of agent engine
    - Encapsulation boundaries (Podbot) for secure tool and repository operations
    - Audit trails and compliance monitoring
 
-#### Major System Components
+##### Major System Components
 
 ```mermaid
 graph TB
@@ -131,816 +177,824 @@ graph TB
     VWS --> CI
 ```
 
-#### Core Technical Approach
+##### Core Technical Approach
 
-The hexagonal architecture, or ports and adapters architecture, is an architectural pattern used in software design that aims at creating loosely coupled application components that can be easily connected to their software environment by means of ports and adapters, making components exchangeable at any level and facilitating test automation.
+The hexagonal architecture, or ports and adapters architecture, is an
+architectural pattern used in software design that aims at creating loosely
+coupled application components that can be easily connected to their software
+environment by means of ports and adapters, making components exchangeable at
+any level and facilitating test automation.
 
 Corbusier implements this through:
-- **Domain-Driven Core**: Pure business logic for conversations, tasks, and workflows
-- **Port Definitions**: Clear interfaces for agent hosting, tool execution, and infrastructure
-- **Adapter Implementation**: Pluggable implementations for different technologies and services
-- **Dependency Inversion**: Core logic depends only on abstractions, not concrete implementations
 
-### 1.2.3 Success Criteria
+- **Domain-Driven Core**: Pure business logic for conversations, tasks, and
+  workflows
+- **Port Definitions**: Clear interfaces for agent hosting, tool execution, and
+  infrastructure
+- **Adapter Implementation**: Pluggable implementations for different
+  technologies and services
+- **Dependency Inversion**: Core logic depends only on abstractions, not
+  concrete implementations
 
-#### Measurable Objectives
+#### 1.2.3 Success Criteria
 
-| Objective | Target Metric | Measurement Method |
-|---|---|---|
-| Development Velocity | 25% reduction in time-to-merge | Git analytics on PR lifecycle |
-| Code Quality | 40% reduction in post-merge defects | Issue tracking and regression analysis |
-| Agent Utilization | 90% successful task completion rate | Task outcome tracking and audit logs |
+##### Measurable Objectives
 
-#### Critical Success Factors
+| Objective            | Target Metric                       | Measurement Method                     |
+| -------------------- | ----------------------------------- | -------------------------------------- |
+| Development Velocity | 25% reduction in time-to-merge      | Git analytics on PR lifecycle          |
+| Code Quality         | 40% reduction in post-merge defects | Issue tracking and regression analysis |
+| Agent Utilization    | 90% successful task completion rate | Task outcome tracking and audit logs   |
 
-1. **Seamless Agent Backend Integration**: Multiple AI agent engines work transparently through Corbusier's orchestration layer
-2. **Consistent Tool Experience**: Developers experience uniform tool capabilities regardless of underlying agent
-3. **Reliable Workflow Governance**: Safety hooks and quality gates execute consistently across all workflows
-4. **Maintainable Architecture**: Software remains easily modifiable throughout its lifetime, structured into components that are isolated from one another and can be developed and tested independently
+##### Critical Success Factors
 
-#### Key Performance Indicators (KPIs)
+1. **Seamless Agent Backend Integration**: Multiple AI agent engines work
+   transparently through Corbusier's orchestration layer
+2. **Consistent Tool Experience**: Developers experience uniform tool
+   capabilities regardless of underlying agent
+3. **Reliable Workflow Governance**: Safety hooks and quality gates execute
+   consistently across all workflows
+4. **Maintainable Architecture**: Software remains easily modifiable throughout
+   its lifetime, structured into components that are isolated from one another
+   and can be developed and tested independently
+
+##### Operational Key Performance Indicators (KPIs)
 
 - **System Reliability**: 99.5% uptime for core orchestration services
 - **Response Latency**: <2 seconds for tool execution initiation
 - **Scalability**: Support for 100+ concurrent agent sessions
 - **Integration Success**: <24 hours to onboard new agent backends or tools
 
-## 1.3 Scope
+### 1.3 Scope
 
-### 1.3.1 In-Scope
+#### 1.3.1 In-Scope
 
-#### Core Features and Functionalities
+##### Core Features and Functionalities
 
-**Conversation Management**
+###### Conversation Management
+
 - Canonical message history with full audit trails
 - Slash command system with templating and expansion
 - Multi-agent conversation coordination
 - Context preservation across agent handoffs
 
-**Task Orchestration**
+###### Task Orchestration
+
 - Issue-to-branch-to-PR workflow automation
 - Milestone-driven task creation and management
 - Task state transitions and lifecycle management
 - Integration with roadmap parsing and planning tools
 
-**Tool Orchestration**
+###### Tool Orchestration
+
 - MCP server hosting and management
 - Weaver-first file editing with change tracking
 - Batteries-included development tools (memory, search, testing)
 - Tool policy enforcement and access control
 
-**Workflow Governance**
+###### Workflow Governance
+
 - Pre-commit and post-commit hook execution
 - Code quality gates and automated testing
 - Review comment ingestion and processing
 - Compliance monitoring and audit logging
 
-#### Implementation Boundaries
+##### Implementation Boundaries
 
-| Boundary Type | Coverage | Implementation Approach |
-|---|---|---|
-| Agent Backends | Claude Code SDK, Codex CLI App Server | Adapter pattern with pluggable implementations |
+| Boundary Type   | Coverage                                     | Implementation Approach                                      |
+| --------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| Agent Backends  | Claude Code SDK, Codex CLI App Server        | Adapter pattern with pluggable implementations               |
 | Version Control | GitHub, GitLab primary; extensible to others | VCS adapter interface with provider-specific implementations |
-| Encapsulation | Podbot containers, future VM/sandbox options | Encapsulation port with multiple adapter implementations |
+| Encapsulation   | Podbot containers, future VM/sandbox options | Encapsulation port with multiple adapter implementations     |
 
-#### User Groups Covered
+##### User Groups Covered
 
-- **Software Developers**: Primary users for code generation, review, and development workflows
+- **Software Developers**: Primary users for code generation, review, and
+  development workflows
 - **DevOps Engineers**: Infrastructure automation and deployment orchestration
-- **Team Leads**: Workflow monitoring, policy configuration, and team productivity oversight
+- **Team Leads**: Workflow monitoring, policy configuration, and team
+  productivity oversight
 
-#### Data Domains Included
+##### Data Domains Included
 
-- **Conversation Data**: Messages, tool calls, agent responses, and interaction metadata
-- **Task Data**: Issue tracking, branch management, PR lifecycle, and workflow state
+- **Conversation Data**: Messages, tool calls, agent responses, and interaction
+  metadata
+- **Task Data**: Issue tracking, branch management, PR lifecycle, and workflow
+  state
 - **Code Data**: File changes, diffs, AST modifications, and semantic analysis
-- **Audit Data**: Hook execution results, policy violations, and compliance records
+- **Audit Data**: Hook execution results, policy violations, and compliance
+  records
 
-### 1.3.2 Out-of-Scope
+#### 1.3.2 Out-of-Scope
 
-#### Explicitly Excluded Features/Capabilities
+##### Explicitly Excluded Features/Capabilities
 
-- **Agent Model Training**: Corbusier orchestrates existing agents but does not train or fine-tune models
-- **Direct Code Execution**: All code execution occurs within encapsulated environments (Podbot), not on host systems
-- **Real-time Collaboration**: Focus on asynchronous workflow orchestration rather than synchronous collaborative editing
-- **Custom Agent Development**: Platform hosts existing agent engines rather than providing agent development frameworks
+- **Agent Model Training**: Corbusier orchestrates existing agents but does not
+  train or fine-tune models
+- **Direct Code Execution**: All code execution occurs within encapsulated
+  environments (Podbot), not on host systems
+- **Real-time Collaboration**: Focus on asynchronous workflow orchestration
+  rather than synchronous collaborative editing
+- **Custom Agent Development**: Platform hosts existing agent engines rather
+  than providing agent development frameworks
 
-#### Future Phase Considerations
+##### Future Phase Considerations
 
-**Phase 2 Enhancements**
+###### Phase 2 Enhancements
+
 - Additional agent backend integrations (AutoGPT, LangChain agents)
 - Advanced workflow analytics and machine learning insights
 - Multi-repository orchestration and cross-project coordination
 - Enterprise SSO and advanced authentication mechanisms
 
-**Phase 3 Expansions**
+###### Phase 3 Expansions
+
 - Cloud-native deployment options and managed service offerings
 - Advanced AI model routing and load balancing
 - Integration with enterprise knowledge management systems
 - Custom workflow template marketplace and sharing
 
-#### Integration Points Not Covered
-
-- **Enterprise Identity Providers**: Initial implementation uses basic authentication; enterprise SSO deferred to Phase 2
-- **Advanced Monitoring Systems**: Basic logging and metrics included; enterprise observability platforms in future phases
-- **Legacy VCS Systems**: Focus on modern Git-based platforms; legacy systems (SVN, Perforce) not initially supported
-
-#### Unsupported Use Cases
-
-- **High-Frequency Trading**: Real-time financial applications requiring microsecond latency
-- **Safety-Critical Systems**: Medical devices, automotive control systems, or other life-critical applications
-- **Compliance-Heavy Industries**: Initial version not designed for SOX, HIPAA, or similar regulatory requirements
-- **Massive Scale Operations**: Designed for teams of 10-100 developers; enterprise-scale (1000+) optimization in future phases
-
-# 2. Product Requirements
-
-## 2.1 Feature Catalog
-
-### 2.1.1 Core Orchestration Features
-
-| Feature ID | Feature Name | Category | Priority | Status |
-|---|---|---|---|---|
-| F-001 | Conversation Management | Core Orchestration | Critical | Proposed |
-| F-002 | Task Lifecycle Management | Core Orchestration | Critical | Proposed |
-| F-003 | Agent Backend Orchestration | Core Orchestration | Critical | Proposed |
-| F-004 | Slash Command System | Core Orchestration | High | Proposed |
-
-#### F-001: Conversation Management
-
-**Description**
-Corbusier provides a standardized way for applications to connect LLMs with external data sources and tools through canonical message history management. The system maintains a unified conversation format across all agent backends while preserving full audit trails and context.
-
-**Business Value**
-- Eliminates context loss during agent handoffs
-- Provides consistent conversation experience regardless of underlying agent
-- Enables comprehensive audit trails for compliance and debugging
-
-**User Benefits**
-- Seamless transitions between different AI agents
-- Complete conversation history preservation
-- Consistent interface across all agent backends
-
-**Technical Context**
-Implements hexagonal architecture with conversation domain at the core, supporting multiple agent adapters through standardized ports.
-
-**Dependencies**
-- Prerequisite Features: None (foundational)
-- System Dependencies: Persistence layer, message serialization
-- External Dependencies: Agent backend APIs (Claude Code SDK, Codex CLI App Server)
-- Integration Requirements: MCP protocol compliance for tool integration
-
-#### F-002: Task Lifecycle Management
-
-**Description**
-Manages the complete lifecycle of development tasks from creation through completion, maintaining associations between issues, branches, and pull requests while tracking state transitions.
-
-**Business Value**
-- Automates workflow coordination between development tools
-- Reduces manual overhead in task management
-- Provides clear traceability from requirements to implementation
-
-**User Benefits**
-- Automated branch and PR creation from issues
-- Clear task state visibility and progression
-- Integrated milestone and roadmap support
-
-**Technical Context**
-Domain-driven design with Task aggregate managing state transitions and VCS integration through adapter pattern.
-
-**Dependencies**
-- Prerequisite Features: F-001 (Conversation Management)
-- System Dependencies: VCS adapters, persistence layer
-- External Dependencies: GitHub/GitLab APIs, issue tracking systems
-- Integration Requirements: Git workflow integration, branch naming policies
-
-#### F-003: Agent Backend Orchestration
-
-**Description**
-Provides pluggable agent engine hosting through standardized adapter interfaces, enabling multiple AI agent backends to work transparently through Corbusier's orchestration layer.
-
-**Business Value**
-- Eliminates vendor lock-in for AI agent selection
-- Enables best-of-breed agent selection per use case
-- Reduces integration complexity for new agent backends
-
-**User Benefits**
-- Choice of AI agent backends without workflow changes
-- Consistent tool and capability access across agents
-- Seamless agent switching within conversations
-
-**Technical Context**
-Hexagonal architecture with AgentHostPort defining standard interface for all agent backends.
-
-**Dependencies**
-- Prerequisite Features: F-001 (Conversation Management)
-- System Dependencies: Tool registry, MCP multiplexer
-- External Dependencies: Claude Code SDK, Codex CLI App Server APIs
-- Integration Requirements: Agent-specific authentication, tool schema translation
-
-#### F-004: Slash Command System
-
-**Description**
-Implements a comprehensive command system with templating and expansion capabilities, supporting both pure templating commands and imperative actions.
-
-**Business Value**
-- Standardizes common development workflows
-- Reduces repetitive prompt engineering
-- Provides audit trail for command execution
-
-**User Benefits**
-- Quick access to common development tasks
-- Consistent command syntax across all contexts
-- Template-based prompt standardization
-
-**Technical Context**
-Command pattern implementation with pluggable command handlers and template engine integration.
-
-**Dependencies**
-- Prerequisite Features: F-001 (Conversation Management)
-- System Dependencies: Template engine, command parser
-- External Dependencies: None
-- Integration Requirements: Task service integration, VCS workflow hooks
-
-### 2.1.2 Tool Orchestration Features
-
-| Feature ID | Feature Name | Category | Priority | Status |
-|---|---|---|---|---|
-| F-005 | MCP Server Hosting | Tool Orchestration | Critical | Proposed |
-| F-006 | Weaver File Editing Integration | Tool Orchestration | Critical | Proposed |
-| F-007 | Tool Registry and Routing | Tool Orchestration | High | Proposed |
-| F-008 | Batteries-Included Tools | Tool Orchestration | Medium | Proposed |
-
-#### F-005: MCP Server Hosting
-
-**Description**
-Hosts and manages Model Context Protocol servers that expose tools for AI agents to call during conversations, providing standardized tool integration. Supports both embedded Rust tools and spawned process tools communicating via MCP over stdio.
-
-**Business Value**
-- Enables natural-language discovery and multiclient support without custom client code
-- Standardizes tool integration across different agent backends
-- Provides consistent tool policy enforcement and access control
-
-**User Benefits**
-- Uniform tool experience regardless of agent backend
-- Simplified tool development and deployment
-- Consistent tool authentication and authorization
-
-**Technical Context**
-MCP serves as the backbone keeping server, model, and UI in sync by standardizing wire format, authentication, and metadata.
-
-**Dependencies**
-- Prerequisite Features: F-003 (Agent Backend Orchestration)
-- System Dependencies: JSON-RPC 2.0 message standard, transport layer (STDIO/HTTP+SSE)
-- External Dependencies: MCP specification compliance
-- Integration Requirements: Tool authentication, workspace boundaries
-
-#### F-006: Weaver File Editing Integration
-
-**Description**
-Integrates Weaver as the authoritative file editing tool, preventing "stealth edits" by agent backends and ensuring all file modifications go through Weaver's change tracking system.
-
-**Business Value**
-- Provides comprehensive change tracking and audit trails
-- Prevents inconsistent file modifications across agents
-- Enables semantic and syntactic change analysis
-
-**User Benefits**
-- Complete visibility into all code changes
-- Consistent file editing experience across agents
-- Rich change metadata for review and analysis
-
-**Technical Context**
-Weaver operates as an MCP tool providing structured change logs with textual diffs, AST changes, and per-file summaries.
-
-**Dependencies**
-- Prerequisite Features: F-005 (MCP Server Hosting)
-- System Dependencies: File system monitoring, git integration
-- External Dependencies: Weaver MCP implementation
-- Integration Requirements: Workspace encapsulation, change reconciliation
-
-#### F-007: Tool Registry and Routing
-
-**Description**
-Manages tool discovery, registration, and execution routing, presenting consistent tool interfaces to agents while handling backend-specific tool call formats.
-
-**Business Value**
-- Centralizes tool management and policy enforcement
-- Enables tool capability discovery and documentation
-- Provides consistent tool execution semantics
-
-**User Benefits**
-- Automatic tool discovery and availability
-- Consistent tool behavior across different agents
-- Centralized tool access control and auditing
-
-**Technical Context**
-Registry pattern with pluggable tool providers and routing logic that translates between agent-specific and canonical tool call formats.
-
-**Dependencies**
-- Prerequisite Features: F-005 (MCP Server Hosting)
-- System Dependencies: Tool metadata storage, execution context management
-- External Dependencies: Agent-specific tool call formats
-- Integration Requirements: Tool authentication, workspace isolation
-
-#### F-008: Batteries-Included Tools
-
-**Description**
-Provides essential development tools out-of-the-box including memory management, semantic search, repository analysis, test execution, and VCS operations.
-
-**Business Value**
-- Reduces setup time for common development workflows
-- Provides consistent tool capabilities across deployments
-- Enables immediate productivity without additional tool configuration
-
-**User Benefits**
-- Ready-to-use development tools without setup
-- Consistent tool behavior across different projects
-- Integrated tool ecosystem with shared context
-
-**Technical Context**
-Collection of MCP-compliant tools implemented as embedded Rust services with shared workspace context.
-
-**Dependencies**
-- Prerequisite Features: F-005 (MCP Server Hosting), F-007 (Tool Registry and Routing)
-- System Dependencies: Search indexing, test framework integration
-- External Dependencies: Language-specific toolchains
-- Integration Requirements: Workspace encapsulation, shared memory context
-
-### 2.1.3 Workflow Governance Features
-
-| Feature ID | Feature Name | Category | Priority | Status |
-|---|---|---|---|---|
-| F-009 | Hook Engine | Workflow Governance | Critical | Proposed |
-| F-010 | Encapsulation Management | Workflow Governance | Critical | Proposed |
-| F-011 | Policy Enforcement | Workflow Governance | High | Proposed |
-| F-012 | Audit and Compliance | Workflow Governance | High | Proposed |
-
-#### F-009: Hook Engine
-
-**Description**
-Implements a comprehensive hook system that executes consistent governance policies across all workflows, regardless of agent backend, with support for multiple trigger points and configurable actions.
-
-**Business Value**
-- Ensures consistent code quality and compliance across all agents
-- Automates governance without manual intervention
-- Provides flexible policy configuration and enforcement
-
-**User Benefits**
-- Automated quality gates and compliance checks
-- Consistent workflow behavior across different agents
-- Configurable policies per project or organization
-
-**Technical Context**
-Event-driven architecture with declarative hook definitions supporting multiple triggers (TurnStart, ToolCall, PreCommit, etc.) and actions (gates, annotations, remediation).
-
-**Dependencies**
-- Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File Editing Integration)
-- System Dependencies: Event system, policy engine
-- External Dependencies: Testing frameworks, linting tools
-- Integration Requirements: VCS integration, encapsulation boundaries
-
-#### F-010: Encapsulation Management
-
-**Description**
-Manages containerized workspaces that encapsulate applications composed of multiple co-located containers, providing secure execution boundaries for tools and repository operations.
-
-**Business Value**
-- Provides secure isolation for code execution and tool operations
-- Enables consistent development environments across deployments
-- Supports multiple encapsulation technologies through adapter pattern
-
-**User Benefits**
-- Secure code execution without host system access
-- Consistent development environment setup
-- Isolated workspace per task or conversation
-
-**Technical Context**
-Implements Pod-like abstraction with shared storage and network resources, co-located and co-scheduled containers running in shared context.
-
-**Dependencies**
-- Prerequisite Features: F-002 (Task Lifecycle Management)
-- System Dependencies: Container runtime, network policies
-- External Dependencies: Podbot, future VM/sandbox implementations
-- Integration Requirements: Repository mounting, tool execution boundaries
-
-#### F-011: Policy Enforcement
-
-**Description**
-Implements configurable policy enforcement across conversations, tools, and workflows with support for project-specific and organization-wide policies.
-
-**Business Value**
-- Ensures consistent governance across all development activities
-- Enables compliance with organizational standards
-- Provides flexible policy configuration and inheritance
-
-**User Benefits**
-- Automated policy compliance without manual oversight
-- Clear policy violation reporting and remediation
-- Configurable policies per project requirements
-
-**Technical Context**
-Policy engine with declarative policy definitions supporting inheritance, overrides, and context-specific application.
-
-**Dependencies**
-- Prerequisite Features: F-009 (Hook Engine)
-- System Dependencies: Policy storage, evaluation engine
-- External Dependencies: Compliance frameworks
-- Integration Requirements: VCS integration, audit logging
-
-#### F-012: Audit and Compliance
-
-**Description**
-Provides comprehensive audit trails for all system activities including conversations, tool executions, hook results, and policy violations with compliance reporting capabilities.
-
-**Business Value**
-- Enables regulatory compliance and audit requirements
-- Provides complete traceability for all system activities
-- Supports forensic analysis and debugging
-
-**User Benefits**
-- Complete activity visibility and traceability
-- Compliance reporting and audit trail generation
-- Debugging support through comprehensive logging
-
-**Technical Context**
-Event sourcing pattern with structured logging, audit trail generation, and compliance reporting capabilities.
-
-**Dependencies**
-- Prerequisite Features: All core features (audit spans entire system)
-- System Dependencies: Structured logging, event storage
-- External Dependencies: Compliance reporting systems
-- Integration Requirements: Log aggregation, retention policies
-
-### 2.1.4 Integration Features
-
-| Feature ID | Feature Name | Category | Priority | Status |
-|---|---|---|---|---|
-| F-013 | VCS Integration | Integration | Critical | Proposed |
-| F-014 | Review Ingestion | Integration | High | Proposed |
-| F-015 | HTTP API Surface | Integration | High | Proposed |
-| F-016 | Real-time Event Streaming | Integration | Medium | Proposed |
-
-#### F-013: VCS Integration
-
-**Description**
-Provides comprehensive version control system integration supporting GitHub, GitLab, and other Git-based platforms through pluggable adapter architecture.
-
-**Business Value**
-- Enables seamless integration with existing development workflows
-- Supports multiple VCS providers without vendor lock-in
-- Automates common VCS operations and state synchronization
-
-**User Benefits**
-- Native integration with existing Git workflows
-- Automated branch, PR, and issue management
-- Consistent VCS operations across different providers
-
-**Technical Context**
-Adapter pattern with provider-specific implementations supporting common VCS operations through standardized interfaces.
-
-**Dependencies**
-- Prerequisite Features: F-002 (Task Lifecycle Management)
-- System Dependencies: Git client libraries, webhook handling
-- External Dependencies: GitHub/GitLab APIs, Git repositories
-- Integration Requirements: Authentication, webhook configuration
-
-#### F-014: Review Ingestion
-
-**Description**
-Integrates with review tools like Frankie to ingest and normalize review comments, enabling interactive review workflows and automated response to feedback.
-
-**Business Value**
-- Automates review feedback processing and response
-- Reduces manual overhead in review workflows
-- Enables consistent review handling across projects
-
-**User Benefits**
-- Automated processing of review feedback
-- Consistent review workflow integration
-- Reduced manual review management overhead
-
-**Technical Context**
-Browser-based review integration with comment ingestion and normalization through Frankie adapter.
-
-**Dependencies**
-- Prerequisite Features: F-013 (VCS Integration)
-- System Dependencies: Comment parsing, normalization engine
-- External Dependencies: Frankie review platform
-- Integration Requirements: Review platform APIs, comment threading
-
-#### F-015: HTTP API Surface
-
-**Description**
-Provides RESTful HTTP API with streaming capabilities for external clients to interact with Corbusier's core functionality including task management, conversation handling, and system monitoring.
-
-**Business Value**
-- Enables integration with external tools and platforms
-- Provides programmatic access to all system capabilities
-- Supports both synchronous and asynchronous interaction patterns
-
-**User Benefits**
-- Integration with existing development tools
-- Programmatic automation of common workflows
-- Real-time visibility into system operations
-
-**Technical Context**
-Actix-web based REST API with Server-Sent Events (SSE) or WebSocket streaming for real-time updates.
-
-**Dependencies**
-- Prerequisite Features: All core features (API exposes system functionality)
-- System Dependencies: HTTP server, authentication middleware
-- External Dependencies: None
-- Integration Requirements: Authentication, rate limiting, API versioning
-
-#### F-016: Real-time Event Streaming
-
-**Description**
-Provides real-time streaming of system events including agent turns, tool executions, hook results, and task state changes through WebSocket or SSE connections.
-
-**Business Value**
-- Enables real-time monitoring and debugging capabilities
-- Supports responsive user interfaces and integrations
-- Provides immediate feedback on system operations
-
-**User Benefits**
-- Real-time visibility into system operations
-- Immediate feedback on agent and tool activities
-- Responsive user interface updates
-
-**Technical Context**
-Event-driven architecture with WebSocket/SSE streaming, event filtering, and subscription management.
-
-**Dependencies**
-- Prerequisite Features: F-015 (HTTP API Surface)
-- System Dependencies: Event bus, streaming infrastructure
-- External Dependencies: None
-- Integration Requirements: Event serialization, client connection management
-
-## 2.2 Functional Requirements
-
-### 2.2.1 Conversation Management Requirements
-
-| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
-|---|---|---|---|---|
-| F-001-RQ-001 | Canonical Message Format | System maintains unified message format across all agent backends | Must-Have | Medium |
-| F-001-RQ-002 | Message History Persistence | All conversation messages stored with full audit trail | Must-Have | Low |
-| F-001-RQ-003 | Context Preservation | Conversation context maintained during agent handoffs | Must-Have | High |
-| F-001-RQ-004 | Multi-Agent Coordination | Support for multiple agents within single conversation | Should-Have | High |
-
-#### F-001-RQ-001: Canonical Message Format
-
-**Technical Specifications**
-- Input Parameters: Agent-specific message formats, tool call results, user inputs
-- Output/Response: Standardized Message objects with role, content, and metadata
-- Performance Criteria: <2ms message format conversion latency
-- Data Requirements: Message ID, timestamp, role (User/Assistant/Tool/System), content parts
-
-**Validation Rules**
-- Business Rules: All messages must have unique IDs and timestamps
-- Data Validation: Message content must be valid JSON with required fields
-- Security Requirements: Message content sanitization and validation
-- Compliance Requirements: Audit trail preservation for all message transformations
-
-#### F-001-RQ-002: Message History Persistence
-
-**Technical Specifications**
-- Input Parameters: Message objects, conversation context
-- Output/Response: Persistent storage confirmation, retrieval capabilities
-- Performance Criteria: <100ms message persistence latency, 99.9% durability
-- Data Requirements: Append-only message storage with immutable history
-
-**Validation Rules**
-- Business Rules: Messages cannot be deleted or modified after persistence
-- Data Validation: Message integrity verification on storage and retrieval
-- Security Requirements: Encrypted storage for sensitive conversation content
-- Compliance Requirements: Retention policies and audit log maintenance
-
-#### F-001-RQ-003: Context Preservation
-
-**Technical Specifications**
-- Input Parameters: Conversation state, agent transition requests
-- Output/Response: Complete context transfer to new agent backend
-- Performance Criteria: <5s context transfer time, 100% context fidelity
-- Data Requirements: Conversation metadata, tool state, workspace context
-
-**Validation Rules**
-- Business Rules: No context loss during agent transitions
-- Data Validation: Context integrity verification after transfer
-- Security Requirements: Secure context transfer between agent backends
-- Compliance Requirements: Context transfer audit logging
-
-#### F-001-RQ-004: Multi-Agent Coordination
-
-**Technical Specifications**
-- Input Parameters: Multiple agent session requests, coordination policies
-- Output/Response: Coordinated agent responses with conflict resolution
-- Performance Criteria: <10s coordination latency for multi-agent turns
-- Data Requirements: Agent capabilities, coordination rules, turn management
-
-**Validation Rules**
-- Business Rules: Clear agent responsibility boundaries and handoff protocols
-- Data Validation: Agent capability verification and compatibility checking
-- Security Requirements: Agent isolation and secure communication channels
-- Compliance Requirements: Multi-agent interaction audit trails
-
-### 2.2.2 Task Lifecycle Management Requirements
-
-| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
-|---|---|---|---|---|
-| F-002-RQ-001 | Issue-to-Task Creation | Automatic task creation from VCS issues with metadata extraction | Must-Have | Medium |
-| F-002-RQ-002 | Branch Association | One-to-one task-branch association with automated branch creation | Must-Have | Medium |
-| F-002-RQ-003 | State Transition Management | Controlled task state transitions with validation | Must-Have | Low |
-| F-002-RQ-004 | PR Lifecycle Integration | Automated PR creation and management from task context | Should-Have | High |
-
-#### F-002-RQ-001: Issue-to-Task Creation
-
-**Technical Specifications**
-- Input Parameters: Issue references (GitHub/GitLab issue URLs or IDs)
-- Output/Response: Task objects with extracted metadata and initial state
-- Performance Criteria: <5s task creation from issue, 100% metadata extraction accuracy
-- Data Requirements: Issue title, description, labels, assignees, milestone information
-
-**Validation Rules**
-- Business Rules: One task per issue, unique task identifiers
-- Data Validation: Issue existence verification, metadata format validation
-- Security Requirements: VCS authentication and authorization verification
-- Compliance Requirements: Task creation audit logging with issue traceability
-
-#### F-002-RQ-002: Branch Association
-
-**Technical Specifications**
-- Input Parameters: Task ID, base branch reference, branch naming policy
-- Output/Response: Created branch reference, task-branch association
-- Performance Criteria: <10s branch creation, 100% association accuracy
-- Data Requirements: Branch name generation rules, base branch validation
-
-**Validation Rules**
-- Business Rules: Exactly one active branch per task, unique branch names
-- Data Validation: Branch name policy compliance, base branch existence
-- Security Requirements: Repository write permissions verification
-- Compliance Requirements: Branch creation and association audit trails
-
-#### F-002-RQ-003: State Transition Management
-
-**Technical Specifications**
-- Input Parameters: Task ID, target state, transition context
-- Output/Response: Updated task state, transition confirmation
-- Performance Criteria: <1s state transition processing
-- Data Requirements: Valid state transitions (Draft→InProgress→InReview→Done/Abandoned)
-
-**Validation Rules**
-- Business Rules: Only valid state transitions allowed, state change authorization
-- Data Validation: State transition rules enforcement
-- Security Requirements: State change authorization and audit logging
-- Compliance Requirements: Complete state transition history preservation
-
-#### F-002-RQ-004: PR Lifecycle Integration
-
-**Technical Specifications**
-- Input Parameters: Task ID, PR creation triggers, review requirements
-- Output/Response: Created/updated PR with task context integration
-- Performance Criteria: <15s PR creation, automatic task-PR linking
-- Data Requirements: PR title/description generation, reviewer assignment rules
-
-**Validation Rules**
-- Business Rules: At most one open PR per task, PR-task bidirectional linking
-- Data Validation: PR metadata consistency with task information
-- Security Requirements: PR creation permissions and review access control
-- Compliance Requirements: PR lifecycle audit trails with task correlation
-
-### 2.2.3 Agent Backend Orchestration Requirements
-
-| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
-|---|---|---|---|---|
-| F-003-RQ-001 | Agent Backend Registration | Dynamic registration of agent backends through adapter interface | Must-Have | Medium |
-| F-003-RQ-002 | Turn Execution Orchestration | Standardized turn execution across different agent backends | Must-Have | High |
-| F-003-RQ-003 | Tool Schema Translation | Automatic translation between agent-specific and canonical tool schemas | Must-Have | High |
-| F-003-RQ-004 | Agent Session Management | Lifecycle management of agent sessions with resource cleanup | Should-Have | Medium |
-
-#### F-003-RQ-001: Agent Backend Registration
-
-**Technical Specifications**
-- Input Parameters: Agent backend configuration, capability declarations
-- Output/Response: Registered agent backend with capability metadata
-- Performance Criteria: <5s registration time, hot-swappable backends
-- Data Requirements: Agent capabilities, authentication requirements, tool support
-
-**Validation Rules**
-- Business Rules: Unique agent backend identifiers, capability verification
-- Data Validation: Agent configuration schema compliance
-- Security Requirements: Agent backend authentication and authorization
-- Compliance Requirements: Agent registration audit logging
-
-#### F-003-RQ-002: Turn Execution Orchestration
-
-**Technical Specifications**
-- Input Parameters: Conversation context, selected agent backend, tool registry
-- Output/Response: Agent response with tool calls and conversation updates
-- Performance Criteria: <30s turn execution, 99% success rate
-- Data Requirements: Turn context, agent session state, tool availability
-
-**Validation Rules**
-- Business Rules: Deterministic turn execution, consistent tool access
-- Data Validation: Turn context integrity, agent response validation
-- Security Requirements: Agent isolation, secure tool execution
-- Compliance Requirements: Complete turn execution audit trails
-
-#### F-003-RQ-003: Tool Schema Translation
-
-**Technical Specifications**
-- Input Parameters: Agent-specific tool schemas, canonical tool definitions
-- Output/Response: Translated tool schemas compatible with target agent
-- Performance Criteria: <100ms schema translation, 100% schema compatibility
-- Data Requirements: Tool schema mappings, agent capability matrices
-
-**Validation Rules**
-- Business Rules: Lossless schema translation, tool capability preservation
-- Data Validation: Schema compatibility verification, translation accuracy
-- Security Requirements: Schema validation and sanitization
-- Compliance Requirements: Schema translation audit logging
-
-#### F-003-RQ-004: Agent Session Management
-
-**Technical Specifications**
-- Input Parameters: Session creation/destruction requests, resource limits
-- Output/Response: Agent session handles with lifecycle management
-- Performance Criteria: <5s session creation, automatic resource cleanup
-- Data Requirements: Session state, resource usage tracking, cleanup policies
-
-**Validation Rules**
-- Business Rules: Session isolation, resource limit enforcement
-- Data Validation: Session state consistency, resource usage monitoring
-- Security Requirements: Session authentication, resource access control
-- Compliance Requirements: Session lifecycle audit trails
-
-### 2.2.4 Tool Orchestration Requirements
-
-| Requirement ID | Description | Acceptance Criteria | Priority | Complexity |
-|---|---|---|---|---|
-| F-005-RQ-001 | MCP Server Lifecycle | Host and manage MCP servers with automatic lifecycle management | Must-Have | High |
-| F-005-RQ-002 | Tool Discovery and Registration | Automatic discovery and registration of available tools | Must-Have | Medium |
-| F-005-RQ-003 | Tool Execution Routing | Route tool calls to appropriate MCP servers with error handling | Must-Have | High |
-| F-006-RQ-001 | Weaver Change Tracking | Comprehensive file change tracking through Weaver integration | Must-Have | Medium |
-
-#### F-005-RQ-001: MCP Server Lifecycle
-
-**Technical Specifications**
-- Input Parameters: MCP server configurations (STDIO/HTTP+SSE transport), resource limits
-- Output/Response: Running MCP server instances with health monitoring
-- Performance Criteria: <10s server startup, 99.9% uptime, automatic restart on failure
-- Data Requirements: JSON-RPC 2.0 message handling, server process management
-
-**Validation Rules**
-- Business Rules: MCP servers must implement list tools and call tools capabilities
-- Data Validation: MCP specification compliance based on TypeScript schema
-- Security Requirements: Resource Indicators (RFC 8707) implementation for token security
-- Compliance Requirements: MCP server lifecycle audit logging
-
-#### F-005-RQ-002: Tool Discovery and Registration
-
-**Technical Specifications**
-- Input Parameters: Tool metadata including JSON Schema input/output contracts
-- Output/Response: Registered tool catalog with capability descriptions
-- Performance Criteria: <5s tool discovery, real-time tool availability updates
-- Data Requirements: Tool schemas, capability annotations, access control policies
-
-**Validation Rules**
-- Business Rules: Natural-language discovery integration with model metadata consumption
-- Data Validation: Tool schema validation, capability verification
-- Security Requirements: Tool access permission verification before execution
-- Compliance Requirements: Tool registration and capability audit trails
-
-#### F-005-RQ-003: Tool Execution Routing
-
-**Technical Specifications**
-- Input Parameters: Tool call requests with arguments corresponding to user intent
-- Output/Response: Tool results with optional inline HTML for UI rendering
-- Performance Criteria: <2s tool execution initiation, <30s total execution time
-- Data Requirements: Structured content and component state flow through conversation
-
-**Validation Rules**
-- Business Rules: Tool execution authorization, workspace boundary enforcement
-- Data Validation: Tool call parameter validation, result format verification
-- Security Requirements: Tool execution isolation, resource limit enforcement
-- Compliance Requirements: Complete tool execution audit trails
-
-#### F-006-RQ-001: Weaver Change Tracking
-
-**Technical Specifications**
-- Input Parameters: File edit requests, workspace context, change policies
-- Output/Response: ChangeSet objects with textual diffs, AST changes, and summaries
-- Performance Criteria: <5s change processing, real-time change detection
-- Data Requirements: File content, change metadata, semantic analysis results
-
-**Validation Rules**
-- Business Rules: All file edits must go through Weaver, no stealth edits allowed
-- Data Validation: Change integrity verification, diff accuracy validation
-- Security Requirements: File access authorization, change audit logging
-- Compliance Requirements: Complete change history preservation
-
-## 2.3 Feature Relationships
-
-### 2.3.1 Feature Dependencies Map
+##### Integration Points Not Covered
+
+- **Enterprise Identity Providers**: Initial implementation uses basic
+  authentication; enterprise SSO deferred to Phase 2
+- **Advanced Monitoring Systems**: Basic logging and metrics included;
+  enterprise observability platforms in future phases
+- **Legacy VCS Systems**: Focus on modern Git-based platforms; legacy systems
+  (SVN, Perforce) not initially supported
+
+##### Unsupported Use Cases
+
+- **High-Frequency Trading**: Real-time financial applications requiring
+  microsecond latency
+- **Safety-Critical Systems**: Medical devices, automotive control systems, or
+  other life-critical applications
+- **Compliance-Heavy Industries**: Initial version not designed for SOX, HIPAA,
+  or similar regulatory requirements
+- **Massive Scale Operations**: Designed for teams of 10-100 developers;
+  enterprise-scale (1000+) optimization in future phases
+
+## 2. Product Requirements
+
+### 2.1 Feature Catalog
+
+#### 2.1.1 Core Orchestration Features
+
+| Feature ID | Feature Name                | Category           | Priority | Status   |
+| ---------- | --------------------------- | ------------------ | -------- | -------- |
+| F-001      | Conversation Management     | Core Orchestration | Critical | Proposed |
+| F-002      | Task Lifecycle Management   | Core Orchestration | Critical | Proposed |
+| F-003      | Agent Backend Orchestration | Core Orchestration | Critical | Proposed |
+| F-004      | Slash Command System        | Core Orchestration | High     | Proposed |
+
+##### F-001: Conversation Management
+
+- **Description:** Corbusier provides a standardized way for applications to
+  connect LLMs with external data sources and tools through canonical message
+  history management. The system maintains a unified conversation format across
+  all agent backends while preserving full audit trails and context.
+- **Business Value:**
+  - Eliminates context loss during agent handoffs
+  - Provides consistent conversation experience regardless of underlying agent
+  - Enables comprehensive audit trails for compliance and debugging
+- **User Benefits:**
+  - Seamless transitions between different AI agents
+  - Complete conversation history preservation
+  - Consistent interface across all agent backends
+- **Technical Context:** Implements hexagonal architecture with conversation
+  domain at the core, supporting multiple agent adapters through standardized
+  ports.
+- **Dependencies:**
+  - Prerequisite Features: None (foundational)
+  - System Dependencies: Persistence layer, message serialization
+  - External Dependencies: Agent backend APIs (Claude Code SDK, Codex CLI App
+    Server)
+  - Integration Requirements: MCP protocol compliance for tool integration
+
+##### F-002: Task Lifecycle Management
+
+- **Description:** Manages the complete lifecycle of development tasks from
+  creation through completion, maintaining associations between issues,
+  branches, and pull requests while tracking state transitions.
+- **Business Value:**
+  - Automates workflow coordination between development tools
+  - Reduces manual overhead in task management
+  - Provides clear traceability from requirements to implementation
+- **User Benefits:**
+  - Automated branch and PR creation from issues
+  - Clear task state visibility and progression
+  - Integrated milestone and roadmap support
+- **Technical Context:** Domain-driven design with Task aggregate managing state
+  transitions and VCS integration through adapter pattern.
+- **Dependencies:**
+  - Prerequisite Features: F-001 (Conversation Management)
+  - System Dependencies: VCS adapters, persistence layer
+  - External Dependencies: GitHub/GitLab APIs, issue tracking systems
+  - Integration Requirements: Git workflow integration, branch naming policies
+
+##### F-003: Agent Backend Orchestration
+
+- **Description:** Provides pluggable agent engine hosting through standardized
+  adapter interfaces, enabling multiple AI agent backends to work transparently
+  through Corbusier's orchestration layer.
+- **Business Value:**
+  - Eliminates vendor lock-in for AI agent selection
+  - Enables best-of-breed agent selection per use case
+  - Reduces integration complexity for new agent backends
+- **User Benefits:**
+  - Choice of AI agent backends without workflow changes
+  - Consistent tool and capability access across agents
+  - Seamless agent switching within conversations
+- **Technical Context:** Hexagonal architecture with AgentHostPort defining
+  standard interface for all agent backends.
+- **Dependencies:**
+  - Prerequisite Features: F-001 (Conversation Management)
+  - System Dependencies: Tool registry, MCP multiplexer
+  - External Dependencies: Claude Code SDK, Codex CLI App Server APIs
+  - Integration Requirements: Agent-specific authentication, tool schema
+    translation
+
+##### F-004: Slash Command System
+
+- **Description:** Implements a comprehensive command system with templating and
+  expansion capabilities, supporting both pure templating commands and
+  imperative actions.
+- **Business Value:**
+  - Standardizes common development workflows
+  - Reduces repetitive prompt engineering
+  - Provides audit trail for command execution
+- **User Benefits:**
+  - Quick access to common development tasks
+  - Consistent command syntax across all contexts
+  - Template-based prompt standardization
+- **Technical Context:** Command pattern implementation with pluggable command
+  handlers and template engine integration.
+- **Dependencies:**
+  - Prerequisite Features: F-001 (Conversation Management)
+  - System Dependencies: Template engine, command parser
+  - External Dependencies: None
+  - Integration Requirements: Task service integration, VCS workflow hooks
+
+#### 2.1.2 Tool Orchestration Features
+
+| Feature ID | Feature Name                    | Category           | Priority | Status   |
+| ---------- | ------------------------------- | ------------------ | -------- | -------- |
+| F-005      | MCP Server Hosting              | Tool Orchestration | Critical | Proposed |
+| F-006      | Weaver File Editing Integration | Tool Orchestration | Critical | Proposed |
+| F-007      | Tool Registry and Routing       | Tool Orchestration | High     | Proposed |
+| F-008      | Batteries-Included Tools        | Tool Orchestration | Medium   | Proposed |
+
+##### F-005: MCP Server Hosting
+
+- **Description:** Hosts and manages Model Context Protocol servers that expose
+  tools for AI agents to call during conversations, providing standardized tool
+  integration. Supports both embedded Rust tools and spawned process tools
+  communicating via MCP over stdio.
+- **Business Value:**
+  - Enables natural-language discovery and multiclient support without custom
+    client code
+  - Standardizes tool integration across different agent backends
+  - Provides consistent tool policy enforcement and access control
+- **User Benefits:**
+  - Uniform tool experience regardless of agent backend
+  - Simplified tool development and deployment
+  - Consistent tool authentication and authorization
+- **Technical Context:** MCP serves as the backbone keeping server, model, and
+  UI in sync by standardizing wire format, authentication, and metadata.
+- **Dependencies:**
+  - Prerequisite Features: F-003 (Agent Backend Orchestration)
+  - System Dependencies: JSON-RPC 2.0 message standard, transport layer
+    (STDIO/HTTP+SSE)
+  - External Dependencies: MCP specification compliance
+  - Integration Requirements: Tool authentication, workspace boundaries
+
+##### F-006: Weaver File Editing Integration
+
+- **Description:** Integrates Weaver as the authoritative file editing tool,
+  preventing "stealth edits" by agent backends and ensuring all file
+  modifications go through Weaver's change tracking system.
+- **Business Value:**
+  - Provides comprehensive change tracking and audit trails
+  - Prevents inconsistent file modifications across agents
+  - Enables semantic and syntactic change analysis
+- **User Benefits:**
+  - Complete visibility into all code changes
+  - Consistent file editing experience across agents
+  - Rich change metadata for review and analysis
+- **Technical Context:** Weaver operates as an MCP tool providing structured
+  change logs with textual diffs, AST changes, and per-file summaries.
+- **Dependencies:**
+  - Prerequisite Features: F-005 (MCP Server Hosting)
+  - System Dependencies: File system monitoring, git integration
+  - External Dependencies: Weaver MCP implementation
+  - Integration Requirements: Workspace encapsulation, change reconciliation
+
+##### F-007: Tool Registry and Routing
+
+- **Description:** Manages tool discovery, registration, and execution routing,
+  presenting consistent tool interfaces to agents while handling backend-
+  specific tool call formats.
+- **Business Value:**
+  - Centralizes tool management and policy enforcement
+  - Enables tool capability discovery and documentation
+  - Provides consistent tool execution semantics
+- **User Benefits:**
+  - Automatic tool discovery and availability
+  - Consistent tool behavior across different agents
+  - Centralized tool access control and auditing
+- **Technical Context:** Registry pattern with pluggable tool providers and
+  routing logic that translates between agent-specific and canonical tool call
+  formats.
+- **Dependencies:**
+  - Prerequisite Features: F-005 (MCP Server Hosting)
+  - System Dependencies: Tool metadata storage, execution context management
+  - External Dependencies: Agent-specific tool call formats
+  - Integration Requirements: Tool authentication, workspace isolation
+
+##### F-008: Batteries-Included Tools
+
+- **Description:** Provides essential development tools out-of-the-box including
+  memory management, semantic search, repository analysis, test execution, and
+  VCS operations.
+- **Business Value:**
+  - Reduces setup time for common development workflows
+  - Provides consistent tool capabilities across deployments
+  - Enables immediate productivity without additional tool configuration
+- **User Benefits:**
+  - Ready-to-use development tools without setup
+  - Consistent tool behavior across different projects
+  - Integrated tool ecosystem with shared context
+- **Technical Context:** Collection of MCP-compliant tools implemented as
+  embedded Rust services with shared workspace context.
+- **Dependencies:**
+  - Prerequisite Features: F-005 (MCP Server Hosting), F-007 (Tool Registry and
+    Routing)
+  - System Dependencies: Search indexing, test framework integration
+  - External Dependencies: Language-specific toolchains
+  - Integration Requirements: Workspace encapsulation, shared memory context
+
+#### 2.1.3 Workflow Governance Features
+
+| Feature ID | Feature Name             | Category            | Priority | Status   |
+| ---------- | ------------------------ | ------------------- | -------- | -------- |
+| F-009      | Hook Engine              | Workflow Governance | Critical | Proposed |
+| F-010      | Encapsulation Management | Workflow Governance | Critical | Proposed |
+| F-011      | Policy Enforcement       | Workflow Governance | High     | Proposed |
+| F-012      | Audit and Compliance     | Workflow Governance | High     | Proposed |
+
+##### F-009: Hook Engine
+
+- **Description:** Implements a comprehensive hook system that executes
+  consistent governance policies across all workflows, regardless of agent
+  backend, with support for multiple trigger points and configurable actions.
+- **Business Value:**
+  - Ensures consistent code quality and compliance across all agents
+  - Automates governance without manual intervention
+  - Provides flexible policy configuration and enforcement
+- **User Benefits:**
+  - Automated quality gates and compliance checks
+  - Consistent workflow behavior across different agents
+  - Configurable policies per project or organization
+- **Technical Context:** Event-driven architecture with declarative hook
+  definitions supporting multiple triggers (TurnStart, ToolCall, PreCommit,
+  etc.) and actions (gates, annotations, remediation).
+- **Dependencies:**
+  - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
+    Editing Integration)
+  - System Dependencies: Event system, policy engine
+  - External Dependencies: Testing frameworks, linting tools
+  - Integration Requirements: VCS integration, encapsulation boundaries
+
+##### F-010: Encapsulation Management
+
+- **Description:** Manages containerized workspaces that encapsulate
+  applications composed of multiple co-located containers, providing secure
+  execution boundaries for tools and repository operations.
+- **Business Value:**
+  - Provides secure isolation for code execution and tool operations
+  - Enables consistent development environments across deployments
+  - Supports multiple encapsulation technologies through adapter pattern
+- **User Benefits:**
+  - Secure code execution without host system access
+  - Consistent development environment setup
+  - Isolated workspace per task or conversation
+- **Technical Context:** Implements Pod-like abstraction with shared storage and
+  network resources, co-located and co-scheduled containers running in shared
+  context.
+- **Dependencies:**
+  - Prerequisite Features: F-002 (Task Lifecycle Management)
+  - System Dependencies: Container runtime, network policies
+  - External Dependencies: Podbot, future VM/sandbox implementations
+  - Integration Requirements: Repository mounting, tool execution boundaries
+
+##### F-011: Policy Enforcement
+
+- **Description:** Implements configurable policy enforcement across
+  conversations, tools, and workflows with support for project-specific and
+  organization-wide policies.
+- **Business Value:**
+  - Ensures consistent governance across all development activities
+  - Enables compliance with organizational standards
+  - Provides flexible policy configuration and inheritance
+- **User Benefits:**
+  - Automated policy compliance without manual oversight
+  - Clear policy violation reporting and remediation
+  - Configurable policies per project requirements
+- **Technical Context:** Policy engine with declarative policy definitions
+  supporting inheritance, overrides, and context-specific application.
+- **Dependencies:**
+  - Prerequisite Features: F-009 (Hook Engine)
+  - System Dependencies: Policy storage, evaluation engine
+  - External Dependencies: Compliance frameworks
+  - Integration Requirements: VCS integration, audit logging
+
+##### F-012: Audit and Compliance
+
+- **Description:** Provides comprehensive audit trails for all system activities
+  including conversations, tool executions, hook results, and policy violations
+  with compliance reporting capabilities.
+- **Business Value:**
+  - Enables regulatory compliance and audit requirements
+  - Provides complete traceability for all system activities
+  - Supports forensic analysis and debugging
+- **User Benefits:**
+  - Complete activity visibility and traceability
+  - Compliance reporting and audit trail generation
+  - Debugging support through comprehensive logging
+- **Technical Context:** Event sourcing pattern with structured logging, audit
+  trail generation, and compliance reporting capabilities.
+- **Dependencies:**
+  - Prerequisite Features: All core features (audit spans entire system)
+  - System Dependencies: Structured logging, event storage
+  - External Dependencies: Compliance reporting systems
+  - Integration Requirements: Log aggregation, retention policies
+
+#### 2.1.4 Integration Features
+
+| Feature ID | Feature Name              | Category    | Priority | Status   |
+| ---------- | ------------------------- | ----------- | -------- | -------- |
+| F-013      | VCS Integration           | Integration | Critical | Proposed |
+| F-014      | Review Ingestion          | Integration | High     | Proposed |
+| F-015      | HTTP API Surface          | Integration | High     | Proposed |
+| F-016      | Real-time Event Streaming | Integration | Medium   | Proposed |
+
+##### F-013: VCS Integration
+
+- **Description:** Provides comprehensive version control system integration
+  supporting GitHub, GitLab, and other Git-based platforms through pluggable
+  adapter architecture.
+- **Business Value:**
+  - Enables seamless integration with existing development workflows
+  - Supports multiple VCS providers without vendor lock-in
+  - Automates common VCS operations and state synchronization
+- **User Benefits:**
+  - Native integration with existing Git workflows
+  - Automated branch, PR, and issue management
+  - Consistent VCS operations across different providers
+- **Technical Context:** Adapter pattern with provider-specific implementations
+  supporting common VCS operations through standardized interfaces.
+- **Dependencies:**
+  - Prerequisite Features: F-002 (Task Lifecycle Management)
+  - System Dependencies: Git client libraries, webhook handling
+  - External Dependencies: GitHub/GitLab APIs, Git repositories
+  - Integration Requirements: Authentication, webhook configuration
+
+##### F-014: Review Ingestion
+
+- **Description:** Integrates with review tools like Frankie to ingest and
+  normalize review comments, enabling interactive review workflows and
+  automated response to feedback.
+- **Business Value:**
+  - Automates review feedback processing and response
+  - Reduces manual overhead in review workflows
+  - Enables consistent review handling across projects
+- **User Benefits:**
+  - Automated processing of review feedback
+  - Consistent review workflow integration
+  - Reduced manual review management overhead
+- **Technical Context:** Browser-based review integration with comment ingestion
+  and normalization through Frankie adapter.
+- **Dependencies:**
+  - Prerequisite Features: F-013 (VCS Integration)
+  - System Dependencies: Comment parsing, normalization engine
+  - External Dependencies: Frankie review platform
+  - Integration Requirements: Review platform APIs, comment threading
+
+##### F-015: HTTP API Surface
+
+- **Description:** Provides RESTful HTTP API with streaming capabilities for
+  external clients to interact with Corbusier's core functionality including
+  task management, conversation handling, and system monitoring.
+- **Business Value:**
+  - Enables integration with external tools and platforms
+  - Provides programmatic access to all system capabilities
+  - Supports both synchronous and asynchronous interaction patterns
+- **User Benefits:**
+  - Integration with existing development tools
+  - Programmatic automation of common workflows
+  - Real-time visibility into system operations
+- **Technical Context:** Actix-web based REST API with Server-Sent Events (SSE)
+  or WebSocket streaming for real-time updates.
+- **Dependencies:**
+  - Prerequisite Features: All core features (API exposes system functionality)
+  - System Dependencies: HTTP server, authentication middleware
+  - External Dependencies: None
+  - Integration Requirements: Authentication, rate limiting, API versioning
+
+##### F-016: Real-time Event Streaming
+
+- **Description:** Provides real-time streaming of system events including agent
+  turns, tool executions, hook results, and task state changes through
+  WebSocket or SSE connections.
+- **Business Value:**
+  - Enables real-time monitoring and debugging capabilities
+  - Supports responsive user interfaces and integrations
+  - Provides immediate feedback on system operations
+- **User Benefits:**
+  - Real-time visibility into system operations
+  - Immediate feedback on agent and tool activities
+  - Responsive user interface updates
+- **Technical Context:** Event-driven architecture with WebSocket/SSE streaming,
+  event filtering, and subscription management.
+- **Dependencies:**
+  - Prerequisite Features: F-015 (HTTP API Surface)
+  - System Dependencies: Event bus, streaming infrastructure
+  - External Dependencies: None
+  - Integration Requirements: Event serialization, client connection management
+
+### 2.2 Functional Requirements
+
+#### 2.2.1 Conversation Management Requirements
+
+| Requirement ID | Description                 | Acceptance Criteria                                               | Priority    | Complexity |
+| -------------- | --------------------------- | ----------------------------------------------------------------- | ----------- | ---------- |
+| F-001-RQ-001   | Canonical Message Format    | System maintains unified message format across all agent backends | Must-Have   | Medium     |
+| F-001-RQ-002   | Message History Persistence | All conversation messages stored with full audit trail            | Must-Have   | Low        |
+| F-001-RQ-003   | Context Preservation        | Conversation context maintained during agent handoffs             | Must-Have   | High       |
+| F-001-RQ-004   | Multi-Agent Coordination    | Support for multiple agents within single conversation            | Should-Have | High       |
+
+##### F-001-RQ-001: Canonical Message Format
+
+- **Technical Specifications:**
+  - Input Parameters: Agent-specific message formats, tool call results, user
+    inputs
+  - Output/Response: Standardized Message objects with role, content, and
+    metadata
+  - Performance Criteria: <2ms message format conversion latency
+  - Data Requirements: Message ID, timestamp, role (User/Assistant/Tool/System),
+    content parts
+- **Validation Rules:**
+  - Business Rules: All messages must have unique IDs and timestamps
+  - Data Validation: Message content must be valid JSON with required fields
+  - Security Requirements: Message content sanitization and validation
+  - Compliance Requirements: Audit trail preservation for all message
+    transformations
+
+##### F-001-RQ-002: Message History Persistence
+
+- **Technical Specifications:**
+  - Input Parameters: Message objects, conversation context
+  - Output/Response: Persistent storage confirmation, retrieval capabilities
+  - Performance Criteria: <100ms message persistence latency, 99.9% durability
+  - Data Requirements: Append-only message storage with immutable history
+- **Validation Rules:**
+  - Business Rules: Messages cannot be deleted or modified after persistence
+  - Data Validation: Message integrity verification on storage and retrieval
+  - Security Requirements: Encrypted storage for sensitive conversation content
+  - Compliance Requirements: Retention policies and audit log maintenance
+
+##### F-001-RQ-003: Context Preservation
+
+- **Technical Specifications:**
+  - Input Parameters: Conversation state, agent transition requests
+  - Output/Response: Complete context transfer to new agent backend
+  - Performance Criteria: <5s context transfer time, 100% context fidelity
+  - Data Requirements: Conversation metadata, tool state, workspace context
+- **Validation Rules:**
+  - Business Rules: No context loss during agent transitions
+  - Data Validation: Context integrity verification after transfer
+  - Security Requirements: Secure context transfer between agent backends
+  - Compliance Requirements: Context transfer audit logging
+
+##### F-001-RQ-004: Multi-Agent Coordination
+
+- **Technical Specifications:**
+  - Input Parameters: Multiple agent session requests, coordination policies
+  - Output/Response: Coordinated agent responses with conflict resolution
+  - Performance Criteria: <10s coordination latency for multi-agent turns
+  - Data Requirements: Agent capabilities, coordination rules, turn management
+- **Validation Rules:**
+  - Business Rules: Clear agent responsibility boundaries and handoff protocols
+  - Data Validation: Agent capability verification and compatibility checking
+  - Security Requirements: Agent isolation and secure communication channels
+  - Compliance Requirements: Multi-agent interaction audit trails
+
+#### 2.2.2 Task Lifecycle Management Requirements
+
+| Requirement ID | Description                 | Acceptance Criteria                                               | Priority    | Complexity |
+| -------------- | --------------------------- | ----------------------------------------------------------------- | ----------- | ---------- |
+| F-002-RQ-001   | Issue-to-Task Creation      | Automatic task creation from VCS issues with metadata extraction  | Must-Have   | Medium     |
+| F-002-RQ-002   | Branch Association          | One-to-one task-branch association with automated branch creation | Must-Have   | Medium     |
+| F-002-RQ-003   | State Transition Management | Controlled task state transitions with validation                 | Must-Have   | Low        |
+| F-002-RQ-004   | PR Lifecycle Integration    | Automated PR creation and management from task context            | Should-Have | High       |
+
+##### F-002-RQ-001: Issue-to-Task Creation
+
+- **Technical Specifications:**
+  - Input Parameters: Issue references (GitHub/GitLab issue URLs or IDs)
+  - Output/Response: Task objects with extracted metadata and initial state
+  - Performance Criteria: <5s task creation from issue, 100% metadata extraction
+    accuracy
+  - Data Requirements: Issue title, description, labels, assignees, milestone
+    information
+- **Validation Rules:**
+  - Business Rules: One task per issue, unique task identifiers
+  - Data Validation: Issue existence verification, metadata format validation
+  - Security Requirements: VCS authentication and authorization verification
+  - Compliance Requirements: Task creation audit logging with issue traceability
+
+##### F-002-RQ-002: Branch Association
+
+- **Technical Specifications:**
+  - Input Parameters: Task ID, base branch reference, branch naming policy
+  - Output/Response: Created branch reference, task-branch association
+  - Performance Criteria: <10s branch creation, 100% association accuracy
+  - Data Requirements: Branch name generation rules, base branch validation
+- **Validation Rules:**
+  - Business Rules: Exactly one active branch per task, unique branch names
+  - Data Validation: Branch name policy compliance, base branch existence
+  - Security Requirements: Repository write permissions verification
+  - Compliance Requirements: Branch creation and association audit trails
+
+##### F-002-RQ-003: State Transition Management
+
+- **Technical Specifications:**
+  - Input Parameters: Task ID, target state, transition context
+  - Output/Response: Updated task state, transition confirmation
+  - Performance Criteria: <1s state transition processing
+  - Data Requirements: Valid state transitions
+    (Draft→InProgress→InReview→Done/Abandoned)
+- **Validation Rules:**
+  - Business Rules: Only valid state transitions allowed, state change
+    authorization
+  - Data Validation: State transition rules enforcement
+  - Security Requirements: State change authorization and audit logging
+  - Compliance Requirements: Complete state transition history preservation
+
+##### F-002-RQ-004: PR Lifecycle Integration
+
+- **Technical Specifications:**
+  - Input Parameters: Task ID, PR creation triggers, review requirements
+  - Output/Response: Created/updated PR with task context integration
+  - Performance Criteria: <15s PR creation, automatic task-PR linking
+  - Data Requirements: PR title/description generation, reviewer assignment
+    rules
+- **Validation Rules:**
+  - Business Rules: At most one open PR per task, PR-task bidirectional linking
+  - Data Validation: PR metadata consistency with task information
+  - Security Requirements: PR creation permissions and review access control
+  - Compliance Requirements: PR lifecycle audit trails with task correlation
+
+#### 2.2.3 Agent Backend Orchestration Requirements
+
+| Requirement ID | Description                  | Acceptance Criteria                                                     | Priority    | Complexity |
+| -------------- | ---------------------------- | ----------------------------------------------------------------------- | ----------- | ---------- |
+| F-003-RQ-001   | Agent Backend Registration   | Dynamic registration of agent backends through adapter interface        | Must-Have   | Medium     |
+| F-003-RQ-002   | Turn Execution Orchestration | Standardized turn execution across different agent backends             | Must-Have   | High       |
+| F-003-RQ-003   | Tool Schema Translation      | Automatic translation between agent-specific and canonical tool schemas | Must-Have   | High       |
+| F-003-RQ-004   | Agent Session Management     | Lifecycle management of agent sessions with resource cleanup            | Should-Have | Medium     |
+
+##### F-003-RQ-001: Agent Backend Registration
+
+- **Technical Specifications:**
+  - Input Parameters: Agent backend configuration, capability declarations
+  - Output/Response: Registered agent backend with capability metadata
+  - Performance Criteria: <5s registration time, hot-swappable backends
+  - Data Requirements: Agent capabilities, authentication requirements, tool
+    support
+- **Validation Rules:**
+  - Business Rules: Unique agent backend identifiers, capability verification
+  - Data Validation: Agent configuration schema compliance
+  - Security Requirements: Agent backend authentication and authorization
+  - Compliance Requirements: Agent registration audit logging
+
+##### F-003-RQ-002: Turn Execution Orchestration
+
+- **Technical Specifications:**
+  - Input Parameters: Conversation context, selected agent backend, tool
+    registry
+  - Output/Response: Agent response with tool calls and conversation updates
+  - Performance Criteria: <30s turn execution, 99% success rate
+  - Data Requirements: Turn context, agent session state, tool availability
+- **Validation Rules:**
+  - Business Rules: Deterministic turn execution, consistent tool access
+  - Data Validation: Turn context integrity, agent response validation
+  - Security Requirements: Agent isolation, secure tool execution
+  - Compliance Requirements: Complete turn execution audit trails
+
+##### F-003-RQ-003: Tool Schema Translation
+
+- **Technical Specifications:**
+  - Input Parameters: Agent-specific tool schemas, canonical tool definitions
+  - Output/Response: Translated tool schemas compatible with target agent
+  - Performance Criteria: <100ms schema translation, 100% schema compatibility
+  - Data Requirements: Tool schema mappings, agent capability matrices
+- **Validation Rules:**
+  - Business Rules: Lossless schema translation, tool capability preservation
+  - Data Validation: Schema compatibility verification, translation accuracy
+  - Security Requirements: Schema validation and sanitization
+  - Compliance Requirements: Schema translation audit logging
+
+##### F-003-RQ-004: Agent Session Management
+
+- **Technical Specifications:**
+  - Input Parameters: Session creation/destruction requests, resource limits
+  - Output/Response: Agent session handles with lifecycle management
+  - Performance Criteria: <5s session creation, automatic resource cleanup
+  - Data Requirements: Session state, resource usage tracking, cleanup policies
+- **Validation Rules:**
+  - Business Rules: Session isolation, resource limit enforcement
+  - Data Validation: Session state consistency, resource usage monitoring
+  - Security Requirements: Session authentication, resource access control
+  - Compliance Requirements: Session lifecycle audit trails
+
+#### 2.2.4 Tool Orchestration Requirements
+
+| Requirement ID | Description                     | Acceptance Criteria                                             | Priority  | Complexity |
+| -------------- | ------------------------------- | --------------------------------------------------------------- | --------- | ---------- |
+| F-005-RQ-001   | MCP Server Lifecycle            | Host and manage MCP servers with automatic lifecycle management | Must-Have | High       |
+| F-005-RQ-002   | Tool Discovery and Registration | Automatic discovery and registration of available tools         | Must-Have | Medium     |
+| F-005-RQ-003   | Tool Execution Routing          | Route tool calls to appropriate MCP servers with error handling | Must-Have | High       |
+| F-006-RQ-001   | Weaver Change Tracking          | Comprehensive file change tracking through Weaver integration   | Must-Have | Medium     |
+
+##### F-005-RQ-001: MCP Server Lifecycle
+
+- **Technical Specifications:**
+  - Input Parameters: MCP server configurations (STDIO/HTTP+SSE transport),
+    resource limits
+  - Output/Response: Running MCP server instances with health monitoring
+  - Performance Criteria: <10s server startup, 99.9% uptime, automatic restart
+    on
+    failure
+  - Data Requirements: JSON-RPC 2.0 message handling, server process management
+- **Validation Rules:**
+  - Business Rules: MCP servers must implement list tools and call tools
+    capabilities
+  - Data Validation: MCP specification compliance based on TypeScript schema
+  - Security Requirements: Resource Indicators (RFC 8707) implementation for
+    token security
+  - Compliance Requirements: MCP server lifecycle audit logging
+
+##### F-005-RQ-002: Tool Discovery and Registration
+
+- **Technical Specifications:**
+  - Input Parameters: Tool metadata including JSON Schema input/output contracts
+  - Output/Response: Registered tool catalog with capability descriptions
+  - Performance Criteria: <5s tool discovery, real-time tool availability
+    updates
+  - Data Requirements: Tool schemas, capability annotations, access control
+    policies
+- **Validation Rules:**
+  - Business Rules: Natural-language discovery integration with model metadata
+    consumption
+  - Data Validation: Tool schema validation, capability verification
+  - Security Requirements: Tool access permission verification before execution
+  - Compliance Requirements: Tool registration and capability audit trails
+
+##### F-005-RQ-003: Tool Execution Routing
+
+- **Technical Specifications:**
+  - Input Parameters: Tool call requests with arguments corresponding to user
+    intent
+  - Output/Response: Tool results with optional inline HTML for UI rendering
+  - Performance Criteria: <2s tool execution initiation, <30s total execution
+    time
+  - Data Requirements: Structured content and component state flow through
+    conversation
+- **Validation Rules:**
+  - Business Rules: Tool execution authorization, workspace boundary enforcement
+  - Data Validation: Tool call parameter validation, result format verification
+  - Security Requirements: Tool execution isolation, resource limit enforcement
+  - Compliance Requirements: Complete tool execution audit trails
+
+##### F-006-RQ-001: Weaver Change Tracking
+
+- **Technical Specifications:**
+  - Input Parameters: File edit requests, workspace context, change policies
+  - Output/Response: ChangeSet objects with textual diffs, AST changes, and
+    summaries
+  - Performance Criteria: <5s change processing, real-time change detection
+  - Data Requirements: File content, change metadata, semantic analysis results
+- **Validation Rules:**
+  - Business Rules: All file edits must go through Weaver, no stealth edits
+    allowed
+  - Data Validation: Change integrity verification, diff accuracy validation
+  - Security Requirements: File access authorization, change audit logging
+  - Compliance Requirements: Complete change history preservation
+
+### 2.3 Feature Relationships
+
+#### 2.3.1 Feature Dependencies Map
 
 ```mermaid
 graph TB
@@ -993,274 +1047,348 @@ F015 --> F016
 F012 --> F015
 ```
 
-### 2.3.2 Integration Points
+#### 2.3.2 Integration Points
 
-| Integration Point | Features Involved | Shared Components | Common Services |
-|---|---|---|---|
-| Agent-Tool Interface | F-003, F-005, F-007 | Tool schema translation, MCP multiplexer | Tool execution context |
-| Conversation-Task Binding | F-001, F-002, F-004 | Task context management | State synchronization |
-| Governance-Execution Pipeline | F-009, F-010, F-006 | Hook execution engine | Policy evaluation |
-| VCS-Review Integration | F-013, F-014, F-002 | Comment normalization | Review state management |
+| Integration Point             | Features Involved   | Shared Components                        | Common Services         |
+| ----------------------------- | ------------------- | ---------------------------------------- | ----------------------- |
+| Agent-Tool Interface          | F-003, F-005, F-007 | Tool schema translation, MCP multiplexer | Tool execution context  |
+| Conversation-Task Binding     | F-001, F-002, F-004 | Task context management                  | State synchronization   |
+| Governance-Execution Pipeline | F-009, F-010, F-006 | Hook execution engine                    | Policy evaluation       |
+| VCS-Review Integration        | F-013, F-014, F-002 | Comment normalization                    | Review state management |
 
-### 2.3.3 Shared Components
+#### 2.3.3 Shared Components
 
-| Component | Description | Used By Features | Interface |
-|---|---|---|---|
-| Message Bus | Event-driven communication backbone | F-001, F-009, F-012, F-016 | Event publishing/subscription |
-| Workspace Manager | Encapsulated execution environment | F-006, F-008, F-010 | Workspace lifecycle API |
-| Policy Engine | Declarative policy evaluation | F-009, F-011, F-012 | Policy definition and evaluation |
-| Audit Logger | Structured audit trail generation | F-001, F-009, F-012, F-013 | Audit event recording |
+| Component         | Description                         | Used By Features           | Interface                        |
+| ----------------- | ----------------------------------- | -------------------------- | -------------------------------- |
+| Message Bus       | Event-driven communication backbone | F-001, F-009, F-012, F-016 | Event publishing/subscription    |
+| Workspace Manager | Encapsulated execution environment  | F-006, F-008, F-010        | Workspace lifecycle API          |
+| Policy Engine     | Declarative policy evaluation       | F-009, F-011, F-012        | Policy definition and evaluation |
+| Audit Logger      | Structured audit trail generation   | F-001, F-009, F-012, F-013 | Audit event recording            |
 
-## 2.4 Implementation Considerations
+### 2.4 Implementation Considerations
 
-### 2.4.1 Technical Constraints
+#### 2.4.1 Technical Constraints
 
-| Feature Category | Constraints | Mitigation Strategies |
-|---|---|---|
+| Feature Category          | Constraints                                | Mitigation Strategies                     |
+| ------------------------- | ------------------------------------------ | ----------------------------------------- |
 | Agent Backend Integration | API rate limits, authentication complexity | Connection pooling, credential management |
-| Tool Execution | Resource limits, security boundaries | Containerization, resource monitoring |
-| Real-time Streaming | Connection scalability, event ordering | Event sourcing, connection management |
-| File System Operations | Concurrent access, change detection | File locking, change event aggregation |
+| Tool Execution            | Resource limits, security boundaries       | Containerization, resource monitoring     |
+| Real-time Streaming       | Connection scalability, event ordering     | Event sourcing, connection management     |
+| File System Operations    | Concurrent access, change detection        | File locking, change event aggregation    |
 
-### 2.4.2 Performance Requirements
+#### 2.4.2 Performance Requirements
 
-| Feature | Latency Target | Throughput Target | Scalability Target |
-|---|---|---|---|
-| F-001: Conversation Management | <100ms message processing | 1000 messages/second | 100 concurrent conversations |
-| F-003: Agent Backend Orchestration | <30s turn execution | 50 concurrent turns | 10 agent backends |
-| F-005: MCP Server Hosting | <2s tool execution initiation | 500 tool calls/minute | 50 concurrent MCP servers |
-| F-013: VCS Integration | <5s VCS operation | 100 VCS operations/minute | Multiple VCS providers |
+| Feature                            | Latency Target                | Throughput Target         | Scalability Target           |
+| ---------------------------------- | ----------------------------- | ------------------------- | ---------------------------- |
+| F-001: Conversation Management     | <100ms message processing     | 1000 messages/second      | 100 concurrent conversations |
+| F-003: Agent Backend Orchestration | <30s turn execution           | 50 concurrent turns       | 10 agent backends            |
+| F-005: MCP Server Hosting          | <2s tool execution initiation | 500 tool calls/minute     | 50 concurrent MCP servers    |
+| F-013: VCS Integration             | <5s VCS operation             | 100 VCS operations/minute | Multiple VCS providers       |
 
-### 2.4.3 Security Implications
+#### 2.4.3 Security Implications
 
-| Security Domain | Requirements | Implementation Approach |
-|---|---|---|
-| Agent Isolation | Prevent cross-agent data leakage | Separate execution contexts, credential isolation |
-| Tool Execution | Secure tool execution boundaries | Container encapsulation with shared storage and network isolation |
-| Data Protection | Encrypt sensitive conversation data | End-to-end encryption, secure key management |
-| Access Control | Role-based access to features and data | RBAC implementation, permission inheritance |
+| Security Domain | Requirements                           | Implementation Approach                                           |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Agent Isolation | Prevent cross-agent data leakage       | Separate execution contexts, credential isolation                 |
+| Tool Execution  | Secure tool execution boundaries       | Container encapsulation with shared storage and network isolation |
+| Data Protection | Encrypt sensitive conversation data    | End-to-end encryption, secure key management                      |
+| Access Control  | Role-based access to features and data | RBAC implementation, permission inheritance                       |
 
-### 2.4.4 Maintenance Requirements
+#### 2.4.4 Maintenance Requirements
 
-| Maintenance Area | Requirements | Automation Level |
-|---|---|---|
-| Agent Backend Updates | Backward compatibility, version management | Automated testing, gradual rollout |
-| Tool Registry Management | Tool versioning, dependency management | Automated tool discovery, health checks |
-| Policy Updates | Policy versioning, impact analysis | Automated policy validation, rollback capability |
-| Audit Data Management | Log rotation, compliance reporting | Automated archival, report generation |
+| Maintenance Area         | Requirements                               | Automation Level                                 |
+| ------------------------ | ------------------------------------------ | ------------------------------------------------ |
+| Agent Backend Updates    | Backward compatibility, version management | Automated testing, gradual rollout               |
+| Tool Registry Management | Tool versioning, dependency management     | Automated tool discovery, health checks          |
+| Policy Updates           | Policy versioning, impact analysis         | Automated policy validation, rollback capability |
+| Audit Data Management    | Log rotation, compliance reporting         | Automated archival, report generation            |
 
-### 2.4.5 Traceability Matrix
+#### 2.4.5 Traceability Matrix
 
-| Business Requirement | Features | Acceptance Criteria | Test Strategy |
-|---|---|---|---|
-| Consistent Agent Experience | F-001, F-003, F-007 | Same tools/capabilities across agents | Integration testing across agent backends |
-| Automated Workflow Governance | F-009, F-011, F-012 | Consistent policy enforcement | Policy compliance testing |
-| Comprehensive Audit Trails | F-001, F-009, F-012 | Complete activity traceability | Audit trail verification testing |
-| Secure Execution Environment | F-010, F-005, F-006 | Isolated tool and code execution | Security penetration testing |
+| Business Requirement          | Features            | Acceptance Criteria                   | Test Strategy                             |
+| ----------------------------- | ------------------- | ------------------------------------- | ----------------------------------------- |
+| Consistent Agent Experience   | F-001, F-003, F-007 | Same tools/capabilities across agents | Integration testing across agent backends |
+| Automated Workflow Governance | F-009, F-011, F-012 | Consistent policy enforcement         | Policy compliance testing                 |
+| Comprehensive Audit Trails    | F-001, F-009, F-012 | Complete activity traceability        | Audit trail verification testing          |
+| Secure Execution Environment  | F-010, F-005, F-006 | Isolated tool and code execution      | Security penetration testing              |
 
-# 3. Technology Stack
+## 3. Technology Stack
 
-## 3.1 Programming Languages
+### 3.1 Programming Languages
 
-### 3.1.1 Primary Language Selection
+#### 3.1.1 Primary Language Selection
 
-| Component | Language | Version | Justification |
-|---|---|---|---|
-| Core Platform | Rust | 1.75+ | Actix Web requires minimum supported Rust version (MSRV) of 1.75, providing memory safety, zero-cost abstractions, and excellent async performance |
-| Agent Adapters | Rust | 1.75+ | Consistent language across platform for type safety and performance |
-| MCP Tools | Rust | 1.75+ | Native MCP server implementation with embedded tools for optimal performance |
-| CLI Tools | Rust | 1.75+ | Single-binary distribution and cross-platform compatibility |
+| Component      | Language | Version | Justification                                                                                                                                      |
+| -------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core Platform  | Rust     | 1.75+   | Actix Web requires minimum supported Rust version (MSRV) of 1.75, providing memory safety, zero-cost abstractions, and excellent async performance |
+| Agent Adapters | Rust     | 1.75+   | Consistent language across platform for type safety and performance                                                                                |
+| MCP Tools      | Rust     | 1.75+   | Native MCP server implementation with embedded tools for optimal performance                                                                       |
+| CLI Tools      | Rust     | 1.75+   | Single-binary distribution and cross-platform compatibility                                                                                        |
 
-### 3.1.2 Language Selection Criteria
+#### 3.1.2 Language Selection Criteria
 
-**Memory Safety and Performance**
-Rust is a language that empowers everyone to build reliable and efficient software, with studies finding that roughly ~70% of high severity security bugs are the result of memory unsafety. This aligns with Corbusier's security requirements for handling sensitive conversation data and tool execution.
+##### Memory Safety and Performance
 
-**Async-First Architecture**
-Tokio is scalable, built on top of the async/await language feature, which itself is scalable. When dealing with networking, there's a limit to how fast you can handle a connection due to latency, so the only way to scale is to handle many connections at once. With the async/await language feature, increasing the number of concurrent operations becomes incredibly cheap, allowing you to scale to a large number of concurrent tasks.
+Rust is a language that empowers everyone to build reliable and efficient
+software, with studies finding that roughly ~70% of high severity security bugs
+are the result of memory unsafety. This aligns with Corbusier's security
+requirements for handling sensitive conversation data and tool execution.
 
-**Hexagonal Architecture Compatibility**
-Rust's trait system and ownership model provide excellent support for dependency inversion and adapter patterns, essential for implementing hexagonal architecture with clean separation between domain logic and infrastructure concerns.
+##### Async-First Architecture
 
-### 3.1.3 Language Constraints and Dependencies
+Tokio is scalable, built on top of the async/await language feature, which
+itself is scalable. When dealing with networking, there's a limit to how fast
+you can handle a connection due to latency, so the only way to scale is to
+handle many connections at once. With the async/await language feature,
+increasing the number of concurrent operations becomes incredibly cheap,
+allowing you to scale to a large number of concurrent tasks.
 
-| Constraint Type | Description | Mitigation Strategy |
-|---|---|---|
-| Compilation Time | Rust compilation can be slower than interpreted languages | Incremental compilation, workspace optimization, parallel builds |
-| Learning Curve | Ownership and borrowing concepts require expertise | Team training, code review processes, comprehensive documentation |
+##### Hexagonal Architecture Compatibility
+
+Rust's trait system and ownership model provide excellent support for
+dependency inversion and adapter patterns, essential for implementing hexagonal
+architecture with clean separation between domain logic and infrastructure
+concerns.
+
+#### 3.1.3 Language Constraints and Dependencies
+
+| Constraint Type    | Description                                                     | Mitigation Strategy                                                  |
+| ------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Compilation Time   | Rust compilation can be slower than interpreted languages       | Incremental compilation, workspace optimization, parallel builds     |
+| Learning Curve     | Ownership and borrowing concepts require expertise              | Team training, code review processes, comprehensive documentation    |
 | Ecosystem Maturity | Some specialized libraries may be less mature than alternatives | Careful dependency selection, fallback to C bindings where necessary |
 
-## 3.2 Frameworks & Libraries
+### 3.2 Frameworks & Libraries
 
-### 3.2.1 Core Web Framework
+#### 3.2.1 Core Web Framework
 
-**Actix Web 4.12.1**
-Latest stable version available on crates.io selected for the HTTP API surface due to:
+##### Actix Web 4.12.1
 
-- One of the fastest web frameworks available according to the TechEmpower Framework Benchmark, with the lowest latency
-- Powerful, pragmatic, and extremely fast web framework for Rust with features out of the box including HTTP/2, logging, etc.
-- Leverages asynchronous execution by default to handle many requests concurrently, making it well-suited for applications requiring responsiveness under load
+Latest stable version available on crates.io selected for the HTTP API surface
+due to:
+
+- One of the fastest web frameworks available according to the TechEmpower
+  Framework Benchmark, with the lowest latency
+- Powerful, pragmatic, and extremely fast web framework for Rust with features
+  out of the box including HTTP/2, logging, etc.
+- Leverages asynchronous execution by default to handle many requests
+  concurrently, making it well-suited for applications requiring responsiveness
+  under load
 - Similar syntax to Express.js, making it accessible to JavaScript developers
 
-**Compatibility Requirements**
-SQLx is compatible with the async-std, tokio, and actix runtimes; and, the native-tls and rustls TLS backends. When adding the dependency, you must choose a runtime feature that is runtime + tls.
+##### Compatibility Requirements
 
-### 3.2.2 Async Runtime
+SQLx is compatible with the async-std, tokio, and actix runtimes; and, the
+native-tls and rustls TLS backends. When adding the dependency, you must choose
+a runtime feature that is runtime + tls.
 
-**Tokio 1.x (Latest)**
-Tokio is a runtime for writing reliable asynchronous applications with Rust. It provides async I/O, networking, scheduling, timers, and more.
+#### 3.2.2 Async Runtime
 
-**Selection Justification**
-- The Tokio library is the most widely used runtime, surpassing all other runtimes in usage combined
+##### Tokio 1.x (Latest)
+
+Tokio is a runtime for writing reliable asynchronous applications with Rust. It
+provides async I/O, networking, scheduling, timers, and more.
+
+##### Selection Justification
+
+- The Tokio library is the most widely used runtime, surpassing all other
+  runtimes in usage combined
 - Most libraries gravitating towards the One True Runtime — Tokio
-- Provides a multi-threaded runtime for executing asynchronous code, an asynchronous version of the standard library, and a large ecosystem of libraries
+- Provides a multi-threaded runtime for executing asynchronous code, an
+  asynchronous version of the standard library, and a large ecosystem of
+  libraries
 
-**Runtime Configuration**
-Tokio provides multiple variations of the runtime. Everything from a multi-threaded, work-stealing runtime to a light-weight, single-threaded runtime. Each of these runtimes come with many knobs to allow users to tune them to their needs.
+##### Runtime Configuration
 
-### 3.2.3 Database Access Layer
+Tokio provides multiple variations of the runtime. Everything from a
+multi-threaded, work-stealing runtime to a light-weight, single-threaded
+runtime. Each of these runtimes come with many knobs to allow users to tune
+them to their needs.
 
-**SQLx 0.8.x (Latest)**
-Database Agnostic support for PostgreSQL, MySQL, MariaDB, SQLite. Pure Rust with Postgres and MySQL/MariaDB drivers written in pure Rust using zero unsafe code.
+#### 3.2.3 Database Access Layer
 
-**Key Features**
-- Supports compile-time checked queries. It does not provide a Rust API or DSL for building queries. Instead, it provides macros that take regular SQL as input and ensure that it is valid for your database
+##### SQLx 0.8.x (Latest)
+
+Database Agnostic support for PostgreSQL, MySQL, MariaDB, SQLite. Pure Rust
+with Postgres and MySQL/MariaDB drivers written in pure Rust using zero unsafe
+code.
+
+##### Key Features
+
+- Supports compile-time checked queries. It does not provide a Rust API or DSL
+  for building queries. Instead, it provides macros that take regular SQL as
+  input and ensure that it is valid for your database
 - Built-in connection pooling with sqlx::Pool
-- Runtime Agnostic. Works on different runtimes (async-std / tokio / actix) and TLS backends (native-tls, rustls)
+- Runtime Agnostic. Works on different runtimes (async-std / tokio / actix) and
+  TLS backends (native-tls, rustls)
 
-### 3.2.4 Observability and Logging
+#### 3.2.4 Observability and Logging
 
-**Tracing 0.1.x (Latest)**
-tracing is a framework for instrumenting Rust programs to collect structured, event-based diagnostic information. tracing is maintained by the Tokio project, but does not require the tokio runtime to be used.
+##### Tracing 0.1.x (Latest)
 
-**Advantages for Async Systems**
-In asynchronous systems like Tokio, interpreting traditional log messages can often be quite challenging. Since individual tasks are multiplexed on the same thread, associated events and log lines are intermixed making it difficult to trace the logic flow. tracing expands upon logging-style diagnostics by allowing libraries and applications to record structured events with additional information about temporality and causality.
+tracing is a framework for instrumenting Rust programs to collect structured,
+event-based diagnostic information. tracing is maintained by the Tokio project,
+but does not require the tokio runtime to be used.
 
-**Integration Capabilities**
-The tracing crates provide a powerful system for logging in your application. It is compatible with many other crates like the OpenTelemetry SDK, allowing you to also send your logs for further analysis.
+##### Advantages for Async Systems
 
-### 3.2.5 Framework Compatibility Matrix
+In asynchronous systems like Tokio, interpreting traditional log messages can
+often be quite challenging. Since individual tasks are multiplexed on the same
+thread, associated events and log lines are intermixed making it difficult to
+trace the logic flow. tracing expands upon logging-style diagnostics by
+allowing libraries and applications to record structured events with additional
+information about temporality and causality.
 
-| Framework | Version | Runtime | TLS Backend | Database Support |
-|---|---|---|---|---|
-| Actix Web | 4.12.1 | Tokio | rustls/native-tls | Via SQLx |
-| SQLx | 0.8.x | Tokio | rustls/native-tls | PostgreSQL, SQLite |
-| Tracing | 0.1.x | Runtime Agnostic | N/A | N/A |
-| Tokio | 1.x | Self | N/A | N/A |
+##### Integration Capabilities
 
-## 3.3 Open Source Dependencies
+The tracing crates provide a powerful system for logging in your application.
+It is compatible with many other crates like the OpenTelemetry SDK, allowing
+you to also send your logs for further analysis.
 
-### 3.3.1 Core Dependencies
+#### 3.2.5 Framework Compatibility Matrix
 
-| Crate | Version | Purpose | Registry |
-|---|---|---|---|
-| actix-web | 4.12.1 | HTTP server framework | crates.io |
-| tokio | 1.x | Async runtime | crates.io |
-| sqlx | 0.8.x | Database access | crates.io |
-| tracing | 0.1.x | Structured logging | crates.io |
-| tracing-subscriber | 0.3.x | Log formatting and output | crates.io |
-| serde | 1.x | Serialization framework | crates.io |
-| serde_json | 1.x | JSON serialization | crates.io |
-| anyhow | 1.x | Error handling | crates.io |
-| thiserror | 1.x | Error derive macros | crates.io |
-| uuid | 1.x | UUID generation | crates.io |
+| Framework | Version | Runtime          | TLS Backend       | Database Support   |
+| --------- | ------- | ---------------- | ----------------- | ------------------ |
+| Actix Web | 4.12.1  | Tokio            | rustls/native-tls | Via SQLx           |
+| SQLx      | 0.8.x   | Tokio            | rustls/native-tls | PostgreSQL, SQLite |
+| Tracing   | 0.1.x   | Runtime Agnostic | N/A               | N/A                |
+| Tokio     | 1.x     | Self             | N/A               | N/A                |
 
-### 3.3.2 MCP Protocol Dependencies
+### 3.3 Open Source Dependencies
 
-| Crate | Version | Purpose | Registry |
-|---|---|---|---|
-| jsonrpc-core | 18.x | JSON-RPC 2.0 implementation | crates.io |
-| async-trait | 0.1.x | Async trait support | crates.io |
-| futures | 0.3.x | Future utilities | crates.io |
-| tokio-util | 0.7.x | Tokio utilities | crates.io |
+#### 3.3.1 Core Dependencies
 
-### 3.3.3 Development and Testing Dependencies
+| Crate              | Version | Purpose                   | Registry  |
+| ------------------ | ------- | ------------------------- | --------- |
+| actix-web          | 4.12.1  | HTTP server framework     | crates.io |
+| tokio              | 1.x     | Async runtime             | crates.io |
+| sqlx               | 0.8.x   | Database access           | crates.io |
+| tracing            | 0.1.x   | Structured logging        | crates.io |
+| tracing-subscriber | 0.3.x   | Log formatting and output | crates.io |
+| serde              | 1.x     | Serialization framework   | crates.io |
+| serde_json         | 1.x     | JSON serialization        | crates.io |
+| anyhow             | 1.x     | Error handling            | crates.io |
+| thiserror          | 1.x     | Error derive macros       | crates.io |
+| uuid               | 1.x     | UUID generation           | crates.io |
 
-| Crate | Version | Purpose | Registry |
-|---|---|---|---|
-| cargo-nextest | Latest | Fast test runner | crates.io |
-| criterion | 0.5.x | Benchmarking | crates.io |
-| mockall | 0.12.x | Mock generation | crates.io |
-| tempfile | 3.x | Temporary file handling | crates.io |
-| wiremock | 0.6.x | HTTP mocking | crates.io |
+#### 3.3.2 MCP Protocol Dependencies
 
-### 3.3.4 Version Management Strategy
+| Crate        | Version | Purpose                     | Registry  |
+| ------------ | ------- | --------------------------- | --------- |
+| jsonrpc-core | 18.x    | JSON-RPC 2.0 implementation | crates.io |
+| async-trait  | 0.1.x   | Async trait support         | crates.io |
+| futures      | 0.3.x   | Future utilities            | crates.io |
+| tokio-util   | 0.7.x   | Tokio utilities             | crates.io |
 
-**Semantic Versioning Compliance**
-All dependencies follow semantic versioning with careful attention to breaking changes. Tokio will keep a rolling MSRV (minimum supported rust version) policy of at least 6 months. When increasing the MSRV, the new Rust version must have been released at least six months ago.
+#### 3.3.3 Development and Testing Dependencies
 
-**Dependency Pinning Strategy**
+| Crate         | Version | Purpose                 | Registry  |
+| ------------- | ------- | ----------------------- | --------- |
+| cargo-nextest | Latest  | Fast test runner        | crates.io |
+| criterion     | 0.5.x   | Benchmarking            | crates.io |
+| mockall       | 0.12.x  | Mock generation         | crates.io |
+| tempfile      | 3.x     | Temporary file handling | crates.io |
+| wiremock      | 0.6.x   | HTTP mocking            | crates.io |
+
+#### 3.3.4 Version Management Strategy
+
+##### Semantic Versioning Compliance
+
+All dependencies follow semantic versioning with careful attention to breaking
+changes. Tokio will keep a rolling MSRV (minimum supported rust version) policy
+of at least 6 months. When increasing the MSRV, the new Rust version must have
+been released at least six months ago.
+
+##### Dependency Pinning Strategy
+
 - Major versions pinned to prevent breaking changes
 - Minor versions allowed to float for security updates
 - Critical security dependencies monitored through cargo-audit
 - Regular dependency updates scheduled monthly
 
-## 3.4 Third-Party Services
+### 3.4 Third-Party Services
 
-### 3.4.1 AI Agent Backend Services
+#### 3.4.1 AI Agent Backend Services
 
-| Service | Purpose | Integration Method | Authentication |
-|---|---|---|---|
-| Claude Code SDK | AI agent backend | Direct SDK integration | API key |
-| Codex CLI App Server | AI agent backend | HTTP API adapter | API key |
-| OpenAI API | Future agent backend | HTTP API adapter | API key |
+| Service              | Purpose              | Integration Method     | Authentication |
+| -------------------- | -------------------- | ---------------------- | -------------- |
+| Claude Code SDK      | AI agent backend     | Direct SDK integration | API key        |
+| Codex CLI App Server | AI agent backend     | HTTP API adapter       | API key        |
+| OpenAI API           | Future agent backend | HTTP API adapter       | API key        |
 
-### 3.4.2 Version Control Integration
+#### 3.4.2 Version Control Integration
 
-| Service | Purpose | Integration Method | Authentication |
-|---|---|---|---|
+| Service    | Purpose                          | Integration Method  | Authentication                    |
+| ---------- | -------------------------------- | ------------------- | --------------------------------- |
 | GitHub API | VCS operations, issue management | REST API + webhooks | OAuth 2.0 / Personal Access Token |
 | GitLab API | VCS operations, issue management | REST API + webhooks | OAuth 2.0 / Personal Access Token |
 
-### 3.4.3 Model Context Protocol Services
+#### 3.4.3 Model Context Protocol Services
 
-Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. Whether you're building an AI-powered IDE, enhancing a chat interface, or creating custom AI workflows, MCP provides a standardized way to connect LLMs with the context they need.
+Model Context Protocol (MCP) is an open protocol that enables seamless
+integration between LLM applications and external data sources and tools.
+Whether you're building an AI-powered IDE, enhancing a chat interface, or
+creating custom AI workflows, MCP provides a standardized way to connect LLMs
+with the context they need.
 
-**MCP Specification Compliance**
-This specification defines the authoritative protocol requirements, based on the TypeScript schema in schema.ts. For implementation guides and examples, visit modelcontextprotocol.io.
+##### MCP Specification Compliance
 
-**Current MCP Version**
-Protocol Revision: 2024-11-05 (Current) with the next version of the Model Context Protocol specification to be released on November 25th, 2025, with a release candidate (RC) available on November 11th, 2025. We're building in a 14-day RC validation window so client implementors and SDK maintainers can thoroughly test the protocol changes.
+This specification defines the authoritative protocol requirements, based on
+the TypeScript schema in schema.ts. For implementation guides and examples,
+visit modelcontextprotocol.io.
 
-### 3.4.4 External Tool Integration
+##### Current MCP Version
 
-| Tool Category | Examples | Integration Method |
-|---|---|---|---|
-| Review Tools | Frankie | Browser automation adapter |
-| Encapsulation | Podbot | Container runtime API |
-| File Editing | Weaver | MCP server integration |
+Protocol Revision: 2024-11-05 (Current) with the next version of the Model
+Context Protocol specification to be released on November 25th, 2025, with a
+release candidate (RC) available on November 11th, 2025. We're building in a
+14-day RC validation window so client implementors and SDK maintainers can
+thoroughly test the protocol changes.
+
+#### 3.4.4 External Tool Integration
+
+| Tool Category      | Examples                       | Integration Method                     |
+| ------------------ | ------------------------------ | -------------------------------------- |
+| Review Tools       | Frankie                        | Browser automation adapter             |
+| Encapsulation      | Podbot                         | Container runtime API                  |
+| File Editing       | Weaver                         | MCP server integration                 |
 | Testing Frameworks | Language-specific test runners | Process execution within encapsulation |
 
-### 3.4.5 Service Reliability Requirements
+#### 3.4.5 Service Reliability Requirements
 
-| Service Type | Availability Target | Fallback Strategy |
-|---|---|---|---|
-| AI Agent Backends | 99.5% | Multiple backend support, graceful degradation |
-| VCS APIs | 99.9% | Local caching, retry mechanisms |
-| MCP Services | 99.5% | Local tool fallbacks, service discovery |
+| Service Type      | Availability Target | Fallback Strategy                              |
+| ----------------- | ------------------- | ---------------------------------------------- |
+| AI Agent Backends | 99.5%               | Multiple backend support, graceful degradation |
+| VCS APIs          | 99.9%               | Local caching, retry mechanisms                |
+| MCP Services      | 99.5%               | Local tool fallbacks, service discovery        |
 
-## 3.5 Databases & Storage
+### 3.5 Databases & Storage
 
-### 3.5.1 Primary Database Selection
+#### 3.5.1 Primary Database Selection
 
-**PostgreSQL 14+**
+##### PostgreSQL 14+
+
 Selected as the primary database for production deployments due to:
 
-- **ACID Compliance**: Full transaction support for conversation and task state management
+- **ACID Compliance**: Full transaction support for conversation and task state
+  management
 - **JSON Support**: Native JSONB for storing conversation messages and metadata
 - **Scalability**: Proven performance for concurrent read/write operations
 - **SQLx Integration**: Native support for the Postgres database server
 
-**SQLite 3.20.0+**
+##### SQLite 3.20.0+
+
 Version 3.20.0 or newer is recommended for development and testing environments:
 
 - **Zero Configuration**: Embedded database for local development
 - **File-based Storage**: Simplified deployment for single-user scenarios
-- **SQLx Compatibility**: Support for the self-contained SQLite database engine with SQLite bundled and statically-linked
+- **SQLx Compatibility**: Support for the self-contained SQLite database engine
+  with SQLite bundled and statically-linked
 
-### 3.5.2 Data Persistence Strategies
+#### 3.5.2 Data Persistence Strategies
 
-**Event Sourcing for Audit Trails**
+##### Event Sourcing for Audit Trails
+
 ```mermaid
 graph TB
     subgraph "Event Store"
@@ -1295,77 +1423,90 @@ graph TB
     AS --> AV
 ```
 
-**Database Schema Strategy**
+##### Database Schema Strategy
+
 - **Conversation Data**: JSONB storage for flexible message formats
 - **Task Data**: Relational tables for structured workflow state
 - **Audit Data**: Append-only event tables with immutable records
 - **Configuration Data**: Structured tables for policies and settings
 
-### 3.5.3 Caching Solutions
+#### 3.5.3 Caching Solutions
 
-**In-Memory Caching**
+##### In-Memory Caching
+
 - **Tool Registry Cache**: Active tool definitions and schemas
 - **Agent Session Cache**: Current agent backend sessions
 - **Policy Cache**: Frequently accessed governance policies
 
-**Distributed Caching (Future)**
+##### Distributed Caching (Future)
+
 - **Redis**: For multi-instance deployments
 - **Conversation Context**: Shared context across agent sessions
 - **Tool Results**: Cacheable tool execution results
 
-### 3.5.4 Storage Services
+#### 3.5.4 Storage Services
 
-**File System Storage**
+##### File System Storage
+
 - **Workspace Files**: Encapsulated file system access through Podbot
 - **Change Logs**: Weaver-generated change sets and diffs
 - **Temporary Files**: Tool execution artifacts and build outputs
 
-**Object Storage (Future)**
+##### Object Storage (Future)
+
 - **Artifact Storage**: Large tool outputs and build artifacts
 - **Backup Storage**: Database backups and disaster recovery
 - **Static Assets**: Documentation and configuration templates
 
-### 3.5.5 Database Configuration
+#### 3.5.5 Database Configuration
 
-| Environment | Database | Connection Pool | Backup Strategy |
-|---|---|---|---|
-| Development | SQLite | Single connection | File copy |
-| Testing | SQLite | Per-test isolation | In-memory |
-| Staging | PostgreSQL | 10 connections | Daily snapshots |
-| Production | PostgreSQL | 50 connections | Continuous WAL archiving |
+| Environment | Database   | Connection Pool    | Backup Strategy          |
+| ----------- | ---------- | ------------------ | ------------------------ |
+| Development | SQLite     | Single connection  | File copy                |
+| Testing     | SQLite     | Per-test isolation | In-memory                |
+| Staging     | PostgreSQL | 10 connections     | Daily snapshots          |
+| Production  | PostgreSQL | 50 connections     | Continuous WAL archiving |
 
-**SQLx Configuration Example**
-Create a database connection pool with PgPoolOptions setting maximum connections and execute queries with fetch_all:
+##### SQLx Configuration Example
+
+Create a database connection pool with PgPoolOptions setting maximum
+connections and execute queries with fetch_all:
 
 ```toml
 [dependencies]
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid"] }
 ```
 
-## 3.6 Development & Deployment
+### 3.6 Development & Deployment
 
-### 3.6.1 Development Tools
+#### 3.6.1 Development Tools
 
-**Build System**
+##### Build System
+
 - **Cargo**: Native Rust build system and package manager
-- **Cargo Workspaces**: Multi-crate project organization following hexagonal architecture
+- **Cargo Workspaces**: Multi-crate project organization following hexagonal
+  architecture
 - **Cargo Features**: Conditional compilation for different deployment targets
 
-**Code Quality Tools**
+##### Code Quality Tools
+
 - **Rustfmt**: Consistent code formatting across the project
-- **Clippy**: Rust linter for catching common mistakes and improving code quality
+- **Clippy**: Rust linter for catching common mistakes and improving code
+  quality
 - **Cargo Audit**: Security vulnerability scanning for dependencies
 - **Cargo Deny**: License and dependency policy enforcement
 
-**Development Environment**
+##### Development Environment
+
 - **Rust Analyzer**: IDE support for code completion and error checking
 - **Cargo Watch**: Automatic rebuilding during development
 - **Cargo Nextest**: Fast parallel test execution
 - **Criterion**: Performance benchmarking and regression detection
 
-### 3.6.2 Containerization Strategy
+#### 3.6.2 Containerization Strategy
 
-**Docker Multi-Stage Builds**
+##### Docker Multi-Stage Builds
+
 ```dockerfile
 # Build stage
 FROM rust:1.75-slim as builder
@@ -1381,15 +1522,17 @@ EXPOSE 8080
 CMD ["corbusier"]
 ```
 
-**Container Architecture**
+##### Container Architecture
+
 - **Application Container**: Main Corbusier service
 - **Database Container**: PostgreSQL for data persistence
 - **Encapsulation Containers**: Podbot-managed workspace containers
 - **Tool Containers**: MCP server containers for external tools
 
-### 3.6.3 CI/CD Pipeline Requirements
+#### 3.6.3 CI/CD Pipeline Requirements
 
-**Continuous Integration**
+##### Continuous Integration
+
 ```mermaid
 graph LR
     subgraph "CI Pipeline"
@@ -1420,69 +1563,85 @@ graph LR
     BUILD --> IMG
 ```
 
-**Deployment Automation**
+##### Deployment Automation
+
 - **GitHub Actions**: Primary CI/CD platform
 - **Automated Testing**: Unit, integration, and end-to-end tests
 - **Security Scanning**: Dependency vulnerabilities and code analysis
 - **Multi-Architecture Builds**: x86_64 and ARM64 container images
 
-### 3.6.4 Infrastructure as Code
+#### 3.6.4 Infrastructure as Code
 
-**Container Orchestration**
+##### Container Orchestration
+
 - **Docker Compose**: Local development environment
 - **Kubernetes**: Production container orchestration (future)
 - **Helm Charts**: Kubernetes application packaging (future)
 
-**Configuration Management**
+##### Configuration Management
+
 - **Environment Variables**: Runtime configuration
 - **Config Files**: TOML-based configuration for complex settings
 - **Secrets Management**: Secure handling of API keys and credentials
 
-### 3.6.5 Monitoring and Observability
+#### 3.6.5 Monitoring and Observability
 
-**Application Metrics**
-tracing is a framework for instrumenting Rust programs to collect structured, event-based diagnostic information integrated throughout the application for:
+##### Application Metrics
+
+tracing is a framework for instrumenting Rust programs to collect structured,
+event-based diagnostic information integrated throughout the application for:
 
 - **Performance Monitoring**: Request latency, throughput, and error rates
-- **Business Metrics**: Task completion rates, agent utilization, tool execution success
-- **System Health**: Database connection pool status, memory usage, CPU utilization
+- **Business Metrics**: Task completion rates, agent utilization, tool
+  execution success
+- **System Health**: Database connection pool status, memory usage, CPU
+  utilization
 
-**Distributed Tracing**
-The tracing crates provide a powerful system for logging in your application. It is compatible with many other crates like the OpenTelemetry SDK, allowing you to also send your logs for further analysis.
+##### Distributed Tracing
 
-**Log Aggregation**
+The tracing crates provide a powerful system for logging in your application.
+It is compatible with many other crates like the OpenTelemetry SDK, allowing
+you to also send your logs for further analysis.
+
+##### Log Aggregation
+
 - **Structured Logging**: JSON-formatted logs for machine processing
 - **Log Levels**: Configurable verbosity for different environments
 - **Correlation IDs**: Request tracking across service boundaries
 
-### 3.6.6 Security Considerations
+#### 3.6.6 Security Considerations
 
-**Container Security**
+##### Container Security
+
 - **Minimal Base Images**: Debian slim for reduced attack surface
 - **Non-Root Execution**: Application runs as non-privileged user
 - **Security Scanning**: Regular vulnerability assessment of container images
 
-**Dependency Security**
+##### Dependency Security
+
 - **Cargo Audit**: Automated security vulnerability scanning
 - **Supply Chain Security**: Verification of dependency integrity
 - **Regular Updates**: Scheduled dependency updates with security patches
 
-**Runtime Security**
+##### Runtime Security
+
 - **Encapsulation Boundaries**: Podbot containers for secure tool execution
 - **Network Policies**: Restricted network access for workspace containers
 - **Secrets Management**: Secure handling of API keys and authentication tokens
 
-# 4. Process Flowchart
+## 4. Process Flowchart
 
-## 4.1 System Workflows
+### 4.1 System Workflows
 
-### 4.1.1 Core Business Processes
+#### 4.1.1 Core Business Processes
 
-#### 4.1.1.1 End-to-End User Journeys
+##### 4.1.1.1 End-to-End User Journeys
 
-**Primary User Journey: Task Creation and Execution**
+###### Primary User Journey: Task Creation and Execution
 
-The Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools, forming the foundation for Corbusier's tool orchestration capabilities.
+The Model Context Protocol (MCP) is an open protocol that enables seamless
+integration between LLM applications and external data sources and tools,
+forming the foundation for Corbusier's tool orchestration capabilities.
 
 ```mermaid
 flowchart TD
@@ -1555,7 +1714,7 @@ flowchart TD
     REVIEW --> MSG
 ```
 
-**Secondary User Journey: Review Comment Processing**
+###### Secondary User Journey: Review Comment Processing
 
 ```mermaid
 flowchart TD
@@ -1589,9 +1748,9 @@ flowchart TD
     CHANGE_GEN --> REVIEW_REPLY
 ```
 
-#### 4.1.1.2 System Interactions
+##### 4.1.1.2 System Interactions
 
-**Agent Backend Integration Flow**
+###### Agent Backend Integration Flow
 
 ```mermaid
 flowchart LR
@@ -1627,9 +1786,11 @@ flowchart LR
     FUTURE --> TOOL_REG
 ```
 
-**MCP Tool Orchestration Flow**
+###### MCP Tool Orchestration Flow
 
-The protocol uses JSON-RPC 2.0 messages to establish communication between servers that provide context and capabilities, enabling standardized tool integration across different agent backends.
+The protocol uses JSON-RPC 2.0 messages to establish communication between
+servers that provide context and capabilities, enabling standardized tool
+integration across different agent backends.
 
 ```mermaid
 sequenceDiagram
@@ -1649,9 +1810,9 @@ sequenceDiagram
     Corbusier-->>Agent: Tool Execution Complete
 ```
 
-#### 4.1.1.3 Decision Points
+##### 4.1.1.3 Decision Points
 
-**Agent Selection Decision Matrix**
+###### Agent Selection Decision Matrix
 
 ```mermaid
 flowchart TD
@@ -1674,7 +1835,7 @@ flowchart TD
     REVIEW_SCOPE -->|Style| DEFAULT
 ```
 
-**Tool Routing Decision Logic**
+###### Tool Routing Decision Logic
 
 ```mermaid
 flowchart TD
@@ -1690,9 +1851,9 @@ flowchart TD
     TOOL_TYPE -->|Custom| MCP_ROUTE[MCP Server Route]
 ```
 
-#### 4.1.1.4 Error Handling Paths
+##### 4.1.1.4 Error Handling Paths
 
-**Agent Turn Error Recovery**
+###### Agent Turn Error Recovery
 
 ```mermaid
 flowchart TD
@@ -1740,7 +1901,7 @@ flowchart TD
     ERROR_MSG --> USER_NOTIFY
 ```
 
-**Hook Execution Error Handling**
+###### Hook Execution Error Handling
 
 ```mermaid
 flowchart TD
@@ -1782,11 +1943,11 @@ flowchart TD
     WARN_USER --> AUDIT_FAILURE
 ```
 
-### 4.1.2 Integration Workflows
+#### 4.1.2 Integration Workflows
 
-#### 4.1.2.1 Data Flow Between Systems
+##### 4.1.2.1 Data Flow Between Systems
 
-**Conversation Data Flow**
+###### Conversation Data Flow
 
 ```mermaid
 flowchart LR
@@ -1836,9 +1997,11 @@ flowchart LR
     CONV_STORE --> ARCHIVE
 ```
 
-**Tool Execution Data Flow**
+###### Tool Execution Data Flow
 
-With Apps SDK, MCP is the backbone that keeps server, model, and UI in sync. By standardising the wire format, authentication, and metadata, it lets ChatGPT reason about your app the same way it reasons about built-in tools.
+With Apps SDK, MCP is the backbone that keeps server, model, and UI in sync. By
+standardising the wire format, authentication, and metadata, it lets ChatGPT
+reason about your app the same way it reasons about built-in tools.
 
 ```mermaid
 flowchart TD
@@ -1878,9 +2041,9 @@ flowchart TD
     HOOK_TRIGGER --> RESPONSE_FORMAT
 ```
 
-#### 4.1.2.2 API Interactions
+##### 4.1.2.2 API Interactions
 
-**VCS Integration API Flow**
+###### VCS Integration API Flow
 
 ```mermaid
 sequenceDiagram
@@ -1907,9 +2070,11 @@ sequenceDiagram
     VCS-->>Corbusier: Normalized Comments
 ```
 
-**MCP Server Communication**
+###### MCP Server Communication
 
-The protocol uses JSON-RPC 2.0 messages to establish communication between servers that provide context and capabilities, ensuring standardized communication across all tool integrations.
+The protocol uses JSON-RPC 2.0 messages to establish communication between
+servers that provide context and capabilities, ensuring standardized
+communication across all tool integrations.
 
 ```mermaid
 sequenceDiagram
@@ -1933,9 +2098,9 @@ sequenceDiagram
     Server->>Tool: Cancel execution
 ```
 
-#### 4.1.2.3 Event Processing Flows
+##### 4.1.2.3 Event Processing Flows
 
-**Real-time Event Streaming**
+###### Real-time Event Streaming
 
 ```mermaid
 flowchart TD
@@ -1975,7 +2140,7 @@ flowchart TD
     ROUTE --> METRICS
 ```
 
-**Hook Event Processing**
+###### Hook Event Processing
 
 ```mermaid
 flowchart TD
@@ -2019,9 +2184,9 @@ flowchart TD
     ACTION_EXEC --> REMEDIATION
 ```
 
-#### 4.1.2.4 Batch Processing Sequences
+##### 4.1.2.4 Batch Processing Sequences
 
-**Audit Data Processing**
+###### Audit Data Processing
 
 ```mermaid
 flowchart LR
@@ -2061,11 +2226,11 @@ flowchart LR
     VALIDATE --> ARCHIVE
 ```
 
-## 4.2 Flowchart Requirements
+### 4.2 Flowchart Requirements
 
-### 4.2.1 Process Steps and Decision Points
+#### 4.2.1 Process Steps and Decision Points
 
-#### 4.2.1.1 Agent Turn Execution Process
+##### 4.2.1.1 Agent Turn Execution Process
 
 ```mermaid
 flowchart TD
@@ -2124,7 +2289,7 @@ flowchart TD
     ERROR_LOG --> AGENT_CALL
 ```
 
-#### 4.2.1.2 Task Lifecycle Management
+##### 4.2.1.2 Task Lifecycle Management
 
 ```mermaid
 stateDiagram-v2
@@ -2161,9 +2326,9 @@ stateDiagram-v2
     end note
 ```
 
-### 4.2.2 System Boundaries and User Touchpoints
+#### 4.2.2 System Boundaries and User Touchpoints
 
-#### 4.2.2.1 System Architecture Boundaries
+##### 4.2.2.1 System Architecture Boundaries
 
 ```mermaid
 flowchart TB
@@ -2229,7 +2394,7 @@ flowchart TB
     TASK --> PERSIST
 ```
 
-#### 4.2.2.2 User Interaction Points
+##### 4.2.2.2 User Interaction Points
 
 ```mermaid
 journey
@@ -2253,9 +2418,9 @@ journey
         Archive conversation: 3: System
 ```
 
-### 4.2.3 Error States and Recovery Paths
+#### 4.2.3 Error States and Recovery Paths
 
-#### 4.2.3.1 Agent Backend Failure Recovery
+##### 4.2.3.1 Agent Backend Failure Recovery
 
 ```mermaid
 flowchart TD
@@ -2310,7 +2475,7 @@ flowchart TD
     HEALTH_CHECK --> RESUME_OPERATION
 ```
 
-#### 4.2.3.2 Tool Execution Error Handling
+##### 4.2.3.2 Tool Execution Error Handling
 
 ```mermaid
 flowchart TD
@@ -2361,11 +2526,11 @@ flowchart TD
     ALTERNATIVE_TOOL --> TOOL_START
 ```
 
-## 4.3 Technical Implementation
+### 4.3 Technical Implementation
 
-### 4.3.1 State Management
+#### 4.3.1 State Management
 
-#### 4.3.1.1 Conversation State Transitions
+##### 4.3.1.1 Conversation State Transitions
 
 ```mermaid
 stateDiagram-v2
@@ -2386,7 +2551,7 @@ stateDiagram-v2
     Error --> Archived: Unrecoverable Error
 ```
 
-#### 4.3.1.2 Task State Management
+##### 4.3.1.2 Task State Management
 
 ```mermaid
 flowchart TD
@@ -2428,9 +2593,9 @@ flowchart TD
     AUDIT --> TASK_STATE
 ```
 
-### 4.3.2 Data Persistence Points
+#### 4.3.2 Data Persistence Points
 
-#### 4.3.2.1 Event Sourcing Architecture
+##### 4.3.2.1 Event Sourcing Architecture
 
 ```mermaid
 flowchart LR
@@ -2482,7 +2647,7 @@ flowchart LR
     CACHE --> API_LAYER
 ```
 
-#### 4.3.2.2 Transaction Boundaries
+##### 4.3.2.2 Transaction Boundaries
 
 ```mermaid
 flowchart TD
@@ -2528,9 +2693,9 @@ flowchart TD
     DURABILITY --> CONSISTENCY
 ```
 
-### 4.3.3 Caching Requirements
+#### 4.3.3 Caching Requirements
 
-#### 4.3.3.1 Multi-Level Caching Strategy
+##### 4.3.3.1 Multi-Level Caching Strategy
 
 ```mermaid
 flowchart TD
@@ -2582,9 +2747,9 @@ flowchart TD
     WARMING --> EVICTION
 ```
 
-### 4.3.4 Error Handling
+#### 4.3.4 Error Handling
 
-#### 4.3.4.1 Retry Mechanisms
+##### 4.3.4.1 Retry Mechanisms
 
 ```mermaid
 flowchart TD
@@ -2631,7 +2796,7 @@ flowchart TD
     FALLBACK --> ERROR_LOG
 ```
 
-#### 4.3.4.2 Fallback Processes
+##### 4.3.4.2 Fallback Processes
 
 ```mermaid
 flowchart TD
@@ -2683,20 +2848,20 @@ flowchart TD
     GRADUAL_RESTORE --> FULL_RESTORE
 ```
 
-## 4.4 Validation Rules
+### 4.4 Validation Rules
 
-### 4.4.1 Business Rules at Each Step
+#### 4.4.1 Business Rules at Each Step
 
-#### 4.4.1.1 Task Creation Validation
+##### 4.4.1.1 Task Creation Validation
 
-| Validation Rule | Description | Enforcement Point | Error Handling |
-|---|---|---|---|
-| Unique Task ID | Each task must have a globally unique identifier | Task creation | Reject with error message |
-| Valid Issue Reference | Task origin must reference existing VCS issue | Issue validation | Fetch and validate issue |
-| Branch Naming Policy | Branch names must follow configured naming convention | Branch creation | Auto-generate compliant name |
-| Workspace Availability | Required workspace resources must be available | Workspace setup | Queue or fallback to alternative |
+| Validation Rule        | Description                                           | Enforcement Point | Error Handling                   |
+| ---------------------- | ----------------------------------------------------- | ----------------- | -------------------------------- |
+| Unique Task ID         | Each task must have a globally unique identifier      | Task creation     | Reject with error message        |
+| Valid Issue Reference  | Task origin must reference existing VCS issue         | Issue validation  | Fetch and validate issue         |
+| Branch Naming Policy   | Branch names must follow configured naming convention | Branch creation   | Auto-generate compliant name     |
+| Workspace Availability | Required workspace resources must be available        | Workspace setup   | Queue or fallback to alternative |
 
-#### 4.4.1.2 Agent Turn Validation
+##### 4.4.1.2 Agent Turn Validation
 
 ```mermaid
 flowchart TD
@@ -2737,9 +2902,9 @@ flowchart TD
     STATE_CONSISTENT -->|No| STATE_ERROR[State Inconsistency]
 ```
 
-### 4.4.2 Data Validation Requirements
+#### 4.4.2 Data Validation Requirements
 
-#### 4.4.2.1 Message Validation Schema
+##### 4.4.2.1 Message Validation Schema
 
 ```mermaid
 flowchart TD
@@ -2775,9 +2940,13 @@ flowchart TD
     METADATA --> SIZE_LIMITS
 ```
 
-#### 4.4.2.2 Tool Call Validation
+##### 4.4.2.2 Tool Call Validation
 
-A minimal MCP server for Apps SDK implements three capabilities: List tools – your server advertises the tools it supports, including their JSON Schema input and output contracts and optional annotations. Call tools – when a model selects a tool to use, it sends a call_tool request with the arguments corresponding to the user intent.
+A minimal MCP server for Apps SDK implements three capabilities: List tools –
+your server advertises the tools it supports, including their JSON Schema input
+and output contracts and optional annotations. Call tools – when a model
+selects a tool to use, it sends a call_tool request with the arguments
+corresponding to the user intent.
 
 ```mermaid
 flowchart TD
@@ -2818,9 +2987,9 @@ flowchart TD
     CONTEXT_VALID -->|No| CONTEXT_ERROR[Context Error]
 ```
 
-### 4.4.3 Authorization Checkpoints
+#### 4.4.3 Authorization Checkpoints
 
-#### 4.4.3.1 Multi-Level Authorization
+##### 4.4.3.1 Multi-Level Authorization
 
 ```mermaid
 flowchart TD
@@ -2868,9 +3037,9 @@ flowchart TD
     OPERATION_AUDIT --> MAINTENANCE_MODE
 ```
 
-### 4.4.4 Regulatory Compliance Checks
+#### 4.4.4 Regulatory Compliance Checks
 
-#### 4.4.4.1 Audit Trail Requirements
+##### 4.4.4.1 Audit Trail Requirements
 
 ```mermaid
 flowchart LR
@@ -2922,21 +3091,21 @@ flowchart LR
     VIOLATION_ALERTS --> EXPORT_CAPABILITY
 ```
 
-## 4.5 Timing and SLA Considerations
+### 4.5 Timing and SLA Considerations
 
-### 4.5.1 Performance Requirements
+#### 4.5.1 Performance Requirements
 
-#### 4.5.1.1 Response Time Targets
+##### 4.5.1.1 Response Time Targets
 
-| Operation Category | Target Latency | Maximum Latency | Measurement Method |
-|---|---|---|---|
-| Message Processing | <100ms | <500ms | End-to-end message handling |
-| Tool Execution Initiation | <2s | <5s | Tool call to execution start |
-| Agent Turn Completion | <30s | <120s | Turn start to completion |
-| VCS Operations | <5s | <15s | API call to response |
-| Hook Execution | <10s | <30s | Hook trigger to completion |
+| Operation Category        | Target Latency | Maximum Latency | Measurement Method           |
+| ------------------------- | -------------- | --------------- | ---------------------------- |
+| Message Processing        | <100ms         | <500ms          | End-to-end message handling  |
+| Tool Execution Initiation | <2s            | <5s             | Tool call to execution start |
+| Agent Turn Completion     | <30s           | <120s           | Turn start to completion     |
+| VCS Operations            | <5s            | <15s            | API call to response         |
+| Hook Execution            | <10s           | <30s            | Hook trigger to completion   |
 
-#### 4.5.1.2 Throughput Requirements
+##### 4.5.1.2 Throughput Requirements
 
 ```mermaid
 flowchart TD
@@ -2972,9 +3141,9 @@ flowchart TD
     QUEUE_MANAGEMENT --> OPTIMIZATION
 ```
 
-### 4.5.2 Availability Requirements
+#### 4.5.2 Availability Requirements
 
-#### 4.5.2.1 Service Level Objectives
+##### 4.5.2.1 Service Level Objectives
 
 ```mermaid
 gantt
@@ -2994,7 +3163,7 @@ gantt
     Feature Deployments               :2024-03-15, 1h
 ```
 
-#### 4.5.2.2 Disaster Recovery
+##### 4.5.2.2 Disaster Recovery
 
 ```mermaid
 flowchart TD
@@ -3034,9 +3203,9 @@ flowchart TD
     VALIDATION --> POST_INCIDENT
 ```
 
-### 4.5.3 Scalability Considerations
+#### 4.5.3 Scalability Considerations
 
-#### 4.5.3.1 Horizontal Scaling Strategy
+##### 4.5.3.1 Horizontal Scaling Strategy
 
 ```mermaid
 flowchart LR
@@ -3084,119 +3253,185 @@ flowchart LR
     STORAGE_TIER --> HEALTH_CHECKS
 ```
 
-# 5. System Architecture
+## 5. System Architecture
 
-## 5.1 High-Level Architecture
+### 5.1 High-Level Architecture
 
-### 5.1.1 System Overview
+#### 5.1.1 System Overview
 
-Corbusier implements hexagonal architecture (also known as ports and adapters architecture), an architectural pattern that aims at creating loosely coupled application components that can be easily connected to their software environment by means of ports and adapters. This architectural approach enables the system to serve as an AI agent orchestration platform that owns the workflow, conversations, tool surface, hooks, and VCS primitives while hosting pluggable agent engines as backend adapters.
+Corbusier implements hexagonal architecture (also known as ports and adapters
+architecture), an architectural pattern that aims at creating loosely coupled
+application components that can be easily connected to their software
+environment by means of ports and adapters. This architectural approach enables
+the system to serve as an AI agent orchestration platform that owns the
+workflow, conversations, tool surface, hooks, and VCS primitives while hosting
+pluggable agent engines as backend adapters.
 
-The architecture follows the principle of dependency inversion, where the application or application component contains the core business logic and receives commands or queries from the ports, and sends requests out through the ports to external actors, which are implemented through adapters. This design ensures that Corbusier's core orchestration logic remains technology-agnostic and can adapt to changing external systems without requiring modifications to the business logic.
+The architecture follows the principle of dependency inversion, where the
+application or application component contains the core business logic and
+receives commands or queries from the ports, and sends requests out through the
+ports to external actors, which are implemented through adapters. This design
+ensures that Corbusier's core orchestration logic remains technology-agnostic
+and can adapt to changing external systems without requiring modifications to
+the business logic.
 
-The system leverages the Model Context Protocol (MCP), an open protocol that enables seamless integration between LLM applications and external data sources and tools, using JSON-RPC 2.0 messages to establish communication between servers that provide context and capabilities. This protocol serves as the backbone for tool orchestration, ensuring standardized communication across all agent backends.
+The system leverages the Model Context Protocol (MCP), an open protocol that
+enables seamless integration between LLM applications and external data sources
+and tools, using JSON-RPC 2.0 messages to establish communication between
+servers that provide context and capabilities. This protocol serves as the
+backbone for tool orchestration, ensuring standardized communication across all
+agent backends.
 
-The hexagonal architecture provides three key benefits for Corbusier: testability through inherent loose coupling that makes writing unit tests and testing in isolation easier, technology adaptability that prevents vendor lock-in, and maintainability through clear separation of concerns between domain logic and infrastructure code.
+The hexagonal architecture provides three key benefits for Corbusier:
+testability through inherent loose coupling that makes writing unit tests and
+testing in isolation easier, technology adaptability that prevents vendor
+lock-in, and maintainability through clear separation of concerns between
+domain logic and infrastructure code.
 
-### 5.1.2 Core Components Table
+#### 5.1.2 Core Components Table
 
-| Component Name | Primary Responsibility | Key Dependencies | Integration Points |
-|---|---|---|---|
-| Conversation Orchestrator | Canonical message history management and agent coordination | Message Bus, Persistence Layer | Agent Backends, HTTP API, Event Streaming |
-| Agent Orchestrator | Pluggable agent backend hosting and turn execution | Tool Registry, Hook Engine | Claude Code SDK, Codex CLI App Server |
-| Tool Registry & Router | MCP server hosting and tool execution routing | MCP Multiplexer, Workspace Manager | Weaver, Battery Tools, Custom MCP Servers |
-| Task Service | Issue-to-branch-to-PR workflow automation | VCS Adapters, Workspace Manager | GitHub/GitLab APIs, Encapsulation Layer |
+| Component Name            | Primary Responsibility                                      | Key Dependencies                   | Integration Points                        |
+| ------------------------- | ----------------------------------------------------------- | ---------------------------------- | ----------------------------------------- |
+| Conversation Orchestrator | Canonical message history management and agent coordination | Message Bus, Persistence Layer     | Agent Backends, HTTP API, Event Streaming |
+| Agent Orchestrator        | Pluggable agent backend hosting and turn execution          | Tool Registry, Hook Engine         | Claude Code SDK, Codex CLI App Server     |
+| Tool Registry & Router    | MCP server hosting and tool execution routing               | MCP Multiplexer, Workspace Manager | Weaver, Battery Tools, Custom MCP Servers |
+| Task Service              | Issue-to-branch-to-PR workflow automation                   | VCS Adapters, Workspace Manager    | GitHub/GitLab APIs, Encapsulation Layer   |
 
-### 5.1.3 Data Flow Description
+#### 5.1.3 Data Flow Description
 
-The primary data flow in Corbusier follows a request-response pattern with event-driven orchestration. User messages enter through the HTTP API and are processed by the Conversation Orchestrator, which maintains canonical message format across all agent backends. The Agent Orchestrator selects appropriate agent backends based on task context and routes tool calls through the Tool Registry to MCP-compliant servers.
+The primary data flow in Corbusier follows a request-response pattern with
+event-driven orchestration. User messages enter through the HTTP API and are
+processed by the Conversation Orchestrator, which maintains canonical message
+format across all agent backends. The Agent Orchestrator selects appropriate
+agent backends based on task context and routes tool calls through the Tool
+Registry to MCP-compliant servers.
 
-With the Apps SDK integration, MCP serves as the backbone that keeps server, model, and UI in sync by standardizing the wire format, authentication, and metadata, allowing ChatGPT to reason about applications the same way it reasons about built-in tools. This standardization ensures consistent tool execution regardless of the underlying agent backend.
+With the Apps SDK integration, MCP serves as the backbone that keeps server,
+model, and UI in sync by standardizing the wire format, authentication, and
+metadata, allowing ChatGPT to reason about applications the same way it reasons
+about built-in tools. This standardization ensures consistent tool execution
+regardless of the underlying agent backend.
 
-File modifications flow exclusively through Weaver as the authoritative file editing tool, preventing "stealth edits" by agent backends and ensuring comprehensive change tracking. The Hook Engine monitors all system events and enforces governance policies at configured trigger points, with results flowing back into the conversation context for agent awareness.
+File modifications flow exclusively through Weaver as the authoritative file
+editing tool, preventing "stealth edits" by agent backends and ensuring
+comprehensive change tracking. The Hook Engine monitors all system events and
+enforces governance policies at configured trigger points, with results flowing
+back into the conversation context for agent awareness.
 
-Task lifecycle data flows from VCS issue creation through branch management to pull request completion, with state transitions managed by the Task Service and synchronized across all system components through the event bus architecture.
+Task lifecycle data flows from VCS issue creation through branch management to
+pull request completion, with state transitions managed by the Task Service and
+synchronized across all system components through the event bus architecture.
 
-### 5.1.4 External Integration Points
+#### 5.1.4 External Integration Points
 
-| System Name | Integration Type | Data Exchange Pattern | Protocol/Format |
-|---|---|---|---|
-| Claude Code SDK | Agent Backend Adapter | Bidirectional streaming | Native SDK API |
-| GitHub/GitLab | VCS Provider Adapter | REST API + Webhooks | JSON over HTTPS |
-| Weaver | File Editing Tool | MCP Server Integration | JSON-RPC 2.0 over STDIO |
-| Podbot | Encapsulation Provider | Container Runtime API | Docker API / Process Management |
+| System Name     | Integration Type       | Data Exchange Pattern   | Protocol/Format                 |
+| --------------- | ---------------------- | ----------------------- | ------------------------------- |
+| Claude Code SDK | Agent Backend Adapter  | Bidirectional streaming | Native SDK API                  |
+| GitHub/GitLab   | VCS Provider Adapter   | REST API + Webhooks     | JSON over HTTPS                 |
+| Weaver          | File Editing Tool      | MCP Server Integration  | JSON-RPC 2.0 over STDIO         |
+| Podbot          | Encapsulation Provider | Container Runtime API   | Docker API / Process Management |
 
-## 5.2 Component Details
+### 5.2 Component Details
 
-### 5.2.1 Conversation Orchestrator
+#### 5.2.1 Conversation Orchestrator
 
-**Purpose and Responsibilities**
-The Conversation Orchestrator serves as the central hub for all conversational interactions, maintaining canonical message history across different agent backends and ensuring consistent conversation experience. It handles message parsing, slash command expansion, context preservation during agent handoffs, and real-time event streaming to connected clients.
+- **Purpose and Responsibilities:** The Conversation Orchestrator serves as the
+  central hub for all conversational interactions, maintaining canonical
+  message history across different agent backends and ensuring consistent
+  conversation experience. It handles message parsing, slash command expansion,
+  context preservation during agent handoffs, and real-time event streaming to
+  connected clients.
+- **Technologies and Frameworks:** Built using Actix Web, one of the fastest web
+  frameworks available according to the TechEmpower Framework Benchmark,
+  providing powerful, pragmatic, and extremely fast web framework capabilities
+  for Rust. The component leverages Tokio for asynchronous message processing
+  and SQLx for conversation persistence with PostgreSQL backend.
+- **Key Interfaces and APIs:** Exposes RESTful HTTP endpoints for conversation
+  management (`POST /conversations/{id}/messages`,
+  `GET /conversations/{id}/history`) and WebSocket/SSE connections for
+  real-time event streaming. Implements the ConversationPort trait for internal
+  service communication and integrates with the Message Bus for event-driven
+  coordination.
+- **Data Persistence Requirements:** Utilizes event sourcing pattern with
+  append-only message storage in PostgreSQL, ensuring immutable conversation
+  history. Message metadata includes timestamps, agent backend information,
+  tool call results, and slash command expansions for complete audit trails.
+- **Scaling Considerations:** Designed for horizontal scaling with stateless
+  message processing and shared conversation state through database
+  persistence. Connection pooling supports up to 100 concurrent conversations
+  with automatic load balancing across multiple service instances.
 
-**Technologies and Frameworks**
-Built using Actix Web, one of the fastest web frameworks available according to the TechEmpower Framework Benchmark, providing powerful, pragmatic, and extremely fast web framework capabilities for Rust. The component leverages Tokio for asynchronous message processing and SQLx for conversation persistence with PostgreSQL backend.
+#### 5.2.2 Agent Orchestrator
 
-**Key Interfaces and APIs**
-Exposes RESTful HTTP endpoints for conversation management (`POST /conversations/{id}/messages`, `GET /conversations/{id}/history`) and WebSocket/SSE connections for real-time event streaming. Implements the ConversationPort trait for internal service communication and integrates with the Message Bus for event-driven coordination.
+- **Purpose and Responsibilities:** The Agent Orchestrator manages the lifecycle
+  of agent backend sessions, coordinates turn execution across different AI
+  agent engines, and provides unified tool access through schema translation.
+  It implements the adapter pattern to support pluggable agent backends while
+  maintaining consistent orchestration logic.
+- **Technologies and Frameworks:** Implements async Rust traits for agent
+  backend abstraction, with concrete adapters for Claude Code SDK and Codex CLI
+  App Server. Uses Tokio for concurrent turn execution and implements circuit
+  breaker patterns for resilient agent communication.
+- **Key Interfaces and APIs:** Defines the AgentHostPort trait for backend
+  integration and ToolRouterPort for tool execution coordination. Provides turn
+  streaming capabilities through async iterators and implements cancellation
+  support using Tokio cancellation tokens.
+- **Data Persistence Requirements:** Stores agent session metadata, turn
+  execution logs, and tool call audit trails. Maintains agent capability
+  matrices and tool schema mappings for cross-backend compatibility.
+- **Scaling Considerations:** Supports up to 50 concurrent agent turns with
+  automatic resource management and session cleanup. Implements connection
+  pooling for agent backend APIs and provides graceful degradation when
+  backends become unavailable.
 
-**Data Persistence Requirements**
-Utilizes event sourcing pattern with append-only message storage in PostgreSQL, ensuring immutable conversation history. Message metadata includes timestamps, agent backend information, tool call results, and slash command expansions for complete audit trails.
+#### 5.2.3 Tool Registry & Router
 
-**Scaling Considerations**
-Designed for horizontal scaling with stateless message processing and shared conversation state through database persistence. Connection pooling supports up to 100 concurrent conversations with automatic load balancing across multiple service instances.
+- **Purpose and Responsibilities:** Implements MCP server hosting with three
+  core capabilities: listing tools with JSON Schema input and output contracts,
+  executing tool calls with arguments corresponding to user intent, and
+  managing tool lifecycle. Routes all tool executions through MCP-compliant
+  interfaces while providing consistent tool access across different agent
+  backends.
+- **Technologies and Frameworks:** Built on JSON-RPC 2.0 message protocol,
+  taking inspiration from the Language Server Protocol to standardize how to
+  integrate additional context and tools into the ecosystem of AI applications.
+  Implements both STDIO and HTTP+SSE transport mechanisms for MCP server
+  communication.
+- **Key Interfaces and APIs:** Exposes MCP-compliant tool discovery
+  (`tools/list`) and execution (`tools/call`) endpoints. Implements tool schema
+  translation between agent-specific formats and canonical MCP schemas.
+  Provides tool authentication and authorization through workspace-scoped
+  access control.
+- **Data Persistence Requirements:** Maintains tool registry metadata, execution
+  logs, and capability annotations. Stores tool schema mappings and access
+  control policies with versioning support for tool updates.
+- **Scaling Considerations:** Designed to host up to 50 concurrent MCP servers
+  with automatic lifecycle management. Implements tool execution queuing and
+  resource limits to prevent system overload during high-throughput scenarios.
 
-### 5.2.2 Agent Orchestrator
+#### 5.2.4 Task Service
 
-**Purpose and Responsibilities**
-The Agent Orchestrator manages the lifecycle of agent backend sessions, coordinates turn execution across different AI agent engines, and provides unified tool access through schema translation. It implements the adapter pattern to support pluggable agent backends while maintaining consistent orchestration logic.
+- **Purpose and Responsibilities:** Manages the complete task lifecycle from VCS
+  issue creation through branch management to pull request completion.
+  Coordinates workspace setup, maintains task-branch-PR associations, and
+  handles state transitions with comprehensive audit logging.
+- **Technologies and Frameworks:** Implements domain-driven design with Task
+  aggregate managing state transitions. Uses VCS adapter pattern for
+  GitHub/GitLab integration and coordinates with Podbot for workspace
+  encapsulation.
+- **Key Interfaces and APIs:** Provides task management endpoints
+  (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through the
+  VcsHostPort trait. Implements webhook handlers for external VCS events and
+  review comment ingestion.
+- **Data Persistence Requirements:** Stores task metadata, state transition
+  history, and VCS association mappings. Maintains branch naming policies and
+  workspace configuration with support for task archival and recovery.
+- **Scaling Considerations:** Supports concurrent task management with
+  optimistic locking for state transitions. Implements task queuing for
+  workspace resource allocation and provides batch operations for bulk task
+  management.
 
-**Technologies and Frameworks**
-Implements async Rust traits for agent backend abstraction, with concrete adapters for Claude Code SDK and Codex CLI App Server. Uses Tokio for concurrent turn execution and implements circuit breaker patterns for resilient agent communication.
-
-**Key Interfaces and APIs**
-Defines the AgentHostPort trait for backend integration and ToolRouterPort for tool execution coordination. Provides turn streaming capabilities through async iterators and implements cancellation support using Tokio cancellation tokens.
-
-**Data Persistence Requirements**
-Stores agent session metadata, turn execution logs, and tool call audit trails. Maintains agent capability matrices and tool schema mappings for cross-backend compatibility.
-
-**Scaling Considerations**
-Supports up to 50 concurrent agent turns with automatic resource management and session cleanup. Implements connection pooling for agent backend APIs and provides graceful degradation when backends become unavailable.
-
-### 5.2.3 Tool Registry & Router
-
-**Purpose and Responsibilities**
-Implements MCP server hosting with three core capabilities: listing tools with JSON Schema input and output contracts, executing tool calls with arguments corresponding to user intent, and managing tool lifecycle. Routes all tool executions through MCP-compliant interfaces while providing consistent tool access across different agent backends.
-
-**Technologies and Frameworks**
-Built on JSON-RPC 2.0 message protocol, taking inspiration from the Language Server Protocol to standardize how to integrate additional context and tools into the ecosystem of AI applications. Implements both STDIO and HTTP+SSE transport mechanisms for MCP server communication.
-
-**Key Interfaces and APIs**
-Exposes MCP-compliant tool discovery (`tools/list`) and execution (`tools/call`) endpoints. Implements tool schema translation between agent-specific formats and canonical MCP schemas. Provides tool authentication and authorization through workspace-scoped access control.
-
-**Data Persistence Requirements**
-Maintains tool registry metadata, execution logs, and capability annotations. Stores tool schema mappings and access control policies with versioning support for tool updates.
-
-**Scaling Considerations**
-Designed to host up to 50 concurrent MCP servers with automatic lifecycle management. Implements tool execution queuing and resource limits to prevent system overload during high-throughput scenarios.
-
-### 5.2.4 Task Service
-
-**Purpose and Responsibilities**
-Manages the complete task lifecycle from VCS issue creation through branch management to pull request completion. Coordinates workspace setup, maintains task-branch-PR associations, and handles state transitions with comprehensive audit logging.
-
-**Technologies and Frameworks**
-Implements domain-driven design with Task aggregate managing state transitions. Uses VCS adapter pattern for GitHub/GitLab integration and coordinates with Podbot for workspace encapsulation.
-
-**Key Interfaces and APIs**
-Provides task management endpoints (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through the VcsHostPort trait. Implements webhook handlers for external VCS events and review comment ingestion.
-
-**Data Persistence Requirements**
-Stores task metadata, state transition history, and VCS association mappings. Maintains branch naming policies and workspace configuration with support for task archival and recovery.
-
-**Scaling Considerations**
-Supports concurrent task management with optimistic locking for state transitions. Implements task queuing for workspace resource allocation and provides batch operations for bulk task management.
-
-### 5.2.5 Component Interaction Diagrams
+#### 5.2.5 Component Interaction Diagrams
 
 ```mermaid
 sequenceDiagram
@@ -3219,7 +3454,7 @@ sequenceDiagram
     Conv-->>User: SSE Event Stream
 ```
 
-### 5.2.6 State Transition Diagrams
+#### 5.2.6 State Transition Diagrams
 
 ```mermaid
 stateDiagram-v2
@@ -3251,61 +3486,115 @@ stateDiagram-v2
     end note
 ```
 
-## 5.3 Technical Decisions
+### 5.3 Technical Decisions
 
-### 5.3.1 Architecture Style Decisions and Tradeoffs
+#### 5.3.1 Architecture Style Decisions and Tradeoffs
 
-**Hexagonal Architecture Selection**
-The hexagonal architecture clearly separates core logic from input and output infrastructure, with the main principle being to have inputs and outputs on the edges of technology-agnostic code, commonly called "the Application" or "the Hexagon". This decision enables Corbusier to serve as an orchestration platform rather than being tightly coupled to specific agent backends or tools.
+##### Hexagonal Architecture Selection
 
-The tradeoff analysis reveals that while the additional adapter code introduces maintenance overhead and is justified only when the application requires several input sources and output destinations or when inputs and outputs must change over time, Corbusier's multi-agent orchestration requirements clearly justify this complexity. The architecture prevents technology lock-in and enables independent evolution of agent backends, tools, and infrastructure components.
+The hexagonal architecture clearly separates core logic from input and output
+infrastructure, with the main principle being to have inputs and outputs on the
+edges of technology-agnostic code, commonly called "the Application" or "the
+Hexagon". This decision enables Corbusier to serve as an orchestration platform
+rather than being tightly coupled to specific agent backends or tools.
 
-**Event-Driven vs Request-Response Patterns**
-Corbusier implements a hybrid approach combining synchronous request-response for user interactions with asynchronous event-driven patterns for internal coordination. This decision balances user experience requirements (immediate feedback) with system scalability needs (loose coupling between components).
+The tradeoff analysis reveals that while the additional adapter code introduces
+maintenance overhead and is justified only when the application requires
+several input sources and output destinations or when inputs and outputs must
+change over time, Corbusier's multi-agent orchestration requirements clearly
+justify this complexity. The architecture prevents technology lock-in and
+enables independent evolution of agent backends, tools, and infrastructure
+components.
 
-**Microservices vs Modular Monolith**
-The system adopts a modular monolith approach with clear component boundaries defined by hexagonal architecture principles. This decision prioritizes development velocity and operational simplicity while maintaining the flexibility to extract components into separate services as scaling requirements evolve.
+##### Event-Driven vs Request-Response Patterns
 
-### 5.3.2 Communication Pattern Choices
+Corbusier implements a hybrid approach combining synchronous request-response
+for user interactions with asynchronous event-driven patterns for internal
+coordination. This decision balances user experience requirements (immediate
+feedback) with system scalability needs (loose coupling between components).
 
-| Pattern Type | Use Case | Justification | Implementation |
-|---|---|---|---|
-| Synchronous HTTP | User-facing APIs | Immediate feedback required | Actix Web REST endpoints |
+##### Microservices vs Modular Monolith
+
+The system adopts a modular monolith approach with clear component boundaries
+defined by hexagonal architecture principles. This decision prioritizes
+development velocity and operational simplicity while maintaining the
+flexibility to extract components into separate services as scaling
+requirements evolve.
+
+#### 5.3.2 Communication Pattern Choices
+
+| Pattern Type        | Use Case              | Justification                     | Implementation                  |
+| ------------------- | --------------------- | --------------------------------- | ------------------------------- |
+| Synchronous HTTP    | User-facing APIs      | Immediate feedback required       | Actix Web REST endpoints        |
 | Asynchronous Events | Internal coordination | Loose coupling between components | Message bus with event sourcing |
-| Streaming | Real-time updates | Live progress visibility | WebSocket/SSE connections |
-| JSON-RPC 2.0 | Tool integration | MCP protocol compliance | STDIO and HTTP+SSE transports |
+| Streaming           | Real-time updates     | Live progress visibility          | WebSocket/SSE connections       |
+| JSON-RPC 2.0        | Tool integration      | MCP protocol compliance           | STDIO and HTTP+SSE transports   |
 
-### 5.3.3 Data Storage Solution Rationale
+#### 5.3.3 Data Storage Solution Rationale
 
-**PostgreSQL for Primary Storage**
-PostgreSQL provides ACID compliance for conversation and task state management, native JSONB support for flexible message formats, and proven scalability for concurrent operations. The choice supports both relational data (task associations) and document storage (conversation messages) within a single system.
+##### PostgreSQL for Primary Storage
 
-**Event Sourcing for Audit Trails**
-Event sourcing ensures complete auditability of all system operations, supports temporal queries for debugging and compliance, and enables system state reconstruction from historical events. This pattern aligns with the requirement for comprehensive audit trails across all agent interactions.
+PostgreSQL provides ACID compliance for conversation and task state management,
+native JSONB support for flexible message formats, and proven scalability for
+concurrent operations. The choice supports both relational data (task
+associations) and document storage (conversation messages) within a single
+system.
 
-**SQLite for Development**
-SQLite provides zero-configuration development environments while maintaining compatibility with the PostgreSQL production schema through SQLx's database-agnostic query interface.
+##### Event Sourcing for Audit Trails (Storage Rationale)
 
-### 5.3.4 Caching Strategy Justification
+Event sourcing ensures complete auditability of all system operations, supports
+temporal queries for debugging and compliance, and enables system state
+reconstruction from historical events. This pattern aligns with the requirement
+for comprehensive audit trails across all agent interactions.
 
-**Multi-Level Caching Architecture**
-The caching strategy implements three distinct levels: application-level caching for tool registries and agent sessions, data-level caching for frequently accessed conversations and tasks, and external caching for VCS data and agent responses. This approach optimizes for different access patterns and data volatility characteristics.
+##### SQLite for Development
 
-**Cache Invalidation Strategy**
-Event-driven cache invalidation ensures consistency across distributed cache layers while minimizing unnecessary cache misses. The strategy balances data freshness requirements with performance optimization goals.
+SQLite provides zero-configuration development environments while maintaining
+compatibility with the PostgreSQL production schema through SQLx's
+database-agnostic query interface.
 
-### 5.3.5 Security Mechanism Selection
+#### 5.3.4 Caching Strategy Justification
 
-**Workspace Encapsulation**
-Podbot container-based encapsulation provides secure isolation for tool execution and repository operations. This decision addresses the security requirements for arbitrary code execution while maintaining development workflow flexibility.
+##### Multi-Level Caching Architecture
 
-**MCP Security Implementation**
-The Model Context Protocol enables powerful capabilities through arbitrary data access and code execution paths, requiring important security and trust considerations, with tools representing arbitrary code execution that must be treated with appropriate caution. Corbusier implements robust consent and authorization flows, access controls, and security best practices as recommended by the MCP specification.
+The caching strategy implements three distinct levels: application-level
+caching for tool registries and agent sessions, data-level caching for
+frequently accessed conversations and tasks, and external caching for VCS data
+and agent responses. This approach optimizes for different access patterns and
+data volatility characteristics.
 
-**Authentication and Authorization Framework**
-Role-based access control (RBAC) with workspace-scoped permissions ensures appropriate access boundaries while supporting collaborative development workflows. The framework integrates with existing enterprise authentication systems through adapter patterns.
+##### Cache Invalidation Strategy
 
-### 5.3.6 Architecture Decision Records
+Event-driven cache invalidation ensures consistency across distributed cache
+layers while minimizing unnecessary cache misses. The strategy balances data
+freshness requirements with performance optimization goals.
+
+#### 5.3.5 Security Mechanism Selection
+
+##### Workspace Encapsulation
+
+Podbot container-based encapsulation provides secure isolation for tool
+execution and repository operations. This decision addresses the security
+requirements for arbitrary code execution while maintaining development
+workflow flexibility.
+
+##### MCP Security Implementation
+
+The Model Context Protocol enables powerful capabilities through arbitrary data
+access and code execution paths, requiring important security and trust
+considerations, with tools representing arbitrary code execution that must be
+treated with appropriate caution. Corbusier implements robust consent and
+authorization flows, access controls, and security best practices as
+recommended by the MCP specification.
+
+##### Authentication and Authorization Framework
+
+Role-based access control (RBAC) with workspace-scoped permissions ensures
+appropriate access boundaries while supporting collaborative development
+workflows. The framework integrates with existing enterprise authentication
+systems through adapter patterns.
+
+#### 5.3.6 Architecture Decision Records
 
 ```mermaid
 flowchart TD
@@ -3343,74 +3632,126 @@ flowchart TD
     RATIONALE --> TRADEOFFS
 ```
 
-## 5.4 Cross-Cutting Concerns
+### 5.4 Cross-Cutting Concerns
 
-### 5.4.1 Monitoring and Observability Approach
+#### 5.4.1 Monitoring and Observability Approach
 
-**Structured Logging with Tracing**
-Corbusier implements the tracing framework for instrumenting Rust programs to collect structured, event-based diagnostic information, with tracing maintained by the Tokio project but not requiring the tokio runtime. The system generates structured logs with correlation IDs for request tracking across service boundaries, enabling comprehensive debugging and performance analysis.
+##### Structured Logging with Tracing
 
-**Distributed Tracing Integration**
-The tracing crates provide compatibility with OpenTelemetry SDK, allowing logs to be sent for further analysis. This integration supports end-to-end request tracing across agent backends, tool executions, and VCS operations, providing visibility into complex multi-component workflows.
+Corbusier implements the tracing framework for instrumenting Rust programs to
+collect structured, event-based diagnostic information, with tracing maintained
+by the Tokio project but not requiring the tokio runtime. The system generates
+structured logs with correlation IDs for request tracking across service
+boundaries, enabling comprehensive debugging and performance analysis.
 
-**Performance Metrics Collection**
-The system collects application metrics including request latency, throughput, error rates, agent utilization, tool execution success rates, and resource consumption. Business metrics track task completion rates, conversation engagement, and workflow efficiency to support capacity planning and optimization efforts.
+##### Distributed Tracing Integration
 
-**Health Monitoring and Alerting**
-Automated health checks monitor core services, agent backend availability, MCP server status, and database connectivity. Alert thresholds trigger notifications for performance degradation, error rate increases, and service unavailability to ensure rapid incident response.
+The tracing crates provide compatibility with OpenTelemetry SDK, allowing logs
+to be sent for further analysis. This integration supports end-to-end request
+tracing across agent backends, tool executions, and VCS operations, providing
+visibility into complex multi-component workflows.
 
-### 5.4.2 Logging and Tracing Strategy
+##### Performance Metrics Collection
 
-| Log Level | Use Case | Retention Period | Processing Method |
-|---|---|---|---|
-| ERROR | System failures, agent errors | 90 days | Real-time alerting |
-| WARN | Policy violations, degraded performance | 30 days | Batch analysis |
-| INFO | User actions, task state changes | 30 days | Structured indexing |
-| DEBUG | Tool executions, internal flows | 7 days | On-demand analysis |
+The system collects application metrics including request latency, throughput,
+error rates, agent utilization, tool execution success rates, and resource
+consumption. Business metrics track task completion rates, conversation
+engagement, and workflow efficiency to support capacity planning and
+optimization efforts.
 
-### 5.4.3 Error Handling Patterns
+##### Health Monitoring and Alerting
 
-**Hierarchical Error Handling**
-The system implements layered error handling with domain-specific error types, adapter-level error translation, and user-friendly error messages. Critical errors trigger automatic recovery procedures while non-critical errors generate warnings and continue processing.
+Automated health checks monitor core services, agent backend availability, MCP
+server status, and database connectivity. Alert thresholds trigger
+notifications for performance degradation, error rate increases, and service
+unavailability to ensure rapid incident response.
 
-**Circuit Breaker Implementation**
-Circuit breakers protect against cascading failures in agent backend communication, tool execution, and external service integration. The pattern provides graceful degradation when dependencies become unavailable and automatic recovery when services restore.
+#### 5.4.2 Logging and Tracing Strategy
 
-**Retry Mechanisms with Exponential Backoff**
-Configurable retry policies handle transient failures in network communication, database operations, and external API calls. Exponential backoff prevents overwhelming failing services while maximizing success probability for recoverable errors.
+| Log Level | Use Case                                | Retention Period | Processing Method   |
+| --------- | --------------------------------------- | ---------------- | ------------------- |
+| ERROR     | System failures, agent errors           | 90 days          | Real-time alerting  |
+| WARN      | Policy violations, degraded performance | 30 days          | Batch analysis      |
+| INFO      | User actions, task state changes        | 30 days          | Structured indexing |
+| DEBUG     | Tool executions, internal flows         | 7 days           | On-demand analysis  |
 
-### 5.4.4 Authentication and Authorization Framework
+#### 5.4.3 Error Handling Patterns
 
-**Role-Based Access Control (RBAC)**
-The authorization framework implements hierarchical roles (Admin, Team Lead, Developer, Viewer) with workspace-scoped permissions. Role inheritance and permission aggregation support complex organizational structures while maintaining security boundaries.
+##### Hierarchical Error Handling
 
-**Workspace-Scoped Security**
-Security policies enforce access control at the workspace level, ensuring users can only access tasks, conversations, and tools within their authorized scope. This approach supports multi-tenant deployments and project isolation requirements.
+The system implements layered error handling with domain-specific error types,
+adapter-level error translation, and user-friendly error messages. Critical
+errors trigger automatic recovery procedures while non-critical errors generate
+warnings and continue processing.
 
-**API Authentication**
-HTTP API endpoints require authentication through JWT tokens or API keys, with rate limiting and request validation to prevent abuse. WebSocket connections implement token-based authentication with automatic session management.
+##### Circuit Breaker Implementation
 
-### 5.4.5 Performance Requirements and SLAs
+Circuit breakers protect against cascading failures in agent backend
+communication, tool execution, and external service integration. The pattern
+provides graceful degradation when dependencies become unavailable and
+automatic recovery when services restore.
 
-| Service Category | Availability Target | Response Time Target | Throughput Target |
-|---|---|---|---|
-| Core Orchestration | 99.9% | <100ms message processing | 1000 messages/second |
-| Agent Backends | 99.5% | <30s turn completion | 50 concurrent turns |
-| Tool Execution | 99.5% | <2s execution initiation | 500 tool calls/minute |
-| VCS Integration | 99.0% | <5s operation completion | 100 operations/minute |
+##### Retry Mechanisms with Exponential Backoff
 
-### 5.4.6 Disaster Recovery Procedures
+Configurable retry policies handle transient failures in network communication,
+database operations, and external API calls. Exponential backoff prevents
+overwhelming failing services while maximizing success probability for
+recoverable errors.
 
-**Automated Backup Strategy**
-PostgreSQL databases utilize continuous WAL archiving with point-in-time recovery capabilities. Conversation data, task state, and configuration settings are backed up every 6 hours with 30-day retention for operational recovery and 1-year retention for compliance requirements.
+#### 5.4.4 Authentication and Authorization Framework
 
-**Service Recovery Procedures**
-Automated failover mechanisms detect service failures and redirect traffic to healthy instances within 30 seconds. Database failover utilizes read replicas promoted to primary status with automatic DNS updates to minimize service disruption.
+##### Role-Based Access Control (RBAC)
 
-**Data Recovery and Validation**
-Recovery procedures include data integrity validation, conversation history verification, and task state consistency checks. Automated testing validates recovery procedures monthly to ensure reliability during actual incidents.
+The authorization framework implements hierarchical roles (Admin, Team Lead,
+Developer, Viewer) with workspace-scoped permissions. Role inheritance and
+permission aggregation support complex organizational structures while
+maintaining security boundaries.
 
-### 5.4.7 Error Handling Flow Diagrams
+##### Workspace-Scoped Security
+
+Security policies enforce access control at the workspace level, ensuring users
+can only access tasks, conversations, and tools within their authorized scope.
+This approach supports multi-tenant deployments and project isolation
+requirements.
+
+##### API Authentication
+
+HTTP API endpoints require authentication through JWT tokens or API keys, with
+rate limiting and request validation to prevent abuse. WebSocket connections
+implement token-based authentication with automatic session management.
+
+#### 5.4.5 Performance Requirements and SLAs
+
+| Service Category   | Availability Target | Response Time Target      | Throughput Target     |
+| ------------------ | ------------------- | ------------------------- | --------------------- |
+| Core Orchestration | 99.9%               | <100ms message processing | 1000 messages/second  |
+| Agent Backends     | 99.5%               | <30s turn completion      | 50 concurrent turns   |
+| Tool Execution     | 99.5%               | <2s execution initiation  | 500 tool calls/minute |
+| VCS Integration    | 99.0%               | <5s operation completion  | 100 operations/minute |
+
+#### 5.4.6 Disaster Recovery Procedures
+
+##### Automated Backup Strategy
+
+PostgreSQL databases utilize continuous WAL archiving with point-in-time
+recovery capabilities. Conversation data, task state, and configuration
+settings are backed up every 6 hours with 30-day retention for operational
+recovery and 1-year retention for compliance requirements.
+
+##### Service Recovery Procedures
+
+Automated failover mechanisms detect service failures and redirect traffic to
+healthy instances within 30 seconds. Database failover utilizes read replicas
+promoted to primary status with automatic DNS updates to minimize service
+disruption.
+
+##### Data Recovery and Validation
+
+Recovery procedures include data integrity validation, conversation history
+verification, and task state consistency checks. Automated testing validates
+recovery procedures monthly to ensure reliability during actual incidents.
+
+#### 5.4.7 Error Handling Flow Diagrams
 
 ```mermaid
 flowchart TD
@@ -3453,16 +3794,24 @@ flowchart TD
     UPDATE_STATUS --> AUDIT_TRAIL
 ```
 
-# 6. SYSTEM COMPONENTS DESIGN
+## 6. SYSTEM COMPONENTS DESIGN
 
-## 6.1 Core Domain Components
+### 6.1 Core Domain Components
 
-### 6.1.1 Conversation Management Component
+#### 6.1.1 Conversation Management Component
 
-**Component Architecture**
-The hexagonal architecture, or ports and adapters architecture, is an architectural pattern used in software design. It aims at creating loosely coupled application components that can be easily connected to their software environment by means of ports and adapters. This makes components exchangeable at any level and facilitates test automation.
+##### Component Architecture
 
-The Conversation Management Component serves as the central orchestrator for all conversational interactions within Corbusier, implementing the core domain logic for message handling, slash command processing, and context preservation across agent handoffs.
+The hexagonal architecture, or ports and adapters architecture, is an
+architectural pattern used in software design. It aims at creating loosely
+coupled application components that can be easily connected to their software
+environment by means of ports and adapters. This makes components exchangeable
+at any level and facilitates test automation.
+
+The Conversation Management Component serves as the central orchestrator for
+all conversational interactions within Corbusier, implementing the core domain
+logic for message handling, slash command processing, and context preservation
+across agent handoffs.
 
 ```mermaid
 graph TB
@@ -3514,19 +3863,26 @@ graph TB
     EBP --> MBA
 ```
 
-**Domain Model Structure**
+##### Domain Model Structure
 
-| Entity | Attributes | Invariants | Relationships |
-|---|---|---|---|
-| Conversation | conversation_id, task_id, messages, context, state | Unique ID, append-only messages | 1:N with Messages, 1:1 with Task |
-| Message | message_id, role, content, metadata, timestamp | Immutable after creation, valid role type | N:1 with Conversation |
-| ConversationContext | agent_backend, tool_policy, templates, workspace_ref | Valid agent selection, consistent policies | 1:1 with Conversation |
-| SlashCommand | command_type, parameters, expansion_result, audit_trail | Valid command syntax, traceable execution | N:1 with Message |
+| Entity              | Attributes                                              | Invariants                                 | Relationships                    |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------ | -------------------------------- |
+| Conversation        | conversation_id, task_id, messages, context, state      | Unique ID, append-only messages            | 1:N with Messages, 1:1 with Task |
+| Message             | message_id, role, content, metadata, timestamp          | Immutable after creation, valid role type  | N:1 with Conversation            |
+| ConversationContext | agent_backend, tool_policy, templates, workspace_ref    | Valid agent selection, consistent policies | 1:1 with Conversation            |
+| SlashCommand        | command_type, parameters, expansion_result, audit_trail | Valid command syntax, traceable execution  | N:1 with Message                 |
 
-**Business Logic Implementation**
-The component implements pure domain logic without external dependencies, ensuring that conversation rules and message processing remain consistent regardless of the underlying infrastructure. The application or application component contains the core business logic. It receives commands or queries from the ports, and sends requests out through the ports to external actors, which are implemented through adapters.
+##### Business Logic Implementation
 
-**Port Definitions**
+The component implements pure domain logic without external dependencies,
+ensuring that conversation rules and message processing remain consistent
+regardless of the underlying infrastructure. The application or application
+component contains the core business logic. It receives commands or queries
+from the ports, and sends requests out through the ports to external actors,
+which are implemented through adapters.
+
+##### Port Definitions
+
 ```rust
 #[async_trait::async_trait]
 pub trait ConversationInputPort: Send + Sync {
@@ -3543,10 +3899,14 @@ pub trait PersistenceStorePort: Send + Sync {
 }
 ```
 
-### 6.1.2 Task Lifecycle Management Component
+#### 6.1.2 Task Lifecycle Management Component
 
-**Component Responsibilities**
-The Task Lifecycle Management Component orchestrates the complete workflow from VCS issue creation through branch management to pull request completion, maintaining state consistency and enforcing business rules throughout the task lifecycle.
+##### Component Responsibilities
+
+The Task Lifecycle Management Component orchestrates the complete workflow from
+VCS issue creation through branch management to pull request completion,
+maintaining state consistency and enforcing business rules throughout the task
+lifecycle.
 
 ```mermaid
 stateDiagram-v2
@@ -3583,16 +3943,20 @@ stateDiagram-v2
     end note
 ```
 
-**Domain Aggregates**
-The Task aggregate serves as the consistency boundary, ensuring that all state transitions follow business rules and maintain referential integrity with associated VCS objects.
+##### Domain Aggregates
 
-| Aggregate Root | Value Objects | Entities | Business Rules |
-|---|---|---|---|
-| Task | TaskOrigin, TaskState, BranchRef, PullRequestRef | TaskEvent, StateTransition | One active branch per task, at most one open PR |
-| Workspace | WorkspaceConfig, EncapsulationSpec | WorkspaceResource, MountPoint | Workspace lifecycle tied to task state |
-| TaskAssociation | IssueRef, MilestoneRef, LinkMetadata | AssociationEvent | Immutable origin reference |
+The Task aggregate serves as the consistency boundary, ensuring that all state
+transitions follow business rules and maintain referential integrity with
+associated VCS objects.
 
-**State Transition Logic**
+| Aggregate Root  | Value Objects                                    | Entities                      | Business Rules                                  |
+| --------------- | ------------------------------------------------ | ----------------------------- | ----------------------------------------------- |
+| Task            | TaskOrigin, TaskState, BranchRef, PullRequestRef | TaskEvent, StateTransition    | One active branch per task, at most one open PR |
+| Workspace       | WorkspaceConfig, EncapsulationSpec               | WorkspaceResource, MountPoint | Workspace lifecycle tied to task state          |
+| TaskAssociation | IssueRef, MilestoneRef, LinkMetadata             | AssociationEvent              | Immutable origin reference                      |
+
+##### State Transition Logic
+
 ```rust
 impl Task {
     pub fn transition_to(&mut self, target_state: TaskState, context: TransitionContext) -> Result<Vec<DomainEvent>> {
@@ -3621,12 +3985,19 @@ impl Task {
 }
 ```
 
-### 6.1.3 Agent Orchestration Component
+#### 6.1.3 Agent Orchestration Component
 
-**Multi-Backend Architecture**
-Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. Whether you're building an AI-powered IDE, enhancing a chat interface, or creating custom AI workflows, MCP provides a standardized way to connect LLMs with the context they need.
+##### Multi-Backend Architecture
 
-The Agent Orchestration Component implements the adapter pattern to support multiple AI agent backends while maintaining consistent orchestration logic and tool access patterns.
+Model Context Protocol (MCP) is an open protocol that enables seamless
+integration between LLM applications and external data sources and tools.
+Whether you're building an AI-powered IDE, enhancing a chat interface, or
+creating custom AI workflows, MCP provides a standardized way to connect LLMs
+with the context they need.
+
+The Agent Orchestration Component implements the adapter pattern to support
+multiple AI agent backends while maintaining consistent orchestration logic and
+tool access patterns.
 
 ```mermaid
 graph TB
@@ -3674,7 +4045,8 @@ graph TB
     TOOL_REG --> SCHEMA_MAP
 ```
 
-**Agent Backend Abstraction**
+##### Agent Backend Abstraction
+
 ```rust
 #[async_trait::async_trait]
 pub trait AgentBackend: Send + Sync {
@@ -3701,21 +4073,30 @@ pub enum TurnEvent {
 }
 ```
 
-**Tool Schema Translation**
-The component handles translation between agent-specific tool call formats and the canonical MCP schema, ensuring consistent tool access across different backends.
+##### Tool Schema Translation
 
-| Agent Backend | Tool Call Format | Schema Translation | Execution Pattern |
-|---|---|---|---|
-| Claude Code SDK | Native function calling | Direct MCP mapping | Streaming with tool results |
-| Codex CLI App Server | Structured commands | Command-to-MCP bridge | Request-response with callbacks |
-| Future Backends | Adapter-specific | Pluggable translators | Configurable patterns |
+The component handles translation between agent-specific tool call formats and
+the canonical MCP schema, ensuring consistent tool access across different
+backends.
 
-### 6.1.4 Tool Registry and Execution Component
+| Agent Backend        | Tool Call Format        | Schema Translation    | Execution Pattern               |
+| -------------------- | ----------------------- | --------------------- | ------------------------------- |
+| Claude Code SDK      | Native function calling | Direct MCP mapping    | Streaming with tool results     |
+| Codex CLI App Server | Structured commands     | Command-to-MCP bridge | Request-response with callbacks |
+| Future Backends      | Adapter-specific        | Pluggable translators | Configurable patterns           |
 
-**MCP Server Hosting Architecture**
-MCP takes some inspiration from the Language Server Protocol, which standardizes how to add support for programming languages across a whole ecosystem of development tools. In a similar way, MCP standardizes how to integrate additional context and tools into the ecosystem of AI applications.
+#### 6.1.4 Tool Registry and Execution Component
 
-The Tool Registry and Execution Component manages MCP server lifecycle, tool discovery, and execution routing while providing consistent tool interfaces across different agent backends.
+##### MCP Server Hosting Architecture
+
+MCP takes some inspiration from the Language Server Protocol, which
+standardizes how to add support for programming languages across a whole
+ecosystem of development tools. In a similar way, MCP standardizes how to
+integrate additional context and tools into the ecosystem of AI applications.
+
+The Tool Registry and Execution Component manages MCP server lifecycle, tool
+discovery, and execution routing while providing consistent tool interfaces
+across different agent backends.
 
 ```mermaid
 graph TB
@@ -3769,8 +4150,11 @@ graph TB
     MCP_HOST --> TEST_RUNNER
 ```
 
-**Tool Registration and Discovery**
-This specification defines the authoritative protocol requirements, based on the TypeScript schema in schema.ts. For implementation guides and examples, visit modelcontextprotocol.io.
+##### Tool Registration and Discovery
+
+This specification defines the authoritative protocol requirements, based on
+the TypeScript schema in schema.ts. For implementation guides and examples,
+visit modelcontextprotocol.io.
 
 ```rust
 pub struct ToolDefinition {
@@ -3801,8 +4185,11 @@ pub struct ToolExecutionContext {
 }
 ```
 
-**Weaver Integration**
-Weaver serves as the authoritative file editing tool, preventing "stealth edits" by agent backends and ensuring comprehensive change tracking through structured change logs.
+##### Weaver Integration
+
+Weaver serves as the authoritative file editing tool, preventing "stealth
+edits" by agent backends and ensuring comprehensive change tracking through
+structured change logs.
 
 ```rust
 pub struct WeaverChangeSet {
@@ -3832,12 +4219,17 @@ pub enum ChangeType {
 }
 ```
 
-## 6.2 Infrastructure Components
+### 6.2 Infrastructure Components
 
-### 6.2.1 HTTP API Layer
+#### 6.2.1 HTTP API Layer
 
-**Actix Web Integration**
-One of the fastest web frameworks available according to the TechEmpower Framework Benchmark. One of the fastest web frameworks available according to the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix Web 4.12.1, providing high-performance REST endpoints and real-time streaming capabilities.
+##### Actix Web Integration
+
+One of the fastest web frameworks available according to the TechEmpower
+Framework Benchmark. One of the fastest web frameworks available according to
+the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix
+Web 4.12.1, providing high-performance REST endpoints and real-time streaming
+capabilities.
 
 ```mermaid
 graph TB
@@ -3890,17 +4282,21 @@ graph TB
     ERR_HAND --> AUDIT_LOG
 ```
 
-**API Endpoint Design**
-Minimum supported Rust version (MSRV) is now 1.75. The API design follows RESTful principles with comprehensive error handling and structured response formats.
+##### API Endpoint Design
 
-| Endpoint Category | Base Path | Authentication | Rate Limiting | Streaming Support |
-|---|---|---|---|---|
-| Conversations | `/api/v1/conversations` | JWT Required | 100 req/min | SSE for turn events |
-| Tasks | `/api/v1/tasks` | JWT Required | 50 req/min | WebSocket for state changes |
-| Tools | `/api/v1/tools` | JWT Required | 200 req/min | SSE for execution logs |
-| Admin | `/api/v1/admin` | Admin Role | 20 req/min | WebSocket for system events |
+Minimum supported Rust version (MSRV) is now 1.75. The API design follows
+RESTful principles with comprehensive error handling and structured response
+formats.
 
-**Request/Response Patterns**
+| Endpoint Category | Base Path               | Authentication | Rate Limiting | Streaming Support           |
+| ----------------- | ----------------------- | -------------- | ------------- | --------------------------- |
+| Conversations     | `/api/v1/conversations` | JWT Required   | 100 req/min   | SSE for turn events         |
+| Tasks             | `/api/v1/tasks`         | JWT Required   | 50 req/min    | WebSocket for state changes |
+| Tools             | `/api/v1/tools`         | JWT Required   | 200 req/min   | SSE for execution logs      |
+| Admin             | `/api/v1/admin`         | Admin Role     | 20 req/min    | WebSocket for system events |
+
+##### Request/Response Patterns
+
 ```rust
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponse<T> {
@@ -3937,10 +4333,13 @@ pub async fn append_message(
 }
 ```
 
-### 6.2.2 Event Streaming Infrastructure
+#### 6.2.2 Event Streaming Infrastructure
 
-**Real-time Event Distribution**
-The event streaming infrastructure provides real-time visibility into system operations through WebSocket and Server-Sent Events, enabling responsive user interfaces and external integrations.
+##### Real-time Event Distribution
+
+The event streaming infrastructure provides real-time visibility into system
+operations through WebSocket and Server-Sent Events, enabling responsive user
+interfaces and external integrations.
 
 ```mermaid
 sequenceDiagram
@@ -3971,7 +4370,8 @@ sequenceDiagram
     SSE->>Client: Send turn_completed event
 ```
 
-**Event Types and Schemas**
+##### Event Types and Schemas
+
 ```rust
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "event_type", content = "data")]
@@ -4013,10 +4413,13 @@ pub enum StreamEvent {
 }
 ```
 
-### 6.2.3 Persistence Layer
+#### 6.2.3 Persistence Layer
 
-**Database Architecture**
-The persistence layer implements a hybrid approach combining relational data for structured entities with JSONB storage for flexible message formats, utilizing PostgreSQL for production and SQLite for development environments.
+##### Database Architecture
+
+The persistence layer implements a hybrid approach combining relational data
+for structured entities with JSONB storage for flexible message formats,
+utilizing PostgreSQL for production and SQLite for development environments.
 
 ```mermaid
 graph TB
@@ -4067,7 +4470,8 @@ graph TB
     SQLITE_ADAPTER --> EVENT_MODEL
 ```
 
-**Schema Design**
+##### Schema Design
+
 ```sql
 -- Conversations table with JSONB for flexible message storage
 CREATE TABLE conversations (
@@ -4114,10 +4518,13 @@ CREATE TABLE domain_events (
 );
 ```
 
-### 6.2.4 Encapsulation and Workspace Management
+#### 6.2.4 Encapsulation and Workspace Management
 
-**Podbot Integration**
-The encapsulation layer provides secure, isolated execution environments for tool operations and repository access through Podbot container management, ensuring consistent development environments and security boundaries.
+##### Podbot Integration
+
+The encapsulation layer provides secure, isolated execution environments for
+tool operations and repository access through Podbot container management,
+ensuring consistent development environments and security boundaries.
 
 ```mermaid
 graph TB
@@ -4169,7 +4576,8 @@ graph TB
     TE --> MON
 ```
 
-**Workspace Configuration**
+##### Workspace Configuration
+
 ```rust
 pub struct WorkspaceConfig {
     pub workspace_id: WorkspaceId,
@@ -4208,12 +4616,15 @@ pub trait EncapsulationProvider: Send + Sync {
 }
 ```
 
-## 6.3 Integration Components
+### 6.3 Integration Components
 
-### 6.3.1 VCS Integration Layer
+#### 6.3.1 VCS Integration Layer
 
-**Multi-Provider Architecture**
-The VCS integration layer supports multiple version control providers through a unified adapter interface, enabling consistent workflow management across GitHub, GitLab, and future providers.
+##### Multi-Provider Architecture
+
+The VCS integration layer supports multiple version control providers through a
+unified adapter interface, enabling consistent workflow management across
+GitHub, GitLab, and future providers.
 
 ```mermaid
 graph TB
@@ -4265,7 +4676,8 @@ graph TB
     EVENT_HANDLER --> RETRY_MGR
 ```
 
-**Provider Abstraction**
+##### Provider Abstraction
+
 ```rust
 #[async_trait::async_trait]
 pub trait VcsProvider: Send + Sync {
@@ -4305,10 +4717,13 @@ pub struct PullRequest {
 }
 ```
 
-### 6.3.2 Review Integration Component
+#### 6.3.2 Review Integration Component
 
-**Frankie Adapter Integration**
-The review integration component leverages Frankie for browser-based review comment ingestion and normalization, enabling interactive review workflows and automated response to feedback.
+##### Frankie Adapter Integration
+
+The review integration component leverages Frankie for browser-based review
+comment ingestion and normalization, enabling interactive review workflows and
+automated response to feedback.
 
 ```mermaid
 sequenceDiagram
@@ -4332,7 +4747,8 @@ sequenceDiagram
     ReviewSvc->>VCS: Post Response Comment
 ```
 
-**Review Comment Processing**
+##### Review Comment Processing
+
 ```rust
 pub struct ReviewComment {
     pub id: CommentId,
@@ -4374,10 +4790,13 @@ pub trait ReviewProcessor: Send + Sync {
 }
 ```
 
-### 6.3.3 Hook Engine Component
+#### 6.3.3 Hook Engine Component
 
-**Declarative Hook System**
-The Hook Engine implements a comprehensive governance system that executes consistent policies across all workflows, regardless of agent backend, with support for multiple trigger points and configurable actions.
+##### Declarative Hook System
+
+The Hook Engine implements a comprehensive governance system that executes
+consistent policies across all workflows, regardless of agent backend, with
+support for multiple trigger points and configurable actions.
 
 ```mermaid
 graph TB
@@ -4431,7 +4850,8 @@ graph TB
     AE --> RM_ACTION
 ```
 
-**Hook Definition Schema**
+##### Hook Definition Schema
+
 ```rust
 pub struct HookDefinition {
     pub id: HookId,
@@ -4498,12 +4918,15 @@ pub struct HookExecutionResult {
 }
 ```
 
-## 6.4 Component Integration Patterns
+### 6.4 Component Integration Patterns
 
-### 6.4.1 Event-Driven Communication
+#### 6.4.1 Event-Driven Communication
 
-**Message Bus Architecture**
-Components communicate through a centralized event bus that ensures loose coupling while maintaining consistency across the system. The event bus supports both synchronous and asynchronous message patterns.
+##### Message Bus Architecture
+
+Components communicate through a centralized event bus that ensures loose
+coupling while maintaining consistency across the system. The event bus
+supports both synchronous and asynchronous message patterns.
 
 ```mermaid
 graph TB
@@ -4555,12 +4978,17 @@ graph TB
     ET --> ED
 ```
 
-### 6.4.2 Dependency Injection Container
+#### 6.4.2 Dependency Injection Container
 
-**Service Registration and Resolution**
-By design, a hexagonal architecture uses abstractions for inputs and outputs. Therefore, writing unit tests and testing in isolation become easier because of the inherent loose coupling.
+##### Service Registration and Resolution
 
-The dependency injection container manages component lifecycle and ensures proper dependency resolution while maintaining the hexagonal architecture's dependency inversion principle.
+By design, a hexagonal architecture uses abstractions for inputs and outputs.
+Therefore, writing unit tests and testing in isolation become easier because of
+the inherent loose coupling.
+
+The dependency injection container manages component lifecycle and ensures
+proper dependency resolution while maintaining the hexagonal architecture's
+dependency inversion principle.
 
 ```rust
 pub struct ServiceContainer {
@@ -4624,12 +5052,17 @@ pub fn configure_services(container: &mut ServiceContainer) {
 }
 ```
 
-### 6.4.3 Cross-Cutting Concerns
+#### 6.4.3 Cross-Cutting Concerns
 
-**Observability Integration**
-The Model Context Protocol enables powerful capabilities through arbitrary data access and code execution paths. With this power comes important security and trust considerations that all implementors must carefully address.
+##### Observability Integration
 
-Cross-cutting concerns such as logging, metrics, security, and error handling are implemented as aspects that can be applied consistently across all components without violating architectural boundaries.
+The Model Context Protocol enables powerful capabilities through arbitrary data
+access and code execution paths. With this power comes important security and
+trust considerations that all implementors must carefully address.
+
+Cross-cutting concerns such as logging, metrics, security, and error handling
+are implemented as aspects that can be applied consistently across all
+components without violating architectural boundaries.
 
 ```rust
 // Tracing integration for observability
@@ -4703,33 +5136,59 @@ impl SecurityAspect {
 }
 ```
 
-This comprehensive system components design ensures that Corbusier maintains clean architectural boundaries while providing the flexibility and extensibility required for an AI agent orchestration platform. The hexagonal architecture enables independent evolution of components while maintaining system coherence through well-defined ports and adapters.
+This comprehensive system components design ensures that Corbusier maintains
+clean architectural boundaries while providing the flexibility and
+extensibility required for an AI agent orchestration platform. The hexagonal
+architecture enables independent evolution of components while maintaining
+system coherence through well-defined ports and adapters.
 
-Based on the comprehensive analysis of Corbusier's architecture and the current industry trends, I can now provide a detailed assessment of the Core Services Architecture requirements.
+Based on the comprehensive analysis of Corbusier's architecture and the current
+industry trends, I can now provide a detailed assessment of the Core Services
+Architecture requirements.
 
-## 6.1 Core Services Architecture
+### 6.1 Core Services Architecture
 
-### 6.1.1 Architecture Decision and Rationale
+#### 6.1.1 Architecture Decision and Rationale
 
-**Core Services Architecture is not applicable for this system** in the traditional distributed microservices sense. Corbusier implements a **modular monolith architecture** with hexagonal (ports and adapters) design patterns, which represents a fundamentally different architectural approach that does not require distributed service components.
+##### Core Services Architecture is not applicable for this system
 
-#### 6.1.1.1 Architectural Pattern Selection
+in the traditional distributed microservices sense. Corbusier implements a
+**modular monolith architecture** with hexagonal (ports and adapters) design
+patterns, which represents a fundamentally different architectural approach
+that does not require distributed service components.
 
-Corbusier avoids the common pitfall where companies "spent nine months building a microservices architecture for an app that had forty-seven users" and instead follows the principle that "telling your team to build a monolith sounds like admitting defeat. It's not. It's called being smart."
+##### 6.1.1.1 Architectural Pattern Selection
 
-The system follows the principle that "it is beneficial to think of microservices as an end-goal rather than a starting point. A modular monolithic architecture in the early stages of software development would pave the way for microservices with a well-defined bounded context later" and "if microservices seems like a big leap, a modular monolith might just be the springboard you need."
+Corbusier avoids the common pitfall where companies "spent nine months building
+a microservices architecture for an app that had forty-seven users" and instead
+follows the principle that "telling your team to build a monolith sounds like
+admitting defeat. It's not. It's called being smart."
 
-#### 6.1.1.2 Modular Monolith Characteristics
+The system follows the principle that "it is beneficial to think of
+microservices as an end-goal rather than a starting point. A modular monolithic
+architecture in the early stages of software development would pave the way for
+microservices with a well-defined bounded context later" and "if microservices
+seems like a big leap, a modular monolith might just be the springboard you
+need."
 
-Corbusier implements "an architectural pattern that structures the application into independent modules or components with well-defined boundaries. The modules are split based on logical boundaries, grouping together related functionalities."
+##### 6.1.1.2 Modular Monolith Characteristics
 
-The key distinction is that "microservice communication occurs over a network, whereas within a Modular Monolith, communication is direct within the same process."
+Corbusier implements "an architectural pattern that structures the application
+into independent modules or components with well-defined boundaries. The
+modules are split based on logical boundaries, grouping together related
+functionalities."
 
-### 6.1.2 Modular Architecture Components
+The key distinction is that "microservice communication occurs over a network,
+whereas within a Modular Monolith, communication is direct within the same
+process."
 
-#### 6.1.2.1 Domain-Oriented Module Structure
+#### 6.1.2 Modular Architecture Components
 
-Corbusier organizes itself as "a collection of loosely coupled, domain modules that are based on DDD subdomains/bounded context rather than technical layers in order to manage complexity and improve team autonomy."
+##### 6.1.2.1 Domain-Oriented Module Structure
+
+Corbusier organizes itself as "a collection of loosely coupled, domain modules
+that are based on DDD subdomains/bounded context rather than technical layers
+in order to manage complexity and improve team autonomy."
 
 ```mermaid
 graph TB
@@ -4784,18 +5243,22 @@ graph TB
     VCS --> EXT
 ```
 
-#### 6.1.2.2 Module Boundaries and Communication
+##### 6.1.2.2 Module Boundaries and Communication
 
-| Module | Primary Responsibility | Communication Pattern | Dependencies |
-|---|---|---|---|
-| Conversation | Message orchestration and agent coordination | Event-driven with direct method calls | Task Management, Agent Orchestration |
-| Task Management | Workflow lifecycle and VCS integration | Command/Query with event publishing | VCS adapters, Workspace management |
-| Agent Orchestration | Multi-backend agent hosting and execution | Adapter pattern with async streaming | Tool Execution, External agent APIs |
-| Tool Execution | MCP server hosting and tool routing | Protocol-based with encapsulation | Workspace containers, File system |
+| Module              | Primary Responsibility                       | Communication Pattern                 | Dependencies                         |
+| ------------------- | -------------------------------------------- | ------------------------------------- | ------------------------------------ |
+| Conversation        | Message orchestration and agent coordination | Event-driven with direct method calls | Task Management, Agent Orchestration |
+| Task Management     | Workflow lifecycle and VCS integration       | Command/Query with event publishing   | VCS adapters, Workspace management   |
+| Agent Orchestration | Multi-backend agent hosting and execution    | Adapter pattern with async streaming  | Tool Execution, External agent APIs  |
+| Tool Execution      | MCP server hosting and tool routing          | Protocol-based with encapsulation     | Workspace containers, File system    |
 
-#### 6.1.2.3 Inter-Module Communication Patterns
+##### 6.1.2.3 Inter-Module Communication Patterns
 
-Following modular monolith principles, "the Payment Domain Module should similarly interact with the Payment Settings Domain or Module through a similar 'public' API, interface, or contract. The main difference is that microservice communication occurs over a network, whereas within a Modular Monolith, communication is direct within the same process."
+Following modular monolith principles, "the Payment Domain Module should
+similarly interact with the Payment Settings Domain or Module through a similar
+'public' API, interface, or contract. The main difference is that microservice
+communication occurs over a network, whereas within a Modular Monolith,
+communication is direct within the same process."
 
 ```mermaid
 sequenceDiagram
@@ -4818,19 +5281,23 @@ sequenceDiagram
     Conv-->>User: HTTP Response
 ```
 
-### 6.1.3 Scalability Design Within Monolith
+#### 6.1.3 Scalability Design Within Monolith
 
-#### 6.1.3.1 Vertical Scaling Approach
+##### 6.1.3.1 Vertical Scaling Approach
 
-The modular monolithic architecture provides benefits where "the modules are produced and delivered as a single unit, which makes the application significantly easier to design, deploy and manage" and "the modules in a modular monolithic architecture are created to function fluidly with one another, which improves performance and stability."
+The modular monolithic architecture provides benefits where "the modules are
+produced and delivered as a single unit, which makes the application
+significantly easier to design, deploy and manage" and "the modules in a
+modular monolithic architecture are created to function fluidly with one
+another, which improves performance and stability."
 
-| Scaling Dimension | Implementation Strategy | Resource Allocation | Performance Optimization |
-|---|---|---|---|
-| CPU Utilization | Tokio async runtime with work-stealing scheduler | Multi-threaded execution pools | Zero-cost abstractions in Rust |
-| Memory Management | Rust ownership model with minimal garbage collection | Efficient data structures and connection pooling | Memory-mapped files for large datasets |
-| I/O Operations | Async I/O with connection multiplexing | Database connection pooling (50 connections) | Streaming responses for real-time updates |
+| Scaling Dimension | Implementation Strategy                              | Resource Allocation                              | Performance Optimization                  |
+| ----------------- | ---------------------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
+| CPU Utilization   | Tokio async runtime with work-stealing scheduler     | Multi-threaded execution pools                   | Zero-cost abstractions in Rust            |
+| Memory Management | Rust ownership model with minimal garbage collection | Efficient data structures and connection pooling | Memory-mapped files for large datasets    |
+| I/O Operations    | Async I/O with connection multiplexing               | Database connection pooling (50 connections)     | Streaming responses for real-time updates |
 
-#### 6.1.3.2 Resource Optimization Techniques
+##### 6.1.3.2 Resource Optimization Techniques
 
 ```mermaid
 graph LR
@@ -4861,19 +5328,22 @@ graph LR
     ST --> BF
 ```
 
-#### 6.1.3.3 Capacity Planning Guidelines
+##### 6.1.3.3 Capacity Planning Guidelines
 
-| Resource Type | Current Capacity | Scaling Triggers | Optimization Actions |
-|---|---|---|---|
-| Concurrent Conversations | 100 active sessions | >80% utilization | Increase connection pool, optimize memory usage |
-| Agent Turn Execution | 50 concurrent turns | >30s average latency | Implement turn queuing, optimize tool execution |
-| Tool Execution | 500 calls/minute | >5s execution time | Add tool result caching, optimize MCP communication |
+| Resource Type            | Current Capacity    | Scaling Triggers     | Optimization Actions                                |
+| ------------------------ | ------------------- | -------------------- | --------------------------------------------------- |
+| Concurrent Conversations | 100 active sessions | >80% utilization     | Increase connection pool, optimize memory usage     |
+| Agent Turn Execution     | 50 concurrent turns | >30s average latency | Implement turn queuing, optimize tool execution     |
+| Tool Execution           | 500 calls/minute    | >5s execution time   | Add tool result caching, optimize MCP communication |
 
-### 6.1.4 Resilience Patterns
+#### 6.1.4 Resilience Patterns
 
-#### 6.1.4.1 Fault Tolerance Within Monolith
+##### 6.1.4.1 Fault Tolerance Within Monolith
 
-The modular approach provides "enhanced flexibility: Adapters provide a modular approach, so if there's a need to swap AWS services or add new integrations, the core logic remains unaffected. This adaptability allows for seamless changes without impacting the entire application."
+The modular approach provides "enhanced flexibility: Adapters provide a modular
+approach, so if there's a need to swap AWS services or add new integrations,
+the core logic remains unaffected. This adaptability allows for seamless
+changes without impacting the entire application."
 
 ```mermaid
 graph TB
@@ -4911,17 +5381,19 @@ graph TB
     ER --> AL
 ```
 
-#### 6.1.4.2 Module-Level Fault Isolation
+##### 6.1.4.2 Module-Level Fault Isolation
 
-| Failure Scenario | Isolation Strategy | Recovery Mechanism | Impact Mitigation |
-|---|---|---|---|
-| Agent Backend Failure | Circuit breaker with fallback agents | Automatic agent switching | Conversation continues with different backend |
-| Tool Execution Failure | Tool-level timeouts and retries | Alternative tool routing | Graceful degradation of capabilities |
-| VCS Integration Failure | Local caching with eventual consistency | Retry with exponential backoff | Offline mode with sync on recovery |
+| Failure Scenario        | Isolation Strategy                      | Recovery Mechanism             | Impact Mitigation                             |
+| ----------------------- | --------------------------------------- | ------------------------------ | --------------------------------------------- |
+| Agent Backend Failure   | Circuit breaker with fallback agents    | Automatic agent switching      | Conversation continues with different backend |
+| Tool Execution Failure  | Tool-level timeouts and retries         | Alternative tool routing       | Graceful degradation of capabilities          |
+| VCS Integration Failure | Local caching with eventual consistency | Retry with exponential backoff | Offline mode with sync on recovery            |
 
-#### 6.1.4.3 Data Redundancy and Backup
+##### 6.1.4.3 Data Redundancy and Backup
 
-The modular monolith approach provides cost advantages where "as all modules may be put on a single server, less infrastructure is required, making it significantly more cost-effective."
+The modular monolith approach provides cost advantages where "as all modules
+may be put on a single server, less infrastructure is required, making it
+significantly more cost-effective."
 
 ```mermaid
 graph TB
@@ -4954,15 +5426,20 @@ graph TB
     MAN --> VAL
 ```
 
-### 6.1.5 Migration Path to Microservices
+#### 6.1.5 Migration Path to Microservices
 
-#### 6.1.5.1 Future Microservices Extraction
+##### 6.1.5.1 Future Microservices Extraction
 
-The modular monolith provides "easier transition to Microservices - A well-structured modular monolith offers a clear path to a microservices architecture. You can gradually extract modules into separate services when the need arises."
+The modular monolith provides "easier transition to Microservices - A
+well-structured modular monolith offers a clear path to a microservices
+architecture. You can gradually extract modules into separate services when the
+need arises."
 
-The architecture is designed so that modules "can be moved or deployed as microservices later if want" and "it can be moved or deployed as microservices later if want."
+The architecture is designed so that modules "can be moved or deployed as
+microservices later if want" and "it can be moved or deployed as microservices
+later if want."
 
-#### 6.1.5.2 Extraction Readiness Assessment
+##### 6.1.5.2 Extraction Readiness Assessment
 
 ```mermaid
 graph TB
@@ -5003,43 +5480,63 @@ graph TB
     GOV --> TECH
 ```
 
-#### 6.1.5.3 Extraction Strategy
+##### 6.1.5.3 Extraction Strategy
 
-| Module | Extraction Priority | Complexity | Prerequisites |
-|---|---|---|---|
-| Tool Execution | High | Medium | Container orchestration, MCP protocol standardization |
-| Agent Orchestration | Medium | High | Service mesh, distributed tracing, circuit breakers |
-| VCS Integration | Low | Low | API gateway, webhook management |
-| Governance | Low | High | Distributed policy enforcement, audit aggregation |
+| Module              | Extraction Priority | Complexity | Prerequisites                                         |
+| ------------------- | ------------------- | ---------- | ----------------------------------------------------- |
+| Tool Execution      | High                | Medium     | Container orchestration, MCP protocol standardization |
+| Agent Orchestration | Medium              | High       | Service mesh, distributed tracing, circuit breakers   |
+| VCS Integration     | Low                 | Low        | API gateway, webhook management                       |
+| Governance          | Low                 | High       | Distributed policy enforcement, audit aggregation     |
 
-### 6.1.6 Architectural Benefits and Trade-offs
+#### 6.1.6 Architectural Benefits and Trade-offs
 
-#### 6.1.6.1 Modular Monolith Advantages
+##### 6.1.6.1 Modular Monolith Advantages
 
-The modular monolith approach provides key benefits: "Encapsulate Business Logic The main benefit of the modular monolith is that the business logics are encapsulated in Modules and it enables high reusability, while data remains consistent and communication patterns simple. Reusable Codes, Easy to Refactor For large development teams, developing modular components of an application will increase reusability. Modular components can be reused that can help teams establish a single source of truth. This will lead to faster and more consistent development."
+The modular monolith approach provides key benefits: "Encapsulate Business
+Logic The main benefit of the modular monolith is that the business logics are
+encapsulated in Modules and it enables high reusability, while data remains
+consistent and communication patterns simple. Reusable Codes, Easy to Refactor
+For large development teams, developing modular components of an application
+will increase reusability. Modular components can be reused that can help teams
+establish a single source of truth. This will lead to faster and more
+consistent development."
 
-#### 6.1.6.2 Operational Simplicity
+##### 6.1.6.2 Operational Simplicity
 
-The monolithic approach provides operational advantages: "The biggest advantage of a monolithic architecture is that there is a lot of overlap in most apps – such as logging or security functions – and these are easier to handle in monolithic architectures. If everything runs on the same app, then it is easy to connect the components. Lower operating overhead costs: as it is a single, large-scale application, the logs, monitoring and tests only have to be set up for one application."
+The monolithic approach provides operational advantages: "The biggest advantage
+of a monolithic architecture is that there is a lot of overlap in most apps –
+such as logging or security functions – and these are easier to handle in
+monolithic architectures. If everything runs on the same app, then it is easy
+to connect the components. Lower operating overhead costs: as it is a single,
+large-scale application, the logs, monitoring and tests only have to be set up
+for one application."
 
-#### 6.1.6.3 Development Velocity Benefits
+##### 6.1.6.3 Development Velocity Benefits
 
-| Benefit Category | Modular Monolith Advantage | Implementation in Corbusier |
-|---|---|---|---|
-| Development Speed | Single deployment unit, shared infrastructure | Unified build system, integrated testing |
-| Debugging Simplicity | Single process, unified logging | Structured tracing with correlation IDs |
-| Transaction Management | ACID compliance across modules | PostgreSQL transactions, event sourcing |
-| Code Reuse | Shared libraries and utilities | Common domain models, shared adapters |
+| Benefit Category       | Modular Monolith Advantage                    | Implementation in Corbusier              |
+| ---------------------- | --------------------------------------------- | ---------------------------------------- |
+| Development Speed      | Single deployment unit, shared infrastructure | Unified build system, integrated testing |
+| Debugging Simplicity   | Single process, unified logging               | Structured tracing with correlation IDs  |
+| Transaction Management | ACID compliance across modules                | PostgreSQL transactions, event sourcing  |
+| Code Reuse             | Shared libraries and utilities                | Common domain models, shared adapters    |
 
-The modular monolith architecture for Corbusier provides the optimal balance of simplicity, maintainability, and future flexibility while avoiding the premature complexity of distributed systems. This approach aligns with industry best practices for AI agent orchestration platforms that prioritize rapid development and reliable operation over distributed system complexity.
+The modular monolith architecture for Corbusier provides the optimal balance of
+simplicity, maintainability, and future flexibility while avoiding the
+premature complexity of distributed systems. This approach aligns with industry
+best practices for AI agent orchestration platforms that prioritize rapid
+development and reliable operation over distributed system complexity.
 
-## 6.2 Database Design
+### 6.2 Database Design
 
-### 6.2.1 Schema Design
+#### 6.2.1 Schema Design
 
-#### 6.2.1.1 Entity Relationships
+##### 6.2.1.1 Entity Relationships
 
-Corbusier implements a hybrid database design combining relational structures for core entities with JSONB storage for flexible message formats and metadata. The design follows event sourcing principles for audit trails while maintaining efficient query patterns for operational data.
+Corbusier implements a hybrid database design combining relational structures
+for core entities with JSONB storage for flexible message formats and metadata.
+The design follows event sourcing principles for audit trails while maintaining
+efficient query patterns for operational data.
 
 ```mermaid
 erDiagram
@@ -5125,20 +5622,22 @@ erDiagram
     hook_executions }o--|| conversations : governs
 ```
 
-#### 6.2.1.2 Data Models and Structures
+##### 6.2.1.2 Data Models and Structures
 
-**Core Entity Models**
+###### Core Entity Models
 
-| Entity | Storage Strategy | Key Attributes | Relationships |
-|---|---|---|---|
-| Conversations | Relational + JSONB context | ID, task_id, state, context | 1:N with Messages, 1:1 with Task |
-| Messages | Append-only with JSONB content | ID, role, content, sequence | N:1 with Conversation |
-| Tasks | Relational with JSONB origin | ID, state, branch_ref, origin | 1:1 with Workspace, 1:N with Events |
-| Domain Events | Event sourcing table | aggregate_id, event_type, data | N:1 with Aggregates |
+| Entity        | Storage Strategy               | Key Attributes                 | Relationships                       |
+| ------------- | ------------------------------ | ------------------------------ | ----------------------------------- |
+| Conversations | Relational + JSONB context     | ID, task_id, state, context    | 1:N with Messages, 1:1 with Task    |
+| Messages      | Append-only with JSONB content | ID, role, content, sequence    | N:1 with Conversation               |
+| Tasks         | Relational with JSONB origin   | ID, state, branch_ref, origin  | 1:1 with Workspace, 1:N with Events |
+| Domain Events | Event sourcing table           | aggregate_id, event_type, data | N:1 with Aggregates                 |
 
-**JSONB Schema Patterns**
+###### JSONB Schema Patterns
 
-JSONB supports indexing the JSON data and is very efficient at parsing and querying it. In most cases, when you work with JSON in PostgreSQL, you should be using JSONB.
+JSONB supports indexing the JSON data and is very efficient at parsing and
+querying it. In most cases, when you work with JSON in PostgreSQL, you should
+be using JSONB.
 
 ```sql
 -- Message content structure
@@ -5190,22 +5689,26 @@ JSONB supports indexing the JSON data and is very efficient at parsing and query
 }
 ```
 
-#### 6.2.1.3 Indexing Strategy
+##### 6.2.1.3 Indexing Strategy
 
-**Primary Indexes**
+###### Primary Indexes
 
-JSONB provides a wide array of options to index your JSON data. At a high level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
+JSONB provides a wide array of options to index your JSON data. At a high
+level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
 
-| Table | Index Type | Columns | Purpose |
-|---|---|---|---|
-| messages | B-tree | (conversation_id, sequence_number) | Message ordering and pagination |
-| messages | GIN | content | Full-text search in message content |
-| conversations | B-tree | (task_id) | Task-conversation lookup |
-| tasks | B-tree | (state, created_at) | Task filtering and sorting |
+| Table         | Index Type | Columns                            | Purpose                             |
+| ------------- | ---------- | ---------------------------------- | ----------------------------------- |
+| messages      | B-tree     | (conversation_id, sequence_number) | Message ordering and pagination     |
+| messages      | GIN        | content                            | Full-text search in message content |
+| conversations | B-tree     | (task_id)                          | Task-conversation lookup            |
+| tasks         | B-tree     | (state, created_at)                | Task filtering and sorting          |
 
-**JSONB Indexing Strategy**
+###### JSONB Indexing Strategy
 
-GIN indexes can be used to efficiently search for keys or key/value pairs occurring within a large number of jsonb documents (datums). Two GIN "operator classes" are provided, offering different performance and flexibility trade-offs.
+GIN indexes can be used to efficiently search for keys or key/value pairs
+occurring within a large number of jsonb documents (datums). Two GIN "operator
+classes" are provided, offering different performance and flexibility
+trade-offs.
 
 ```sql
 -- GIN indexes for JSONB columns
@@ -5223,9 +5726,10 @@ CREATE INDEX idx_messages_conversation_role ON messages (conversation_id, role, 
 CREATE INDEX idx_domain_events_aggregate ON domain_events (aggregate_type, aggregate_id, occurred_at);
 ```
 
-**Performance Optimization Indexes**
+###### Performance Optimization Indexes
 
-The jsonb_path_ops operator class also supports @>, @?, and @@ operators, it has notable performance advantages over the default operator class jsonb_ops.
+The jsonb_path_ops operator class also supports @>, @?, and @@ operators, it
+has notable performance advantages over the default operator class jsonb_ops.
 
 ```sql
 -- Optimized GIN indexes using jsonb_path_ops for containment queries
@@ -5237,11 +5741,13 @@ CREATE INDEX idx_tasks_active ON tasks (created_at) WHERE state IN ('draft', 'in
 CREATE INDEX idx_conversations_active ON conversations (updated_at) WHERE state = 'active';
 ```
 
-#### 6.2.1.4 Partitioning Approach
+##### 6.2.1.4 Partitioning Approach
 
-**Time-Based Partitioning for Audit Data**
+###### Time-Based Partitioning for Audit Data
 
-We can store all changes to the domain object state as a sequence of events in an append-only event stream. Thus, event streams will contain an entire history of changes.
+We can store all changes to the domain object state as a sequence of events in
+an append-only event stream. Thus, event streams will contain an entire history
+of changes.
 
 ```sql
 -- Partition domain_events by month for efficient archival
@@ -5276,18 +5782,18 @@ CREATE TABLE tool_executions (
 ) PARTITION BY RANGE (started_at);
 ```
 
-#### 6.2.1.5 Replication Configuration
+##### 6.2.1.5 Replication Configuration
 
-**Primary-Replica Setup**
+###### Primary-Replica Setup
 
-| Configuration | Primary Database | Read Replicas | Purpose |
-|---|---|---|---|
-| Write Operations | All writes | None | Data consistency |
-| Read Operations | Real-time queries | Historical queries, reporting | Load distribution |
-| Backup Source | Primary | Replicas | Reduced primary load |
-| Failover Target | N/A | Promoted replica | High availability |
+| Configuration    | Primary Database  | Read Replicas                 | Purpose              |
+| ---------------- | ----------------- | ----------------------------- | -------------------- |
+| Write Operations | All writes        | None                          | Data consistency     |
+| Read Operations  | Real-time queries | Historical queries, reporting | Load distribution    |
+| Backup Source    | Primary           | Replicas                      | Reduced primary load |
+| Failover Target  | N/A               | Promoted replica              | High availability    |
 
-**Streaming Replication Configuration**
+###### Streaming Replication Configuration
 
 ```sql
 -- Primary database configuration
@@ -5305,9 +5811,9 @@ primary_conninfo = 'host=primary-db port=5432 user=replicator'
 trigger_file = '/tmp/postgresql.trigger'
 ```
 
-#### 6.2.1.6 Backup Architecture
+##### 6.2.1.6 Backup Architecture
 
-**Multi-Tier Backup Strategy**
+###### Multi-Tier Backup Strategy
 
 ```mermaid
 graph TB
@@ -5344,13 +5850,19 @@ graph TB
     YEARLY --> GLACIER
 ```
 
-### 6.2.2 Data Management
+#### 6.2.2 Data Management
 
-#### 6.2.2.1 Migration Procedures
+##### 6.2.2.1 Migration Procedures
 
-**Schema Evolution Strategy**
+###### Schema Evolution Strategy
 
-SQLx provides connection pooling through sqlx::Pool. Create a pool using database-specific options (e.g., PgPoolOptions for PostgreSQL). Key configuration parameters: max_connections: Maximum simultaneous connections (align with database limits) min_connections: Pre-established connections to reduce latency max_lifetime: Duration before replacing connections (prevents stale states) idle_timeout: Time before closing unused connections acquire_timeout: Wait time for connection acquisition
+SQLx provides connection pooling through sqlx::Pool. Create a pool using
+database-specific options (e.g., PgPoolOptions for PostgreSQL). Key
+configuration parameters: max_connections: Maximum simultaneous connections
+(align with database limits) min_connections: Pre-established connections to
+reduce latency max_lifetime: Duration before replacing connections (prevents
+stale states) idle_timeout: Time before closing unused connections
+acquire_timeout: Wait time for connection acquisition
 
 ```rust
 // Migration management with SQLx
@@ -5385,7 +5897,7 @@ impl MigrationManager {
 }
 ```
 
-**Migration File Structure**
+###### Migration File Structure
 
 ```sql
 -- 20240115_001_initial_schema.sql
@@ -5430,18 +5942,19 @@ CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
 COMMIT;
 ```
 
-#### 6.2.2.2 Versioning Strategy
+##### 6.2.2.2 Versioning Strategy
 
-**Event Schema Versioning**
+###### Event Schema Versioning
 
-New read-side projections can be created as needed (later) from events. It allows responding to future needs and new requirements.
+New read-side projections can be created as needed (later) from events. It
+allows responding to future needs and new requirements.
 
-| Version Strategy | Implementation | Use Case | Migration Path |
-|---|---|---|---|
-| Additive Changes | Add new JSONB fields | New event properties | Backward compatible |
-| Schema Evolution | Version field in events | Breaking changes | Event upcasting |
-| Projection Updates | New projection handlers | Read model changes | Rebuild projections |
-| Event Transformation | Event migration scripts | Major schema changes | Batch processing |
+| Version Strategy     | Implementation          | Use Case             | Migration Path      |
+| -------------------- | ----------------------- | -------------------- | ------------------- |
+| Additive Changes     | Add new JSONB fields    | New event properties | Backward compatible |
+| Schema Evolution     | Version field in events | Breaking changes     | Event upcasting     |
+| Projection Updates   | New projection handlers | Read model changes   | Rebuild projections |
+| Event Transformation | Event migration scripts | Major schema changes | Batch processing    |
 
 ```rust
 // Event versioning implementation
@@ -5482,9 +5995,9 @@ impl EventUpgrader for MessageCreatedUpgrader {
 }
 ```
 
-#### 6.2.2.3 Archival Policies
+##### 6.2.2.3 Archival Policies
 
-**Data Lifecycle Management**
+###### Data Lifecycle Management
 
 ```mermaid
 graph LR
@@ -5512,7 +6025,7 @@ graph LR
     COLD -->|7 years| ARCHIVE
 ```
 
-**Automated Archival Process**
+###### Automated Archival Process
 
 ```sql
 -- Archival stored procedure
@@ -5544,11 +6057,14 @@ $$ LANGUAGE plpgsql;
 SELECT cron.schedule('archive-events', '0 2 * * 0', 'SELECT archive_old_events();');
 ```
 
-#### 6.2.2.4 Data Storage and Retrieval Mechanisms
+##### 6.2.2.4 Data Storage and Retrieval Mechanisms
 
-**Connection Pool Configuration**
+###### Connection Pool Configuration
 
-The pool has a maximum connection limit that it will not exceed; if acquire() is called when at this limit and all connections are checked out, the task will be made to wait until a connection becomes available. You can configure the connection limit, and other parameters, using PoolOptions.
+The pool has a maximum connection limit that it will not exceed; if acquire()
+is called when at this limit and all connections are checked out, the task will
+be made to wait until a connection becomes available. You can configure the
+connection limit, and other parameters, using PoolOptions.
 
 ```rust
 use sqlx::postgres::PgPoolOptions;
@@ -5567,7 +6083,7 @@ pub async fn create_database_pool(database_url: &str) -> Result<PgPool, sqlx::Er
 }
 ```
 
-**Repository Pattern Implementation**
+###### Repository Pattern Implementation
 
 ```rust
 #[async_trait::async_trait]
@@ -5635,18 +6151,19 @@ impl ConversationRepository for PostgresConversationRepository {
 }
 ```
 
-#### 6.2.2.5 Caching Policies
+##### 6.2.2.5 Caching Policies
 
-**Multi-Level Caching Strategy**
+###### Multi-Level Caching Strategy
 
-In practice, a hybrid approach works best: use traditional columns for fixed, frequently queried attributes and JSONB for variable parts of your data.
+In practice, a hybrid approach works best: use traditional columns for fixed,
+frequently queried attributes and JSONB for variable parts of your data.
 
-| Cache Level | Technology | TTL | Use Case |
-|---|---|---|---|
-| Application Cache | In-memory HashMap | 5 minutes | Active conversation context |
-| Query Cache | PostgreSQL | 1 hour | Frequently accessed read models |
-| Connection Cache | SQLx Pool | Connection lifetime | Database connections |
-| Result Cache | Redis (future) | 30 minutes | Expensive query results |
+| Cache Level       | Technology        | TTL                 | Use Case                        |
+| ----------------- | ----------------- | ------------------- | ------------------------------- |
+| Application Cache | In-memory HashMap | 5 minutes           | Active conversation context     |
+| Query Cache       | PostgreSQL        | 1 hour              | Frequently accessed read models |
+| Connection Cache  | SQLx Pool         | Connection lifetime | Database connections            |
+| Result Cache      | Redis (future)    | 30 minutes          | Expensive query results         |
 
 ```rust
 use std::collections::HashMap;
@@ -5701,22 +6218,23 @@ impl ConversationCache {
 }
 ```
 
-### 6.2.3 Compliance Considerations
+#### 6.2.3 Compliance Considerations
 
-#### 6.2.3.1 Data Retention Rules
+##### 6.2.3.1 Data Retention Rules
 
-**Regulatory Compliance Framework**
+###### Regulatory Compliance Framework (Security Controls)
 
-A true history of the system (audit and traceability). An industry standard for implementing audit trail.
+A true history of the system (audit and traceability). An industry standard for
+implementing audit trail.
 
-| Data Category | Retention Period | Compliance Requirement | Deletion Policy |
-|---|---|---|---|
-| Conversation Messages | 7 years | Audit trail requirements | Archive to cold storage |
-| Domain Events | Permanent | Event sourcing integrity | Never delete |
-| Tool Execution Logs | 3 years | Operational audit | Compress and archive |
-| User Activity Logs | 2 years | Privacy regulations | Anonymize after 1 year |
+| Data Category         | Retention Period | Compliance Requirement   | Deletion Policy         |
+| --------------------- | ---------------- | ------------------------ | ----------------------- |
+| Conversation Messages | 7 years          | Audit trail requirements | Archive to cold storage |
+| Domain Events         | Permanent        | Event sourcing integrity | Never delete            |
+| Tool Execution Logs   | 3 years          | Operational audit        | Compress and archive    |
+| User Activity Logs    | 2 years          | Privacy regulations      | Anonymize after 1 year  |
 
-**Retention Policy Implementation**
+###### Retention Policy Implementation
 
 ```sql
 -- Data retention policy table
@@ -5768,9 +6286,9 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-#### 6.2.3.2 Backup and Fault Tolerance Policies
+##### 6.2.3.2 Backup and Fault Tolerance Policies
 
-**Backup Verification and Testing**
+###### Backup Verification and Testing
 
 ```mermaid
 graph TB
@@ -5804,19 +6322,22 @@ graph TB
     MONITORING --> ALERTING
 ```
 
-**Recovery Time and Point Objectives**
+###### Recovery Time and Point Objectives
 
-| Service Tier | RTO (Recovery Time) | RPO (Recovery Point) | Backup Frequency | Verification |
-|---|---|---|---|---|
-| Critical (Conversations) | < 1 hour | < 5 minutes | Continuous WAL | Daily restore test |
-| Important (Tasks) | < 4 hours | < 30 minutes | Hourly incremental | Weekly verification |
-| Standard (Logs) | < 24 hours | < 4 hours | Daily full backup | Monthly verification |
+| Service Tier             | RTO (Recovery Time) | RPO (Recovery Point) | Backup Frequency   | Verification         |
+| ------------------------ | ------------------- | -------------------- | ------------------ | -------------------- |
+| Critical (Conversations) | < 1 hour            | < 5 minutes          | Continuous WAL     | Daily restore test   |
+| Important (Tasks)        | < 4 hours           | < 30 minutes         | Hourly incremental | Weekly verification  |
+| Standard (Logs)          | < 24 hours          | < 4 hours            | Daily full backup  | Monthly verification |
 
-#### 6.2.3.3 Privacy Controls
+##### 6.2.3.3 Privacy Controls
 
-**Data Classification and Protection**
+###### Data Classification and Protection
 
-Each event is enriched with metadata such as created_at (timestamp) and created_by (user). This design provides a tamper-proof audit log that makes it easy to trace who performed which action and when, improving both transparency and accountability.
+Each event is enriched with metadata such as created_at (timestamp) and
+created_by (user). This design provides a tamper-proof audit log that makes it
+easy to trace who performed which action and when, improving both transparency
+and accountability.
 
 ```sql
 -- Data classification table
@@ -5873,11 +6394,12 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-#### 6.2.3.4 Audit Mechanisms
+##### 6.2.3.4 Audit Mechanisms
 
-**Comprehensive Audit Trail Design**
+###### Comprehensive Audit Trail Design
 
-Metadata tracks important context: user ID, correlation ID, causation ID. This audit trail proves invaluable for debugging and compliance.
+Metadata tracks important context: user ID, correlation ID, causation ID. This
+audit trail proves invaluable for debugging and compliance.
 
 ```sql
 -- Audit log table for all database operations
@@ -5956,9 +6478,9 @@ CREATE TRIGGER tasks_audit_trigger
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 ```
 
-#### 6.2.3.5 Access Controls
+##### 6.2.3.5 Access Controls
 
-**Row-Level Security Implementation**
+###### Row-Level Security Implementation
 
 ```sql
 -- Enable row-level security
@@ -6004,13 +6526,15 @@ CREATE POLICY workspace_isolation_policy ON workspaces
     );
 ```
 
-### 6.2.4 Performance Optimization
+#### 6.2.4 Performance Optimization
 
-#### 6.2.4.1 Query Optimization Patterns
+##### 6.2.4.1 Query Optimization Patterns
 
-**JSONB Query Optimization**
+###### JSONB Query Optimization
 
-When we use ->> operator of JSONB, PostgreSQL can use B-tree or Hash index for processing the operations. PostgreSQL can use indexes for the text results as compare operands.
+When we use ->> operator of JSONB, PostgreSQL can use B-tree or Hash index for
+processing the operations. PostgreSQL can use indexes for the text results as
+compare operands.
 
 ```sql
 -- Optimized queries using proper indexing
@@ -6047,7 +6571,7 @@ GROUP BY c.id, c.context->>'agent_backend'
 ORDER BY last_message DESC;
 ```
 
-**Query Performance Monitoring**
+###### Query Performance Monitoring
 
 ```sql
 -- Query performance tracking
@@ -6097,9 +6621,9 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-#### 6.2.4.2 Caching Strategy
+##### 6.2.4.2 Caching Strategy
 
-**Application-Level Caching**
+###### Application-Level Caching
 
 ```rust
 use redis::AsyncCommands;
@@ -6182,11 +6706,14 @@ impl CacheKeys {
 }
 ```
 
-#### 6.2.4.3 Connection Pooling
+##### 6.2.4.3 Connection Pooling
 
-**Advanced Connection Pool Configuration**
+###### Advanced Connection Pool Configuration
 
-Set the maximum number of connections that this pool should maintain. Be mindful of the connection limits for your database as well as other applications which may want to connect to the same database (or even multiple instances of the same application in high-availability deployments).
+Set the maximum number of connections that this pool should maintain. Be
+mindful of the connection limits for your database as well as other
+applications which may want to connect to the same database (or even multiple
+instances of the same application in high-availability deployments).
 
 ```rust
 use sqlx::postgres::{PgPoolOptions, PgConnectOptions};
@@ -6250,9 +6777,9 @@ pub async fn create_optimized_pool(
 }
 ```
 
-#### 6.2.4.4 Read/Write Splitting
+##### 6.2.4.4 Read/Write Splitting
 
-**Database Connection Routing**
+###### Database Connection Routing
 
 ```rust
 pub struct DatabaseManager {
@@ -6301,11 +6828,13 @@ impl DatabaseManager {
 }
 ```
 
-#### 6.2.4.5 Batch Processing Approach
+##### 6.2.4.5 Batch Processing Approach
 
-**Efficient Batch Operations**
+###### Efficient Batch Operations
 
-Our PostgreSQL-based implementation processes 10K events/second with proper indexing and partitioning. The append-only nature makes it extremely fast - no updates, no deletes, just inserts.
+Our PostgreSQL-based implementation processes 10K events/second with proper
+indexing and partitioning. The append-only nature makes it extremely fast - no
+updates, no deletes, just inserts.
 
 ```rust
 pub struct BatchProcessor {
@@ -6343,9 +6872,10 @@ impl BatchProcessor {
         let mut tx = self.pool.begin().await?;
         
         for chunk in events.chunks(500) {
-            let mut query_builder = QueryBuilder::new(
-                "INSERT INTO domain_events (id, aggregate_id, aggregate_type, event_type, event_data, event_version, occurred_at) "
-            );
+            let mut query_builder = QueryBuilder::new(concat!(
+                "INSERT INTO domain_events (id, aggregate_id, aggregate_type, event_type, ",
+                "event_data, event_version, occurred_at) "
+            ));
             
             query_builder.push_values(chunk, |mut b, event| {
                 b.push_bind(event.id.as_uuid())
@@ -6367,28 +6897,39 @@ impl BatchProcessor {
 }
 ```
 
-This comprehensive database design provides Corbusier with a robust, scalable, and compliant data foundation that supports the AI agent orchestration platform's requirements for conversation management, task lifecycle tracking, comprehensive audit trails, and high-performance operations while maintaining data integrity and regulatory compliance.
+This comprehensive database design provides Corbusier with a robust, scalable,
+and compliant data foundation that supports the AI agent orchestration
+platform's requirements for conversation management, task lifecycle tracking,
+comprehensive audit trails, and high-performance operations while maintaining
+data integrity and regulatory compliance.
 
-## 6.3 Integration Architecture
+### 6.3 Integration Architecture
 
-### 6.3.1 API Design
+#### 6.3.1 API Design
 
-#### 6.3.1.1 Protocol Specifications
+##### 6.3.1.1 Protocol Specifications
 
-Corbusier implements a comprehensive integration architecture centered around three primary protocols: Model Context Protocol (MCP) using JSON-RPC 2.0 messages to establish communication between servers that provide context and capabilities, with this specification defining the authoritative protocol requirements based on the TypeScript schema, HTTP/REST for external client integration, and WebSocket/SSE for real-time event streaming.
+Corbusier implements a comprehensive integration architecture centered around
+three primary protocols: Model Context Protocol (MCP) using JSON-RPC 2.0
+messages to establish communication between servers that provide context and
+capabilities, with this specification defining the authoritative protocol
+requirements based on the TypeScript schema, HTTP/REST for external client
+integration, and WebSocket/SSE for real-time event streaming.
 
-**Primary Protocol Stack**
+###### Primary Protocol Stack
 
-| Protocol | Version | Transport | Use Case | Compliance Standard |
-|---|---|---|---|
-| MCP | 2024-11-05 | JSON-RPC 2.0 over STDIO/HTTP+SSE | Tool integration and agent communication | TypeScript schema specification with implementation guides at modelcontextprotocol.io |
-| HTTP/REST | 1.1 | HTTPS with TLS 1.3 | External API access and client integration | OpenAPI 3.0 specification |
-| WebSocket | RFC 6455 | WSS over TLS | Real-time event streaming | tokio-tungstenite implementation |
-| Server-Sent Events | W3C Standard | HTTP/2 | Unidirectional event streaming | Actix Web SSE support |
+| Protocol           | Version      | Transport                        | Use Case                                   | Compliance Standard                                                                   |
+| ------------------ | ------------ | -------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| MCP                | 2024-11-05   | JSON-RPC 2.0 over STDIO/HTTP+SSE | Tool integration and agent communication   | TypeScript schema specification with implementation guides at modelcontextprotocol.io |
+| HTTP/REST          | 1.1          | HTTPS with TLS 1.3               | External API access and client integration | OpenAPI 3.0 specification                                                             |
+| WebSocket          | RFC 6455     | WSS over TLS                     | Real-time event streaming                  | tokio-tungstenite implementation                                                      |
+| Server-Sent Events | W3C Standard | HTTP/2                           | Unidirectional event streaming             | Actix Web SSE support                                                                 |
 
-**MCP Protocol Implementation**
+###### MCP Protocol Implementation
 
-MCP takes inspiration from the Language Server Protocol, standardizing how to integrate additional context and tools into the ecosystem of AI applications. Corbusier implements MCP as the backbone for tool orchestration:
+MCP takes inspiration from the Language Server Protocol, standardizing how to
+integrate additional context and tools into the ecosystem of AI applications.
+Corbusier implements MCP as the backbone for tool orchestration:
 
 ```mermaid
 sequenceDiagram
@@ -6407,22 +6948,28 @@ sequenceDiagram
     Corbusier-->>Agent: Tool Execution Complete
 ```
 
-**HTTP API Specification**
+###### HTTP API Specification
 
-Actix Web provides middleware support for authentication, with actix_web_httpauth providing middleware that makes it simple to add authentication to any actix-based API:
+Actix Web provides middleware support for authentication, with
+actix_web_httpauth providing middleware that makes it simple to add
+authentication to any actix-based API:
 
-| Endpoint Category | Base Path | Methods | Authentication | Rate Limiting |
-|---|---|---|---|---|
-| Conversations | `/api/v1/conversations` | GET, POST, PUT | JWT Bearer Token | 100 req/min |
-| Tasks | `/api/v1/tasks` | GET, POST, PUT, DELETE | JWT Bearer Token | 50 req/min |
-| Tools | `/api/v1/tools` | GET, POST | JWT Bearer Token | 200 req/min |
-| Events | `/api/v1/events` | GET (SSE) | JWT Bearer Token | 10 connections |
+| Endpoint Category | Base Path               | Methods                | Authentication   | Rate Limiting  |
+| ----------------- | ----------------------- | ---------------------- | ---------------- | -------------- |
+| Conversations     | `/api/v1/conversations` | GET, POST, PUT         | JWT Bearer Token | 100 req/min    |
+| Tasks             | `/api/v1/tasks`         | GET, POST, PUT, DELETE | JWT Bearer Token | 50 req/min     |
+| Tools             | `/api/v1/tools`         | GET, POST              | JWT Bearer Token | 200 req/min    |
+| Events            | `/api/v1/events`        | GET (SSE)              | JWT Bearer Token | 10 connections |
 
-#### 6.3.1.2 Authentication Methods
+##### 6.3.1.2 Authentication Methods
 
-**JWT-Based Authentication Framework**
+###### JWT-Based Authentication Framework
 
-JWT authentication implementation covers generating and verifying JWT tokens with the HS256 algorithm, with JSON Web Token defining a compact and self-contained way of transmitting information securely between parties as a JSON object that can securely hold claims such as user identity, permissions, and session data.
+JWT authentication implementation covers generating and verifying JWT tokens
+with the HS256 algorithm, with JSON Web Token defining a compact and
+self-contained way of transmitting information securely between parties as a
+JSON object that can securely hold claims such as user identity, permissions,
+and session data.
 
 ```mermaid
 graph TB
@@ -6461,32 +7008,38 @@ graph TB
     REVOKE --> EXPIRE
 ```
 
-**Authentication Implementation**
+###### Authentication Implementation
 
-JWT middleware attempts to obtain the token from the Authorization header first, and if the token is not present, it will then look in the Cookies object, with a 401 Unauthorized error sent to the client if the token cannot be found in either location:
+JWT middleware attempts to obtain the token from the Authorization header
+first, and if the token is not present, it will then look in the Cookies
+object, with a 401 Unauthorized error sent to the client if the token cannot be
+found in either location:
 
-| Authentication Method | Implementation | Token Location | Expiration Policy |
-|---|---|---|---|
-| Bearer Token | JWT with HS256 | Authorization Header | 24 hours with refresh |
-| Cookie-based | Secure HTTP-only cookies | Cookie header | 7 days with sliding expiration |
-| API Key | Static key authentication | X-API-Key header | No expiration (admin only) |
+| Authentication Method | Implementation            | Token Location       | Expiration Policy              |
+| --------------------- | ------------------------- | -------------------- | ------------------------------ |
+| Bearer Token          | JWT with HS256            | Authorization Header | 24 hours with refresh          |
+| Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration |
+| API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     |
 
-**MCP Authentication Integration**
+###### MCP Authentication Integration
 
-MCP clients are required to implement Resource Indicators as specified in RFC 8707, with clients explicitly stating the intended recipient of the access token, allowing the Authorization Server to issue tokens that are tightly scoped and only valid for that specific MCP server.
+MCP clients are required to implement Resource Indicators as specified in RFC
+8707, with clients explicitly stating the intended recipient of the access
+token, allowing the Authorization Server to issue tokens that are tightly
+scoped and only valid for that specific MCP server.
 
-#### 6.3.1.3 Authorization Framework
+##### 6.3.1.3 Authorization Framework
 
-**Role-Based Access Control (RBAC)**
+###### Role-Based Access Control (RBAC) Model
 
-| Role | Permissions | Resource Scope | API Access |
-|---|---|---|---|
-| Admin | Full system access | All workspaces and tasks | All endpoints |
-| Team Lead | Team management, policy configuration | Team workspaces | Management endpoints |
-| Developer | Task creation, conversation management | Own tasks and shared workspaces | Core functionality |
-| Viewer | Read-only access | Assigned tasks only | Read endpoints only |
+| Role      | Permissions                            | Resource Scope                  | API Access           |
+| --------- | -------------------------------------- | ------------------------------- | -------------------- |
+| Admin     | Full system access                     | All workspaces and tasks        | All endpoints        |
+| Team Lead | Team management, policy configuration  | Team workspaces                 | Management endpoints |
+| Developer | Task creation, conversation management | Own tasks and shared workspaces | Core functionality   |
+| Viewer    | Read-only access                       | Assigned tasks only             | Read endpoints only  |
 
-**Workspace-Scoped Authorization**
+###### Workspace-Scoped Authorization Rules
 
 ```mermaid
 graph TB
@@ -6511,20 +7064,22 @@ graph TB
     ACCESS_DECISION --> AUDIT_LOG
 ```
 
-#### 6.3.1.4 Rate Limiting Strategy
+##### 6.3.1.4 Rate Limiting Strategy
 
-**Multi-Tier Rate Limiting**
+###### Multi-Tier Rate Limiting
 
-| Tier | Limit Type | Threshold | Window | Enforcement |
-|---|---|---|---|---|
-| Global | Requests per IP | 1000/hour | Sliding window | IP-based blocking |
-| User | Requests per user | 500/hour | Fixed window | User-based throttling |
-| Endpoint | Endpoint-specific | Variable | Per endpoint | Function-based limiting |
-| Resource | Concurrent operations | 10 per user | Real-time | Resource locking |
+| Tier     | Limit Type            | Threshold   | Window         | Enforcement             |
+| -------- | --------------------- | ----------- | -------------- | ----------------------- |
+| Global   | Requests per IP       | 1000/hour   | Sliding window | IP-based blocking       |
+| User     | Requests per user     | 500/hour    | Fixed window   | User-based throttling   |
+| Endpoint | Endpoint-specific     | Variable    | Per endpoint   | Function-based limiting |
+| Resource | Concurrent operations | 10 per user | Real-time      | Resource locking        |
 
-**Rate Limiting Implementation**
+###### Rate Limiting Implementation
 
-Tokio provides an event-driven, non-blocking I/O platform with a multithreaded, work-stealing based task scheduler, enabling efficient rate limiting through async middleware:
+Tokio provides an event-driven, non-blocking I/O platform with a multithreaded,
+work-stealing based task scheduler, enabling efficient rate limiting through
+async middleware:
 
 ```rust
 pub struct RateLimiter {
@@ -6563,17 +7118,17 @@ impl RateLimiter {
 }
 ```
 
-#### 6.3.1.5 Versioning Approach
+##### 6.3.1.5 Versioning Approach
 
-**API Versioning Strategy**
+###### API Versioning Strategy
 
-| Versioning Method | Implementation | Scope | Migration Strategy |
-|---|---|---|---|
-| URL Path Versioning | `/api/v1/`, `/api/v2/` | Major API changes | Parallel version support |
-| Header Versioning | `Accept: application/vnd.corbusier.v1+json` | Content negotiation | Backward compatibility |
-| MCP Protocol Versioning | Protocol specification released on November 25th, 2025, with 14-day RC validation window | Tool protocol changes | Gradual rollout |
+| Versioning Method       | Implementation                                                                           | Scope                 | Migration Strategy       |
+| ----------------------- | ---------------------------------------------------------------------------------------- | --------------------- | ------------------------ |
+| URL Path Versioning     | `/api/v1/`, `/api/v2/`                                                                   | Major API changes     | Parallel version support |
+| Header Versioning       | `Accept: application/vnd.corbusier.v1+json`                                              | Content negotiation   | Backward compatibility   |
+| MCP Protocol Versioning | Protocol specification released on November 25th, 2025, with 14-day RC validation window | Tool protocol changes | Gradual rollout          |
 
-**Version Lifecycle Management**
+###### Version Lifecycle Management
 
 ```mermaid
 gantt
@@ -6590,18 +7145,18 @@ gantt
     Stable Release  :2025-04-01, 365d
 ```
 
-#### 6.3.1.6 Documentation Standards
+##### 6.3.1.6 Documentation Standards
 
-**OpenAPI 3.0 Specification**
+###### OpenAPI 3.0 Specification
 
-| Documentation Component | Standard | Tool | Update Frequency |
-|---|---|---|---|
-| API Schema | OpenAPI 3.0 | Swagger/Redoc | Automated from code |
-| MCP Tools | JSON Schema | Custom generator | Per tool update |
-| Authentication | OAuth 2.1 | Standard documentation | Per security update |
-| Examples | Postman Collections | Automated export | Weekly |
+| Documentation Component | Standard            | Tool                   | Update Frequency    |
+| ----------------------- | ------------------- | ---------------------- | ------------------- |
+| API Schema              | OpenAPI 3.0         | Swagger/Redoc          | Automated from code |
+| MCP Tools               | JSON Schema         | Custom generator       | Per tool update     |
+| Authentication          | OAuth 2.1           | Standard documentation | Per security update |
+| Examples                | Postman Collections | Automated export       | Weekly              |
 
-**Documentation Generation Pipeline**
+###### Documentation Generation Pipeline
 
 ```mermaid
 graph LR
@@ -6635,13 +7190,16 @@ graph LR
     MCP_DOC --> MCP_SPEC
 ```
 
-### 6.3.2 Message Processing
+#### 6.3.2 Message Processing
 
-#### 6.3.2.1 Event Processing Patterns
+##### 6.3.2.1 Event Processing Patterns
 
-**Event-Driven Architecture**
+###### Event-Driven Architecture
 
-Streams are like async iterators that suspend until items are ready, excelling in scenarios where data is continuous or unpredictable, such as processing HTTP chunks, streaming logs, or handling WebSocket messages. Corbusier implements comprehensive event processing for real-time system coordination:
+Streams are like async iterators that suspend until items are ready, excelling
+in scenarios where data is continuous or unpredictable, such as processing HTTP
+chunks, streaming logs, or handling WebSocket messages. Corbusier implements
+comprehensive event processing for real-time system coordination:
 
 ```mermaid
 graph TB
@@ -6685,20 +7243,22 @@ graph TB
     EVENT_ROUTE --> NOTIFICATION_SVC
 ```
 
-**Event Schema and Types**
+###### Event Schema and Types
 
-| Event Category | Event Types | Schema Version | Processing Priority |
-|---|---|---|---|
-| Conversation Events | TurnStarted, TurnCompleted, MessageAppended | v1.0 | High |
-| Tool Events | ToolCallInitiated, ToolExecutionComplete, ToolError | v1.0 | High |
-| Task Events | TaskCreated, StateTransition, BranchCreated | v1.0 | Medium |
-| System Events | ServiceStarted, HealthCheck, ConfigurationChanged | v1.0 | Low |
+| Event Category      | Event Types                                         | Schema Version | Processing Priority |
+| ------------------- | --------------------------------------------------- | -------------- | ------------------- |
+| Conversation Events | TurnStarted, TurnCompleted, MessageAppended         | v1.0           | High                |
+| Tool Events         | ToolCallInitiated, ToolExecutionComplete, ToolError | v1.0           | High                |
+| Task Events         | TaskCreated, StateTransition, BranchCreated         | v1.0           | Medium              |
+| System Events       | ServiceStarted, HealthCheck, ConfigurationChanged   | v1.0           | Low                 |
 
-#### 6.3.2.2 Message Queue Architecture
+##### 6.3.2.2 Message Queue Architecture
 
-**Tokio-Based Message Processing**
+###### Tokio-Based Message Processing
 
-Tokio streams enable developers to process dynamic, asynchronous data with efficiency and safety, enabling non-blocking processing to handle data as it arrives without blocking the runtime:
+Tokio streams enable developers to process dynamic, asynchronous data with
+efficiency and safety, enabling non-blocking processing to handle data as it
+arrives without blocking the runtime:
 
 ```mermaid
 graph TB
@@ -6738,20 +7298,21 @@ graph TB
     EVENT_PROCESSORS --> NOTIFICATION_SVC
 ```
 
-**Channel Configuration and Patterns**
+###### Channel Configuration and Patterns
 
-| Channel Type | Use Case | Buffer Size | Backpressure Strategy |
-|---|---|---|---|
-| Broadcast | Event distribution to multiple consumers | 1000 messages | Drop oldest on overflow |
-| MPSC | Producer-consumer workflows | 100 messages | Async backpressure |
-| Oneshot | Request-response patterns | N/A | Immediate response |
-| Watch | Configuration updates | 1 message | Latest value only |
+| Channel Type | Use Case                                 | Buffer Size   | Backpressure Strategy   |
+| ------------ | ---------------------------------------- | ------------- | ----------------------- |
+| Broadcast    | Event distribution to multiple consumers | 1000 messages | Drop oldest on overflow |
+| MPSC         | Producer-consumer workflows              | 100 messages  | Async backpressure      |
+| Oneshot      | Request-response patterns                | N/A           | Immediate response      |
+| Watch        | Configuration updates                    | 1 message     | Latest value only       |
 
-#### 6.3.2.3 Stream Processing Design
+##### 6.3.2.3 Stream Processing Design
 
-**Real-Time Event Streaming**
+###### Real-Time Event Streaming
 
-Tokio broadcast receivers can be used to await receive methods and send out new events every time a new message is received, enabling real-time event streaming:
+Tokio broadcast receivers can be used to await receive methods and send out new
+events every time a new message is received, enabling real-time event streaming:
 
 ```rust
 pub struct EventStreamManager {
@@ -6786,18 +7347,18 @@ impl EventStreamManager {
 }
 ```
 
-**Stream Processing Patterns**
+###### Stream Processing Patterns
 
-| Pattern | Implementation | Use Case | Performance Characteristics |
-|---|---|---|---|
-| Fan-out | Broadcast channels | Event distribution | High throughput, low latency |
-| Pipeline | Chained stream transformations | Data processing | Sequential processing |
-| Merge | Multiple stream combination | Event aggregation | Ordered event processing |
-| Buffer | Buffered stream processing | Batch operations | Controlled memory usage |
+| Pattern  | Implementation                 | Use Case           | Performance Characteristics  |
+| -------- | ------------------------------ | ------------------ | ---------------------------- |
+| Fan-out  | Broadcast channels             | Event distribution | High throughput, low latency |
+| Pipeline | Chained stream transformations | Data processing    | Sequential processing        |
+| Merge    | Multiple stream combination    | Event aggregation  | Ordered event processing     |
+| Buffer   | Buffered stream processing     | Batch operations   | Controlled memory usage      |
 
-#### 6.3.2.4 Batch Processing Flows
+##### 6.3.2.4 Batch Processing Flows
 
-**Asynchronous Batch Processing**
+###### Asynchronous Batch Processing
 
 ```mermaid
 graph LR
@@ -6830,18 +7391,18 @@ graph LR
     RETRY --> VALIDATE
 ```
 
-**Batch Processing Configuration**
+###### Batch Processing Configuration
 
-| Batch Type | Trigger Condition | Batch Size | Processing Interval |
-|---|---|---|---|
-| Audit Events | Time-based (5 minutes) | 1000 events | Every 5 minutes |
-| Metrics Data | Size-based (500 events) | 500 events | When buffer full |
-| Tool Execution Logs | Mixed (time + size) | 100 events | 1 minute or buffer full |
-| VCS Operations | Event-based | 50 operations | On completion |
+| Batch Type          | Trigger Condition       | Batch Size    | Processing Interval     |
+| ------------------- | ----------------------- | ------------- | ----------------------- |
+| Audit Events        | Time-based (5 minutes)  | 1000 events   | Every 5 minutes         |
+| Metrics Data        | Size-based (500 events) | 500 events    | When buffer full        |
+| Tool Execution Logs | Mixed (time + size)     | 100 events    | 1 minute or buffer full |
+| VCS Operations      | Event-based             | 50 operations | On completion           |
 
-#### 6.3.2.5 Error Handling Strategy
+##### 6.3.2.5 Error Handling Strategy
 
-**Comprehensive Error Handling Pipeline**
+###### Comprehensive Error Handling Pipeline
 
 ```mermaid
 graph TB
@@ -6880,22 +7441,23 @@ graph TB
     FALLBACK --> ALERT
 ```
 
-**Error Handling Implementation**
+###### Error Handling Implementation
 
-| Error Type | Retry Strategy | Max Retries | Backoff Strategy |
-|---|---|---|---|
-| Network Timeout | Exponential backoff | 3 attempts | 1s, 2s, 4s |
-| Rate Limit Exceeded | Fixed delay | 5 attempts | Rate limit reset time |
-| Authentication Failure | No retry | 0 attempts | Immediate failure |
-| Tool Execution Error | Linear backoff | 2 attempts | 5s, 10s |
+| Error Type             | Retry Strategy      | Max Retries | Backoff Strategy      |
+| ---------------------- | ------------------- | ----------- | --------------------- |
+| Network Timeout        | Exponential backoff | 3 attempts  | 1s, 2s, 4s            |
+| Rate Limit Exceeded    | Fixed delay         | 5 attempts  | Rate limit reset time |
+| Authentication Failure | No retry            | 0 attempts  | Immediate failure     |
+| Tool Execution Error   | Linear backoff      | 2 attempts  | 5s, 10s               |
 
-### 6.3.3 External Systems
+#### 6.3.3 External Systems
 
-#### 6.3.3.1 Third-Party Integration Patterns
+##### 6.3.3.1 Third-Party Integration Patterns
 
-**Agent Backend Integration**
+###### Agent Backend Integration
 
-Corbusier implements the adapter pattern for multiple AI agent backends, ensuring consistent orchestration regardless of the underlying agent technology:
+Corbusier implements the adapter pattern for multiple AI agent backends,
+ensuring consistent orchestration regardless of the underlying agent technology:
 
 ```mermaid
 graph TB
@@ -6931,20 +7493,21 @@ graph TB
     STREAM_HANDLER --> CONVERSATION_SVC
 ```
 
-**VCS Provider Integration**
+###### VCS Provider Integration
 
-| VCS Provider | Integration Method | Authentication | Webhook Support |
-|---|---|---|---|
-| GitHub | REST API v4 + GraphQL | OAuth 2.0, Personal Access Tokens | Full webhook support |
-| GitLab | REST API v4 | OAuth 2.0, Project Access Tokens | Full webhook support |
-| Bitbucket | REST API 2.0 | OAuth 2.0, App Passwords | Limited webhook support |
-| Generic Git | Git CLI + SSH | SSH Keys, HTTPS credentials | No webhook support |
+| VCS Provider | Integration Method    | Authentication                    | Webhook Support         |
+| ------------ | --------------------- | --------------------------------- | ----------------------- |
+| GitHub       | REST API v4 + GraphQL | OAuth 2.0, Personal Access Tokens | Full webhook support    |
+| GitLab       | REST API v4           | OAuth 2.0, Project Access Tokens  | Full webhook support    |
+| Bitbucket    | REST API 2.0          | OAuth 2.0, App Passwords          | Limited webhook support |
+| Generic Git  | Git CLI + SSH         | SSH Keys, HTTPS credentials       | No webhook support      |
 
-#### 6.3.3.2 Legacy System Interfaces
+##### 6.3.3.2 Legacy System Interfaces
 
-**Encapsulation Provider Integration**
+###### Encapsulation Provider Integration
 
-Corbusier integrates with Podbot for secure workspace encapsulation, with extensibility for future encapsulation technologies:
+Corbusier integrates with Podbot for secure workspace encapsulation, with
+extensibility for future encapsulation technologies:
 
 ```mermaid
 sequenceDiagram
@@ -6968,18 +7531,18 @@ sequenceDiagram
     Encap-->>Task: Tool Result
 ```
 
-**Review Integration (Frankie)**
+###### Review Integration (Frankie)
 
-| Integration Component | Technology | Data Flow | Processing Method |
-|---|---|---|---|
-| Comment Extraction | Browser automation | VCS → Frankie → Corbusier | Real-time webhook processing |
-| Comment Normalization | Text processing | Raw comments → Structured data | Async batch processing |
-| Thread Management | State tracking | Comment threads → Conversation context | Event-driven updates |
-| Response Generation | AI integration | Structured feedback → Agent prompts | Streaming response |
+| Integration Component | Technology         | Data Flow                                | Processing Method            |
+| --------------------- | ------------------ | ---------------------------------------- | ---------------------------- |
+| Comment Extraction    | Browser automation | VCS → Frankie → Corbusier                | Real-time webhook processing |
+| Comment Normalization | Text processing    | Raw comments → Structured data           | Async batch processing       |
+| Thread Management     | State tracking     | Comment threads → Conversation context   | Event-driven updates         |
+| Response Generation   | AI integration     | Structured feedback → Agent prompts      | Streaming response           |
 
-#### 6.3.3.3 API Gateway Configuration
+##### 6.3.3.3 API Gateway Configuration
 
-**Gateway Architecture**
+###### Gateway Architecture
 
 ```mermaid
 graph TB
@@ -7019,27 +7582,27 @@ graph TB
     CORS_HANDLER --> ADMIN_API
 ```
 
-**Gateway Configuration**
+###### Gateway Configuration
 
-| Configuration Aspect | Implementation | Technology | Performance Target |
-|---|---|---|---|
-| Load Balancing | Round-robin with health checks | Actix Web built-in | <1ms routing overhead |
-| SSL Termination | TLS 1.3 with modern ciphers | rustls | <5ms handshake time |
-| Request Routing | Path-based routing | Actix Web router | <0.1ms route resolution |
-| Response Caching | Selective endpoint caching | In-memory cache | 95% cache hit rate |
+| Configuration Aspect | Implementation                 | Technology         | Performance Target      |
+| -------------------- | ------------------------------ | ------------------ | ----------------------- |
+| Load Balancing       | Round-robin with health checks | Actix Web built-in | <1ms routing overhead   |
+| SSL Termination      | TLS 1.3 with modern ciphers    | rustls             | <5ms handshake time     |
+| Request Routing      | Path-based routing             | Actix Web router   | <0.1ms route resolution |
+| Response Caching     | Selective endpoint caching     | In-memory cache    | 95% cache hit rate      |
 
-#### 6.3.3.4 External Service Contracts
+##### 6.3.3.4 External Service Contracts
 
-**Service Level Agreements**
+###### Service Level Agreements
 
-| External Service | Availability SLA | Response Time SLA | Error Rate SLA | Fallback Strategy |
-|---|---|---|---|---|
-| Claude Code SDK | 99.5% | <2s for tool calls | <1% error rate | Fallback to Codex |
-| GitHub API | 99.9% | <1s for API calls | <0.5% error rate | Local caching |
-| Podbot Runtime | 99.8% | <5s container startup | <2% error rate | Local execution |
-| MCP Tool Servers | 99.0% | <10s tool execution | <5% error rate | Tool degradation |
+| External Service | Availability SLA | Response Time SLA     | Error Rate SLA   | Fallback Strategy |
+| ---------------- | ---------------- | --------------------- | ---------------- | ----------------- |
+| Claude Code SDK  | 99.5%            | <2s for tool calls    | <1% error rate   | Fallback to Codex |
+| GitHub API       | 99.9%            | <1s for API calls     | <0.5% error rate | Local caching     |
+| Podbot Runtime   | 99.8%            | <5s container startup | <2% error rate   | Local execution   |
+| MCP Tool Servers | 99.0%            | <10s tool execution   | <5% error rate   | Tool degradation  |
 
-**Contract Monitoring and Enforcement**
+###### Contract Monitoring and Enforcement
 
 ```mermaid
 graph LR
@@ -7063,16 +7626,16 @@ graph LR
     SLA_DASHBOARD --> AUTO_RECOVERY
 ```
 
-**Integration Resilience Patterns**
+###### Integration Resilience Patterns
 
-| Pattern | Implementation | Trigger Condition | Recovery Action |
-|---|---|---|---|
-| Circuit Breaker | Per-service circuit breakers | 5 consecutive failures | Open circuit for 30s |
-| Retry with Backoff | Exponential backoff | Transient failures | 3 retries with 1s, 2s, 4s delays |
-| Bulkhead Isolation | Resource pool separation | Resource exhaustion | Isolate failing service |
-| Timeout Management | Per-operation timeouts | Slow responses | Cancel and retry |
+| Pattern            | Implementation               | Trigger Condition      | Recovery Action                  |
+| ------------------ | ---------------------------- | ---------------------- | -------------------------------- |
+| Circuit Breaker    | Per-service circuit breakers | 5 consecutive failures | Open circuit for 30s             |
+| Retry with Backoff | Exponential backoff          | Transient failures     | 3 retries with 1s, 2s, 4s delays |
+| Bulkhead Isolation | Resource pool separation     | Resource exhaustion    | Isolate failing service          |
+| Timeout Management | Per-operation timeouts       | Slow responses         | Cancel and retry                 |
 
-**External Dependency Management**
+###### External Dependency Management
 
 ```mermaid
 graph TB
@@ -7108,25 +7671,37 @@ graph TB
     RESOURCE_THROTTLING --> SERVICE_DISCOVERY
 ```
 
-This comprehensive integration architecture ensures that Corbusier can effectively orchestrate AI agents while maintaining robust, secure, and performant integrations with external systems. The Model Context Protocol enables powerful capabilities through arbitrary data access and code execution paths, requiring important security and trust considerations, with tools representing arbitrary code execution that must be treated with appropriate caution, and implementors should build robust consent and authorization flows, provide clear documentation of security implications, implement appropriate access controls and data protections, and follow security best practices.
+This comprehensive integration architecture ensures that Corbusier can
+effectively orchestrate AI agents while maintaining robust, secure, and
+performant integrations with external systems. The Model Context Protocol
+enables powerful capabilities through arbitrary data access and code execution
+paths, requiring important security and trust considerations, with tools
+representing arbitrary code execution that must be treated with appropriate
+caution, and implementors should build robust consent and authorization flows,
+provide clear documentation of security implications, implement appropriate
+access controls and data protections, and follow security best practices.
 
-## 6.4 Security Architecture
+### 6.4 Security Architecture
 
-### 6.4.1 Authentication Framework
+#### 6.4.1 Authentication Framework
 
-#### 6.4.1.1 Identity Management
+##### 6.4.1.1 Identity Management
 
-Corbusier implements a comprehensive identity management system built on industry-standard protocols and security best practices. The system uses JWT (JSON Web Token) authentication, which defines a compact and self-contained way of transmitting information securely between parties as a JSON object that can securely hold claims such as user identity, permissions, and session data.
+Corbusier implements a comprehensive identity management system built on
+industry-standard protocols and security best practices. The system uses JWT
+(JSON Web Token) authentication, which defines a compact and self-contained way
+of transmitting information securely between parties as a JSON object that can
+securely hold claims such as user identity, permissions, and session data.
 
-**Identity Provider Integration**
+###### Identity Provider Integration
 
-| Identity Provider | Integration Method | Authentication Flow | Token Management |
-|---|---|---|---|
-| Local Authentication | Direct credential validation | Username/password with JWT | HS256 signing with refresh tokens |
-| OAuth 2.1 Providers | External provider integration | Authorization code flow with PKCE | Bearer token validation |
-| Enterprise SSO | SAML/OIDC integration | Federated authentication | Token exchange and validation |
+| Identity Provider    | Integration Method            | Authentication Flow               | Token Management                  |
+| -------------------- | ----------------------------- | --------------------------------- | --------------------------------- |
+| Local Authentication | Direct credential validation  | Username/password with JWT        | HS256 signing with refresh tokens |
+| OAuth 2.1 Providers  | External provider integration | Authorization code flow with PKCE | Bearer token validation           |
+| Enterprise SSO       | SAML/OIDC integration         | Federated authentication          | Token exchange and validation     |
 
-**User Identity Model**
+###### User Identity Model
 
 ```mermaid
 graph TB
@@ -7162,24 +7737,29 @@ graph TB
     SESSION_MGR --> TOKEN_CACHE
 ```
 
-#### 6.4.1.2 Multi-Factor Authentication
+##### 6.4.1.2 Multi-Factor Authentication
 
-**MFA Implementation Strategy**
+###### MFA Implementation Strategy
 
-To further enhance security, the system implements additional checks in the route protection middleware. After verifying the JWT, the system can query additional verification mechanisms to ensure the user's session is still valid.
+To further enhance security, the system implements additional checks in the
+route protection middleware. After verifying the JWT, the system can query
+additional verification mechanisms to ensure the user's session is still valid.
 
-| MFA Method | Implementation | Use Case | Security Level |
-|---|---|---|---|
-| TOTP (Time-based OTP) | RFC 6238 compliant | Standard user authentication | Medium |
-| WebAuthn/FIDO2 | Browser-based biometric | High-security operations | High |
-| SMS/Email OTP | External service integration | Account recovery | Low |
-| Hardware Tokens | PKCS#11 integration | Administrative access | Very High |
+| MFA Method            | Implementation               | Use Case                     | Security Level |
+| --------------------- | ---------------------------- | ---------------------------- | -------------- |
+| TOTP (Time-based OTP) | RFC 6238 compliant           | Standard user authentication | Medium         |
+| WebAuthn/FIDO2        | Browser-based biometric      | High-security operations     | High           |
+| SMS/Email OTP         | External service integration | Account recovery             | Low            |
+| Hardware Tokens       | PKCS#11 integration          | Administrative access        | Very High      |
 
-#### 6.4.1.3 Session Management
+##### 6.4.1.3 Session Management
 
-**JWT-Based Session Architecture**
+###### JWT-Based Session Architecture
 
-The implementation implies that the token duration stays valid since last active. It does not mean that after this duration, the token becomes invalid or expired. So long as the client keeps sending requests while the token is valid, it will never expire.
+The implementation implies that the token duration stays valid since last
+active. It does not mean that after this duration, the token becomes invalid or
+expired. So long as the client keeps sending requests while the token is valid,
+it will never expire.
 
 ```rust
 pub struct SessionManager {
@@ -7215,19 +7795,21 @@ impl SessionManager {
 }
 ```
 
-#### 6.4.1.4 Token Handling
+##### 6.4.1.4 Token Handling
 
-**JWT Token Security Implementation**
+###### JWT Token Security Implementation
 
-The JWT implementation supports multiple cryptographic signing and verifying algorithms such as HS256, HS384, HS512, EdDSA and ES256, providing flexibility in security requirements.
+The JWT implementation supports multiple cryptographic signing and verifying
+algorithms such as HS256, HS384, HS512, EdDSA and ES256, providing flexibility
+in security requirements.
 
-| Token Type | Algorithm | Expiration | Storage Location | Revocation Method |
-|---|---|---|---|---|
-| Access Token | HS256/RS256 | 1 hour | Memory/HTTP-only cookie | Session invalidation |
-| Refresh Token | HS256/RS256 | 7 days | Secure HTTP-only cookie | Database blacklist |
-| API Key | Static validation | No expiration | Authorization header | Database revocation |
+| Token Type    | Algorithm         | Expiration    | Storage Location        | Revocation Method    |
+| ------------- | ----------------- | ------------- | ----------------------- | -------------------- |
+| Access Token  | HS256/RS256       | 1 hour        | Memory/HTTP-only cookie | Session invalidation |
+| Refresh Token | HS256/RS256       | 7 days        | Secure HTTP-only cookie | Database blacklist   |
+| API Key       | Static validation | No expiration | Authorization header    | Database revocation  |
 
-**Token Validation Pipeline**
+###### Token Validation Pipeline
 
 ```mermaid
 sequenceDiagram
@@ -7249,24 +7831,27 @@ sequenceDiagram
     Middleware-->>Client: Authorized Response
 ```
 
-#### 6.4.1.5 Password Policies
+##### 6.4.1.5 Password Policies
 
-**Password Security Requirements**
+###### Password Security Requirements
 
-| Policy Aspect | Requirement | Implementation | Enforcement Point |
-|---|---|---|---|
-| Minimum Length | 12 characters | Client and server validation | Registration/password change |
-| Complexity | Mixed case, numbers, symbols | Regex validation | Password creation |
-| History | Last 5 passwords | Hashed password storage | Password update |
-| Expiration | 90 days (configurable) | Database tracking | Login validation |
+| Policy Aspect  | Requirement                  | Implementation               | Enforcement Point            |
+| -------------- | ---------------------------- | ---------------------------- | ---------------------------- |
+| Minimum Length | 12 characters                | Client and server validation | Registration/password change |
+| Complexity     | Mixed case, numbers, symbols | Regex validation             | Password creation            |
+| History        | Last 5 passwords             | Hashed password storage      | Password update              |
+| Expiration     | 90 days (configurable)       | Database tracking            | Login validation             |
 
-### 6.4.2 Authorization System
+#### 6.4.2 Authorization System
 
-#### 6.4.2.1 Role-Based Access Control
+##### 6.4.2.1 Role-Based Access Control
 
-**RBAC Implementation Architecture**
+###### RBAC Implementation Architecture
 
-The core of authorization is determining, for each action, should this agent (or user) be allowed to do this? In traditional applications, this often boils down to checking a user's role or permissions before executing an operation. With MCP and AI agents, we have a similar need, but it can get more complex.
+The core of authorization is determining, for each action, should this agent
+(or user) be allowed to do this? In traditional applications, this often boils
+down to checking a user's role or permissions before executing an operation.
+With MCP and AI agents, we have a similar need, but it can get more complex.
 
 ```mermaid
 graph TB
@@ -7311,20 +7896,23 @@ graph TB
     TOOL_PERMS --> USER
 ```
 
-**Role Definition Matrix**
+###### Role Definition Matrix
 
-| Role | System Admin | Workspace Management | Task Creation | Tool Execution | Read Access |
-|---|---|---|---|---|---|
-| Administrator | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Team Lead | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Developer | ✗ | ✗ | ✓ | ✓ | ✓ |
-| Viewer | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Role          | System Admin | Workspace Management | Task Creation | Tool Execution | Read Access |
+| ------------- | ------------ | -------------------- | ------------- | -------------- | ----------- |
+| Administrator | ✓            | ✓                    | ✓             | ✓              | ✓           |
+| Team Lead     | ✗            | ✓                    | ✓             | ✓              | ✓           |
+| Developer     | ✗            | ✗                    | ✓             | ✓              | ✓           |
+| Viewer        | ✗            | ✗                    | ✗             | ✗              | ✓           |
 
-#### 6.4.2.2 Permission Management
+##### 6.4.2.2 Permission Management
 
-**Fine-Grained Permission System**
+###### Fine-Grained Permission System
 
-Implementing authorization logic directly in the MCP server code, with a bunch of if/else checks for roles, etc. is error-prone and inflexible. Hardcoding such rules leads to brittle code - any policy change means modifying the code and redeploying the server, which is not agile or scalable.
+Implementing authorization logic directly in the MCP server code, with a bunch
+of if/else checks for roles, etc. is error-prone and inflexible. Hardcoding
+such rules leads to brittle code - any policy change means modifying the code
+and redeploying the server, which is not agile or scalable.
 
 ```rust
 pub struct PermissionEngine {
@@ -7381,20 +7969,24 @@ impl PermissionEngine {
 }
 ```
 
-#### 6.4.2.3 Resource Authorization
+##### 6.4.2.3 Resource Authorization
 
-**Workspace-Scoped Authorization**
+###### Workspace-Scoped Authorization
 
-Imagine an AI assistant that has access to a finance database: a regular employee's AI assistant should perhaps read records but not create payments, whereas a manager's assistant might initiate a purchase order but only up to a certain amount. If the MCP server doesn't enforce these distinctions, the AI agent could overstep its authority.
+Imagine an AI assistant that has access to a finance database: a regular
+employee's AI assistant should perhaps read records but not create payments,
+whereas a manager's assistant might initiate a purchase order but only up to a
+certain amount. If the MCP server doesn't enforce these distinctions, the AI
+agent could overstep its authority.
 
-| Resource Type | Authorization Scope | Access Control Method | Inheritance Rules |
-|---|---|---|---|
-| Workspaces | User membership + role | RBAC with workspace context | Team permissions inherit |
-| Tasks | Workspace membership | Task ownership + delegation | Creator and assignee access |
-| Conversations | Task association | Task permissions apply | Read access for team members |
-| Tools | Workspace + tool policy | Tool-specific permissions | Workspace tool policies |
+| Resource Type | Authorization Scope     | Access Control Method       | Inheritance Rules            |
+| ------------- | ----------------------- | --------------------------- | ---------------------------- |
+| Workspaces    | User membership + role  | RBAC with workspace context | Team permissions inherit     |
+| Tasks         | Workspace membership    | Task ownership + delegation | Creator and assignee access  |
+| Conversations | Task association        | Task permissions apply      | Read access for team members |
+| Tools         | Workspace + tool policy | Tool-specific permissions   | Workspace tool policies      |
 
-**Resource Authorization Flow**
+###### Resource Authorization Flow
 
 ```mermaid
 flowchart TD
@@ -7435,18 +8027,18 @@ flowchart TD
     CONDITION_CHECK --> CONDITIONAL
 ```
 
-#### 6.4.2.4 Policy Enforcement Points
+##### 6.4.2.4 Policy Enforcement Points
 
-**Multi-Layer Policy Enforcement**
+###### Multi-Layer Policy Enforcement
 
-| Enforcement Layer | Implementation | Scope | Performance Impact |
-|---|---|---|---|
-| API Gateway | HTTP middleware | All external requests | Low (<1ms) |
-| Service Layer | Method-level decorators | Business logic calls | Medium (<5ms) |
-| Data Layer | Repository-level filters | Database queries | Low (<2ms) |
-| Tool Execution | MCP server validation | Tool calls | Medium (<10ms) |
+| Enforcement Layer | Implementation           | Scope                 | Performance Impact |
+| ----------------- | ------------------------ | --------------------- | ------------------ |
+| API Gateway       | HTTP middleware          | All external requests | Low (<1ms)         |
+| Service Layer     | Method-level decorators  | Business logic calls  | Medium (<5ms)      |
+| Data Layer        | Repository-level filters | Database queries      | Low (<2ms)         |
+| Tool Execution    | MCP server validation    | Tool calls            | Medium (<10ms)     |
 
-**Policy Enforcement Architecture**
+###### Policy Enforcement Architecture
 
 ```rust
 #[async_trait::async_trait]
@@ -7489,33 +8081,36 @@ impl PolicyEnforcementPoint for ApiGatewayPEP {
 }
 ```
 
-#### 6.4.2.5 Audit Logging
+##### 6.4.2.5 Audit Logging
 
-**Comprehensive Authorization Audit Trail**
+###### Comprehensive Authorization Audit Trail
 
-Another point to consider is auditability and compliance. When AI agents are making tool calls, you need a clear log of "who (or which agent) did what, and was it allowed." This is not just for security forensics but also for compliance with regulations.
+Another point to consider is auditability and compliance. When AI agents are
+making tool calls, you need a clear log of "who (or which agent) did what, and
+was it allowed." This is not just for security forensics but also for
+compliance with regulations.
 
-| Audit Event Type | Information Captured | Retention Period | Analysis Method |
-|---|---|---|---|
-| Authentication Events | User login/logout, MFA challenges | 2 years | Real-time monitoring |
-| Authorization Decisions | Permission checks, policy evaluations | 7 years | Batch analysis |
-| Resource Access | Resource access attempts and results | 1 year | Pattern analysis |
-| Policy Changes | Policy modifications and approvals | Permanent | Change tracking |
+| Audit Event Type        | Information Captured                  | Retention Period | Analysis Method      |
+| ----------------------- | ------------------------------------- | ---------------- | -------------------- |
+| Authentication Events   | User login/logout, MFA challenges     | 2 years          | Real-time monitoring |
+| Authorization Decisions | Permission checks, policy evaluations | 7 years          | Batch analysis       |
+| Resource Access         | Resource access attempts and results  | 1 year           | Pattern analysis     |
+| Policy Changes          | Policy modifications and approvals    | Permanent        | Change tracking      |
 
-### 6.4.3 Data Protection
+#### 6.4.3 Data Protection
 
-#### 6.4.3.1 Encryption Standards
+##### 6.4.3.1 Encryption Standards
 
-**Encryption Implementation Matrix**
+###### Encryption Implementation Matrix
 
-| Data State | Encryption Method | Key Management | Algorithm | Key Rotation |
-|---|---|---|---|---|
-| Data at Rest | AES-256-GCM | Database-level encryption | AES-256 | Annual |
-| Data in Transit | TLS 1.3 | Certificate management | ChaCha20-Poly1305 | Certificate lifecycle |
-| Application Secrets | Envelope encryption | External key management | AES-256-GCM | Quarterly |
-| JWT Tokens | HMAC/RSA signing | Rotating key pairs | HS256/RS256 | Monthly |
+| Data State          | Encryption Method   | Key Management            | Algorithm         | Key Rotation          |
+| ------------------- | ------------------- | ------------------------- | ----------------- | --------------------- |
+| Data at Rest        | AES-256-GCM         | Database-level encryption | AES-256           | Annual                |
+| Data in Transit     | TLS 1.3             | Certificate management    | ChaCha20-Poly1305 | Certificate lifecycle |
+| Application Secrets | Envelope encryption | External key management   | AES-256-GCM       | Quarterly             |
+| JWT Tokens          | HMAC/RSA signing    | Rotating key pairs        | HS256/RS256       | Monthly               |
 
-**Encryption Architecture**
+###### Encryption Architecture
 
 ```mermaid
 graph TB
@@ -7553,9 +8148,9 @@ graph TB
     ROTATION --> CERT_RENEWAL
 ```
 
-#### 6.4.3.2 Key Management
+##### 6.4.3.2 Key Management
 
-**Hierarchical Key Management System**
+###### Hierarchical Key Management System
 
 ```rust
 pub struct KeyManager {
@@ -7598,48 +8193,52 @@ impl KeyManager {
 }
 ```
 
-#### 6.4.3.3 Data Masking Rules
+##### 6.4.3.3 Data Masking Rules
 
-**Sensitive Data Protection**
+###### Sensitive Data Protection
 
-| Data Category | Masking Strategy | Implementation | Access Control |
-|---|---|---|---|
-| User Credentials | Hash with salt | bcrypt/Argon2 | Admin-only access |
-| API Keys | Partial masking | Show last 4 characters | Owner + admin access |
-| Conversation Content | Context-aware masking | PII detection and redaction | Role-based access |
-| Tool Parameters | Parameter-specific rules | Configurable masking patterns | Tool-specific policies |
+| Data Category        | Masking Strategy         | Implementation                | Access Control         |
+| -------------------- | ------------------------ | ----------------------------- | ---------------------- |
+| User Credentials     | Hash with salt           | bcrypt/Argon2                 | Admin-only access      |
+| API Keys             | Partial masking          | Show last 4 characters        | Owner + admin access   |
+| Conversation Content | Context-aware masking    | PII detection and redaction   | Role-based access      |
+| Tool Parameters      | Parameter-specific rules | Configurable masking patterns | Tool-specific policies |
 
-#### 6.4.3.4 Secure Communication
+##### 6.4.3.4 Secure Communication
 
-**TLS Configuration and Security**
+###### TLS Configuration and Security
 
-All authorization endpoints MUST be served over HTTPS with TLS 1.3, and clients MUST securely store tokens following OAuth 2.1 best practices.
+All authorization endpoints MUST be served over HTTPS with TLS 1.3, and clients
+MUST securely store tokens following OAuth 2.1 best practices.
 
-| Communication Channel | Protocol | Cipher Suites | Certificate Management |
-|---|---|---|---|
-| Client-Server | TLS 1.3 | ChaCha20-Poly1305, AES-256-GCM | Automated certificate renewal |
-| MCP Tool Communication | TLS 1.3 or mTLS | AES-256-GCM | Client certificate authentication |
-| Database Connections | TLS 1.2+ | AES-256-CBC | Database-specific certificates |
-| Inter-service Communication | mTLS | ChaCha20-Poly1305 | Service mesh certificates |
+| Communication Channel       | Protocol        | Cipher Suites                  | Certificate Management            |
+| --------------------------- | --------------- | ------------------------------ | --------------------------------- |
+| Client-Server               | TLS 1.3         | ChaCha20-Poly1305, AES-256-GCM | Automated certificate renewal     |
+| MCP Tool Communication      | TLS 1.3 or mTLS | AES-256-GCM                    | Client certificate authentication |
+| Database Connections        | TLS 1.2+        | AES-256-CBC                    | Database-specific certificates    |
+| Inter-service Communication | mTLS            | ChaCha20-Poly1305              | Service mesh certificates         |
 
-#### 6.4.3.5 Compliance Controls
+##### 6.4.3.5 Compliance Controls
 
-**Regulatory Compliance Framework**
+###### Regulatory Compliance Framework
 
-| Regulation | Applicable Controls | Implementation | Audit Requirements |
-|---|---|---|---|
-| GDPR | Data minimization, right to erasure | Data classification, automated deletion | Annual compliance audit |
-| SOC 2 Type II | Access controls, encryption | RBAC, encryption at rest/transit | Continuous monitoring |
-| ISO 27001 | Information security management | Security policies, risk assessment | Annual certification |
-| NIST Cybersecurity Framework | Identify, protect, detect, respond, recover | Comprehensive security program | Quarterly assessments |
+| Regulation                   | Applicable Controls                         | Implementation                          | Audit Requirements      |
+| ---------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------- |
+| GDPR                         | Data minimization, right to erasure         | Data classification, automated deletion | Annual compliance audit |
+| SOC 2 Type II                | Access controls, encryption                 | RBAC, encryption at rest/transit        | Continuous monitoring   |
+| ISO 27001                    | Information security management             | Security policies, risk assessment      | Annual certification    |
+| NIST Cybersecurity Framework | Identify, protect, detect, respond, recover | Comprehensive security program          | Quarterly assessments   |
 
-### 6.4.4 MCP Security Considerations
+#### 6.4.4 MCP Security Considerations
 
-#### 6.4.4.1 MCP Protocol Security
+##### 6.4.4.1 MCP Protocol Security
 
-**MCP-Specific Security Implementation**
+###### MCP-Specific Security Implementation
 
-To prevent session hijacking and event injection attacks, MCP servers that implement authorization MUST verify all inbound requests. MCP Servers MUST NOT use sessions for authentication. MCP servers MUST use secure, non-deterministic session IDs.
+To prevent session hijacking and event injection attacks, MCP servers that
+implement authorization MUST verify all inbound requests. MCP Servers MUST NOT
+use sessions for authentication. MCP servers MUST use secure, non-deterministic
+session IDs.
 
 ```mermaid
 graph TB
@@ -7675,22 +8274,28 @@ graph TB
     CONSENT_MANAGEMENT --> TOKEN_AUDIENCE
 ```
 
-**MCP Authorization Implementation**
+###### MCP Authorization Implementation
 
-MCP auth implementations MUST implement OAuth 2.1 with appropriate security measures for both confidential and public clients. MCP deployments are encouraged to publish a Protected Resource Metadata document as defined in RFC 9728.
+MCP auth implementations MUST implement OAuth 2.1 with appropriate security
+measures for both confidential and public clients. MCP deployments are
+encouraged to publish a Protected Resource Metadata document as defined in RFC
+9728.
 
-| Security Requirement | Implementation | Compliance Standard | Validation Method |
-|---|---|---|---|
-| PKCE with SHA-256 | All OAuth flows | OAuth 2.1 mandatory | Code challenge verification |
-| HTTPS endpoints | All authorization endpoints | TLS 1.3 minimum | Certificate validation |
-| Token audience validation | MCP server token verification | RFC 8707 | Audience claim verification |
-| Scope minimization | Least privilege principle | OAuth 2.1 best practices | Scope validation |
+| Security Requirement      | Implementation                | Compliance Standard      | Validation Method           |
+| ------------------------- | ----------------------------- | ------------------------ | --------------------------- |
+| PKCE with SHA-256         | All OAuth flows               | OAuth 2.1 mandatory      | Code challenge verification |
+| HTTPS endpoints           | All authorization endpoints   | TLS 1.3 minimum          | Certificate validation      |
+| Token audience validation | MCP server token verification | RFC 8707                 | Audience claim verification |
+| Scope minimization        | Least privilege principle     | OAuth 2.1 best practices | Scope validation            |
 
-#### 6.4.4.2 Tool Execution Security
+##### 6.4.4.2 Tool Execution Security
 
-**Secure Tool Execution Environment**
+###### Secure Tool Execution Environment
 
-The MCP server should enforce limits on what the AI can do — e.g., the maximum file size it can read, or CPU time for an execution tool. If the AI has a code execution tool, consider running it in a secure sandbox or container with strict resource controls.
+The MCP server should enforce limits on what the AI can do — e.g., the maximum
+file size it can read, or CPU time for an execution tool. If the AI has a code
+execution tool, consider running it in a secure sandbox or container with
+strict resource controls.
 
 ```rust
 pub struct SecureToolExecutor {
@@ -7742,20 +8347,23 @@ impl SecureToolExecutor {
 }
 ```
 
-#### 6.4.4.3 Workspace Isolation
+##### 6.4.4.3 Workspace Isolation
 
-**Container-Based Security Architecture**
+###### Container-Based Security Architecture
 
-A Pod can encapsulate an application composed of multiple co-located containers that are tightly coupled and need to share resources. These co-located containers form a single cohesive unit of service, providing the foundation for Corbusier's workspace isolation model.
+A Pod can encapsulate an application composed of multiple co-located containers
+that are tightly coupled and need to share resources. These co-located
+containers form a single cohesive unit of service, providing the foundation for
+Corbusier's workspace isolation model.
 
-| Isolation Mechanism | Implementation | Security Benefit | Performance Impact |
-|---|---|---|---|
-| Process Isolation | Container namespaces | Prevent process interference | Low |
-| Network Isolation | Container networking | Restrict network access | Medium |
-| File System Isolation | Container volumes | Prevent unauthorized file access | Low |
-| Resource Isolation | Container resource limits | Prevent resource exhaustion | Medium |
+| Isolation Mechanism   | Implementation            | Security Benefit                 | Performance Impact |
+| --------------------- | ------------------------- | -------------------------------- | ------------------ |
+| Process Isolation     | Container namespaces      | Prevent process interference     | Low                |
+| Network Isolation     | Container networking      | Restrict network access          | Medium             |
+| File System Isolation | Container volumes         | Prevent unauthorized file access | Low                |
+| Resource Isolation    | Container resource limits | Prevent resource exhaustion      | Medium             |
 
-**Workspace Security Configuration**
+###### Workspace Security Configuration
 
 ```mermaid
 graph TB
@@ -7805,22 +8413,22 @@ graph TB
     QUOTA_LIMITS --> AUDIT_TRAIL
 ```
 
-### 6.4.5 Security Monitoring and Incident Response
+#### 6.4.5 Security Monitoring and Incident Response
 
-#### 6.4.5.1 Security Event Monitoring
+##### 6.4.5.1 Security Event Monitoring
 
-**Real-Time Security Monitoring**
+###### Real-Time Security Monitoring
 
-| Event Category | Detection Method | Response Time | Escalation Criteria |
-|---|---|---|---|
-| Authentication Failures | Failed login attempts | Real-time | >5 failures in 5 minutes |
-| Authorization Violations | Permission denied events | Real-time | Any admin privilege attempt |
-| Suspicious Tool Usage | Anomaly detection | <1 minute | Unusual tool execution patterns |
-| Data Access Anomalies | Access pattern analysis | <5 minutes | Bulk data access attempts |
+| Event Category           | Detection Method         | Response Time | Escalation Criteria             |
+| ------------------------ | ------------------------ | ------------- | ------------------------------- |
+| Authentication Failures  | Failed login attempts    | Real-time     | >5 failures in 5 minutes        |
+| Authorization Violations | Permission denied events | Real-time     | Any admin privilege attempt     |
+| Suspicious Tool Usage    | Anomaly detection        | <1 minute     | Unusual tool execution patterns |
+| Data Access Anomalies    | Access pattern analysis  | <5 minutes    | Bulk data access attempts       |
 
-#### 6.4.5.2 Incident Response Framework
+##### 6.4.5.2 Incident Response Framework
 
-**Security Incident Response Process**
+###### Security Incident Response Process
 
 ```mermaid
 flowchart TD
@@ -7852,28 +8460,39 @@ flowchart TD
     MONITORING --> LESSONS_LEARNED
 ```
 
-#### 6.4.5.3 Compliance and Audit Requirements
+##### 6.4.5.3 Compliance and Audit Requirements
 
-**Continuous Compliance Monitoring**
+###### Continuous Compliance Monitoring
 
-| Compliance Area | Monitoring Method | Reporting Frequency | Audit Trail Retention |
-|---|---|---|---|
-| Access Control | Automated policy validation | Daily | 7 years |
-| Data Protection | Encryption verification | Continuous | 7 years |
-| Security Configuration | Configuration drift detection | Hourly | 3 years |
-| Incident Response | Response time tracking | Per incident | 7 years |
+| Compliance Area        | Monitoring Method             | Reporting Frequency | Audit Trail Retention |
+| ---------------------- | ----------------------------- | ------------------- | --------------------- |
+| Access Control         | Automated policy validation   | Daily               | 7 years               |
+| Data Protection        | Encryption verification       | Continuous          | 7 years               |
+| Security Configuration | Configuration drift detection | Hourly              | 3 years               |
+| Incident Response      | Response time tracking        | Per incident        | 7 years               |
 
-This comprehensive security architecture ensures that Corbusier maintains robust protection across all system components while supporting the unique security requirements of AI agent orchestration. MCP servers pose significant security risks due to their ability to execute commands and perform API calls. One major concern is that even if a user doesn't intend a specific action, the LLM might decide it's the appropriate one, making the multi-layered security approach essential for safe AI agent operations.
+This comprehensive security architecture ensures that Corbusier maintains
+robust protection across all system components while supporting the unique
+security requirements of AI agent orchestration. MCP servers pose significant
+security risks due to their ability to execute commands and perform API calls.
+One major concern is that even if a user doesn't intend a specific action, the
+LLM might decide it's the appropriate one, making the multi-layered security
+approach essential for safe AI agent operations.
 
-## 6.5 Monitoring and Observability
+### 6.5 Monitoring and Observability
 
-### 6.5.1 Monitoring Infrastructure
+#### 6.5.1 Monitoring Infrastructure
 
-#### 6.5.1.1 Metrics Collection Framework
+##### 6.5.1.1 Metrics Collection Framework
 
-The tracing crate provides a versatile interface for collecting structured telemetry—including metrics, traces, and logs. Its design allows developers to plug in their implementation of choice to deliver this data as needed to a preferred backend system. Corbusier implements a comprehensive metrics collection framework built on the Rust tracing ecosystem and OpenTelemetry standards.
+The tracing crate provides a versatile interface for collecting structured
+telemetry—including metrics, traces, and logs. Its design allows developers to
+plug in their implementation of choice to deliver this data as needed to a
+preferred backend system. Corbusier implements a comprehensive metrics
+collection framework built on the Rust tracing ecosystem and OpenTelemetry
+standards.
 
-**Core Metrics Architecture**
+###### Core Metrics Architecture
 
 ```mermaid
 graph TB
@@ -7924,20 +8543,23 @@ graph TB
     PROM_SERVER --> ALERTMANAGER
 ```
 
-**Metrics Collection Implementation**
+###### Metrics Collection Implementation
 
-| Metric Category | Collection Method | Export Format | Retention Period |
-|---|---|---|---|
-| HTTP Request Metrics | Actix-Web middleware | Prometheus format | 30 days |
-| Agent Turn Metrics | Custom instrumentation | OpenTelemetry | 30 days |
-| Tool Execution Metrics | MCP server instrumentation | Prometheus format | 7 days |
-| System Resource Metrics | Node exporter | Prometheus format | 90 days |
+| Metric Category         | Collection Method          | Export Format     | Retention Period |
+| ----------------------- | -------------------------- | ----------------- | ---------------- |
+| HTTP Request Metrics    | Actix-Web middleware       | Prometheus format | 30 days          |
+| Agent Turn Metrics      | Custom instrumentation     | OpenTelemetry     | 30 days          |
+| Tool Execution Metrics  | MCP server instrumentation | Prometheus format | 7 days           |
+| System Resource Metrics | Node exporter              | Prometheus format | 90 days          |
 
-#### 6.5.1.2 Log Aggregation System
+##### 6.5.1.2 Log Aggregation System
 
-This is where observability comes in, provided by Tokio tracing crate and OpenTelemetry (OTel) crates. The log aggregation system leverages structured logging with correlation IDs to provide comprehensive visibility into system operations.
+This is where observability comes in, provided by Tokio tracing crate and
+OpenTelemetry (OTel) crates. The log aggregation system leverages structured
+logging with correlation IDs to provide comprehensive visibility into system
+operations.
 
-**Structured Logging Configuration**
+###### Structured Logging Configuration
 
 ```mermaid
 graph LR
@@ -7979,20 +8601,24 @@ graph LR
     FILTERING --> EXTERNAL
 ```
 
-**Log Level Configuration Matrix**
+###### Log Level Configuration Matrix
 
-| Component | Development | Staging | Production | Retention |
-|---|---|---|---|---|
-| HTTP Requests | DEBUG | INFO | WARN | 7 days |
-| Agent Operations | DEBUG | DEBUG | INFO | 14 days |
-| Tool Executions | TRACE | DEBUG | INFO | 7 days |
-| Security Events | INFO | INFO | INFO | 90 days |
+| Component        | Development | Staging | Production | Retention |
+| ---------------- | ----------- | ------- | ---------- | --------- |
+| HTTP Requests    | DEBUG       | INFO    | WARN       | 7 days    |
+| Agent Operations | DEBUG       | DEBUG   | INFO       | 14 days   |
+| Tool Executions  | TRACE       | DEBUG   | INFO       | 7 days    |
+| Security Events  | INFO        | INFO    | INFO       | 90 days   |
 
-#### 6.5.1.3 Distributed Tracing Implementation
+##### 6.5.1.3 Distributed Tracing Implementation
 
-You can see the complete breakdown of your requests with details like how much time each operation took, span attributes, etc · Using OpenTelemetry libraries, you can instrument your Rust applications for end-to-end tracing. Corbusier implements distributed tracing to track requests across agent backends, tool executions, and VCS operations.
+You can see the complete breakdown of your requests with details like how much
+time each operation took, span attributes, etc · Using OpenTelemetry libraries,
+you can instrument your Rust applications for end-to-end tracing. Corbusier
+implements distributed tracing to track requests across agent backends, tool
+executions, and VCS operations.
 
-**Tracing Architecture**
+###### Tracing Architecture
 
 ```mermaid
 sequenceDiagram
@@ -8020,20 +8646,24 @@ sequenceDiagram
     HTTP-->>User: HTTP Response
 ```
 
-**Trace Context Propagation**
+###### Trace Context Propagation
 
-| Boundary | Propagation Method | Context Format | Implementation |
-|---|---|---|---|
-| HTTP Requests | HTTP Headers | W3C Trace Context | Actix-Web middleware |
-| Agent Backends | SDK Integration | OpenTelemetry context | Custom propagation |
-| Tool Execution | MCP Protocol | Custom headers | MCP middleware |
-| Database Operations | SQLx integration | Span context | Query instrumentation |
+| Boundary            | Propagation Method | Context Format        | Implementation        |
+| ------------------- | ------------------ | --------------------- | --------------------- |
+| HTTP Requests       | HTTP Headers       | W3C Trace Context     | Actix-Web middleware  |
+| Agent Backends      | SDK Integration    | OpenTelemetry context | Custom propagation    |
+| Tool Execution      | MCP Protocol       | Custom headers        | MCP middleware        |
+| Database Operations | SQLx integration   | Span context          | Query instrumentation |
 
-#### 6.5.1.4 Alert Management System
+##### 6.5.1.4 Alert Management System
 
-While Prometheus offers basic alerting capabilities, Grafana allows visualizing alerts alongside metrics dashboards, providing a comprehensive monitoring experience. By leveraging Prometheus alerting rules and Grafana integration, organizations can automate the detection and notification of critical events within their infrastructure.
+While Prometheus offers basic alerting capabilities, Grafana allows visualizing
+alerts alongside metrics dashboards, providing a comprehensive monitoring
+experience. By leveraging Prometheus alerting rules and Grafana integration,
+organizations can automate the detection and notification of critical events
+within their infrastructure.
 
-**Alert Processing Flow**
+###### Alert Processing Flow
 
 ```mermaid
 graph TB
@@ -8073,26 +8703,31 @@ graph TB
     SILENCING --> PAGERDUTY
 ```
 
-#### 6.5.1.5 Dashboard Design Framework
+##### 6.5.1.5 Dashboard Design Framework
 
-Grafana and Prometheus are a powerful duo for monitoring and visualizing real-time data. Prometheus collects critical metrics, while Grafana turns them into dynamic, interactive dashboards.
+Grafana and Prometheus are a powerful duo for monitoring and visualizing
+real-time data. Prometheus collects critical metrics, while Grafana turns them
+into dynamic, interactive dashboards.
 
-**Dashboard Hierarchy**
+###### Dashboard Hierarchy
 
-| Dashboard Level | Purpose | Audience | Update Frequency |
-|---|---|---|---|
-| Executive Summary | High-level KPIs and SLA status | Management | Daily |
-| Operational Overview | System health and performance | Operations team | Real-time |
-| Component Deep Dive | Detailed component metrics | Development team | Real-time |
-| Troubleshooting | Diagnostic and debugging views | Support team | Real-time |
+| Dashboard Level      | Purpose                        | Audience         | Update Frequency |
+| -------------------- | ------------------------------ | ---------------- | ---------------- |
+| Executive Summary    | High-level KPIs and SLA status | Management       | Daily            |
+| Operational Overview | System health and performance  | Operations team  | Real-time        |
+| Component Deep Dive  | Detailed component metrics     | Development team | Real-time        |
+| Troubleshooting      | Diagnostic and debugging views | Support team     | Real-time        |
 
-### 6.5.2 Observability Patterns
+#### 6.5.2 Observability Patterns
 
-#### 6.5.2.1 Health Check Implementation
+##### 6.5.2.1 Health Check Implementation
 
-use actix_web::{web, App, HttpResponse, HttpServer}; use actix_web_metrics_mw::Metrics; fn health() -> HttpResponse { counter!("endpoint.method.status", 1); HttpResponse::Ok().finish() } Corbusier implements comprehensive health checks across all system components.
+use actix_web::{web, App, HttpResponse, HttpServer}; use
+actix_web_metrics_mw::Metrics; fn health() -> HttpResponse {
+counter!("endpoint.method.status", 1); HttpResponse::Ok().finish() } Corbusier
+implements comprehensive health checks across all system components.
 
-**Health Check Architecture**
+###### Health Check Architecture
 
 ```mermaid
 graph TB
@@ -8137,29 +8772,30 @@ ENCAP_HEALTH --> STATUS_CALC
 STATUS_CALC --> CACHE
 ```
 
-**Health Check Response Matrix**
+###### Health Check Response Matrix
 
-| Endpoint | Healthy Response | Degraded Response | Unhealthy Response | Timeout |
-|---|---|---|---|---|
-| /health/live | 200 OK | 200 OK | 503 Service Unavailable | 5s |
-| /health/ready | 200 OK | 503 Service Unavailable | 503 Service Unavailable | 10s |
-| /health/startup | 200 OK | 503 Service Unavailable | 503 Service Unavailable | 30s |
-| /health/detailed | JSON status | JSON with warnings | JSON with errors | 15s |
+| Endpoint         | Healthy Response | Degraded Response       | Unhealthy Response      | Timeout |
+| ---------------- | ---------------- | ----------------------- | ----------------------- | ------- |
+| /health/live     | 200 OK           | 200 OK                  | 503 Service Unavailable | 5s      |
+| /health/ready    | 200 OK           | 503 Service Unavailable | 503 Service Unavailable | 10s     |
+| /health/startup  | 200 OK           | 503 Service Unavailable | 503 Service Unavailable | 30s     |
+| /health/detailed | JSON status      | JSON with warnings      | JSON with errors        | 15s     |
 
-#### 6.5.2.2 Performance Metrics Collection
+##### 6.5.2.2 Performance Metrics Collection
 
-Metrics provide insights into the system's general performance and specific functionalities. They will also help monitor performance and health.
+Metrics provide insights into the system's general performance and specific
+functionalities. They will also help monitor performance and health.
 
-**Core Performance Metrics**
+###### Core Performance Metrics
 
-| Metric Name | Type | Description | Alert Threshold |
-|---|---|---|---|
-| `http_request_duration_seconds` | Histogram | HTTP request latency | P95 > 2s |
-| `agent_turn_duration_seconds` | Histogram | Agent turn execution time | P95 > 30s |
-| `tool_execution_duration_seconds` | Histogram | Tool execution time | P95 > 10s |
-| `active_conversations_total` | Gauge | Number of active conversations | > 100 |
+| Metric Name                       | Type      | Description                    | Alert Threshold |
+| --------------------------------- | --------- | ------------------------------ | --------------- |
+| `http_request_duration_seconds`   | Histogram | HTTP request latency           | P95 > 2s        |
+| `agent_turn_duration_seconds`     | Histogram | Agent turn execution time      | P95 > 30s       |
+| `tool_execution_duration_seconds` | Histogram | Tool execution time            | P95 > 10s       |
+| `active_conversations_total`      | Gauge     | Number of active conversations | > 100           |
 
-**Business Metrics Framework**
+###### Business Metrics Framework
 
 ```mermaid
 graph LR
@@ -8197,22 +8833,25 @@ graph LR
     CPU_USAGE --> BUSINESS_KPIs
 ```
 
-#### 6.5.2.3 SLA Monitoring Framework
+##### 6.5.2.3 SLA Monitoring Framework
 
-Sometimes these are written into formal service level agreements (SLAs) with customers, and sometimes they are implicit in customers expectations for a service. Good SLOs are simple. Don't use every metric you can track as an SLI; choose the ones that really matter to the consumers of your service.
+Sometimes these are written into formal service level agreements (SLAs) with
+customers, and sometimes they are implicit in customers expectations for a
+service. Good SLOs are simple. Don't use every metric you can track as an SLI;
+choose the ones that really matter to the consumers of your service.
 
-**SLA Definitions and Targets**
+###### SLA Definitions and Targets
 
-| Service Level Indicator | Target | Measurement Window | Calculation Method |
-|---|---|---|---|
-| System Availability | 99.5% | 30 days | Uptime / Total time |
-| API Response Time | P95 < 2s | 24 hours | Response time percentile |
-| Task Success Rate | 95% | 7 days | Successful tasks / Total tasks |
-| Agent Turn Success Rate | 98% | 24 hours | Successful turns / Total turns |
+| Service Level Indicator | Target   | Measurement Window | Calculation Method             |
+| ----------------------- | -------- | ------------------ | ------------------------------ |
+| System Availability     | 99.5%    | 30 days            | Uptime / Total time            |
+| API Response Time       | P95 < 2s | 24 hours           | Response time percentile       |
+| Task Success Rate       | 95%      | 7 days             | Successful tasks / Total tasks |
+| Agent Turn Success Rate | 98%      | 24 hours           | Successful turns / Total turns |
 
-#### 6.5.2.4 Capacity Tracking System
+##### 6.5.2.4 Capacity Tracking System
 
-**Resource Capacity Monitoring**
+###### Resource Capacity Monitoring
 
 ```mermaid
 graph TB
@@ -8250,31 +8889,33 @@ graph TB
     BOTTLENECK_ID --> CAPACITY_ALERTS
 ```
 
-**Capacity Thresholds and Actions**
+###### Capacity Thresholds and Actions
 
-| Resource | Warning Threshold | Critical Threshold | Auto-scaling Action | Manual Intervention |
-|---|---|---|---|---|
-| CPU Utilization | 70% | 85% | Scale horizontally | Performance optimization |
-| Memory Usage | 75% | 90% | Increase memory allocation | Memory leak investigation |
-| Database Connections | 80% | 95% | Increase connection pool | Query optimization |
-| Active Agent Sessions | 40 sessions | 50 sessions | Queue new requests | Add agent capacity |
+| Resource              | Warning Threshold | Critical Threshold | Auto-scaling Action        | Manual Intervention       |
+| --------------------- | ----------------- | ------------------ | -------------------------- | ------------------------- |
+| CPU Utilization       | 70%               | 85%                | Scale horizontally         | Performance optimization  |
+| Memory Usage          | 75%               | 90%                | Increase memory allocation | Memory leak investigation |
+| Database Connections  | 80%               | 95%                | Increase connection pool   | Query optimization        |
+| Active Agent Sessions | 40 sessions       | 50 sessions        | Queue new requests         | Add agent capacity        |
 
-### 6.5.3 Incident Response
+#### 6.5.3 Incident Response
 
-#### 6.5.3.1 Alert Routing Configuration
+##### 6.5.3.1 Alert Routing Configuration
 
-Alertmanager is used to handle alerts sent by Prometheus and can forward them to services like Slack, email, PagerDuty, etc. Below is how to configure Alertmanager to send notifications to a Slack channel.
+Alertmanager is used to handle alerts sent by Prometheus and can forward them
+to services like Slack, email, PagerDuty, etc. Below is how to configure
+Alertmanager to send notifications to a Slack channel.
 
-**Alert Routing Matrix**
+###### Alert Routing Matrix
 
-| Alert Severity | Primary Channel | Secondary Channel | Escalation Time | On-Call Response |
-|---|---|---|---|---|
-| Critical | PagerDuty + Slack | Email | Immediate | 5 minutes |
-| High | Slack | Email | 15 minutes | 30 minutes |
-| Medium | Slack | None | 1 hour | Next business day |
-| Low | Email | None | 4 hours | Next business day |
+| Alert Severity | Primary Channel   | Secondary Channel | Escalation Time | On-Call Response  |
+| -------------- | ----------------- | ----------------- | --------------- | ----------------- |
+| Critical       | PagerDuty + Slack | Email             | Immediate       | 5 minutes         |
+| High           | Slack             | Email             | 15 minutes      | 30 minutes        |
+| Medium         | Slack             | None              | 1 hour          | Next business day |
+| Low            | Email             | None              | 4 hours         | Next business day |
 
-**Alert Routing Flow**
+###### Alert Routing Flow
 
 ```mermaid
 graph TB
@@ -8318,20 +8959,20 @@ graph TB
     ROUTING --> WEBHOOK
 ```
 
-#### 6.5.3.2 Escalation Procedures
+##### 6.5.3.2 Escalation Procedures
 
-**Incident Escalation Timeline**
+###### Incident Escalation Timeline
 
-| Time Elapsed | Severity Level | Escalation Action | Responsible Party |
-|---|---|---|---|
-| 0 minutes | Critical | Immediate PagerDuty alert | On-call engineer |
-| 5 minutes | Critical | Escalate to senior engineer | Team lead |
-| 15 minutes | Critical | Escalate to engineering manager | Engineering manager |
-| 30 minutes | Critical | Escalate to VP Engineering | VP Engineering |
+| Time Elapsed | Severity Level | Escalation Action               | Responsible Party   |
+| ------------ | -------------- | ------------------------------- | ------------------- |
+| 0 minutes    | Critical       | Immediate PagerDuty alert       | On-call engineer    |
+| 5 minutes    | Critical       | Escalate to senior engineer     | Team lead           |
+| 15 minutes   | Critical       | Escalate to engineering manager | Engineering manager |
+| 30 minutes   | Critical       | Escalate to VP Engineering      | VP Engineering      |
 
-#### 6.5.3.3 Runbook Integration
+##### 6.5.3.3 Runbook Integration
 
-**Automated Runbook Execution**
+###### Automated Runbook Execution
 
 ```mermaid
 graph LR
@@ -8367,18 +9008,18 @@ graph LR
     VALIDATION --> NOTIFICATION
 ```
 
-**Common Runbooks**
+###### Common Runbooks
 
-| Alert Type | Runbook Actions | Success Criteria | Escalation Trigger |
-|---|---|---|---|
-| High Memory Usage | Restart service, check for memory leaks | Memory usage < 70% | No improvement in 10 minutes |
-| Database Connection Pool Exhaustion | Increase pool size, kill long-running queries | Available connections > 20% | Pool still exhausted after 5 minutes |
-| Agent Backend Timeout | Switch to fallback agent, restart agent service | Successful agent response | Multiple backend failures |
-| Tool Execution Failure | Retry tool execution, check workspace health | Tool execution success | Persistent tool failures |
+| Alert Type                          | Runbook Actions                                 | Success Criteria            | Escalation Trigger                   |
+| ----------------------------------- | ----------------------------------------------- | --------------------------- | ------------------------------------ |
+| High Memory Usage                   | Restart service, check for memory leaks         | Memory usage < 70%          | No improvement in 10 minutes         |
+| Database Connection Pool Exhaustion | Increase pool size, kill long-running queries   | Available connections > 20% | Pool still exhausted after 5 minutes |
+| Agent Backend Timeout               | Switch to fallback agent, restart agent service | Successful agent response   | Multiple backend failures            |
+| Tool Execution Failure              | Retry tool execution, check workspace health    | Tool execution success      | Persistent tool failures             |
 
-#### 6.5.3.4 Post-Mortem Process
+##### 6.5.3.4 Post-Mortem Process
 
-**Incident Analysis Framework**
+###### Incident Analysis Framework
 
 ```mermaid
 graph TB
@@ -8426,22 +9067,22 @@ graph TB
     TRACKING --> MONITORING_IMPROVEMENT
 ```
 
-#### 6.5.3.5 Improvement Tracking
+##### 6.5.3.5 Improvement Tracking
 
-**Continuous Improvement Metrics**
+###### Continuous Improvement Metrics
 
-| Improvement Area | Metric | Target | Measurement Method |
-|---|---|---|---|
-| Mean Time to Detection (MTTD) | Time from incident start to alert | < 2 minutes | Alert timestamp - incident start |
-| Mean Time to Response (MTTR) | Time from alert to first response | < 5 minutes | First response - alert timestamp |
-| Mean Time to Resolution (MTTR) | Time from alert to resolution | < 30 minutes | Resolution - alert timestamp |
-| Incident Recurrence Rate | Percentage of recurring incidents | < 10% | Recurring incidents / Total incidents |
+| Improvement Area               | Metric                            | Target       | Measurement Method                    |
+| ------------------------------ | --------------------------------- | ------------ | ------------------------------------- |
+| Mean Time to Detection (MTTD)  | Time from incident start to alert | < 2 minutes  | Alert timestamp - incident start      |
+| Mean Time to Response (MTTR)   | Time from alert to first response | < 5 minutes  | First response - alert timestamp      |
+| Mean Time to Resolution (MTTR) | Time from alert to resolution     | < 30 minutes | Resolution - alert timestamp          |
+| Incident Recurrence Rate       | Percentage of recurring incidents | < 10%        | Recurring incidents / Total incidents |
 
-### 6.5.4 Monitoring Implementation Details
+#### 6.5.4 Monitoring Implementation Details
 
-#### 6.5.4.1 Prometheus Configuration
+##### 6.5.4.1 Prometheus Configuration
 
-**Prometheus Scrape Configuration**
+###### Prometheus Scrape Configuration
 
 ```yaml
 global:
@@ -8475,9 +9116,9 @@ scrape_configs:
       - targets: ['node-exporter:9100']
 ```
 
-#### 6.5.4.2 Grafana Dashboard Configuration
+##### 6.5.4.2 Grafana Dashboard Configuration
 
-**Dashboard Layout Structure**
+###### Grafana Dashboard Layout Structure
 
 ```mermaid
 graph TB
@@ -8510,9 +9151,9 @@ graph TB
     end
 ```
 
-#### 6.5.4.3 Alert Rule Definitions
+##### 6.5.4.3 Alert Rule Definitions
 
-**Critical Alert Rules**
+###### Critical Alert Rules
 
 ```yaml
 groups:
@@ -8546,26 +9187,35 @@ groups:
           description: "Connection pool utilization is {{ $value | humanizePercentage }}"
 ```
 
-This comprehensive monitoring and observability framework ensures that Corbusier maintains high availability and performance while providing the visibility needed for effective operations and continuous improvement. Prometheus metrics provide visibility into the inner workings of our systems. They allow us to track things like the number of requests, the latency of requests, the memory usage, and the CPU usage. This information can be used to identify problems, troubleshoot issues and optimize performance.
+This comprehensive monitoring and observability framework ensures that
+Corbusier maintains high availability and performance while providing the
+visibility needed for effective operations and continuous improvement.
+Prometheus metrics provide visibility into the inner workings of our systems.
+They allow us to track things like the number of requests, the latency of
+requests, the memory usage, and the CPU usage. This information can be used to
+identify problems, troubleshoot issues and optimize performance.
 
-## 6.6 Testing Strategy
+### 6.6 Testing Strategy
 
-### 6.6.1 Testing Approach
+#### 6.6.1 Testing Approach
 
-#### 6.6.1.1 Unit Testing
+##### 6.6.1.1 Unit Testing
 
-**Testing Framework and Tools**
+###### Testing Framework and Tools
 
-Corbusier leverages Tokio's testing capabilities where testing is extremely and amazingly easy by simply adding/replacing #[test] with #[tokio::test] before any test function. The testing framework utilizes Rust's built-in testing infrastructure enhanced with async-specific tooling.
+Corbusier leverages Tokio's testing capabilities where testing is extremely and
+amazingly easy by simply adding/replacing #[test] with #[tokio::test] before
+any test function. The testing framework utilizes Rust's built-in testing
+infrastructure enhanced with async-specific tooling.
 
-| Framework Component | Technology | Version | Purpose |
-|---|---|---|---|
-| Core Test Framework | `cargo test` | Built-in | Standard Rust testing |
-| Async Test Support | `tokio-test` | 0.4.5 | Testing utilities for Tokio- and futures-based code |
-| Mocking Framework | `mockall` | 0.14.0 | A powerful mock object library for Rust that provides tools to create mock versions of almost any trait or struct for use in unit tests as a stand-in for the real object |
-| Test Runner | `cargo-nextest` | Latest | Modern execution model for faster, more reliable test runs that powers Rust development at every scale |
+| Framework Component | Technology      | Version  | Purpose                                                                                                                                                                   |
+| ------------------- | --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core Test Framework | `cargo test`    | Built-in | Standard Rust testing                                                                                                                                                     |
+| Async Test Support  | `tokio-test`    | 0.4.5    | Testing utilities for Tokio- and futures-based code                                                                                                                       |
+| Mocking Framework   | `mockall`       | 0.14.0   | A powerful mock object library for Rust that provides tools to create mock versions of almost any trait or struct for use in unit tests as a stand-in for the real object |
+| Test Runner         | `cargo-nextest` | Latest   | Modern execution model for faster, more reliable test runs that powers Rust development at every scale                                                                    |
 
-**Test Organization Structure**
+###### Test Organization Structure
 
 ```mermaid
 graph TB
@@ -8603,27 +9253,29 @@ graph TB
     TOOL_TESTS --> DB_MOCKS
 ```
 
-**Mocking Strategy**
+###### Mocking Strategy
 
-The easiest approach is to use #[automock] which can mock most traits, or structs that only have a single impl block. For things it can't handle, there is mock!
+The easiest approach is to use #[automock] which can mock most traits, or
+structs that only have a single impl block. For things it can't handle, there
+is mock!
 
-| Component Type | Mocking Approach | Implementation | Test Isolation |
-|---|---|---|---|
+| Component Type | Mocking Approach                 | Implementation                            | Test Isolation                        |
+| -------------- | -------------------------------- | ----------------------------------------- | ------------------------------------- |
 | Agent Backends | Trait mocking with `#[automock]` | MockAgentBackend with expectation setting | Complete isolation from external APIs |
-| VCS Providers | Interface mocking | MockVcsProvider with predefined responses | No external VCS calls |
-| MCP Servers | Protocol mocking | Mock JSON-RPC responses | Isolated tool execution |
-| Database | Repository pattern mocking | MockRepository implementations | In-memory test data |
+| VCS Providers  | Interface mocking                | MockVcsProvider with predefined responses | No external VCS calls                 |
+| MCP Servers    | Protocol mocking                 | Mock JSON-RPC responses                   | Isolated tool execution               |
+| Database       | Repository pattern mocking       | MockRepository implementations            | In-memory test data                   |
 
-**Code Coverage Requirements**
+###### Code Coverage Requirements
 
-| Component Category | Coverage Target | Measurement Method | Quality Gate |
-|---|---|---|---|
-| Domain Logic | 95% | Line coverage with `cargo-tarpaulin` | Fail CI if below 90% |
-| Service Layer | 90% | Branch coverage | Fail CI if below 85% |
-| Adapter Layer | 80% | Integration coverage | Fail CI if below 75% |
-| Utility Functions | 100% | Line coverage | Fail CI if below 95% |
+| Component Category | Coverage Target | Measurement Method                   | Quality Gate         |
+| ------------------ | --------------- | ------------------------------------ | -------------------- |
+| Domain Logic       | 95%             | Line coverage with `cargo-tarpaulin` | Fail CI if below 90% |
+| Service Layer      | 90%             | Branch coverage                      | Fail CI if below 85% |
+| Adapter Layer      | 80%             | Integration coverage                 | Fail CI if below 75% |
+| Utility Functions  | 100%            | Line coverage                        | Fail CI if below 95% |
 
-**Test Naming Conventions**
+###### Test Naming Conventions
 
 ```rust
 // Test module organization
@@ -8655,20 +9307,22 @@ mod tests {
 }
 ```
 
-**Test Data Management**
+###### Test Data Management
 
-| Data Type | Management Strategy | Implementation | Cleanup Method |
-|---|---|---|---|
-| Test Fixtures | Builder pattern | `ConversationBuilder`, `TaskBuilder` | Automatic with test scope |
-| Mock Data | Factory functions | `create_test_message()`, `create_test_task()` | Memory cleanup |
-| Temporary Files | `tempfile` crate | Scoped temporary directories | Automatic cleanup |
-| Test Databases | SQLite in-memory | `:memory:` database | Connection drop cleanup |
+| Data Type       | Management Strategy | Implementation                                | Cleanup Method            |
+| --------------- | ------------------- | --------------------------------------------- | ------------------------- |
+| Test Fixtures   | Builder pattern     | `ConversationBuilder`, `TaskBuilder`          | Automatic with test scope |
+| Mock Data       | Factory functions   | `create_test_message()`, `create_test_task()` | Memory cleanup            |
+| Temporary Files | `tempfile` crate    | Scoped temporary directories                  | Automatic cleanup         |
+| Test Databases  | SQLite in-memory    | `:memory:` database                           | Connection drop cleanup   |
 
-#### 6.6.1.2 Integration Testing
+##### 6.6.1.2 Integration Testing
 
-**Service Integration Test Approach**
+###### Service Integration Test Approach
 
-Integration testing uses mock servers (e.g., wiremock) and binds test servers to ephemeral ports to eliminate non-deterministic failures caused by network I/O or backoff.
+Integration testing uses mock servers (e.g., wiremock) and binds test servers
+to ephemeral ports to eliminate non-deterministic failures caused by network
+I/O or backoff.
 
 ```mermaid
 sequenceDiagram
@@ -8692,18 +9346,20 @@ sequenceDiagram
     Test->>Test: Verify end-to-end behavior
 ```
 
-**API Testing Strategy**
+###### API Testing Strategy
 
-| API Layer | Testing Approach | Tools | Validation Method |
-|---|---|---|---|
-| HTTP REST API | Actix-Web test client | `actix-web::test` | Request/response validation |
-| WebSocket/SSE | Connection testing | `tokio-tungstenite` | Event stream validation |
-| MCP Protocol | JSON-RPC testing | Custom MCP test client | Protocol compliance |
-| Database Integration | Repository testing | SQLite test database | Data persistence validation |
+| API Layer            | Testing Approach      | Tools                  | Validation Method           |
+| -------------------- | --------------------- | ---------------------- | --------------------------- |
+| HTTP REST API        | Actix-Web test client | `actix-web::test`      | Request/response validation |
+| WebSocket/SSE        | Connection testing    | `tokio-tungstenite`    | Event stream validation     |
+| MCP Protocol         | JSON-RPC testing      | Custom MCP test client | Protocol compliance         |
+| Database Integration | Repository testing    | SQLite test database   | Data persistence validation |
 
-**Database Integration Testing**
+###### Database Integration Testing
 
-Many databases allow you to configure an in-memory backend which means that you get the correct behavior in your tests, plus they are fast and will automatically clean up after themselves.
+Many databases allow you to configure an in-memory backend which means that you
+get the correct behavior in your tests, plus they are fast and will
+automatically clean up after themselves.
 
 ```rust
 // Database integration test setup
@@ -8736,18 +9392,20 @@ async fn test_conversation_repository_integration() {
 }
 ```
 
-**External Service Mocking**
+###### External Service Mocking
 
-WireMock provides HTTP mocking to perform black-box testing of Rust applications that interact with third-party APIs, though there is WireMock Rust implementation, but not a Testcontainers one.
+WireMock provides HTTP mocking to perform black-box testing of Rust
+applications that interact with third-party APIs, though there is WireMock Rust
+implementation, but not a Testcontainers one.
 
-| External Service | Mocking Strategy | Implementation | Test Scenarios |
-|---|---|---|---|
-| Claude Code SDK | HTTP mock server | `wiremock-rs` | API responses, timeouts, errors |
-| GitHub/GitLab APIs | REST API mocking | `wiremock-rs` | Webhook events, API failures |
-| MCP Tool Servers | Protocol mocking | Custom JSON-RPC mock | Tool execution, errors |
-| Podbot Runtime | Container mocking | Mock container adapter | Workspace lifecycle |
+| External Service   | Mocking Strategy  | Implementation         | Test Scenarios                  |
+| ------------------ | ----------------- | ---------------------- | ------------------------------- |
+| Claude Code SDK    | HTTP mock server  | `wiremock-rs`          | API responses, timeouts, errors |
+| GitHub/GitLab APIs | REST API mocking  | `wiremock-rs`          | Webhook events, API failures    |
+| MCP Tool Servers   | Protocol mocking  | Custom JSON-RPC mock   | Tool execution, errors          |
+| Podbot Runtime     | Container mocking | Mock container adapter | Workspace lifecycle             |
 
-**Test Environment Management**
+###### Test Environment Management
 
 ```mermaid
 graph TB
@@ -8782,20 +9440,21 @@ graph TB
     DB_SETUP --> FILE_SYSTEM
 ```
 
-#### 6.6.1.3 End-to-End Testing
+##### 6.6.1.3 End-to-End Testing
 
-**E2E Test Scenarios**
+###### E2E Test Scenarios
 
-| Scenario | Description | Components Tested | Success Criteria |
-|---|---|---|---|
-| Complete Task Workflow | Issue creation to PR merge | All system components | Task state transitions correctly |
-| Agent Turn Execution | Full conversation turn with tools | Agent orchestration, tool execution | Correct tool results and conversation updates |
-| Review Comment Processing | VCS webhook to agent response | VCS integration, review processing | Automated response to review feedback |
-| Hook Execution Pipeline | Policy enforcement across workflow | Hook engine, governance | Consistent policy application |
+| Scenario                  | Description                        | Components Tested                   | Success Criteria                              |
+| ------------------------- | ---------------------------------- | ----------------------------------- | --------------------------------------------- |
+| Complete Task Workflow    | Issue creation to PR merge         | All system components               | Task state transitions correctly              |
+| Agent Turn Execution      | Full conversation turn with tools  | Agent orchestration, tool execution | Correct tool results and conversation updates |
+| Review Comment Processing | VCS webhook to agent response      | VCS integration, review processing  | Automated response to review feedback         |
+| Hook Execution Pipeline   | Policy enforcement across workflow | Hook engine, governance             | Consistent policy application                 |
 
-**UI Automation Approach**
+###### UI Automation Approach
 
-Since Corbusier is primarily an API-driven system with optional web interfaces, E2E testing focuses on API workflows rather than traditional UI automation.
+Since Corbusier is primarily an API-driven system with optional web interfaces,
+E2E testing focuses on API workflows rather than traditional UI automation.
 
 ```rust
 // End-to-end test example
@@ -8844,35 +9503,37 @@ async fn test_complete_task_workflow_e2e() {
 }
 ```
 
-**Test Data Setup/Teardown**
+###### Test Data Setup/Teardown
 
-| Resource Type | Setup Method | Teardown Method | Isolation Level |
-|---|---|---|---|
-| Test Databases | Fresh SQLite instance | Connection drop | Per test |
-| Mock Services | WireMock server startup | Server shutdown | Per test suite |
-| Temporary Files | `tempfile` directories | Automatic cleanup | Per test |
-| Container Resources | Podbot test containers | Container termination | Per test |
+| Resource Type       | Setup Method            | Teardown Method       | Isolation Level |
+| ------------------- | ----------------------- | --------------------- | --------------- |
+| Test Databases      | Fresh SQLite instance   | Connection drop       | Per test        |
+| Mock Services       | WireMock server startup | Server shutdown       | Per test suite  |
+| Temporary Files     | `tempfile` directories  | Automatic cleanup     | Per test        |
+| Container Resources | Podbot test containers  | Container termination | Per test        |
 
-**Performance Testing Requirements**
+###### Performance Testing Requirements
 
-Tokio's multi-threaded runtime is 2.7x faster than a single-threaded alternative when stress-testing network clients under 1000+ concurrent requests.
+Tokio's multi-threaded runtime is 2.7x faster than a single-threaded
+alternative when stress-testing network clients under 1000+ concurrent requests.
 
-| Performance Metric | Target | Measurement Method | Load Pattern |
-|---|---|---|---|
-| Agent Turn Latency | P95 < 30s | Response time measurement | Concurrent turns |
-| Tool Execution Time | P95 < 10s | Tool call duration | Parallel tool execution |
-| HTTP API Response | P95 < 2s | Request-response timing | Sustained load |
-| Concurrent Conversations | 100 active | Resource utilization | Gradual ramp-up |
+| Performance Metric       | Target     | Measurement Method        | Load Pattern            |
+| ------------------------ | ---------- | ------------------------- | ----------------------- |
+| Agent Turn Latency       | P95 < 30s  | Response time measurement | Concurrent turns        |
+| Tool Execution Time      | P95 < 10s  | Tool call duration        | Parallel tool execution |
+| HTTP API Response        | P95 < 2s   | Request-response timing   | Sustained load          |
+| Concurrent Conversations | 100 active | Resource utilization      | Gradual ramp-up         |
 
-**Cross-Browser Testing Strategy**
+###### Cross-Browser Testing Strategy
 
-Not applicable - Corbusier is primarily a backend API service with optional web interfaces that would be tested separately.
+Not applicable - Corbusier is primarily a backend API service with optional web
+interfaces that would be tested separately.
 
-### 6.6.2 Test Automation
+#### 6.6.2 Test Automation
 
-#### 6.6.2.1 CI/CD Integration
+##### 6.6.2.1 CI/CD Integration
 
-**Automated Test Triggers**
+###### Automated Test Triggers
 
 ```mermaid
 graph LR
@@ -8909,20 +9570,24 @@ graph LR
     PERFORMANCE --> DOCS
 ```
 
-**Parallel Test Execution**
+###### Parallel Test Execution
 
-Nextest uses a modern execution model for faster, more reliable test runs and excels in situations where there are bottlenecks in multiple test binaries: cargo test can only run them serially, while nextest can run those tests in parallel.
+Nextest uses a modern execution model for faster, more reliable test runs and
+excels in situations where there are bottlenecks in multiple test binaries:
+cargo test can only run them serially, while nextest can run those tests in
+parallel.
 
-| Test Category | Parallelization Strategy | Resource Allocation | Execution Time Target |
-|---|---|---|---|
-| Unit Tests | Per-test parallelization | 4 CPU cores | < 2 minutes |
-| Integration Tests | Per-service parallelization | 2 CPU cores | < 5 minutes |
-| End-to-End Tests | Sequential execution | 1 CPU core | < 10 minutes |
-| Performance Tests | Isolated execution | 8 CPU cores | < 15 minutes |
+| Test Category     | Parallelization Strategy    | Resource Allocation | Execution Time Target |
+| ----------------- | --------------------------- | ------------------- | --------------------- |
+| Unit Tests        | Per-test parallelization    | 4 CPU cores         | < 2 minutes           |
+| Integration Tests | Per-service parallelization | 2 CPU cores         | < 5 minutes           |
+| End-to-End Tests  | Sequential execution        | 1 CPU core          | < 10 minutes          |
+| Performance Tests | Isolated execution          | 8 CPU cores         | < 15 minutes          |
 
-**Test Reporting Requirements**
+###### Test Reporting Requirements
 
-cargo-nextest is an alternative test runner for Rust which, among other cool features, supports XML and JSON output.
+cargo-nextest is an alternative test runner for Rust which, among other cool
+features, supports XML and JSON output.
 
 ```yaml
 # .config/nextest.toml
@@ -8937,18 +9602,22 @@ verbose = true
 status-level = "all"
 ```
 
-**Failed Test Handling**
+###### Failed Test Handling
 
-| Failure Type | Handling Strategy | Retry Policy | Escalation |
-|---|---|---|---|
-| Flaky Tests | Automatic retry | 3 attempts with exponential backoff | Mark as flaky after 3 failures |
-| Infrastructure Failures | Environment reset | 2 attempts | Alert infrastructure team |
-| Code Failures | Immediate failure | No retry | Block PR merge |
-| Timeout Failures | Extended timeout retry | 1 attempt with 2x timeout | Manual investigation |
+| Failure Type            | Handling Strategy      | Retry Policy                        | Escalation                     |
+| ----------------------- | ---------------------- | ----------------------------------- | ------------------------------ |
+| Flaky Tests             | Automatic retry        | 3 attempts with exponential backoff | Mark as flaky after 3 failures |
+| Infrastructure Failures | Environment reset      | 2 attempts                          | Alert infrastructure team      |
+| Code Failures           | Immediate failure      | No retry                            | Block PR merge                 |
+| Timeout Failures        | Extended timeout retry | 1 attempt with 2x timeout           | Manual investigation           |
 
-**Flaky Test Management**
+###### Flaky Test Management
 
-Configure your pipeline to run cargo nextest run or cargo test with the --test-threads=1 flag to prevent race conditions and flakiness. Parallel execution in CI/CD tools such as GitHub Actions can lead to port collisions and resource contention when tests are not isolated. Leverage the RUST_TEST_THREADS environment variable to control concurrency.
+Configure your pipeline to run cargo nextest run or cargo test with the
+--test-threads=1 flag to prevent race conditions and flakiness. Parallel
+execution in CI/CD tools such as GitHub Actions can lead to port collisions and
+resource contention when tests are not isolated. Leverage the RUST_TEST_THREADS
+environment variable to control concurrency.
 
 ```rust
 // Flaky test detection and handling
@@ -8968,9 +9637,9 @@ async fn test_potentially_flaky_operation() {
 }
 ```
 
-#### 6.6.2.2 Test Environment Automation
+##### 6.6.2.2 Test Environment Automation
 
-**Environment Provisioning**
+###### Environment Provisioning
 
 ```mermaid
 graph TB
@@ -9010,42 +9679,45 @@ graph TB
     NETWORKS --> CLEANUP
 ```
 
-### 6.6.3 Quality Metrics
+#### 6.6.3 Quality Metrics
 
-#### 6.6.3.1 Code Coverage Targets
+##### 6.6.3.1 Code Coverage Targets
 
-**Coverage Requirements by Component**
+###### Coverage Requirements by Component
 
-Automate coverage checks for future-proofing by integrating cargo-tarpaulin and fail the job if line coverage drops below your threshold.
+Automate coverage checks for future-proofing by integrating cargo-tarpaulin and
+fail the job if line coverage drops below your threshold.
 
-| Component | Line Coverage | Branch Coverage | Function Coverage | Quality Gate |
-|---|---|---|---|---|
-| Domain Logic | 95% | 90% | 100% | Fail CI below 90% |
-| Application Services | 90% | 85% | 95% | Fail CI below 85% |
-| Infrastructure Adapters | 80% | 75% | 90% | Fail CI below 75% |
-| HTTP API Handlers | 85% | 80% | 95% | Fail CI below 80% |
+| Component               | Line Coverage | Branch Coverage | Function Coverage | Quality Gate      |
+| ----------------------- | ------------- | --------------- | ----------------- | ----------------- |
+| Domain Logic            | 95%           | 90%             | 100%              | Fail CI below 90% |
+| Application Services    | 90%           | 85%             | 95%               | Fail CI below 85% |
+| Infrastructure Adapters | 80%           | 75%             | 90%               | Fail CI below 75% |
+| HTTP API Handlers       | 85%           | 80%             | 95%               | Fail CI below 80% |
 
-**Test Success Rate Requirements**
+###### Test Success Rate Requirements
 
-Regularly monitor test runtime and pass rates within your pipeline dashboard; any drop below 95% pass rate week-over-week should trigger an alert for maintainers to triage flaky cases.
+Regularly monitor test runtime and pass rates within your pipeline dashboard;
+any drop below 95% pass rate week-over-week should trigger an alert for
+maintainers to triage flaky cases.
 
-| Test Category | Success Rate Target | Measurement Window | Alert Threshold |
-|---|---|---|---|
-| Unit Tests | 99% | Per commit | < 98% |
-| Integration Tests | 97% | Daily | < 95% |
-| End-to-End Tests | 95% | Weekly | < 90% |
-| Performance Tests | 90% | Weekly | < 85% |
+| Test Category     | Success Rate Target | Measurement Window | Alert Threshold |
+| ----------------- | ------------------- | ------------------ | --------------- |
+| Unit Tests        | 99%                 | Per commit         | < 98%           |
+| Integration Tests | 97%                 | Daily              | < 95%           |
+| End-to-End Tests  | 95%                 | Weekly             | < 90%           |
+| Performance Tests | 90%                 | Weekly             | < 85%           |
 
-**Performance Test Thresholds**
+###### Performance Test Thresholds
 
-| Performance Metric | Baseline | Warning Threshold | Critical Threshold | Action |
-|---|---|---|---|---|
-| Agent Turn Latency | 15s | 25s | 35s | Performance investigation |
-| Tool Execution Time | 5s | 8s | 12s | Tool optimization |
-| Memory Usage | 512MB | 768MB | 1GB | Memory leak investigation |
-| CPU Utilization | 50% | 75% | 90% | Resource scaling |
+| Performance Metric  | Baseline | Warning Threshold | Critical Threshold | Action                    |
+| ------------------- | -------- | ----------------- | ------------------ | ------------------------- |
+| Agent Turn Latency  | 15s      | 25s               | 35s                | Performance investigation |
+| Tool Execution Time | 5s       | 8s                | 12s                | Tool optimization         |
+| Memory Usage        | 512MB    | 768MB             | 1GB                | Memory leak investigation |
+| CPU Utilization     | 50%      | 75%               | 90%                | Resource scaling          |
 
-**Quality Gates**
+###### Quality Gates
 
 ```mermaid
 graph LR
@@ -9081,16 +9753,16 @@ graph LR
     SECURITY_GATE --> MANUAL
 ```
 
-**Documentation Requirements**
+###### Documentation Requirements
 
-| Documentation Type | Coverage Requirement | Update Trigger | Quality Check |
-|---|---|---|---|
-| API Documentation | 100% of public APIs | Code changes | Automated generation |
-| Architecture Documentation | All major components | Design changes | Manual review |
-| Test Documentation | All test scenarios | Test additions | Peer review |
-| Deployment Documentation | All environments | Infrastructure changes | Validation testing |
+| Documentation Type         | Coverage Requirement | Update Trigger         | Quality Check        |
+| -------------------------- | -------------------- | ---------------------- | -------------------- |
+| API Documentation          | 100% of public APIs  | Code changes           | Automated generation |
+| Architecture Documentation | All major components | Design changes         | Manual review        |
+| Test Documentation         | All test scenarios   | Test additions         | Peer review          |
+| Deployment Documentation   | All environments     | Infrastructure changes | Validation testing   |
 
-#### 6.6.3.2 Test Execution Flow
+##### 6.6.3.2 Test Execution Flow
 
 ```mermaid
 flowchart TD
@@ -9149,52 +9821,71 @@ flowchart TD
     ARTIFACTS --> NOTIFICATION
 ```
 
-This comprehensive testing strategy ensures that Corbusier maintains high quality and reliability while supporting the complex requirements of AI agent orchestration. According to The Rust Survey 2024, teams adopting property strategies catch 32% more protocol violations before deployment, emphasizing the importance of thorough testing in distributed systems like Corbusier.
+This comprehensive testing strategy ensures that Corbusier maintains high
+quality and reliability while supporting the complex requirements of AI agent
+orchestration. According to The Rust Survey 2024, teams adopting property
+strategies catch 32% more protocol violations before deployment, emphasizing
+the importance of thorough testing in distributed systems like Corbusier.
 
-Based on the comprehensive analysis of Corbusier's architecture and the search results about AI agent orchestration platforms, I can now provide the User Interface Design section. From the detailed technical specifications, it's clear that Corbusier is primarily designed as an API-driven orchestration platform with optional web interfaces for monitoring and management.
+Based on the comprehensive analysis of Corbusier's architecture and the search
+results about AI agent orchestration platforms, I can now provide the User
+Interface Design section. From the detailed technical specifications, it's
+clear that Corbusier is primarily designed as an API-driven orchestration
+platform with optional web interfaces for monitoring and management.
 
-# 7. User Interface Design
+## 7. User Interface Design
 
-## 7.1 UI Architecture Overview
+### 7.1 UI Architecture Overview
 
-### 7.1.1 Interface Strategy
+#### 7.1.1 Interface Strategy
 
-Corbusier implements a hybrid UI approach centered around an intuitive dashboard that integrates agents, connectors, and APIs into a single interface, allowing teams to set up workflows quickly and maintain visibility into their performance, with centralized dashboards for governance and monitoring dashboards providing audit trails and visibility into performance.
+Corbusier implements a hybrid UI approach centered around an intuitive
+dashboard that integrates agents, connectors, and APIs into a single interface,
+allowing teams to set up workflows quickly and maintain visibility into their
+performance, with centralized dashboards for governance and monitoring
+dashboards providing audit trails and visibility into performance.
 
-The platform follows the principle that agents should meet users where they are, whether in Teams, Slack, ServiceNow, or other frontline tools, as agentic systems mature into the primary interface through which users interact with enterprise systems.
+The platform follows the principle that agents should meet users where they
+are, whether in Teams, Slack, ServiceNow, or other frontline tools, as agentic
+systems mature into the primary interface through which users interact with
+enterprise systems.
 
-**Primary Interface Components**
+##### Primary Interface Components
 
-| Interface Type | Purpose | Target Users | Technology Stack |
-|---|---|---|---|
-| Web Dashboard | System monitoring and configuration | Engineering managers, DevOps teams | React/TypeScript with Actix Web backend |
-| Real-time Streaming | Live workflow visibility | Development teams, operations | Server-Sent Events (SSE) and WebSocket |
-| CLI Interface | Developer tooling and automation | Software developers | Rust CLI with HTTP API integration |
-| Conversational Interface | Natural language task management | All user types | Chat-based interface with slash commands |
+| Interface Type           | Purpose                             | Target Users                       | Technology Stack                         |
+| ------------------------ | ----------------------------------- | ---------------------------------- | ---------------------------------------- |
+| Web Dashboard            | System monitoring and configuration | Engineering managers, DevOps teams | React/TypeScript with Actix Web backend  |
+| Real-time Streaming      | Live workflow visibility            | Development teams, operations      | Server-Sent Events (SSE) and WebSocket   |
+| CLI Interface            | Developer tooling and automation    | Software developers                | Rust CLI with HTTP API integration       |
+| Conversational Interface | Natural language task management    | All user types                     | Chat-based interface with slash commands |
 
-### 7.1.2 Core UI Technologies
+#### 7.1.2 Core UI Technologies
 
-**Frontend Technology Stack**
+##### Frontend Technology Stack
 
-| Technology | Version | Purpose | Justification |
-|---|---|---|---|
-| React | 18.x | Component-based UI framework | Industry standard for complex dashboards |
-| TypeScript | 5.x | Type-safe JavaScript | Enhanced developer experience and error prevention |
-| Tailwind CSS | 3.x | Utility-first CSS framework | Rapid UI development with consistent design |
-| React Query | 4.x | Server state management | Efficient data fetching and caching |
-| Recharts | 2.x | Data visualization | Real-time metrics and performance charts |
+| Technology   | Version | Purpose                      | Justification                                      |
+| ------------ | ------- | ---------------------------- | -------------------------------------------------- |
+| React        | 18.x    | Component-based UI framework | Industry standard for complex dashboards           |
+| TypeScript   | 5.x     | Type-safe JavaScript         | Enhanced developer experience and error prevention |
+| Tailwind CSS | 3.x     | Utility-first CSS framework  | Rapid UI development with consistent design        |
+| React Query  | 4.x     | Server state management      | Efficient data fetching and caching                |
+| Recharts     | 2.x     | Data visualization           | Real-time metrics and performance charts           |
 
-**Backend Integration**
+##### Backend Integration
 
-The UI communicates with Corbusier's core through the HTTP API layer built on Actix Web, leveraging extensive community-built connectors, monitoring dashboards, and scalability across cloud and on-prem environments.
+The UI communicates with Corbusier's core through the HTTP API layer built on
+Actix Web, leveraging extensive community-built connectors, monitoring
+dashboards, and scalability across cloud and on-prem environments.
 
-## 7.2 Core UI Use Cases
+### 7.2 Core UI Use Cases
 
-### 7.2.1 Task Management Interface
+#### 7.2.1 Task Management Interface
 
-**Primary Use Case: Task Lifecycle Visualization**
+##### Primary Use Case: Task Lifecycle Visualization
 
-Users need to visualize and manage the complete task lifecycle from issue creation through pull request completion, with real-time status updates and workflow progression indicators.
+Users need to visualize and manage the complete task lifecycle from issue
+creation through pull request completion, with real-time status updates and
+workflow progression indicators.
 
 ```mermaid
 graph TB
@@ -9233,28 +9924,32 @@ graph TB
     TOOL_CONFIG --> HOOK_SETTINGS
 ```
 
-### 7.2.2 Conversation Management Interface
+#### 7.2.2 Conversation Management Interface
 
-**Primary Use Case: Agent Turn Monitoring**
+##### Primary Use Case: Agent Turn Monitoring
 
-The web-based UI provides a clear, step-by-step log of the agent's 'thinking' process, making it easy to track its progress and tasks, enabling users to monitor agent conversations and tool executions in real-time.
+The web-based UI provides a clear, step-by-step log of the agent's 'thinking'
+process, making it easy to track its progress and tasks, enabling users to
+monitor agent conversations and tool executions in real-time.
 
-**Interface Components**
+##### Interface Components
 
-| Component | Functionality | Real-time Updates | User Interactions |
-|---|---|---|---|
-| Conversation Timeline | Chronological message display | Live message streaming | Message filtering, search |
-| Agent Status Panel | Current agent activity | Turn progress indicators | Agent switching, configuration |
-| Tool Execution Log | Tool call details and results | Execution status updates | Tool result inspection, retry |
-| Slash Command Interface | Command input and expansion | Command completion | Template selection, parameter input |
+| Component               | Functionality                 | Real-time Updates        | User Interactions                   |
+| ----------------------- | ----------------------------- | ------------------------ | ----------------------------------- |
+| Conversation Timeline   | Chronological message display | Live message streaming   | Message filtering, search           |
+| Agent Status Panel      | Current agent activity        | Turn progress indicators | Agent switching, configuration      |
+| Tool Execution Log      | Tool call details and results | Execution status updates | Tool result inspection, retry       |
+| Slash Command Interface | Command input and expansion   | Command completion       | Template selection, parameter input |
 
-### 7.2.3 System Monitoring Dashboard
+#### 7.2.3 System Monitoring Dashboard
 
-**Primary Use Case: Operational Visibility**
+##### Primary Use Case: Operational Visibility
 
-Monitoring dashboards give developers visibility into agent performance with dashboards for agent performance and debugging, providing comprehensive system health and performance metrics.
+Monitoring dashboards give developers visibility into agent performance with
+dashboards for agent performance and debugging, providing comprehensive system
+health and performance metrics.
 
-**Dashboard Layout Structure**
+##### Dashboard Layout Structure
 
 ```mermaid
 graph TB
@@ -9287,22 +9982,26 @@ graph TB
     end
 ```
 
-## 7.3 UI/Backend Interaction Boundaries
+### 7.3 UI/Backend Interaction Boundaries
 
-### 7.3.1 API Integration Patterns
+#### 7.3.1 API Integration Patterns
 
-**RESTful API Endpoints**
+##### RESTful API Endpoints
 
-| Endpoint Category | HTTP Methods | Response Format | Caching Strategy |
-|---|---|---|---|
-| `/api/v1/tasks` | GET, POST, PUT, DELETE | JSON with metadata | 5-minute cache for lists |
-| `/api/v1/conversations` | GET, POST, PUT | JSON with SSE streaming | Real-time, no cache |
-| `/api/v1/agents` | GET, POST | JSON with capabilities | 1-hour cache |
-| `/api/v1/tools` | GET, POST | JSON with schemas | 30-minute cache |
+| Endpoint Category       | HTTP Methods           | Response Format         | Caching Strategy         |
+| ----------------------- | ---------------------- | ----------------------- | ------------------------ |
+| `/api/v1/tasks`         | GET, POST, PUT, DELETE | JSON with metadata      | 5-minute cache for lists |
+| `/api/v1/conversations` | GET, POST, PUT         | JSON with SSE streaming | Real-time, no cache      |
+| `/api/v1/agents`        | GET, POST              | JSON with capabilities  | 1-hour cache             |
+| `/api/v1/tools`         | GET, POST              | JSON with schemas       | 30-minute cache          |
 
-**Real-time Data Streaming**
+##### Real-time Data Streaming
 
-The UI leverages Server-Sent Events (SSE) for real-time updates, following the pattern where the analytics dashboard tracks data like error logs and performance metrics, while state tracking can monitor runs and tasks across workflows and infrastructure, with feature-wise support for human-in-the-loop workflows.
+The UI leverages Server-Sent Events (SSE) for real-time updates, following the
+pattern where the analytics dashboard tracks data like error logs and
+performance metrics, while state tracking can monitor runs and tasks across
+workflows and infrastructure, with feature-wise support for human-in-the-loop
+workflows.
 
 ```typescript
 // SSE Integration Example
@@ -9343,22 +10042,22 @@ class EventStreamManager {
 }
 ```
 
-### 7.3.2 State Management Architecture
+#### 7.3.2 State Management Architecture
 
-**Frontend State Management**
+##### Frontend State Management
 
-| State Category | Management Strategy | Persistence | Synchronization |
-|---|---|---|---|
-| UI State | React useState/useReducer | Session storage | Local only |
-| Server State | React Query | Memory cache | Real-time sync |
-| User Preferences | Local storage | Browser storage | Manual sync |
-| Real-time Events | Event-driven updates | No persistence | SSE streaming |
+| State Category   | Management Strategy       | Persistence     | Synchronization |
+| ---------------- | ------------------------- | --------------- | --------------- |
+| UI State         | React useState/useReducer | Session storage | Local only      |
+| Server State     | React Query               | Memory cache    | Real-time sync  |
+| User Preferences | Local storage             | Browser storage | Manual sync     |
+| Real-time Events | Event-driven updates      | No persistence  | SSE streaming   |
 
-## 7.4 UI Schemas and Data Models
+### 7.4 UI Schemas and Data Models
 
-### 7.4.1 Core Data Interfaces
+#### 7.4.1 Core Data Interfaces
 
-**Task Interface Schema**
+##### Task Interface Schema
 
 ```typescript
 interface Task {
@@ -9393,7 +10092,7 @@ interface TaskOrigin {
 }
 ```
 
-**Conversation Interface Schema**
+##### Conversation Interface Schema
 
 ```typescript
 interface Conversation {
@@ -9431,9 +10130,9 @@ interface ConversationContext {
 }
 ```
 
-### 7.4.2 Real-time Event Schemas
+#### 7.4.2 Real-time Event Schemas
 
-**Stream Event Types**
+##### Stream Event Types
 
 ```typescript
 type StreamEventType = 
@@ -9468,11 +10167,11 @@ interface ToolExecutionCompleteEvent extends BaseStreamEvent {
 }
 ```
 
-## 7.5 Screen Specifications
+### 7.5 Screen Specifications
 
-### 7.5.1 Task Management Dashboard
+#### 7.5.1 Task Management Dashboard
 
-**Layout Structure**
+##### Layout Structure
 
 ```mermaid
 graph TB
@@ -9502,70 +10201,76 @@ graph TB
     TASK_GRID --> DETAIL_PANEL
 ```
 
-**Screen Components**
+##### Screen Components
 
-| Component | Functionality | Data Source | Update Frequency |
-|---|---|---|---|
-| Task List | Display all tasks with filtering | `/api/v1/tasks` | Real-time via SSE |
-| Task Detail Panel | Show task information and actions | `/api/v1/tasks/{id}` | On selection |
-| Workflow Visualization | Display task state transitions | Task state events | Real-time |
-| Agent Status Indicator | Show current agent activity | Agent orchestrator status | Every 5 seconds |
+| Component              | Functionality                     | Data Source               | Update Frequency  |
+| ---------------------- | --------------------------------- | ------------------------- | ----------------- |
+| Task List              | Display all tasks with filtering  | `/api/v1/tasks`           | Real-time via SSE |
+| Task Detail Panel      | Show task information and actions | `/api/v1/tasks/{id}`      | On selection      |
+| Workflow Visualization | Display task state transitions    | Task state events         | Real-time         |
+| Agent Status Indicator | Show current agent activity       | Agent orchestrator status | Every 5 seconds   |
 
-### 7.5.2 Conversation Interface
+#### 7.5.2 Conversation Interface
 
-**Chat-Style Interface Design**
+##### Chat-Style Interface Design
 
-The conversation interface follows modern chat application patterns with real-time message streaming and interactive tool result displays.
+The conversation interface follows modern chat application patterns with
+real-time message streaming and interactive tool result displays.
 
-**Interface Elements**
+##### Interface Elements
 
-| Element | Purpose | Behavior | Styling |
-|---|---|---|---|
-| Message Timeline | Display conversation history | Auto-scroll to latest | Chronological layout |
-| Message Input | User message composition | Slash command completion | Rich text editor |
-| Tool Result Cards | Display tool execution results | Expandable/collapsible | Syntax highlighting |
-| Agent Status Badge | Show current agent state | Real-time updates | Color-coded status |
+| Element            | Purpose                        | Behavior                 | Styling              |
+| ------------------ | ------------------------------ | ------------------------ | -------------------- |
+| Message Timeline   | Display conversation history   | Auto-scroll to latest    | Chronological layout |
+| Message Input      | User message composition       | Slash command completion | Rich text editor     |
+| Tool Result Cards  | Display tool execution results | Expandable/collapsible   | Syntax highlighting  |
+| Agent Status Badge | Show current agent state       | Real-time updates        | Color-coded status   |
 
-### 7.5.3 System Monitoring Dashboard
+#### 7.5.3 System Monitoring Dashboard
 
-**Multi-Panel Dashboard Layout**
+##### Multi-Panel Dashboard Layout
 
-The dashboard creates interactive dashboards and embeds AI-powered conversational interfaces to deliver actionable insights, providing comprehensive system visibility.
+The dashboard creates interactive dashboards and embeds AI-powered
+conversational interfaces to deliver actionable insights, providing
+comprehensive system visibility.
 
-**Dashboard Panels**
+##### Dashboard Panels
 
-| Panel | Metrics Displayed | Chart Type | Refresh Rate |
-|---|---|---|---|
-| System Health | CPU, Memory, Database connections | Gauge charts | 10 seconds |
-| Agent Performance | Turn completion rates, response times | Line charts | 30 seconds |
-| Tool Execution | Success rates, execution times | Bar charts | 1 minute |
-| Error Tracking | Error rates, failure patterns | Heat maps | 1 minute |
+| Panel             | Metrics Displayed                     | Chart Type   | Refresh Rate |
+| ----------------- | ------------------------------------- | ------------ | ------------ |
+| System Health     | CPU, Memory, Database connections     | Gauge charts | 10 seconds   |
+| Agent Performance | Turn completion rates, response times | Line charts  | 30 seconds   |
+| Tool Execution    | Success rates, execution times        | Bar charts   | 1 minute     |
+| Error Tracking    | Error rates, failure patterns         | Heat maps    | 1 minute     |
 
-## 7.6 User Interactions
+### 7.6 User Interactions
 
-### 7.6.1 Primary User Workflows
+#### 7.6.1 Primary User Workflows
 
-**Task Creation Workflow**
+##### Task Creation Workflow
 
 1. **Issue Selection**: User selects GitHub/GitLab issue from integrated picker
-2. **Agent Configuration**: Choose agent backend (Claude Code SDK, Codex CLI App Server)
+2. **Agent Configuration**: Choose agent backend (Claude Code SDK, Codex CLI
+   App Server)
 3. **Workspace Setup**: Configure development environment and tool policies
 4. **Task Initialization**: System creates branch and workspace automatically
 5. **Conversation Start**: Begin agent interaction with context-aware prompts
 
-**Agent Interaction Workflow**
+##### Agent Interaction Workflow
 
 1. **Message Composition**: User types message with slash command support
-2. **Command Expansion**: System expands slash commands with template suggestions
+2. **Command Expansion**: System expands slash commands with template
+   suggestions
 3. **Agent Processing**: Real-time display of agent thinking and tool execution
 4. **Result Review**: Interactive display of tool results and file changes
 5. **Approval/Iteration**: User approves changes or requests modifications
 
-### 7.6.2 Interactive Elements
+#### 7.6.2 Interactive Elements
 
-**Slash Command Interface**
+##### Slash Command Interface
 
-The system provides an intelligent command interface with auto-completion and template expansion.
+The system provides an intelligent command interface with auto-completion and
+template expansion.
 
 ```typescript
 interface SlashCommand {
@@ -9605,118 +10310,131 @@ const SLASH_COMMANDS: SlashCommand[] = [
 ];
 ```
 
-### 7.6.3 Responsive Design Considerations
+#### 7.6.3 Responsive Design Considerations
 
-**Breakpoint Strategy**
+##### Breakpoint Strategy
 
-| Breakpoint | Screen Size | Layout Adjustments | Component Behavior |
-|---|---|---|---|
-| Mobile | < 768px | Single column, collapsible sidebar | Simplified task cards |
-| Tablet | 768px - 1024px | Two-column layout | Condensed detail panels |
-| Desktop | > 1024px | Full three-column layout | Complete feature set |
-| Large Desktop | > 1440px | Extended detail panels | Enhanced visualizations |
+| Breakpoint    | Screen Size    | Layout Adjustments                 | Component Behavior      |
+| ------------- | -------------- | ---------------------------------- | ----------------------- |
+| Mobile        | < 768px        | Single column, collapsible sidebar | Simplified task cards   |
+| Tablet        | 768px - 1024px | Two-column layout                  | Condensed detail panels |
+| Desktop       | > 1024px       | Full three-column layout           | Complete feature set    |
+| Large Desktop | > 1440px       | Extended detail panels             | Enhanced visualizations |
 
-## 7.7 Visual Design Considerations
+### 7.7 Visual Design Considerations
 
-### 7.7.1 Design System
+#### 7.7.1 Design System
 
-**Color Palette**
+##### Color Palette
 
-| Color Category | Hex Code | Usage | Accessibility |
-|---|---|---|---|
-| Primary Blue | #2563EB | Actions, links, highlights | WCAG AA compliant |
-| Success Green | #10B981 | Success states, completed tasks | High contrast |
-| Warning Orange | #F59E0B | Warnings, pending states | Sufficient contrast |
-| Error Red | #EF4444 | Errors, failed operations | High contrast |
-| Neutral Gray | #6B7280 | Text, borders, backgrounds | Multiple shades |
+| Color Category | Hex Code | Usage                           | Accessibility       |
+| -------------- | -------- | ------------------------------- | ------------------- |
+| Primary Blue   | #2563EB  | Actions, links, highlights      | WCAG AA compliant   |
+| Success Green  | #10B981  | Success states, completed tasks | High contrast       |
+| Warning Orange | #F59E0B  | Warnings, pending states        | Sufficient contrast |
+| Error Red      | #EF4444  | Errors, failed operations       | High contrast       |
+| Neutral Gray   | #6B7280  | Text, borders, backgrounds      | Multiple shades     |
 
-**Typography Scale**
+##### Typography Scale
 
-| Element | Font Size | Font Weight | Line Height | Usage |
-|---|---|---|---|---|
-| Heading 1 | 2.25rem | 700 | 1.2 | Page titles |
-| Heading 2 | 1.875rem | 600 | 1.3 | Section headers |
-| Heading 3 | 1.5rem | 600 | 1.4 | Subsection headers |
-| Body Text | 1rem | 400 | 1.6 | General content |
-| Small Text | 0.875rem | 400 | 1.5 | Metadata, captions |
+| Element    | Font Size | Font Weight | Line Height | Usage              |
+| ---------- | --------- | ----------- | ----------- | ------------------ |
+| Heading 1  | 2.25rem   | 700         | 1.2         | Page titles        |
+| Heading 2  | 1.875rem  | 600         | 1.3         | Section headers    |
+| Heading 3  | 1.5rem    | 600         | 1.4         | Subsection headers |
+| Body Text  | 1rem      | 400         | 1.6         | General content    |
+| Small Text | 0.875rem  | 400         | 1.5         | Metadata, captions |
 
-### 7.7.2 Component Library
+#### 7.7.2 Component Library
 
-**Reusable UI Components**
+##### Reusable UI Components
 
-| Component | Purpose | Variants | Props |
-|---|---|---|---|
-| TaskCard | Display task information | Compact, detailed, grid | task, onClick, selected |
-| StatusBadge | Show status indicators | Success, warning, error, info | status, size, animated |
-| AgentAvatar | Display agent identity | Small, medium, large | agentType, status, tooltip |
-| ToolResultCard | Show tool execution results | Expandable, inline, modal | result, expanded, onToggle |
+| Component      | Purpose                     | Variants                      | Props                      |
+| -------------- | --------------------------- | ----------------------------- | -------------------------- |
+| TaskCard       | Display task information    | Compact, detailed, grid       | task, onClick, selected    |
+| StatusBadge    | Show status indicators      | Success, warning, error, info | status, size, animated     |
+| AgentAvatar    | Display agent identity      | Small, medium, large          | agentType, status, tooltip |
+| ToolResultCard | Show tool execution results | Expandable, inline, modal     | result, expanded, onToggle |
 
-### 7.7.3 Accessibility Standards
+#### 7.7.3 Accessibility Standards
 
-**WCAG 2.1 AA Compliance**
+##### WCAG 2.1 AA Compliance
 
-| Requirement | Implementation | Testing Method | Compliance Level |
-|---|---|---|---|
-| Color Contrast | 4.5:1 minimum ratio | Automated testing | AA |
-| Keyboard Navigation | Full keyboard support | Manual testing | AA |
-| Screen Reader Support | ARIA labels and roles | Screen reader testing | AA |
-| Focus Management | Visible focus indicators | Keyboard testing | AA |
+| Requirement           | Implementation           | Testing Method        | Compliance Level |
+| --------------------- | ------------------------ | --------------------- | ---------------- |
+| Color Contrast        | 4.5:1 minimum ratio      | Automated testing     | AA               |
+| Keyboard Navigation   | Full keyboard support    | Manual testing        | AA               |
+| Screen Reader Support | ARIA labels and roles    | Screen reader testing | AA               |
+| Focus Management      | Visible focus indicators | Keyboard testing      | AA               |
 
-### 7.7.4 Performance Considerations
+#### 7.7.4 Performance Considerations
 
-**Frontend Performance Targets**
+##### Frontend Performance Targets
 
-| Metric | Target | Measurement | Optimization Strategy |
-|---|---|---|---|
-| First Contentful Paint | < 1.5s | Lighthouse | Code splitting, lazy loading |
-| Largest Contentful Paint | < 2.5s | Lighthouse | Image optimization, CDN |
-| Cumulative Layout Shift | < 0.1 | Lighthouse | Reserved space, stable layouts |
-| Time to Interactive | < 3.5s | Lighthouse | Bundle optimization, caching |
+| Metric                   | Target | Measurement | Optimization Strategy          |
+| ------------------------ | ------ | ----------- | ------------------------------ |
+| First Contentful Paint   | < 1.5s | Lighthouse  | Code splitting, lazy loading   |
+| Largest Contentful Paint | < 2.5s | Lighthouse  | Image optimization, CDN        |
+| Cumulative Layout Shift  | < 0.1  | Lighthouse  | Reserved space, stable layouts |
+| Time to Interactive      | < 3.5s | Lighthouse  | Bundle optimization, caching   |
 
-The UI design for Corbusier emphasizes operational efficiency and real-time visibility while maintaining the platform's core principle of serving as "the best room" for AI agent orchestration. The interface provides comprehensive monitoring and control capabilities without overwhelming users, supporting both technical and non-technical team members in their daily workflows.
+The UI design for Corbusier emphasizes operational efficiency and real-time
+visibility while maintaining the platform's core principle of serving as "the
+best room" for AI agent orchestration. The interface provides comprehensive
+monitoring and control capabilities without overwhelming users, supporting both
+technical and non-technical team members in their daily workflows.
 
-# 8. Infrastructure
+## 8. Infrastructure
 
-## 8.1 Deployment Environment
+### 8.1 Deployment Environment
 
-### 8.1.1 Target Environment Assessment
+#### 8.1.1 Target Environment Assessment
 
-**Environment Type Selection**
+##### Environment Type Selection
 
-Corbusier is designed as a hybrid deployment platform supporting multiple environment types to accommodate diverse organizational requirements. The compiled nature of Rust programs means that they are normally best ran in containers or alternatively a VPS. The platform's hexagonal architecture enables flexible deployment across various infrastructure models.
+Corbusier is designed as a hybrid deployment platform supporting multiple
+environment types to accommodate diverse organizational requirements. The
+compiled nature of Rust programs means that they are normally best ran in
+containers or alternatively a VPS. The platform's hexagonal architecture
+enables flexible deployment across various infrastructure models.
 
-| Environment Type | Use Case | Deployment Method | Resource Requirements |
-|---|---|---|---|
-| On-Premises | Enterprise with strict data governance | Kubernetes cluster or VPS | 4 CPU cores, 8GB RAM, 100GB storage |
-| Cloud (AWS/GCP/Azure) | Scalable production deployments | Container orchestration | Auto-scaling based on load |
-| Hybrid | Multi-region with compliance needs | Federated Kubernetes | Distributed resource allocation |
-| Local Development | Developer workstations | Docker Compose | 2 CPU cores, 4GB RAM, 20GB storage |
+| Environment Type      | Use Case                               | Deployment Method         | Resource Requirements               |
+| --------------------- | -------------------------------------- | ------------------------- | ----------------------------------- |
+| On-Premises           | Enterprise with strict data governance | Kubernetes cluster or VPS | 4 CPU cores, 8GB RAM, 100GB storage |
+| Cloud (AWS/GCP/Azure) | Scalable production deployments        | Container orchestration   | Auto-scaling based on load          |
+| Hybrid                | Multi-region with compliance needs     | Federated Kubernetes      | Distributed resource allocation     |
+| Local Development     | Developer workstations                 | Docker Compose            | 2 CPU cores, 4GB RAM, 20GB storage  |
 
-**Geographic Distribution Requirements**
+##### Geographic Distribution Requirements
 
-| Deployment Scenario | Geographic Strategy | Latency Requirements | Data Residency |
-|---|---|---|---|
-| Single Region | Centralized deployment | <100ms within region | Local compliance |
-| Multi-Region | Regional clusters with data sync | <200ms cross-region | Regional data sovereignty |
-| Edge Deployment | Distributed edge nodes | <50ms to end users | Edge data processing |
-| Global Enterprise | Federated multi-cloud | <300ms global access | Country-specific requirements |
+| Deployment Scenario | Geographic Strategy              | Latency Requirements | Data Residency                |
+| ------------------- | -------------------------------- | -------------------- | ----------------------------- |
+| Single Region       | Centralized deployment           | <100ms within region | Local compliance              |
+| Multi-Region        | Regional clusters with data sync | <200ms cross-region  | Regional data sovereignty     |
+| Edge Deployment     | Distributed edge nodes           | <50ms to end users   | Edge data processing          |
+| Global Enterprise   | Federated multi-cloud            | <300ms global access | Country-specific requirements |
 
-**Resource Requirements Analysis**
+##### Resource Requirements Analysis
 
-Based on Rust application deployment patterns, The image size was reduced from 2GB to 11.2MB. This is how you optimize a Rust containerized application through multi-stage builds, and this feature can be used with any compiled programming language.
+Based on Rust application deployment patterns, The image size was reduced from
+2GB to 11.2MB. This is how you optimize a Rust containerized application
+through multi-stage builds, and this feature can be used with any compiled
+programming language.
 
-| Component | CPU Requirements | Memory Requirements | Storage Requirements | Network Requirements |
-|---|---|---|---|---|
-| Corbusier Core | 2-4 cores | 4-8GB RAM | 50GB persistent | 1Gbps |
-| PostgreSQL Database | 2-4 cores | 8-16GB RAM | 200GB persistent | 1Gbps |
-| Agent Backend Adapters | 1-2 cores per backend | 2-4GB RAM per backend | 10GB ephemeral | 100Mbps |
-| MCP Tool Servers | 0.5-1 core per tool | 1-2GB RAM per tool | 5GB ephemeral | 100Mbps |
+| Component              | CPU Requirements      | Memory Requirements   | Storage Requirements | Network Requirements |
+| ---------------------- | --------------------- | --------------------- | -------------------- | -------------------- |
+| Corbusier Core         | 2-4 cores             | 4-8GB RAM             | 50GB persistent      | 1Gbps                |
+| PostgreSQL Database    | 2-4 cores             | 8-16GB RAM            | 200GB persistent     | 1Gbps                |
+| Agent Backend Adapters | 1-2 cores per backend | 2-4GB RAM per backend | 10GB ephemeral       | 100Mbps              |
+| MCP Tool Servers       | 0.5-1 core per tool   | 1-2GB RAM per tool    | 5GB ephemeral        | 100Mbps              |
 
-### 8.1.2 Environment Management
+#### 8.1.2 Environment Management
 
-**Infrastructure as Code (IaC) Approach**
+##### Infrastructure as Code (IaC) Approach
 
-Corbusier adopts a comprehensive IaC strategy using Terraform for infrastructure provisioning and Kubernetes manifests for application deployment, following cloud-native best practices.
+Corbusier adopts a comprehensive IaC strategy using Terraform for
+infrastructure provisioning and Kubernetes manifests for application
+deployment, following cloud-native best practices.
 
 ```mermaid
 graph TB
@@ -9754,16 +10472,16 @@ graph TB
     FEATURE_FLAGS --> POLICIES
 ```
 
-**Configuration Management Strategy**
+##### Configuration Management Strategy
 
-| Configuration Type | Management Tool | Storage Location | Update Frequency |
-|---|---|---|---|
-| Infrastructure Config | Terraform | Git repository | On infrastructure changes |
-| Application Config | Helm/Kustomize | Git repository | Per deployment |
-| Runtime Config | ConfigMaps/Secrets | Kubernetes cluster | Dynamic updates |
-| Feature Flags | External service | Feature flag service | Real-time |
+| Configuration Type    | Management Tool    | Storage Location     | Update Frequency          |
+| --------------------- | ------------------ | -------------------- | ------------------------- |
+| Infrastructure Config | Terraform          | Git repository       | On infrastructure changes |
+| Application Config    | Helm/Kustomize     | Git repository       | Per deployment            |
+| Runtime Config        | ConfigMaps/Secrets | Kubernetes cluster   | Dynamic updates           |
+| Feature Flags         | External service   | Feature flag service | Real-time                 |
 
-**Environment Promotion Strategy**
+##### Environment Promotion Strategy
 
 ```mermaid
 graph LR
@@ -9795,39 +10513,48 @@ graph LR
     PROD_DEPLOY --> PROD_MONITOR
 ```
 
-**Backup and Disaster Recovery Plans**
+##### Backup and Disaster Recovery Plans
 
-| Recovery Scenario | RTO (Recovery Time) | RPO (Recovery Point) | Recovery Strategy |
-|---|---|---|---|
-| Database Failure | 15 minutes | 5 minutes | Automated failover to read replica |
-| Application Failure | 5 minutes | 0 minutes | Rolling restart with health checks |
-| Cluster Failure | 30 minutes | 15 minutes | Multi-AZ deployment with backup cluster |
-| Region Failure | 2 hours | 30 minutes | Cross-region replication and failover |
+| Recovery Scenario   | RTO (Recovery Time) | RPO (Recovery Point) | Recovery Strategy                       |
+| ------------------- | ------------------- | -------------------- | --------------------------------------- |
+| Database Failure    | 15 minutes          | 5 minutes            | Automated failover to read replica      |
+| Application Failure | 5 minutes           | 0 minutes            | Rolling restart with health checks      |
+| Cluster Failure     | 30 minutes          | 15 minutes           | Multi-AZ deployment with backup cluster |
+| Region Failure      | 2 hours             | 30 minutes           | Cross-region replication and failover   |
 
-## 8.2 Containerization
+### 8.2 Containerization
 
-### 8.2.1 Container Platform Selection
+#### 8.2.1 Container Platform Selection
 
-**Docker as Primary Container Platform**
+##### Docker as Primary Container Platform
 
-This is done by putting your Rust application into a Docker container image, which then gets built into a final image that gets added to a Kubernetes cluster (for example) or a similar orchestrator. This has the huge advantage of being able to deploy whatever will fit in a container image - which allows you to ship software quickly and efficiently without delay.
+This is done by putting your Rust application into a Docker container image,
+which then gets built into a final image that gets added to a Kubernetes
+cluster (for example) or a similar orchestrator. This has the huge advantage of
+being able to deploy whatever will fit in a container image - which allows you
+to ship software quickly and efficiently without delay.
 
-Docker provides the optimal containerization platform for Corbusier due to its mature ecosystem, excellent Rust support, and seamless integration with Kubernetes orchestration.
+Docker provides the optimal containerization platform for Corbusier due to its
+mature ecosystem, excellent Rust support, and seamless integration with
+Kubernetes orchestration.
 
-**Container Architecture Strategy**
+##### Container Architecture Strategy
 
-| Container Type | Base Image | Size Target | Security Profile |
-|---|---|---|---|
-| Corbusier Core | debian:bookworm-slim | <50MB | Non-root user, minimal packages |
-| Database | postgres:16-alpine | <200MB | Encrypted storage, network policies |
-| Tool Containers | alpine:latest | <20MB | Isolated execution, resource limits |
-| Development | rust:1.75-bookworm | <2GB | Full toolchain for building |
+| Container Type  | Base Image           | Size Target | Security Profile                    |
+| --------------- | -------------------- | ----------- | ----------------------------------- |
+| Corbusier Core  | debian:bookworm-slim | <50MB       | Non-root user, minimal packages     |
+| Database        | postgres:16-alpine   | <200MB      | Encrypted storage, network policies |
+| Tool Containers | alpine:latest        | <20MB       | Isolated execution, resource limits |
+| Development     | rust:1.75-bookworm   | <2GB        | Full toolchain for building         |
 
-### 8.2.2 Base Image Strategy
+#### 8.2.2 Base Image Strategy
 
-**Multi-Stage Build Optimization**
+##### Multi-Stage Build Optimization
 
-It is a multi-stage build: we create an intermediate Docker image (builder) to compile our binary and then we copy that binary over to the final Docker image (runtime) where we actually run it. This approach significantly reduces final image size and attack surface.
+It is a multi-stage build: we create an intermediate Docker image (builder) to
+compile our binary and then we copy that binary over to the final Docker image
+(runtime) where we actually run it. This approach significantly reduces final
+image size and attack surface.
 
 ```dockerfile
 # Build stage
@@ -9878,18 +10605,18 @@ EXPOSE 8080
 CMD ["corbusier"]
 ```
 
-### 8.2.3 Image Versioning Approach
+#### 8.2.3 Image Versioning Approach
 
-**Semantic Versioning for Container Images**
+##### Semantic Versioning for Container Images
 
-| Version Type | Tag Format | Use Case | Retention Policy |
-|---|---|---|---|
-| Release | `v1.2.3` | Production deployments | Permanent retention |
-| Release Candidate | `v1.2.3-rc.1` | Pre-production testing | 90 days |
-| Development | `dev-{git-sha}` | Development testing | 30 days |
-| Latest | `latest` | Latest stable release | Overwritten on release |
+| Version Type      | Tag Format      | Use Case               | Retention Policy       |
+| ----------------- | --------------- | ---------------------- | ---------------------- |
+| Release           | `v1.2.3`        | Production deployments | Permanent retention    |
+| Release Candidate | `v1.2.3-rc.1`   | Pre-production testing | 90 days                |
+| Development       | `dev-{git-sha}` | Development testing    | 30 days                |
+| Latest            | `latest`        | Latest stable release  | Overwritten on release |
 
-**Image Tagging Strategy**
+##### Image Tagging Strategy
 
 ```mermaid
 graph TB
@@ -9929,24 +10656,30 @@ graph TB
     RELEASE --> RC
 ```
 
-### 8.2.4 Build Optimization Techniques
+#### 8.2.4 Build Optimization Techniques
 
-**Dependency Caching Strategy**
+##### Dependency Caching Strategy
 
-We are taking advantage of how Docker layer caching interacts with multi-stage builds: the COPY . . statement in the planner stage will invalidate the cache for the planner container, but it will not invalidate the cache for the builder container, as long as the checksum of the recipe.json returned by cargo chef prepare does not change. You can think of each stage as its own Docker image with its own caching - they only interact with each other when using the COPY --from statement.
+We are taking advantage of how Docker layer caching interacts with multi-stage
+builds: the COPY . . statement in the planner stage will invalidate the cache
+for the planner container, but it will not invalidate the cache for the builder
+container, as long as the checksum of the recipe.json returned by cargo chef
+prepare does not change. You can think of each stage as its own Docker image
+with its own caching - they only interact with each other when using the COPY
+--from statement.
 
-**Build Performance Optimization**
+##### Build Performance Optimization
 
-| Optimization Technique | Implementation | Performance Gain | Complexity |
-|---|---|---|---|
-| Layer Caching | Separate dependency and source layers | 80% faster rebuilds | Low |
-| Multi-stage Builds | Builder and runtime stages | 95% smaller images | Medium |
-| Parallel Builds | BuildKit parallel execution | 50% faster builds | Medium |
-| Registry Caching | Remote cache layers | 60% faster CI builds | High |
+| Optimization Technique | Implementation                        | Performance Gain     | Complexity |
+| ---------------------- | ------------------------------------- | -------------------- | ---------- |
+| Layer Caching          | Separate dependency and source layers | 80% faster rebuilds  | Low        |
+| Multi-stage Builds     | Builder and runtime stages            | 95% smaller images   | Medium     |
+| Parallel Builds        | BuildKit parallel execution           | 50% faster builds    | Medium     |
+| Registry Caching       | Remote cache layers                   | 60% faster CI builds | High       |
 
-### 8.2.5 Security Scanning Requirements
+#### 8.2.5 Security Scanning Requirements
 
-**Container Security Pipeline**
+##### Container Security Pipeline
 
 ```mermaid
 graph LR
@@ -9982,38 +10715,45 @@ graph LR
     OPA --> QUARANTINE
 ```
 
-**Security Compliance Matrix**
+##### Security Compliance Matrix
 
-| Security Check | Tool | Severity Threshold | Action |
-|---|---|---|---|
-| Critical Vulnerabilities | Trivy | CVSS > 9.0 | Block deployment |
-| High Vulnerabilities | Snyk | CVSS > 7.0 | Require approval |
-| Secret Detection | GitLeaks | Any secrets found | Block deployment |
-| Policy Violations | OPA | Policy failures | Block deployment |
+| Security Check           | Tool     | Severity Threshold | Action           |
+| ------------------------ | -------- | ------------------ | ---------------- |
+| Critical Vulnerabilities | Trivy    | CVSS > 9.0         | Block deployment |
+| High Vulnerabilities     | Snyk     | CVSS > 7.0         | Require approval |
+| Secret Detection         | GitLeaks | Any secrets found  | Block deployment |
+| Policy Violations        | OPA      | Policy failures    | Block deployment |
 
-## 8.3 Orchestration
+### 8.3 Orchestration
 
-### 8.3.1 Orchestration Platform Selection
+#### 8.3.1 Orchestration Platform Selection
 
-**Kubernetes as Primary Orchestration Platform**
+##### Kubernetes as Primary Orchestration Platform
 
-Rust is a systems programming language known for its performance, memory safety, and concurrency support. It's a great choice for building high-performance applications like web services, CLI tools, microservices, and embedded systems. Rust ensures safety by eliminating common bugs like null pointer dereferences and data races, making it a solid choice for production-ready applications.
+Rust is a systems programming language known for its performance, memory
+safety, and concurrency support. It's a great choice for building
+high-performance applications like web services, CLI tools, microservices, and
+embedded systems. Rust ensures safety by eliminating common bugs like null
+pointer dereferences and data races, making it a solid choice for
+production-ready applications.
 
-Kubernetes provides the ideal orchestration platform for Corbusier's distributed architecture, offering robust container management, service discovery, and scaling capabilities essential for AI agent orchestration.
+Kubernetes provides the ideal orchestration platform for Corbusier's
+distributed architecture, offering robust container management, service
+discovery, and scaling capabilities essential for AI agent orchestration.
 
-**Platform Justification Matrix**
+##### Platform Justification Matrix
 
-| Requirement | Kubernetes | Docker Swarm | Nomad | Score |
-|---|---|---|---|---|
-| Multi-container orchestration | Excellent | Good | Good | K8s: 9/10 |
-| Service discovery | Native | Basic | Good | K8s: 9/10 |
-| Auto-scaling | Advanced | Limited | Basic | K8s: 9/10 |
-| Ecosystem maturity | Excellent | Good | Fair | K8s: 9/10 |
-| Rust application support | Excellent | Good | Good | K8s: 9/10 |
+| Requirement                   | Kubernetes | Docker Swarm | Nomad | Score     |
+| ----------------------------- | ---------- | ------------ | ----- | --------- |
+| Multi-container orchestration | Excellent  | Good         | Good  | K8s: 9/10 |
+| Service discovery             | Native     | Basic        | Good  | K8s: 9/10 |
+| Auto-scaling                  | Advanced   | Limited      | Basic | K8s: 9/10 |
+| Ecosystem maturity            | Excellent  | Good         | Fair  | K8s: 9/10 |
+| Rust application support      | Excellent  | Good         | Good  | K8s: 9/10 |
 
-### 8.3.2 Cluster Architecture
+#### 8.3.2 Cluster Architecture
 
-**Multi-Tier Cluster Design**
+##### Multi-Tier Cluster Design
 
 ```mermaid
 graph TB
@@ -10053,29 +10793,30 @@ graph TB
     POSTGRES --> STORAGE
 ```
 
-**Node Configuration Strategy**
+##### Node Configuration Strategy
 
-| Node Type | Instance Size | Node Count | Workload Types |
-|---|---|---|---|
-| Control Plane | 2 CPU, 4GB RAM | 3 (HA) | Kubernetes control components |
-| Application Nodes | 4 CPU, 8GB RAM | 3-10 (auto-scale) | Corbusier, agent backends, tools |
-| Data Nodes | 4 CPU, 16GB RAM | 3 (HA) | PostgreSQL, Redis, persistent workloads |
-| Edge Nodes | 2 CPU, 4GB RAM | 2+ | Ingress, monitoring, logging |
+| Node Type         | Instance Size   | Node Count        | Workload Types                          |
+| ----------------- | --------------- | ----------------- | --------------------------------------- |
+| Control Plane     | 2 CPU, 4GB RAM  | 3 (HA)            | Kubernetes control components           |
+| Application Nodes | 4 CPU, 8GB RAM  | 3-10 (auto-scale) | Corbusier, agent backends, tools        |
+| Data Nodes        | 4 CPU, 16GB RAM | 3 (HA)            | PostgreSQL, Redis, persistent workloads |
+| Edge Nodes        | 2 CPU, 4GB RAM  | 2+                | Ingress, monitoring, logging            |
 
-### 8.3.3 Service Deployment Strategy
+#### 8.3.3 Service Deployment Strategy
 
-**Deployment Patterns**
+##### Deployment Patterns
 
-Deploying a Rust application to Kubernetes involves several steps. Let's first review the overall process and then discuss the various steps in depth.
+Deploying a Rust application to Kubernetes involves several steps. Let's first
+review the overall process and then discuss the various steps in depth.
 
-| Service | Deployment Pattern | Replica Count | Update Strategy |
-|---|---|---|---|
-| Corbusier Core | Deployment | 3 replicas | Rolling update |
-| PostgreSQL | StatefulSet | 3 replicas | Ordered update |
-| Agent Backends | Deployment | 2-5 replicas | Blue-green |
-| MCP Tools | DaemonSet | Per node | Rolling update |
+| Service        | Deployment Pattern | Replica Count | Update Strategy |
+| -------------- | ------------------ | ------------- | --------------- |
+| Corbusier Core | Deployment         | 3 replicas    | Rolling update  |
+| PostgreSQL     | StatefulSet        | 3 replicas    | Ordered update  |
+| Agent Backends | Deployment         | 2-5 replicas  | Blue-green      |
+| MCP Tools      | DaemonSet          | Per node      | Rolling update  |
 
-**Service Mesh Integration**
+##### Service Mesh Integration
 
 ```mermaid
 graph TB
@@ -10110,18 +10851,18 @@ graph TB
     TRAFFIC --> SECURITY
 ```
 
-### 8.3.4 Auto-scaling Configuration
+#### 8.3.4 Auto-scaling Configuration
 
-**Horizontal Pod Autoscaler (HPA) Configuration**
+##### Horizontal Pod Autoscaler (HPA) Configuration
 
-| Component | Scaling Metric | Min Replicas | Max Replicas | Target Utilization |
-|---|---|---|---|---|
-| Corbusier Core | CPU + Memory | 3 | 10 | 70% CPU, 80% Memory |
-| Agent Backends | Custom (active turns) | 2 | 8 | 5 active turns per pod |
-| Tool Servers | CPU | 1 | 5 | 60% CPU |
-| Database | Manual scaling | 3 | 3 | N/A (StatefulSet) |
+| Component      | Scaling Metric        | Min Replicas | Max Replicas | Target Utilization     |
+| -------------- | --------------------- | ------------ | ------------ | ---------------------- |
+| Corbusier Core | CPU + Memory          | 3            | 10           | 70% CPU, 80% Memory    |
+| Agent Backends | Custom (active turns) | 2            | 8            | 5 active turns per pod |
+| Tool Servers   | CPU                   | 1            | 5            | 60% CPU                |
+| Database       | Manual scaling        | 3            | 3            | N/A (StatefulSet)      |
 
-**Vertical Pod Autoscaler (VPA) Configuration**
+##### Vertical Pod Autoscaler (VPA) Configuration
 
 ```yaml
 apiVersion: autoscaling.k8s.io/v1
@@ -10146,18 +10887,18 @@ spec:
         memory: 256Mi
 ```
 
-### 8.3.5 Resource Allocation Policies
+#### 8.3.5 Resource Allocation Policies
 
-**Resource Quotas and Limits**
+##### Resource Quotas and Limits
 
-| Namespace | CPU Limit | Memory Limit | Storage Limit | Pod Limit |
-|---|---|---|---|---|
-| corbusier-system | 20 cores | 40Gi | 500Gi | 100 pods |
-| corbusier-agents | 16 cores | 32Gi | 100Gi | 50 pods |
-| corbusier-tools | 8 cores | 16Gi | 50Gi | 30 pods |
-| corbusier-data | 12 cores | 48Gi | 1Ti | 20 pods |
+| Namespace        | CPU Limit | Memory Limit | Storage Limit | Pod Limit |
+| ---------------- | --------- | ------------ | ------------- | --------- |
+| corbusier-system | 20 cores  | 40Gi         | 500Gi         | 100 pods  |
+| corbusier-agents | 16 cores  | 32Gi         | 100Gi         | 50 pods   |
+| corbusier-tools  | 8 cores   | 16Gi         | 50Gi          | 30 pods   |
+| corbusier-data   | 12 cores  | 48Gi         | 1Ti           | 20 pods   |
 
-**Quality of Service Classes**
+##### Quality of Service Classes
 
 ```mermaid
 graph TB
@@ -10188,13 +10929,15 @@ graph TB
     BESTEFFORT --> LOW_PRIORITY
 ```
 
-## 8.4 CI/CD Pipeline
+### 8.4 CI/CD Pipeline
 
-### 8.4.1 Build Pipeline
+#### 8.4.1 Build Pipeline
 
-**Source Control Triggers**
+##### Source Control Triggers
 
-The CI/CD pipeline leverages GitHub Actions for comprehensive automation, triggered by various source control events to ensure code quality and deployment reliability.
+The CI/CD pipeline leverages GitHub Actions for comprehensive automation,
+triggered by various source control events to ensure code quality and
+deployment reliability.
 
 ```mermaid
 graph LR
@@ -10238,18 +10981,20 @@ graph LR
     PERF --> APPROVE
 ```
 
-**Build Environment Requirements**
+##### Build Environment Requirements
 
-Your Rust configuration management is crucial. To configure your Rust application for deployment to Heroku, which includes setting up the app for deployment and creating a deployment pipeline.
+Your Rust configuration management is crucial. To configure your Rust
+application for deployment to Heroku, which includes setting up the app for
+deployment and creating a deployment pipeline.
 
-| Build Stage | Environment | Resource Requirements | Duration Target |
-|---|---|---|---|
-| Code Checkout | GitHub Actions Runner | 2 CPU, 7GB RAM | <30 seconds |
-| Dependency Installation | Rust 1.75+ | 4 CPU, 8GB RAM | <2 minutes |
-| Testing | Tokio Runtime | 4 CPU, 8GB RAM | <5 minutes |
-| Container Build | Docker BuildKit | 4 CPU, 8GB RAM | <3 minutes |
+| Build Stage             | Environment           | Resource Requirements | Duration Target |
+| ----------------------- | --------------------- | --------------------- | --------------- |
+| Code Checkout           | GitHub Actions Runner | 2 CPU, 7GB RAM        | <30 seconds     |
+| Dependency Installation | Rust 1.75+            | 4 CPU, 8GB RAM        | <2 minutes      |
+| Testing                 | Tokio Runtime         | 4 CPU, 8GB RAM        | <5 minutes      |
+| Container Build         | Docker BuildKit       | 4 CPU, 8GB RAM        | <3 minutes      |
 
-**Dependency Management Strategy**
+##### Dependency Management Strategy
 
 ```yaml
 # .github/workflows/ci.yml
@@ -10294,18 +11039,18 @@ jobs:
         run: cargo clippy -- -D warnings
 ```
 
-### 8.4.2 Deployment Pipeline
+#### 8.4.2 Deployment Pipeline
 
-**Deployment Strategy Selection**
+##### Deployment Strategy Selection
 
-| Environment | Strategy | Rollback Time | Risk Level |
-|---|---|---|---|
-| Development | Direct deployment | Immediate | Low |
-| Staging | Blue-green | <5 minutes | Medium |
-| Production | Canary deployment | <10 minutes | High |
-| Hotfix | Rolling update | <2 minutes | Critical |
+| Environment | Strategy          | Rollback Time | Risk Level |
+| ----------- | ----------------- | ------------- | ---------- |
+| Development | Direct deployment | Immediate     | Low        |
+| Staging     | Blue-green        | <5 minutes    | Medium     |
+| Production  | Canary deployment | <10 minutes   | High       |
+| Hotfix      | Rolling update    | <2 minutes    | Critical   |
 
-**Environment Promotion Workflow**
+##### Environment Promotion Workflow
 
 ```mermaid
 graph TB
@@ -10343,18 +11088,18 @@ graph TB
     FULL_DEPLOY --> PROD_VALIDATE
 ```
 
-### 8.4.3 Rollback Procedures
+#### 8.4.3 Rollback Procedures
 
-**Automated Rollback Triggers**
+##### Automated Rollback Triggers
 
-| Trigger Condition | Detection Method | Rollback Strategy | Recovery Time |
-|---|---|---|---|
-| Health Check Failure | Kubernetes liveness probe | Automatic pod restart | <2 minutes |
-| Error Rate Spike | Prometheus alerts | Automatic rollback | <5 minutes |
-| Performance Degradation | Custom metrics | Canary rollback | <3 minutes |
-| Manual Trigger | Operator intervention | Immediate rollback | <1 minute |
+| Trigger Condition       | Detection Method          | Rollback Strategy     | Recovery Time |
+| ----------------------- | ------------------------- | --------------------- | ------------- |
+| Health Check Failure    | Kubernetes liveness probe | Automatic pod restart | <2 minutes    |
+| Error Rate Spike        | Prometheus alerts         | Automatic rollback    | <5 minutes    |
+| Performance Degradation | Custom metrics            | Canary rollback       | <3 minutes    |
+| Manual Trigger          | Operator intervention     | Immediate rollback    | <1 minute     |
 
-**Rollback Decision Matrix**
+##### Rollback Decision Matrix
 
 ```mermaid
 graph TB
@@ -10392,20 +11137,20 @@ graph TB
     DECISION --> EMERGENCY_STOP
 ```
 
-### 8.4.4 Post-Deployment Validation
+#### 8.4.4 Post-Deployment Validation
 
-**Validation Test Suite**
+##### Validation Test Suite
 
-| Test Category | Test Method | Success Criteria | Timeout |
-|---|---|---|---|
-| Health Checks | HTTP endpoints | 200 OK responses | 30 seconds |
-| Functional Tests | API integration tests | All tests pass | 5 minutes |
-| Performance Tests | Load testing | <2s response time | 10 minutes |
-| Security Tests | Vulnerability scans | No critical issues | 15 minutes |
+| Test Category     | Test Method           | Success Criteria   | Timeout    |
+| ----------------- | --------------------- | ------------------ | ---------- |
+| Health Checks     | HTTP endpoints        | 200 OK responses   | 30 seconds |
+| Functional Tests  | API integration tests | All tests pass     | 5 minutes  |
+| Performance Tests | Load testing          | <2s response time  | 10 minutes |
+| Security Tests    | Vulnerability scans   | No critical issues | 15 minutes |
 
-### 8.4.5 Release Management Process
+#### 8.4.5 Release Management Process
 
-**Release Versioning Strategy**
+##### Release Versioning Strategy
 
 ```mermaid
 gantt
@@ -10426,22 +11171,24 @@ gantt
     Post-Deploy Monitor  :2024-01-31, 3d
 ```
 
-**Release Approval Gates**
+##### Release Approval Gates
 
-| Gate | Criteria | Approver | Bypass Conditions |
-|---|---|---|---|
-| Code Quality | All tests pass, coverage >85% | Automated | None |
-| Security | No critical vulnerabilities | Security team | Emergency hotfix |
-| Performance | Meets SLA requirements | Engineering lead | Performance regression fix |
-| Business | Feature complete, documented | Product owner | Critical bug fix |
+| Gate         | Criteria                      | Approver         | Bypass Conditions          |
+| ------------ | ----------------------------- | ---------------- | -------------------------- |
+| Code Quality | All tests pass, coverage >85% | Automated        | None                       |
+| Security     | No critical vulnerabilities   | Security team    | Emergency hotfix           |
+| Performance  | Meets SLA requirements        | Engineering lead | Performance regression fix |
+| Business     | Feature complete, documented  | Product owner    | Critical bug fix           |
 
-## 8.5 Infrastructure Monitoring
+### 8.5 Infrastructure Monitoring
 
-### 8.5.1 Resource Monitoring Approach
+#### 8.5.1 Resource Monitoring Approach
 
-**Comprehensive Monitoring Stack**
+##### Comprehensive Monitoring Stack
 
-The infrastructure monitoring leverages Prometheus for metrics collection, Grafana for visualization, and AlertManager for notification management, providing comprehensive visibility into system performance and health.
+The infrastructure monitoring leverages Prometheus for metrics collection,
+Grafana for visualization, and AlertManager for notification management,
+providing comprehensive visibility into system performance and health.
 
 ```mermaid
 graph TB
@@ -10487,27 +11234,27 @@ QUERIES --> REPORTS
 REPORTS --> CAPACITY
 ```
 
-**Key Performance Indicators (KPIs)**
+##### Key Performance Indicators (KPIs)
 
-| Metric Category | Key Metrics | Alert Thresholds | Collection Frequency |
-|---|---|---|---|
-| Infrastructure | CPU, Memory, Disk, Network | >80% utilization | 15 seconds |
-| Application | Request rate, latency, errors | >2s latency, >5% errors | 10 seconds |
-| Business | Task completion, agent utilization | <95% success rate | 1 minute |
-| Security | Failed logins, policy violations | Any security events | Real-time |
+| Metric Category | Key Metrics                        | Alert Thresholds        | Collection Frequency |
+| --------------- | ---------------------------------- | ----------------------- | -------------------- |
+| Infrastructure  | CPU, Memory, Disk, Network         | >80% utilization        | 15 seconds           |
+| Application     | Request rate, latency, errors      | >2s latency, >5% errors | 10 seconds           |
+| Business        | Task completion, agent utilization | <95% success rate       | 1 minute             |
+| Security        | Failed logins, policy violations   | Any security events     | Real-time            |
 
-### 8.5.2 Performance Metrics Collection
+#### 8.5.2 Performance Metrics Collection
 
-**Application Performance Monitoring**
+##### Application Performance Monitoring
 
-| Component | Metrics Collected | Instrumentation Method | Retention Period |
-|---|---|---|---|
-| Corbusier Core | HTTP requests, database queries, memory usage | Prometheus metrics, tracing | 30 days |
-| Agent Backends | Turn execution time, success rate, queue depth | Custom metrics | 7 days |
-| Tool Servers | Execution time, resource usage, error rate | MCP metrics | 7 days |
-| Database | Query performance, connection pool, locks | PostgreSQL exporter | 90 days |
+| Component      | Metrics Collected                              | Instrumentation Method      | Retention Period |
+| -------------- | ---------------------------------------------- | --------------------------- | ---------------- |
+| Corbusier Core | HTTP requests, database queries, memory usage  | Prometheus metrics, tracing | 30 days          |
+| Agent Backends | Turn execution time, success rate, queue depth | Custom metrics              | 7 days           |
+| Tool Servers   | Execution time, resource usage, error rate     | MCP metrics                 | 7 days           |
+| Database       | Query performance, connection pool, locks      | PostgreSQL exporter         | 90 days          |
 
-**Custom Metrics Implementation**
+##### Custom Metrics Implementation
 
 ```rust
 use prometheus::{Counter, Histogram, Gauge, register_counter, register_histogram, register_gauge};
@@ -10548,18 +11295,18 @@ impl CorbuiserMetrics {
 }
 ```
 
-### 8.5.3 Cost Monitoring and Optimization
+#### 8.5.3 Cost Monitoring and Optimization
 
-**Cloud Cost Tracking**
+##### Cloud Cost Tracking
 
-| Cost Category | Monitoring Tool | Optimization Strategy | Target Reduction |
-|---|---|---|---|
-| Compute Resources | Cloud provider billing APIs | Right-sizing, spot instances | 20-30% |
-| Storage Costs | Kubernetes storage metrics | Lifecycle policies, compression | 15-25% |
-| Network Costs | Network flow monitoring | CDN usage, regional optimization | 10-20% |
-| Third-party Services | API usage tracking | Rate limiting, caching | 25-35% |
+| Cost Category        | Monitoring Tool             | Optimization Strategy            | Target Reduction |
+| -------------------- | --------------------------- | -------------------------------- | ---------------- |
+| Compute Resources    | Cloud provider billing APIs | Right-sizing, spot instances     | 20-30%           |
+| Storage Costs        | Kubernetes storage metrics  | Lifecycle policies, compression  | 15-25%           |
+| Network Costs        | Network flow monitoring     | CDN usage, regional optimization | 10-20%           |
+| Third-party Services | API usage tracking          | Rate limiting, caching           | 25-35%           |
 
-**Resource Optimization Dashboard**
+##### Resource Optimization Dashboard
 
 ```mermaid
 graph TB
@@ -10595,20 +11342,20 @@ graph TB
     CLEANUP --> ALERTS
 ```
 
-### 8.5.4 Security Monitoring
+#### 8.5.4 Security Monitoring
 
-**Security Event Detection**
+##### Security Event Detection
 
-| Security Domain | Monitoring Method | Alert Conditions | Response Actions |
-|---|---|---|---|
-| Authentication | Failed login attempts | >5 failures in 5 minutes | Account lockout, notification |
-| Authorization | Permission violations | Any unauthorized access | Block request, audit log |
-| Network Security | Traffic analysis | Unusual traffic patterns | Rate limiting, investigation |
-| Container Security | Runtime monitoring | Privilege escalation attempts | Container termination, alert |
+| Security Domain    | Monitoring Method     | Alert Conditions              | Response Actions              |
+| ------------------ | --------------------- | ----------------------------- | ----------------------------- |
+| Authentication     | Failed login attempts | >5 failures in 5 minutes      | Account lockout, notification |
+| Authorization      | Permission violations | Any unauthorized access       | Block request, audit log      |
+| Network Security   | Traffic analysis      | Unusual traffic patterns      | Rate limiting, investigation  |
+| Container Security | Runtime monitoring    | Privilege escalation attempts | Container termination, alert  |
 
-### 8.5.5 Compliance Auditing
+#### 8.5.5 Compliance Auditing
 
-**Audit Trail Management**
+##### Audit Trail Management
 
 ```mermaid
 graph LR
@@ -10648,193 +11395,236 @@ graph LR
     EXPORT --> ARCHIVAL
 ```
 
-**Compliance Framework Mapping**
+##### Compliance Framework Mapping
 
-| Regulation | Requirements | Implementation | Audit Frequency |
-|---|---|---|---|
-| SOC 2 Type II | Access controls, encryption | RBAC, TLS, audit logs | Annual |
-| GDPR | Data protection, right to erasure | Data classification, deletion procedures | Quarterly |
-| ISO 27001 | Information security management | Security policies, risk assessment | Annual |
-| PCI DSS | Payment data protection | Network segmentation, encryption | Quarterly |
+| Regulation    | Requirements                      | Implementation                           | Audit Frequency |
+| ------------- | --------------------------------- | ---------------------------------------- | --------------- |
+| SOC 2 Type II | Access controls, encryption       | RBAC, TLS, audit logs                    | Annual          |
+| GDPR          | Data protection, right to erasure | Data classification, deletion procedures | Quarterly       |
+| ISO 27001     | Information security management   | Security policies, risk assessment       | Annual          |
+| PCI DSS       | Payment data protection           | Network segmentation, encryption         | Quarterly       |
 
-## 8.6 Infrastructure Cost Estimates
+### 8.6 Infrastructure Cost Estimates
 
-### 8.6.1 Cloud Infrastructure Costs
+#### 8.6.1 Cloud Infrastructure Costs
 
-**AWS Cost Breakdown (Monthly)**
+##### AWS Cost Breakdown (Monthly)
 
-| Service Category | Instance Type | Quantity | Monthly Cost | Annual Cost |
-|---|---|---|---|---|
-| Kubernetes Control Plane | EKS Cluster | 1 | $73 | $876 |
-| Worker Nodes | t3.large | 6 | $380 | $4,560 |
-| Database | RDS PostgreSQL (db.r5.large) | 1 | $180 | $2,160 |
-| Load Balancer | Application Load Balancer | 1 | $25 | $300 |
-| Storage | EBS gp3 (500GB) | 1 | $40 | $480 |
-| **Total Base Infrastructure** | | | **$698** | **$8,376** |
+| Service Category              | Instance Type                | Quantity | Monthly Cost | Annual Cost |
+| ----------------------------- | ---------------------------- | -------- | ------------ | ----------- |
+| Kubernetes Control Plane      | EKS Cluster                  | 1        | $73          | $876        |
+| Worker Nodes                  | t3.large                     | 6        | $380         | $4,560      |
+| Database                      | RDS PostgreSQL (db.r5.large) | 1        | $180         | $2,160      |
+| Load Balancer                 | Application Load Balancer    | 1        | $25          | $300        |
+| Storage                       | EBS gp3 (500GB)              | 1        | $40          | $480        |
+| **Total Base Infrastructure** | —                            | —        | **$698**     | **$8,376**  |
 
-**Scaling Cost Projections**
+##### Scaling Cost Projections
 
 | User Scale | Additional Nodes | Monthly Cost | Total Monthly | Annual Total |
-|---|---|---|---|---|
-| 100 users | 0 | $0 | $698 | $8,376 |
-| 500 users | 2 | $127 | $825 | $9,900 |
-| 1000 users | 4 | $253 | $951 | $11,412 |
-| 5000 users | 8 | $507 | $1,205 | $14,460 |
+| ---------- | ---------------- | ------------ | ------------- | ------------ |
+| 100 users  | 0                | $0           | $698          | $8,376       |
+| 500 users  | 2                | $127         | $825          | $9,900       |
+| 1000 users | 4                | $253         | $951          | $11,412      |
+| 5000 users | 8                | $507         | $1,205        | $14,460      |
 
-### 8.6.2 Operational Cost Estimates
+#### 8.6.2 Operational Cost Estimates
 
-**Third-Party Service Costs**
+##### Third-Party Service Costs
 
-| Service | Purpose | Monthly Cost | Scaling Factor |
-|---|---|---|---|
-| Container Registry | Image storage | $20 | Linear with images |
-| Monitoring (Datadog) | Infrastructure monitoring | $150 | Per host |
-| Security Scanning | Vulnerability assessment | $100 | Per repository |
-| Backup Storage | Disaster recovery | $50 | Linear with data |
+| Service              | Purpose                   | Monthly Cost | Scaling Factor     |
+| -------------------- | ------------------------- | ------------ | ------------------ |
+| Container Registry   | Image storage             | $20          | Linear with images |
+| Monitoring (Datadog) | Infrastructure monitoring | $150         | Per host           |
+| Security Scanning    | Vulnerability assessment  | $100         | Per repository     |
+| Backup Storage       | Disaster recovery         | $50          | Linear with data   |
 
-### 8.6.3 Total Cost of Ownership (TCO)
+#### 8.6.3 Total Cost of Ownership (TCO)
 
-**3-Year TCO Analysis**
+##### 3-Year TCO Analysis
 
-| Cost Category | Year 1 | Year 2 | Year 3 | Total |
-|---|---|---|---|---|
-| Infrastructure | $11,412 | $13,694 | $16,433 | $41,539 |
-| Operations | $3,840 | $4,608 | $5,530 | $13,978 |
-| Development | $15,000 | $10,000 | $8,000 | $33,000 |
-| Support | $5,000 | $6,000 | $7,200 | $18,200 |
-| **Total TCO** | **$35,252** | **$34,302** | **$37,163** | **$106,717** |
+| Cost Category  | Year 1      | Year 2      | Year 3      | Total        |
+| -------------- | ----------- | ----------- | ----------- | ------------ |
+| Infrastructure | $11,412     | $13,694     | $16,433     | $41,539      |
+| Operations     | $3,840      | $4,608      | $5,530      | $13,978      |
+| Development    | $15,000     | $10,000     | $8,000      | $33,000      |
+| Support        | $5,000      | $6,000      | $7,200      | $18,200      |
+| **Total TCO**  | **$35,252** | **$34,302** | **$37,163** | **$106,717** |
 
-This comprehensive infrastructure design ensures that Corbusier can be deployed reliably across various environments while maintaining cost efficiency and operational excellence. The modular architecture supports both small-scale deployments and enterprise-grade scaling requirements, with clear cost projections and optimization strategies for long-term sustainability.
+This comprehensive infrastructure design ensures that Corbusier can be deployed
+reliably across various environments while maintaining cost efficiency and
+operational excellence. The modular architecture supports both small-scale
+deployments and enterprise-grade scaling requirements, with clear cost
+projections and optimization strategies for long-term sustainability.
 
-# 9. Appendices
+## 9. Appendices
 
-## 9.1 Additional Technical Information
+### 9.1 Additional Technical Information
 
-### 9.1.1 MCP Protocol Evolution and Roadmap
+#### 9.1.1 MCP Protocol Evolution and Roadmap
 
-The Model Context Protocol specification is actively evolving, with the current version being 2024-11-05 and the next version scheduled for release on November 25th, 2025, with a release candidate (RC) available on November 11th, 2025. The development team is building in a 14-day RC validation window so client implementors and SDK maintainers can thoroughly test the protocol changes.
+The Model Context Protocol specification is actively evolving, with the current
+version being 2024-11-05 and the next version scheduled for release on November
+25th, 2025, with a release candidate (RC) available on November 11th, 2025. The
+development team is building in a 14-day RC validation window so client
+implementors and SDK maintainers can thoroughly test the protocol changes.
 
-The last specification version was released on June 18, 2025, and focused on structured tool outputs, OAuth-based authorization, elicitation for server-initiated user interactions, and improved security best practices. The upcoming version focuses on five key protocol improvements identified by working groups:
+The last specification version was released on June 18, 2025, and focused on
+structured tool outputs, OAuth-based authorization, elicitation for
+server-initiated user interactions, and improved security best practices. The
+upcoming version focuses on five key protocol improvements identified by
+working groups:
 
-| Improvement Area | Description | Impact on Corbusier |
-|---|---|---|---|
-| Asynchronous Operations | Moving beyond mostly synchronous operations to support operations that take minutes or hours | Enhanced support for long-running tool executions |
-| Protocol Extensions | Official recognition and documentation of popular protocol extensions for specific industries like healthcare, finance, or education | Standardized patterns for domain-specific tools |
-| SDK Tiering System | Clear tiering system for SDKs based on specification compliance speed, maintenance responsiveness, and feature completeness | Better SDK selection for Rust implementation |
+| Improvement Area        | Description                                                                                                                          | Impact on Corbusier                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Asynchronous Operations | Moving beyond mostly synchronous operations to support operations that take minutes or hours                                         | Enhanced support for long-running tool executions |
+| Protocol Extensions     | Official recognition and documentation of popular protocol extensions for specific industries like healthcare, finance, or education | Standardized patterns for domain-specific tools   |
+| SDK Tiering System      | Clear tiering system for SDKs based on specification compliance speed, maintenance responsiveness, and feature completeness          | Better SDK selection for Rust implementation      |
 
-### 9.1.2 Hexagonal Architecture Implementation Patterns
+#### 9.1.2 Hexagonal Architecture Implementation Patterns
 
-Concrete units are isolated to their own classes (adapters) while the application core uses interfaces (ports) to communicate with them. The application core has no idea of the underlying adapter implementations. This really looks like the `trait` concept in Rust, so we will leverage it in this tutorial.
+Concrete units are isolated to their own classes (adapters) while the
+application core uses interfaces (ports) to communicate with them. The
+application core has no idea of the underlying adapter implementations. This
+really looks like the `trait` concept in Rust, so we will leverage it in this
+tutorial.
 
-**Rust-Specific Implementation Considerations**
+##### Rust-Specific Implementation Considerations
 
-Implementing Hexagonal Architecture in Rust involves leveraging the language's features such as traits, enums, and modules to define and manage core application components, ports, and adapters effectively. In the context of Rust, Hexagonal Architecture benefits from the language's strong type system and modularity features. Rust's traits and enums can be effectively used to define and implement ports and adapters, ensuring type safety and clear boundaries between components. The language's focus on concurrency and safety also complements the pattern's emphasis on modularity and isolation.
+Implementing Hexagonal Architecture in Rust involves leveraging the language's
+features such as traits, enums, and modules to define and manage core
+application components, ports, and adapters effectively. In the context of
+Rust, Hexagonal Architecture benefits from the language's strong type system
+and modularity features. Rust's traits and enums can be effectively used to
+define and implement ports and adapters, ensuring type safety and clear
+boundaries between components. The language's focus on concurrency and safety
+also complements the pattern's emphasis on modularity and isolation.
 
-**Testing Strategy for Hexagonal Architecture**
+##### Testing Strategy for Hexagonal Architecture
 
-Traits in Rust are a perfect match for defining ports. Structs implementing those traits become adapters—testable and swappable. The core domain crate (banker-core) has no dependencies on infrastructure or axum. Tests can exercise the domain logic via fixtures and in-memory mocks.
+Traits in Rust are a perfect match for defining ports. Structs implementing
+those traits become adapters—testable and swappable. The core domain crate
+(banker-core) has no dependencies on infrastructure or axum. Tests can exercise
+the domain logic via fixtures and in-memory mocks.
 
-### 9.1.3 Container Orchestration Alternatives
+#### 9.1.3 Container Orchestration Alternatives
 
-While Corbusier primarily targets Kubernetes for production deployments, the hexagonal architecture enables support for alternative orchestration platforms:
+While Corbusier primarily targets Kubernetes for production deployments, the
+hexagonal architecture enables support for alternative orchestration platforms:
 
-| Platform | Use Case | Integration Approach | Complexity |
-|---|---|---|---|
-| Docker Swarm | Simplified deployments | Native Docker Compose | Low |
-| Nomad | Multi-workload orchestration | Job specification templates | Medium |
-| Podman | Rootless containers | Pod-based deployment | Medium |
+| Platform     | Use Case                     | Integration Approach        | Complexity |
+| ------------ | ---------------------------- | --------------------------- | ---------- |
+| Docker Swarm | Simplified deployments       | Native Docker Compose       | Low        |
+| Nomad        | Multi-workload orchestration | Job specification templates | Medium     |
+| Podman       | Rootless containers          | Pod-based deployment        | Medium     |
 
-### 9.1.4 Security Considerations for MCP Integration
+#### 9.1.4 Security Considerations for MCP Integration
 
-The Model Context Protocol enables powerful capabilities through arbitrary data access and code execution paths. With this power comes important security and trust considerations that all implementors must carefully address. While MCP itself cannot enforce these security principles at the protocol level, implementors SHOULD: Build robust consent and authorization flows into their applications · Provide clear documentation of security implications · Implement appropriate access controls and data protections · Follow security best practices in their integrations.
+The Model Context Protocol enables powerful capabilities through arbitrary data
+access and code execution paths. With this power comes important security and
+trust considerations that all implementors must carefully address. While MCP
+itself cannot enforce these security principles at the protocol level,
+implementors SHOULD: Build robust consent and authorization flows into their
+applications · Provide clear documentation of security implications · Implement
+appropriate access controls and data protections · Follow security best
+practices in their integrations.
 
-**MCP Security Implementation Requirements**
+##### MCP Security Implementation Requirements
 
-The most recent versions have focused heavily on security and enterprise readiness, introducing mechanisms to authenticate users and clients while providing recommendations for authorizing resource access. The ability to implement granular access controls for resources is especially critical for enterprises integrating sensitive company and user data with MCP servers.
+The most recent versions have focused heavily on security and enterprise
+readiness, introducing mechanisms to authenticate users and clients while
+providing recommendations for authorizing resource access. The ability to
+implement granular access controls for resources is especially critical for
+enterprises integrating sensitive company and user data with MCP servers.
 
-### 9.1.5 Performance Optimization Techniques
+#### 9.1.5 Performance Optimization Techniques
 
-**Rust-Specific Optimizations**
+##### Rust-Specific Optimizations
 
-The compiled nature of Rust provides inherent performance advantages for container deployments. The image size was reduced from 2GB to 11.2MB. This is how you optimize a Rust containerized application through multi-stage builds, and this feature can be used with any compiled programming language.
+The compiled nature of Rust provides inherent performance advantages for
+container deployments. The image size was reduced from 2GB to 11.2MB. This is
+how you optimize a Rust containerized application through multi-stage builds,
+and this feature can be used with any compiled programming language.
 
-**Async Runtime Performance**
+##### Async Runtime Performance
 
-Tokio's async runtime provides significant performance benefits for I/O-intensive operations typical in AI agent orchestration scenarios, with studies showing substantial improvements in concurrent request handling.
+Tokio's async runtime provides significant performance benefits for
+I/O-intensive operations typical in AI agent orchestration scenarios, with
+studies showing substantial improvements in concurrent request handling.
 
-## 9.2 Glossary
+### 9.2 Glossary
 
-| Term | Definition |
-|---|---|
-| **Agent Backend** | A pluggable AI service (e.g., Claude Code SDK, Codex CLI App Server) that provides AI capabilities through standardized adapter interfaces |
-| **Agent Orchestration** | The coordination and management of multiple AI agents to accomplish complex workflows that single agents struggle with |
-| **Agent Turn** | A complete cycle of AI agent processing, including receiving input, executing tools, and providing output |
-| **Canonical Message Format** | A standardized message structure maintained by Corbusier across all agent backends to ensure consistency |
-| **ChangeSet** | A structured record of file modifications generated by Weaver, including textual diffs, AST changes, and semantic summaries |
-| **Encapsulation** | Secure isolation of tool execution and repository operations, primarily implemented through Podbot containers |
-| **Event Sourcing** | An architectural pattern where all changes to application state are stored as a sequence of events |
-| **Hexagonal Architecture** | An architectural pattern that aims at creating loosely coupled application components through ports and adapters |
-| **Hook** | A declarative governance mechanism that executes at specific trigger points to enforce policies and quality gates |
-| **MCP Multiplexer** | A component that hosts and manages multiple MCP servers, providing unified tool access to agent backends |
-| **Podbot** | A container orchestration tool that provides workspace encapsulation for secure tool and repository operations |
-| **Port** | An interface or abstraction in hexagonal architecture that defines how the core application communicates with external systems |
-| **Slash Command** | A command system with templating and expansion capabilities for both pure templating and imperative actions |
-| **Task Lifecycle** | The complete workflow from VCS issue creation through branch management to pull request completion |
-| **Tool Registry** | A centralized system for discovering, registering, and routing tool executions across different agent backends |
-| **Workspace** | An encapsulated execution environment that provides secure boundaries for tool operations and repository access |
+| Term                         | Definition                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Agent Backend**            | A pluggable AI service (e.g., Claude Code SDK, Codex CLI App Server) that provides AI capabilities through standardized adapter interfaces |
+| **Agent Orchestration**      | The coordination and management of multiple AI agents to accomplish complex workflows that single agents struggle with                     |
+| **Agent Turn**               | A complete cycle of AI agent processing, including receiving input, executing tools, and providing output                                  |
+| **Canonical Message Format** | A standardized message structure maintained by Corbusier across all agent backends to ensure consistency                                   |
+| **ChangeSet**                | A structured record of file modifications generated by Weaver, including textual diffs, AST changes, and semantic summaries                |
+| **Encapsulation**            | Secure isolation of tool execution and repository operations, primarily implemented through Podbot containers                              |
+| **Event Sourcing**           | An architectural pattern where all changes to application state are stored as a sequence of events                                         |
+| **Hexagonal Architecture**   | An architectural pattern that aims at creating loosely coupled application components through ports and adapters                           |
+| **Hook**                     | A declarative governance mechanism that executes at specific trigger points to enforce policies and quality gates                          |
+| **MCP Multiplexer**          | A component that hosts and manages multiple MCP servers, providing unified tool access to agent backends                                   |
+| **Podbot**                   | A container orchestration tool that provides workspace encapsulation for secure tool and repository operations                             |
+| **Port**                     | An interface or abstraction in hexagonal architecture that defines how the core application communicates with external systems             |
+| **Slash Command**            | A command system with templating and expansion capabilities for both pure templating and imperative actions                                |
+| **Task Lifecycle**           | The complete workflow from VCS issue creation through branch management to pull request completion                                         |
+| **Tool Registry**            | A centralized system for discovering, registering, and routing tool executions across different agent backends                             |
+| **Workspace**                | An encapsulated execution environment that provides secure boundaries for tool operations and repository access                            |
 
-## 9.3 Acronyms
+### 9.3 Acronyms
 
-| Acronym | Expanded Form |
-|---|---|
-| **API** | Application Programming Interface |
-| **AST** | Abstract Syntax Tree |
+| Acronym   | Expanded Form                                |
+| --------- | -------------------------------------------- |
+| **API**   | Application Programming Interface            |
+| **AST**   | Abstract Syntax Tree                         |
 | **CI/CD** | Continuous Integration/Continuous Deployment |
-| **CLI** | Command Line Interface |
-| **CRUD** | Create, Read, Update, Delete |
-| **DDD** | Domain-Driven Design |
-| **DNS** | Domain Name System |
-| **E2E** | End-to-End |
-| **GDPR** | General Data Protection Regulation |
-| **GIN** | Generalized Inverted Index |
-| **HPA** | Horizontal Pod Autoscaler |
-| **HTTP** | Hypertext Transfer Protocol |
-| **HTTPS** | Hypertext Transfer Protocol Secure |
-| **IaC** | Infrastructure as Code |
-| **IDE** | Integrated Development Environment |
-| **JSON** | JavaScript Object Notation |
-| **JSONB** | JSON Binary (PostgreSQL data type) |
-| **JWT** | JSON Web Token |
-| **KPI** | Key Performance Indicator |
-| **LLM** | Large Language Model |
-| **MCP** | Model Context Protocol |
-| **MSRV** | Minimum Supported Rust Version |
-| **MTTR** | Mean Time To Recovery/Resolution |
-| **OAuth** | Open Authorization |
-| **ORM** | Object-Relational Mapping |
-| **PKCE** | Proof Key for Code Exchange |
-| **PR** | Pull Request |
-| **QoS** | Quality of Service |
-| **RBAC** | Role-Based Access Control |
-| **REST** | Representational State Transfer |
-| **RPC** | Remote Procedure Call |
-| **RPO** | Recovery Point Objective |
-| **RTO** | Recovery Time Objective |
-| **SDK** | Software Development Kit |
-| **SLA** | Service Level Agreement |
-| **SLI** | Service Level Indicator |
-| **SLO** | Service Level Objective |
-| **SOC** | Service Organization Control |
-| **SQL** | Structured Query Language |
-| **SSE** | Server-Sent Events |
-| **SSO** | Single Sign-On |
-| **TCO** | Total Cost of Ownership |
-| **TDD** | Test-Driven Development |
-| **TLS** | Transport Layer Security |
-| **TOML** | Tom's Obvious Minimal Language |
-| **TTL** | Time To Live |
-| **UUID** | Universally Unique Identifier |
-| **VCS** | Version Control System |
-| **VPA** | Vertical Pod Autoscaler |
-| **WAL** | Write-Ahead Logging |
-| **WCAG** | Web Content Accessibility Guidelines |
+| **CLI**   | Command Line Interface                       |
+| **CRUD**  | Create, Read, Update, Delete                 |
+| **DDD**   | Domain-Driven Design                         |
+| **DNS**   | Domain Name System                           |
+| **E2E**   | End-to-End                                   |
+| **GDPR**  | General Data Protection Regulation           |
+| **GIN**   | Generalized Inverted Index                   |
+| **HPA**   | Horizontal Pod Autoscaler                    |
+| **HTTP**  | Hypertext Transfer Protocol                  |
+| **HTTPS** | Hypertext Transfer Protocol Secure           |
+| **IaC**   | Infrastructure as Code                       |
+| **IDE**   | Integrated Development Environment           |
+| **JSON**  | JavaScript Object Notation                   |
+| **JSONB** | JSON Binary (PostgreSQL data type)           |
+| **JWT**   | JSON Web Token                               |
+| **KPI**   | Key Performance Indicator                    |
+| **LLM**   | Large Language Model                         |
+| **MCP**   | Model Context Protocol                       |
+| **MSRV**  | Minimum Supported Rust Version               |
+| **MTTR**  | Mean Time To Recovery/Resolution             |
+| **OAuth** | Open Authorization                           |
+| **ORM**   | Object-Relational Mapping                    |
+| **PKCE**  | Proof Key for Code Exchange                  |
+| **PR**    | Pull Request                                 |
+| **QoS**   | Quality of Service                           |
+| **RBAC**  | Role-Based Access Control                    |
+| **REST**  | Representational State Transfer              |
+| **RPC**   | Remote Procedure Call                        |
+| **RPO**   | Recovery Point Objective                     |
+| **RTO**   | Recovery Time Objective                      |
+| **SDK**   | Software Development Kit                     |
+| **SLA**   | Service Level Agreement                      |
+| **SLI**   | Service Level Indicator                      |
+| **SLO**   | Service Level Objective                      |
+| **SOC**   | Service Organization Control                 |
+| **SQL**   | Structured Query Language                    |
+| **SSE**   | Server-Sent Events                           |
+| **SSO**   | Single Sign-On                               |
+| **TCO**   | Total Cost of Ownership                      |
+| **TDD**   | Test-Driven Development                      |
+| **TLS**   | Transport Layer Security                     |
+| **TOML**  | Tom's Obvious Minimal Language               |
+| **TTL**   | Time To Live                                 |
+| **UUID**  | Universally Unique Identifier                |
+| **VCS**   | Version Control System                       |
+| **VPA**   | Vertical Pod Autoscaler                      |
+| **WAL**   | Write-Ahead Logging                          |
+| **WCAG**  | Web Content Accessibility Guidelines         |
