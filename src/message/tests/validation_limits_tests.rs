@@ -1,6 +1,6 @@
 //! Unit tests for validation service - limits and multi-part tests.
 
-use super::validation_fixtures::{clock, create_message, default_validator};
+use super::validation_fixtures::{clock, create_message, default_validator, strict_validator};
 use crate::message::{
     domain::{ContentPart, Role, TextPart, ToolCallPart},
     error::ValidationError,
@@ -56,18 +56,18 @@ fn multiple_errors_collected(default_validator: DefaultMessageValidator, clock: 
 // ============================================================================
 
 #[rstest]
-fn message_exceeding_max_content_parts_fails(clock: DefaultClock) {
+fn message_exceeding_max_content_parts_fails(
+    strict_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     // Strict config has max_content_parts of 20
-    let config = ValidationConfig::strict();
-    let validator = DefaultMessageValidator::with_config(config);
-
     // Create 21 content parts (exceeds limit of 20)
     let parts: Vec<ContentPart> = (0..21)
         .map(|i| ContentPart::Text(TextPart::new(format!("Part {i}"))))
         .collect();
 
     let message = create_message(Role::User, parts, &clock);
-    let result = validator.validate(&message);
+    let result = strict_validator.validate(&message);
     assert!(matches!(
         result,
         Err(ValidationError::TooManyContentParts {

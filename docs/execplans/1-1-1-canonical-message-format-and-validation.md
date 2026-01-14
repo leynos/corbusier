@@ -13,7 +13,8 @@ documented at `.claude/skills/execplans/SKILL.md`.
 ## Purpose / Big Picture
 
 After this change, Corbusier will have a type-safe canonical message format
-that unifies messages from any agent backend (Claude Code SDK, Codex, etc.)
+that unifies messages from any agent backend (Claude Code software development
+kit (SDK), Codex, etc.)
 into a single schema. Users will be able to store and retrieve conversation
 messages with guaranteed structure validation, immutability guarantees, and
 schema versioning support for future migrations.
@@ -67,7 +68,7 @@ Thresholds that trigger escalation:
       Severity: low
       Likelihood: medium
       Mitigation: Write unit tests for each ContentPart variant early;
-      verify round-trip serialisation.
+      verify round-trip serialization.
 
     - Risk: Clock abstraction adds complexity
       Severity: low
@@ -358,7 +359,7 @@ Expected: All tests pass, exit code 0.
 - Performance: Message validation completes in <2ms (verify via test timing)
 - Security: No unsafe code; all inputs validated before processing
 
-**Quality method (how we check):**
+**Quality method (verification):**
 
     make check-fmt && make lint && make test
 

@@ -173,6 +173,7 @@ pub enum RepositoryError {
 
 impl RepositoryError {
     /// Creates a database error from any error type.
+    #[must_use]
     pub fn database(err: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Database(Arc::new(err))
     }
