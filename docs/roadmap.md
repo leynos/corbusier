@@ -8,13 +8,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.1. Conversation management
 
-- [ ] 1.1.1 Implement the canonical message format and validation. See
+- [x] 1.1.1 Implement the canonical message format and validation. See
   corbusier-design.md §2.2.1.
-  - [ ] Define user, assistant, and tool event schemas. See
+  - [x] Define user, assistant, and tool event schemas. See
     corbusier-design.md §2.2.1.
-  - [ ] Add versioned schema validation at ingestion boundaries. See
+  - [x] Add versioned schema validation at ingestion boundaries. See
     corbusier-design.md §4.4.2.1.
-  - [ ] Success criteria: all stored messages conform to the canonical schema.
+  - [x] Success criteria: all stored messages conform to the canonical schema.
 - [ ] 1.1.2 Persist message history with audit trails. See
   corbusier-design.md §2.2.1 and §6.2.3.
   - [ ] Implement conversation history persistence with immutable ordering. See
