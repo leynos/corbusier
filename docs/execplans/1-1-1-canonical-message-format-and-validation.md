@@ -58,42 +58,41 @@ Thresholds that trigger escalation:
 
 ## Risks
 
-    - Risk: NewType boilerplate explosion
-      Severity: medium
-      Likelihood: medium
-      Mitigation: Use newtype wrappers for homogeneous types; keep custom impls
-      minimal. Monitor file sizes.
+- Risk: NewType boilerplate explosion
+  Severity: medium
+  Likelihood: medium
+  Mitigation: Use newtype wrappers for homogeneous types; keep custom impls
+  minimal. Monitor file sizes.
 
-    - Risk: Serde configuration complexity for tagged enums
-      Severity: low
-      Likelihood: medium
-      Mitigation: Write unit tests for each ContentPart variant early;
-      verify round-trip serialization.
+- Risk: Serde configuration complexity for tagged enums
+  Severity: low
+  Likelihood: medium
+  Mitigation: Write unit tests for each ContentPart variant early;
+  verify round-trip serialization.
 
-    - Risk: Clock abstraction adds complexity
-      Severity: low
-      Likelihood: low
-      Mitigation: Use mockable crate's Clock trait as documented in
-      docs/reliable-testing-in-rust-via-dependency-injection.md.
+- Risk: Clock abstraction adds complexity
+  Severity: low
+  Likelihood: low
+  Mitigation: Use mockable crate's Clock trait as documented in
+  docs/reliable-testing-in-rust-via-dependency-injection.md.
 
-    - Risk: rstest-bdd (Behaviour-Driven Development (BDD)) learning curve
-      Severity: medium
-      Likelihood: medium
-      Mitigation: Start with simple scenarios; refer to
-      docs/rstest-bdd-users-guide.md for patterns.
+- Risk: rstest-bdd (Behaviour-Driven Development (BDD)) learning curve
+  Severity: medium
+  Likelihood: medium
+  Mitigation: Start with simple scenarios; refer to
+  docs/rstest-bdd-users-guide.md for patterns.
 
 ## Progress
 
-    - [x] Stage A: Project setup and dependencies
-    - [x] Stage B: Domain types implementation
-    - [x] Stage C: Error types and ports
-    - [x] Stage D: Validation service
-    - [x] Stage E: Schema versioning
-    - [x] Stage F: Unit tests
-    - [x] Stage G: Behavioural tests (implemented as plain Rust integration
-          tests)
-    - [x] Stage H: Documentation and cleanup
-    - [x] Stage I: Mark roadmap complete
+- [x] Stage A: Project setup and dependencies
+- [x] Stage B: Domain types implementation
+- [x] Stage C: Error types and ports
+- [x] Stage D: Validation service
+- [x] Stage E: Schema versioning
+- [x] Stage F: Unit tests
+- [x] Stage G: Behavioural tests (implemented as plain Rust integration tests)
+- [x] Stage H: Documentation and cleanup
+- [x] Stage I: Mark roadmap complete
 
 ## Surprises & Discoveries
 
@@ -108,21 +107,21 @@ Thresholds that trigger escalation:
 
 ## Decision Log
 
-    - Decision: Use feature-based module layout (src/message/) rather than
-      layer-based (src/domain/, src/ports/)
-      Rationale: Aligns with AGENTS.md "group by feature, not layer" and
-      hexagonal architecture skill guidance for smaller projects.
-      Date/Author: Initial plan
+- Decision: Use feature-based module layout (src/message/) rather than
+  layer-based (src/domain/, src/ports/)
+  Rationale: Aligns with AGENTS.md "group by feature, not layer" and
+  hexagonal architecture skill guidance for smaller projects.
+  Date/Author: Initial plan
 
-    - Decision: Use mockable crate for Clock abstraction
-      Rationale: Documented in docs/reliable-testing-in-rust-via-dependency-
-      injection.md as the preferred approach; avoids environment mutation.
-      Date/Author: Initial plan
+- Decision: Use mockable crate for Clock abstraction
+  Rationale: Documented in docs/reliable-testing-in-rust-via-dependency-
+  injection.md as the preferred approach; avoids environment mutation.
+  Date/Author: Initial plan
 
-    - Decision: Store ContentPart as serde tagged enum with snake_case
-      Rationale: Matches the JSONB "type" field pattern in
-      corbusier-design.md section 6.2.1.2.
-      Date/Author: Initial plan
+- Decision: Store ContentPart as serde tagged enum with snake_case
+  Rationale: Matches the JSONB "type" field pattern in
+  corbusier-design.md section 6.2.1.2.
+  Date/Author: Initial plan
 
 ## Outcomes & Retrospective
 
