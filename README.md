@@ -33,6 +33,7 @@ lead.**
 - Preserves context so agents don't lose track of what they're doing.
 
 ### Unified Tool Surface
+
 - Hosts MCP (Model Context Protocol) servers with consistent discovery and
   routing
 - Enforces Weaver as the authoritative file editor for all changes
