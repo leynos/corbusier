@@ -6,5 +6,9 @@
 mod content_tests;
 mod id_tests;
 mod message_tests;
-mod validation_tests;
+mod validation_config_tests;
+mod validation_content_tests;
+mod validation_fixtures;
+mod validation_limits_tests;
+mod validation_structure_tests;
 mod versioning_tests;

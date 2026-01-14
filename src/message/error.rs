@@ -127,9 +127,9 @@ impl ValidationError {
             }
             1 => {
                 // Length is verified to be 1 immediately above, so this will always succeed.
-                errors.into_iter().next().unwrap_or_else(
-                    || Self::InvalidMetadata("internal error: no validation errors".into()),
-                )
+                errors.into_iter().next().unwrap_or_else(|| {
+                    Self::InvalidMetadata("internal error: no validation errors".into())
+                })
             }
             _ => Self::Multiple(errors),
         }

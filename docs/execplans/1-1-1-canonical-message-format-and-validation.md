@@ -1,8 +1,9 @@
 # Implement Canonical Message Format and Validation (Roadmap 1.1.1)
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -74,7 +75,7 @@ Thresholds that trigger escalation:
       Mitigation: Use mockable crate's Clock trait as documented in
       docs/reliable-testing-in-rust-via-dependency-injection.md.
 
-    - Risk: rstest-bdd (behaviour-driven development) learning curve
+    - Risk: rstest-bdd (Behaviour-Driven Development (BDD)) learning curve
       Severity: medium
       Likelihood: medium
       Mitigation: Start with simple scenarios; refer to
