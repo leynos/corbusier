@@ -33,11 +33,10 @@ lead.**
 - Preserves context so agents don't lose track of what they're doing.
 
 ### Unified Tool Surface
-
 - Hosts MCP (Model Context Protocol) servers with consistent discovery and
   routing
 - Enforces Weaver as the authoritative file editor for all changes
-- Translates tool schemas per backend so every agent speaks the same language
+- Translates tool schemas per backend, so every agent speaks the same language
 - Provides encapsulated workspaces (via Podbot) for safe tool execution
 
 ### Safety Policies and Governance
