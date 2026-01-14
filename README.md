@@ -2,7 +2,7 @@
 
 **The "best room," not the smartest agent.**
 
-Corbusier is an AI agent orchestration platform that lets multiple specialised
+Corbusier is an AI agent orchestration platform that lets multiple specialized
 AI agents work together seamlessly. Rather than forcing one agent to do
 everything, Corbusier owns the workflow—managing conversations, tools, safety
 policies, and version control—while different AI backends handle what they do
