@@ -30,7 +30,7 @@ lead.**
 - Tracks tasks from creation through completion with full audit trails
 - Coordinates turn execution between different agent backends (Claude Code,
   Codex, etc.)
-- Preserves context so agents don't lose track of what they're doing
+- Preserves context so agents don't lose track of what they're doing.
 
 ### Unified Tool Surface
 
