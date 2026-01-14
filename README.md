@@ -122,6 +122,7 @@ The project enforces strict code quality standards:
 Copyright © 2026 Payton McIntosh
 
 Corbusier is released under the ISC Licence. See [LICENSE](LICENSE) for details.
+
 ## Credit
 
 Built with care by [df12 Productions](https://df12.studio).
