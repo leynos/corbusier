@@ -102,7 +102,7 @@ designed but not yet implemented.
   architecture, components, and design decisions
 - **[Development Roadmap](docs/roadmap.md)** — What's being built, in what
   order, and why
-- **[Users Guide](docs/users-guide.md)** — Practical guidance on how Corbusier
+- **[User Guide](docs/users-guide.md)** — Practical guidance on how Corbusier
   works, including quirks and edge cases (the "nicknacks")
 
 ## Contributing
