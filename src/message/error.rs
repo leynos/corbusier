@@ -73,6 +73,15 @@ pub enum ValidationError {
         limit_bytes: usize,
     },
 
+    /// The message has too many content parts.
+    #[error("message has {actual} content parts, exceeds limit of {max}")]
+    TooManyContentParts {
+        /// The maximum allowed number of content parts.
+        max: usize,
+        /// The actual number of content parts.
+        actual: usize,
+    },
+
     /// The message references a non-existent conversation.
     #[error("conversation not found")]
     ConversationNotFound,
@@ -103,11 +112,32 @@ impl ValidationError {
     /// Combines multiple validation errors into a single error.
     ///
     /// If only one error is provided, returns it directly rather than wrapping.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds if called with an empty vector, as this indicates
+    /// a logic error in the caller. In release builds, returns an internal
+    /// error variant.
     #[must_use]
     pub fn multiple(errors: Vec<Self>) -> Self {
         match errors.len() {
-            0 => Self::EmptyContent, // Should not happen, but provide a fallback
-            1 => errors.into_iter().next().unwrap_or(Self::EmptyContent),
+            0 => {
+                debug_assert!(false, "multiple() called with empty errors vector");
+                Self::InvalidMetadata("internal error: no validation errors".into())
+            }
+            1 => {
+                // SAFETY: We just checked that errors.len() == 1, so into_iter().next() is
+                // guaranteed to return Some. Using unwrap_unchecked avoids the
+                // clippy::expect_used lint for this hot path.
+                #[expect(
+                    unsafe_code,
+                    reason = "Length verified above; unwrap_unchecked avoids expect_used lint"
+                )]
+                // SAFETY: Length is verified to be 1 immediately above.
+                unsafe {
+                    errors.into_iter().next().unwrap_unchecked()
+                }
+            }
             _ => Self::Multiple(errors),
         }
     }
@@ -140,8 +170,8 @@ pub enum RepositoryError {
     Database(Arc<dyn std::error::Error + Send + Sync>),
 
     /// A serialisation error occurred.
-    #[error("serialization error: {0}")]
-    Serialization(String),
+    #[error("serialisation error: {0}")]
+    Serialisation(String),
 
     /// A connection error occurred.
     #[error("connection error: {0}")]
@@ -156,8 +186,8 @@ impl RepositoryError {
 
     /// Creates a serialisation error.
     #[must_use]
-    pub fn serialization(message: impl Into<String>) -> Self {
-        Self::Serialization(message.into())
+    pub fn serialisation(message: impl Into<String>) -> Self {
+        Self::Serialisation(message.into())
     }
 
     /// Creates a connection error.
@@ -173,6 +203,10 @@ pub enum SchemaUpgradeError {
     /// The schema version is not supported.
     #[error("unsupported schema version: {0}")]
     UnsupportedVersion(u32),
+
+    /// The event type is not recognized.
+    #[error("unknown event type: {0}")]
+    UnknownEventType(String),
 
     /// The upgrade failed.
     #[error("upgrade from version {from} to {to} failed: {reason}")]

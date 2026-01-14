@@ -62,18 +62,18 @@ pub fn validate_message_size(
 ///
 /// # Errors
 ///
-/// Returns `ValidationError::InvalidMetadata` if the number of parts exceeds
+/// Returns `ValidationError::TooManyContentParts` if the number of parts exceeds
 /// the configured limit.
 pub fn validate_content_parts_count(
     message: &Message,
     config: &ValidationConfig,
 ) -> Result<(), ValidationError> {
-    if message.content().len() > config.max_content_parts {
-        return Err(ValidationError::InvalidMetadata(format!(
-            "message has {} content parts, but maximum is {}",
-            message.content().len(),
-            config.max_content_parts
-        )));
+    let count = message.content().len();
+    if count > config.max_content_parts {
+        return Err(ValidationError::TooManyContentParts {
+            max: config.max_content_parts,
+            actual: count,
+        });
     }
     Ok(())
 }
@@ -127,7 +127,8 @@ fn validate_text_part(
         ));
     }
 
-    if text.len() > config.max_text_length {
+    let char_count = text.text.chars().count();
+    if char_count > config.max_text_length {
         return Err(ValidationError::invalid_content_part(
             index,
             format!(

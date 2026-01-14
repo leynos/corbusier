@@ -21,7 +21,7 @@ thiserror = "2.0"
 async-trait = "0.1"
 
 # Clock abstraction for deterministic testing
-mockable = { version = "0.1", default-features = false, features = ["clock"] }
+mockable = { version = "3.0", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 rstest = "0.24"

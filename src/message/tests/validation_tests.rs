@@ -280,12 +280,41 @@ fn multiple_errors_collected(default_validator: DefaultMessageValidator) {
         ],
     );
     let result = default_validator.validate(&message);
-    assert!(result.is_err());
 
-    // Should collect multiple errors
-    if let Err(ValidationError::Multiple(errors)) = result {
-        assert!(errors.len() >= 2);
+    // Should collect exactly 2 errors
+    match result {
+        Err(ValidationError::Multiple(errors)) => {
+            assert_eq!(errors.len(), 2, "Expected exactly 2 validation errors");
+        }
+        Err(other) => panic!("Expected Multiple error, got: {other:?}"),
+        Ok(()) => panic!("Expected validation to fail"),
     }
+}
+
+// ============================================================================
+// Content parts limit tests
+// ============================================================================
+
+#[rstest]
+fn message_exceeding_max_content_parts_fails() {
+    // Strict config has max_content_parts of 20
+    let config = ValidationConfig::strict();
+    let validator = DefaultMessageValidator::with_config(config);
+
+    // Create 21 content parts (exceeds limit of 20)
+    let parts: Vec<ContentPart> = (0..21)
+        .map(|i| ContentPart::Text(TextPart::new(format!("Part {i}"))))
+        .collect();
+
+    let message = create_message(Role::User, parts);
+    let result = validator.validate(&message);
+    assert!(matches!(
+        result,
+        Err(ValidationError::TooManyContentParts {
+            max: 20,
+            actual: 21
+        })
+    ));
 }
 
 // ============================================================================

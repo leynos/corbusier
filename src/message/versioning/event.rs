@@ -65,6 +65,24 @@ impl VersionedEvent {
         }
     }
 
+    /// Creates a new versioned event with custom metadata.
+    ///
+    /// Use this when you need to set source or correlation ID for traceability.
+    #[must_use]
+    pub fn with_metadata(
+        version: u32,
+        event_type: impl Into<String>,
+        data: Value,
+        metadata: EventMetadata,
+    ) -> Self {
+        Self {
+            version,
+            event_type: event_type.into(),
+            data,
+            metadata,
+        }
+    }
+
     /// Returns the schema version.
     #[must_use]
     pub const fn version(&self) -> u32 {
@@ -84,7 +102,6 @@ impl VersionedEvent {
     }
 
     /// Returns a mutable reference to the event data.
-    #[must_use]
     #[expect(
         clippy::missing_const_for_fn,
         reason = "&mut self methods cannot be const in stable Rust"

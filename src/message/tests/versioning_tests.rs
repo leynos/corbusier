@@ -4,6 +4,7 @@ use crate::message::{
     error::SchemaUpgradeError,
     versioning::{EventUpgrader, MessageCreatedUpgrader, UpgraderRegistry, VersionedEvent},
 };
+use chrono::Utc;
 use rstest::rstest;
 use serde_json::json;
 
@@ -21,9 +22,16 @@ fn versioned_event_new() {
 
 #[rstest]
 fn versioned_event_metadata_has_timestamp() {
+    let before = Utc::now();
     let event = VersionedEvent::new(1, "TestEvent", json!({}));
-    // Metadata should have occurred_at set
-    let _ = event.metadata().occurred_at;
+    let after = Utc::now();
+
+    // Verify timestamp is within the expected range
+    let occurred_at = event.metadata().occurred_at;
+    assert!(
+        occurred_at >= before && occurred_at <= after,
+        "occurred_at {occurred_at} should be between {before} and {after}"
+    );
 }
 
 #[rstest]
@@ -54,18 +62,13 @@ fn upgrader_current_version() {
 
 #[rstest]
 fn upgrader_supported_versions() {
-    let upgrader = MessageCreatedUpgrader::new();
-    let versions = upgrader.supported_versions();
-    assert!(versions.contains(&1));
-    assert!(versions.contains(&2));
-}
-
-#[rstest]
-fn upgrader_supports_version() {
+    // Test that upgrader supports expected versions (via supports_version method)
     let upgrader = MessageCreatedUpgrader::new();
     assert!(upgrader.supports_version(1));
     assert!(upgrader.supports_version(2));
-    assert!(!upgrader.supports_version(99));
+    // Verify unsupported versions return false
+    assert!(!upgrader.supports_version(0));
+    assert!(!upgrader.supports_version(3));
 }
 
 #[rstest]
@@ -196,7 +199,10 @@ fn registry_upgrade_unknown_type_fails() {
 
     let result = registry.upgrade(event);
 
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(SchemaUpgradeError::UnknownEventType(ref t)) if t == "UnknownEventType"
+    ));
 }
 
 #[rstest]

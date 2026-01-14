@@ -2,7 +2,7 @@
 //!
 //! This module provides infrastructure for versioned events and schema
 //! migrations, allowing the system to evolve message formats while
-//! maintaining backward compatibility with stored data.
+//! maintaining backwards compatibility with stored data.
 
 pub mod event;
 pub mod upgrader;

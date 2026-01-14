@@ -1,7 +1,7 @@
 //! Event upgrader trait and implementations for schema migrations.
 //!
 //! Upgraders transform events from older schema versions to the current
-//! version, enabling backward-compatible evolution of the event format.
+//! version, enabling backwards-compatible evolution of the event format.
 
 use super::VersionedEvent;
 use crate::message::error::SchemaUpgradeError;
@@ -36,18 +36,11 @@ pub trait EventUpgrader: Send + Sync {
     /// - The event data is malformed
     fn upgrade(&self, event: VersionedEvent) -> UpgradeResult<VersionedEvent>;
 
-    /// Returns the versions supported by this upgrader.
-    ///
-    /// The returned vector should be sorted in ascending order.
-    fn supported_versions(&self) -> Vec<u32>;
-
     /// Returns the current (target) version that this upgrader produces.
     fn current_version(&self) -> u32;
 
     /// Returns `true` if this upgrader can handle the given version.
-    fn supports_version(&self, version: u32) -> bool {
-        self.supported_versions().contains(&version)
-    }
+    fn supports_version(&self, version: u32) -> bool;
 }
 
 /// Upgrader for `MessageCreated` events.
@@ -72,6 +65,9 @@ pub struct MessageCreatedUpgrader;
 impl MessageCreatedUpgrader {
     /// The current schema version.
     pub const CURRENT_VERSION: u32 = 2;
+
+    /// Supported schema versions.
+    const SUPPORTED_VERSIONS: &'static [u32] = &[1, 2];
 
     /// Creates a new upgrader.
     #[must_use]
@@ -103,12 +99,12 @@ impl EventUpgrader for MessageCreatedUpgrader {
         }
     }
 
-    fn supported_versions(&self) -> Vec<u32> {
-        vec![1, 2]
-    }
-
     fn current_version(&self) -> u32 {
         Self::CURRENT_VERSION
+    }
+
+    fn supports_version(&self, version: u32) -> bool {
+        Self::SUPPORTED_VERSIONS.contains(&version)
     }
 }
 
@@ -159,12 +155,16 @@ impl UpgraderRegistry {
     ///
     /// # Errors
     ///
-    /// Returns `SchemaUpgradeError::UnsupportedVersion` if no upgrader is
-    /// registered for the event type.
+    /// - Returns `SchemaUpgradeError::UnknownEventType` if no upgrader is
+    ///   registered for the event type.
+    /// - May return `SchemaUpgradeError::UnsupportedVersion` if the upgrader
+    ///   for the event type does not support the event's version.
     pub fn upgrade(&self, event: VersionedEvent) -> UpgradeResult<VersionedEvent> {
         match self.upgraders.get(event.event_type()) {
             Some(upgrader) => upgrader.upgrade(event),
-            None => Err(SchemaUpgradeError::UnsupportedVersion(event.version())),
+            None => Err(SchemaUpgradeError::UnknownEventType(
+                event.event_type().to_owned(),
+            )),
         }
     }
 
@@ -245,6 +245,9 @@ mod tests {
 
         let result = registry.upgrade(event);
 
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(SchemaUpgradeError::UnknownEventType(ref t)) if t == "UnknownEvent"
+        ));
     }
 }

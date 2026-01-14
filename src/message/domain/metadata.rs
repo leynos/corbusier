@@ -34,6 +34,11 @@ pub struct MessageMetadata {
     pub slash_command_expansion: Option<SlashCommandExpansion>,
 
     /// Extension data for custom metadata fields.
+    ///
+    /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
+    /// fields during deserialisation will be captured here. This can cause
+    /// unexpected behaviour if an extension key collides with a future field name.
+    /// Avoid using keys like `agent_backend`, `turn_id`, or `slash_command_expansion`.
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub extensions: HashMap<String, Value>,
 }

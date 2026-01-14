@@ -41,6 +41,9 @@ impl MessageId {
     }
 }
 
+/// Note: This implementation generates a new random UUID on each call,
+/// which is non-standard behaviour for `Default`. Use `MessageId::new()`
+/// if the intent to generate a random ID should be explicit.
 impl Default for MessageId {
     fn default() -> Self {
         Self::new()
@@ -115,6 +118,15 @@ impl fmt::Display for ConversationId {
 ///
 /// A turn represents a single interaction cycle between the user and an agent,
 /// potentially including multiple tool calls.
+///
+/// # Examples
+///
+/// ```
+/// use corbusier::message::domain::TurnId;
+///
+/// let id = TurnId::new();
+/// assert!(!id.as_ref().is_nil());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct TurnId(Uuid);
@@ -190,13 +202,12 @@ impl SequenceNumber {
 
     /// Returns the next sequence number.
     ///
-    /// # Panics
-    ///
-    /// This method will not panic under normal use as u64 overflow is
-    /// practically unreachable (would require 2^64 messages).
+    /// Uses saturating arithmetic, so at `u64::MAX` it will not overflow
+    /// but return `u64::MAX`. This is practically unreachable in normal use
+    /// (would require 2^64 messages).
     #[must_use]
     pub const fn next(&self) -> Self {
-        Self(self.0 + 1)
+        Self(self.0.saturating_add(1))
     }
 }
 

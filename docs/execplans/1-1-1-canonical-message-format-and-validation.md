@@ -12,7 +12,7 @@ documented at `.claude/skills/execplans/SKILL.md`.
 ## Purpose / Big Picture
 
 After this change, Corbusier will have a type-safe canonical message format
-that unifies messages from any agent backend (Claude Code SDK, Codex, etc.)
+that unifies messages from any agent backend (Claude Code software development kit (SDK), Codex, etc.)
 into a single schema. Users will be able to store and retrieve conversation
 messages with guaranteed structure validation, immutability guarantees, and
 schema versioning support for future migrations.
@@ -59,7 +59,7 @@ Thresholds that trigger escalation:
     - Risk: NewType boilerplate explosion
       Severity: medium
       Likelihood: medium
-      Mitigation: Use newt-hype for homogeneous wrappers; keep custom impls
+      Mitigation: Use newtype wrappers for homogeneous types; keep custom impls
       minimal. Monitor file sizes.
 
     - Risk: Serde configuration complexity for tagged enums
@@ -74,7 +74,7 @@ Thresholds that trigger escalation:
       Mitigation: Use mockable crate's Clock trait as documented in
       docs/reliable-testing-in-rust-via-dependency-injection.md.
 
-    - Risk: rstest-bdd learning curve
+    - Risk: rstest-bdd (behaviour-driven development) learning curve
       Severity: medium
       Likelihood: medium
       Mitigation: Start with simple scenarios; refer to
@@ -88,7 +88,7 @@ Thresholds that trigger escalation:
     - [x] Stage D: Validation service
     - [x] Stage E: Schema versioning
     - [x] Stage F: Unit tests
-    - [x] Stage G: Behavioural tests (skipped - rstest-bdd not available)
+    - [x] Stage G: Behavioural tests (implemented as plain Rust integration tests)
     - [x] Stage H: Documentation and cleanup
     - [x] Stage I: Mark roadmap complete
 
@@ -96,8 +96,8 @@ Thresholds that trigger escalation:
 
 - The mockable crate uses `utc()` not `now()` for getting the current UTC time.
 - The rstest-bdd crate does not appear to be available in the public crates.io
-  registry, so behavioural tests were skipped. Unit test coverage is
-  comprehensive enough.
+  registry. Behavioural tests were later implemented using plain Rust
+  integration tests in `tests/message_validation_integration.rs`.
 - Clippy requires `#[expect]` instead of `#[allow]` with a `reason` parameter
   for lint suppressions in this project.
 - The project enforces `Self` type aliases in enum variants (e.g.,
@@ -125,23 +125,23 @@ Thresholds that trigger escalation:
 
 **Completed successfully.** All quality gates pass:
 
-- `make all` (check-fmt, lint, test) passes with 109 unit tests + 17 doctests
+- `make all` (check-fmt, lint, test) passes with 108 unit tests + 8 integration
+  tests + 17 doctests
 - No unsafe code; all inputs validated before processing
 - Messages are immutable after creation (no setter methods)
 - Schema versioning implemented with v1 to v2 upgrade path
 
 **Deviations from plan:**
 
-- Behavioural tests (Stage G) skipped as rstest-bdd crate not available.
-  Comprehensive unit tests provide equivalent coverage.
-- File count is 19 files (vs 20 estimated) - BDD step definitions not created.
-- Total lines approximately 1,500 (vs 1,700 estimated) - simpler tests than
-  anticipated.
+- Behavioural tests (Stage G) implemented as plain Rust integration tests
+  instead of rstest-bdd (crate not available).
+- File count is 20 files (vs 20 estimated) — integration tests added in
+  `tests/message_validation_integration.rs`.
 
 **Key metrics:**
 
-- Test count: 109 unit tests, 17 doctests
-- Files created: 19 source files
+- Test count: 108 unit tests, 8 integration tests, 17 doctests
+- Files created: 20 source files (including integration test file)
 - Dependencies added: 7 runtime, 2 dev-dependencies (within tolerance of 8)
 
 ## Context and Orientation
@@ -255,7 +255,7 @@ Create `tests/features/message_validation.feature` with Gherkin scenarios:
 
 Implement step definitions in `tests/message_validation_steps.rs`.
 
-**Validation**: `make test` passes including BDD tests.
+**Validation**: `make test` passes, including BDD tests.
 
 ### Stage H: Documentation and Cleanup
 
@@ -388,7 +388,7 @@ If a step fails:
 
 No destructive operations are performed; git can restore any file.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 ### File Structure After Implementation
 
@@ -494,5 +494,6 @@ In `src/message/versioning/upgrader.rs`:
 
     pub trait EventUpgrader: Send + Sync {
         fn upgrade(&self, event: VersionedEvent) -> UpgradeResult<VersionedEvent>;
-        fn supported_versions(&self) -> Vec<u32>;
+        fn current_version(&self) -> u32;
+        fn supports_version(&self, version: u32) -> bool;
     }

@@ -56,7 +56,7 @@ pub trait MessageValidator: Send + Sync {
 
 /// Configuration for validation rules.
 ///
-/// Allows customisation of validation behaviour for different contexts.
+/// Allows customization of validation behaviour for different contexts.
 ///
 /// # Examples
 ///
