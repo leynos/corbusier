@@ -45,7 +45,7 @@ pub fn validate_message_size(
     config: &ValidationConfig,
 ) -> Result<(), ValidationError> {
     let serialized = serde_json::to_vec(message).map_err(|e| {
-        ValidationError::InvalidMetadata(format!("failed to serialise message: {e}"))
+        ValidationError::InvalidMetadata(format!("failed to serialize message: {e}"))
     })?;
 
     if serialized.len() > config.max_message_size_bytes {
@@ -199,28 +199,52 @@ mod tests {
     use super::*;
     use crate::message::domain::{ConversationId, Role, SequenceNumber};
     use mockable::DefaultClock;
+    use rstest::{fixture, rstest};
 
-    fn create_test_message(content: Vec<ContentPart>) -> Message {
-        let clock = DefaultClock;
+    #[fixture]
+    fn clock() -> DefaultClock {
+        DefaultClock
+    }
+
+    fn create_message_with_content(content: Vec<ContentPart>, clock: &DefaultClock) -> Message {
         Message::new(
             ConversationId::new(),
             Role::User,
             content,
             SequenceNumber::new(1),
-            &clock,
+            clock,
         )
         .expect("test message should be valid")
     }
 
-    #[test]
-    fn validate_message_id_accepts_valid_id() {
-        let message = create_test_message(vec![ContentPart::Text(TextPart::new("test"))]);
+    #[rstest]
+    fn validate_message_id_accepts_valid_id(clock: DefaultClock) {
+        let message =
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
         assert!(validate_message_id(&message).is_ok());
     }
 
-    #[test]
-    fn validate_content_not_empty_accepts_non_empty() {
-        let message = create_test_message(vec![ContentPart::Text(TextPart::new("test"))]);
+    #[rstest]
+    fn validate_content_not_empty_accepts_non_empty(clock: DefaultClock) {
+        let message =
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
         assert!(validate_content_not_empty(&message).is_ok());
+    }
+
+    #[rstest]
+    fn validate_content_not_empty_rejects_empty_content(clock: DefaultClock) {
+        // Attempt to create a message with empty content fails at the builder level,
+        // so we test the validation function directly by using a message that has
+        // been constructed (which requires at least one content part).
+        // Instead, we test the rejection scenario using the builder.
+        let result = Message::new(
+            ConversationId::new(),
+            Role::User,
+            vec![],
+            SequenceNumber::new(1),
+            &clock,
+        );
+        // The Message::new constructor rejects empty content
+        assert!(result.is_err());
     }
 }

@@ -12,7 +12,7 @@ documented at `.claude/skills/execplans/SKILL.md`.
 ## Purpose / Big Picture
 
 After this change, Corbusier will have a type-safe canonical message format
-that unifies messages from any agent backend (Claude Code software development kit (SDK), Codex, etc.)
+that unifies messages from any agent backend (Claude Code SDK, Codex, etc.)
 into a single schema. Users will be able to store and retrieve conversation
 messages with guaranteed structure validation, immutability guarantees, and
 schema versioning support for future migrations.
@@ -88,7 +88,8 @@ Thresholds that trigger escalation:
     - [x] Stage D: Validation service
     - [x] Stage E: Schema versioning
     - [x] Stage F: Unit tests
-    - [x] Stage G: Behavioural tests (implemented as plain Rust integration tests)
+    - [x] Stage G: Behavioural tests (implemented as plain Rust integration
+          tests)
     - [x] Stage H: Documentation and cleanup
     - [x] Stage I: Mark roadmap complete
 

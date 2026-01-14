@@ -126,17 +126,10 @@ impl ValidationError {
                 Self::InvalidMetadata("internal error: no validation errors".into())
             }
             1 => {
-                // SAFETY: We just checked that errors.len() == 1, so into_iter().next() is
-                // guaranteed to return Some. Using unwrap_unchecked avoids the
-                // clippy::expect_used lint for this hot path.
-                #[expect(
-                    unsafe_code,
-                    reason = "Length verified above; unwrap_unchecked avoids expect_used lint"
-                )]
-                // SAFETY: Length is verified to be 1 immediately above.
-                unsafe {
-                    errors.into_iter().next().unwrap_unchecked()
-                }
+                // Length is verified to be 1 immediately above, so this will always succeed.
+                errors.into_iter().next().unwrap_or_else(
+                    || Self::InvalidMetadata("internal error: no validation errors".into()),
+                )
             }
             _ => Self::Multiple(errors),
         }

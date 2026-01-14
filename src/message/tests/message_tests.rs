@@ -5,16 +5,24 @@ use crate::message::domain::{
     SequenceNumber, TextPart, ToolCallPart,
 };
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use serde_json::json;
+
+// ============================================================================
+// Fixtures
+// ============================================================================
+
+#[fixture]
+fn clock() -> DefaultClock {
+    DefaultClock
+}
 
 // ============================================================================
 // Message constructor tests
 // ============================================================================
 
 #[rstest]
-fn message_new_with_valid_content() {
-    let clock = DefaultClock;
+fn message_new_with_valid_content(clock: DefaultClock) {
     let result = Message::new(
         ConversationId::new(),
         Role::User,
@@ -26,8 +34,7 @@ fn message_new_with_valid_content() {
 }
 
 #[rstest]
-fn message_new_with_empty_content_fails() {
-    let clock = DefaultClock;
+fn message_new_with_empty_content_fails(clock: DefaultClock) {
     let result = Message::new(
         ConversationId::new(),
         Role::User,
@@ -39,8 +46,7 @@ fn message_new_with_empty_content_fails() {
 }
 
 #[rstest]
-fn message_accessors() {
-    let clock = DefaultClock;
+fn message_accessors(clock: DefaultClock) {
     let conversation_id = ConversationId::new();
     let seq = SequenceNumber::new(5);
     let message = Message::new(
@@ -66,8 +72,7 @@ fn message_accessors() {
 // ============================================================================
 
 #[rstest]
-fn message_builder_basic() {
-    let clock = DefaultClock;
+fn message_builder_basic(clock: DefaultClock) {
     let message = Message::builder(ConversationId::new(), Role::User, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new("Hello")))
         .build(&clock)
@@ -77,8 +82,7 @@ fn message_builder_basic() {
 }
 
 #[rstest]
-fn message_builder_with_metadata() {
-    let clock = DefaultClock;
+fn message_builder_with_metadata(clock: DefaultClock) {
     let metadata = MessageMetadata::with_agent_backend("claude");
     let message = Message::builder(
         ConversationId::new(),
@@ -94,8 +98,7 @@ fn message_builder_with_metadata() {
 }
 
 #[rstest]
-fn message_builder_with_custom_id() {
-    let clock = DefaultClock;
+fn message_builder_with_custom_id(clock: DefaultClock) {
     let custom_id = MessageId::new();
     let message = Message::builder(ConversationId::new(), Role::User, SequenceNumber::new(1))
         .with_id(custom_id)
@@ -107,8 +110,7 @@ fn message_builder_with_custom_id() {
 }
 
 #[rstest]
-fn message_builder_with_multiple_content_parts() {
-    let clock = DefaultClock;
+fn message_builder_with_multiple_content_parts(clock: DefaultClock) {
     let message = Message::builder(
         ConversationId::new(),
         Role::Assistant,
@@ -127,8 +129,7 @@ fn message_builder_with_multiple_content_parts() {
 }
 
 #[rstest]
-fn message_builder_with_content_parts_iterator() {
-    let clock = DefaultClock;
+fn message_builder_with_content_parts_iterator(clock: DefaultClock) {
     let parts = vec![
         ContentPart::Text(TextPart::new("Part 1")),
         ContentPart::Text(TextPart::new("Part 2")),
@@ -142,8 +143,7 @@ fn message_builder_with_content_parts_iterator() {
 }
 
 #[rstest]
-fn message_builder_empty_content_fails() {
-    let clock = DefaultClock;
+fn message_builder_empty_content_fails(clock: DefaultClock) {
     let result =
         Message::builder(ConversationId::new(), Role::User, SequenceNumber::new(1)).build(&clock);
 
@@ -155,8 +155,7 @@ fn message_builder_empty_content_fails() {
 // ============================================================================
 
 #[rstest]
-fn message_serialization_round_trip() {
-    let clock = DefaultClock;
+fn message_serialization_round_trip(clock: DefaultClock) {
     let message = Message::new(
         ConversationId::new(),
         Role::User,

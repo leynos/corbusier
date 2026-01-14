@@ -52,6 +52,27 @@ fn conversation_id_new_creates_non_nil() {
     assert!(!id.as_ref().is_nil());
 }
 
+#[rstest]
+fn conversation_id_default_creates_non_nil() {
+    let id = ConversationId::default();
+    assert!(!id.as_ref().is_nil());
+}
+
+#[rstest]
+fn conversation_id_different_ids_not_equal() {
+    let id1 = ConversationId::new();
+    let id2 = ConversationId::new();
+    assert_ne!(id1, id2);
+}
+
+#[rstest]
+fn conversation_id_from_uuid_preserves_value() {
+    let uuid = uuid::Uuid::new_v4();
+    let id = ConversationId::from_uuid(uuid);
+    assert_eq!(id.as_ref(), &uuid);
+    assert_eq!(id.into_inner(), uuid);
+}
+
 // ============================================================================
 // TurnId tests
 // ============================================================================
@@ -60,6 +81,27 @@ fn conversation_id_new_creates_non_nil() {
 fn turn_id_new_creates_non_nil() {
     let id = TurnId::new();
     assert!(!id.as_ref().is_nil());
+}
+
+#[rstest]
+fn turn_id_default_creates_non_nil() {
+    let id = TurnId::default();
+    assert!(!id.as_ref().is_nil());
+}
+
+#[rstest]
+fn turn_id_different_ids_not_equal() {
+    let id1 = TurnId::new();
+    let id2 = TurnId::new();
+    assert_ne!(id1, id2);
+}
+
+#[rstest]
+fn turn_id_from_uuid_preserves_value() {
+    let uuid = uuid::Uuid::new_v4();
+    let id = TurnId::from_uuid(uuid);
+    assert_eq!(id.as_ref(), &uuid);
+    assert_eq!(id.into_inner(), uuid);
 }
 
 // ============================================================================
@@ -89,4 +131,11 @@ fn sequence_number_ordering() {
     let seq1 = SequenceNumber::new(1);
     let seq2 = SequenceNumber::new(2);
     assert!(seq1 < seq2);
+}
+
+#[rstest]
+fn sequence_number_next_saturates_at_max() {
+    let seq = SequenceNumber::new(u64::MAX);
+    // Verify saturation: calling next() on u64::MAX should still return u64::MAX
+    assert_eq!(seq.next().value(), u64::MAX);
 }

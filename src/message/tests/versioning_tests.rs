@@ -55,20 +55,15 @@ fn versioned_event_data_mut() {
 // ============================================================================
 
 #[rstest]
-fn upgrader_current_version() {
+#[case(0, false)]
+#[case(1, true)]
+#[case(2, true)]
+#[case(3, false)]
+fn upgrader_version_support(#[case] version: u32, #[case] expected: bool) {
     let upgrader = MessageCreatedUpgrader::new();
+    assert_eq!(upgrader.supports_version(version), expected);
+    // Current version is always 2
     assert_eq!(upgrader.current_version(), 2);
-}
-
-#[rstest]
-fn upgrader_supported_versions() {
-    // Test that upgrader supports expected versions (via supports_version method)
-    let upgrader = MessageCreatedUpgrader::new();
-    assert!(upgrader.supports_version(1));
-    assert!(upgrader.supports_version(2));
-    // Verify unsupported versions return false
-    assert!(!upgrader.supports_version(0));
-    assert!(!upgrader.supports_version(3));
 }
 
 #[rstest]

@@ -32,14 +32,18 @@ fn strict_validator() -> DefaultMessageValidator {
     DefaultMessageValidator::with_config(ValidationConfig::strict())
 }
 
-fn create_message(role: Role, content: Vec<ContentPart>) -> Message {
-    let clock = DefaultClock;
+#[fixture]
+fn clock() -> DefaultClock {
+    DefaultClock
+}
+
+fn create_message(role: Role, content: Vec<ContentPart>, clock: &DefaultClock) -> Message {
     Message::new(
         ConversationId::new(),
         role,
         content,
         SequenceNumber::new(1),
-        &clock,
+        clock,
     )
     .expect("test message should build")
 }
@@ -49,39 +53,46 @@ fn create_message(role: Role, content: Vec<ContentPart>) -> Message {
 // ============================================================================
 
 #[rstest]
-fn valid_text_message_passes(default_validator: DefaultMessageValidator) {
-    let message = create_message(Role::User, vec![ContentPart::Text(TextPart::new("Hello"))]);
-    assert!(default_validator.validate(&message).is_ok());
-}
-
-#[rstest]
-fn valid_assistant_message_passes(default_validator: DefaultMessageValidator) {
+fn valid_text_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
-        Role::Assistant,
-        vec![ContentPart::Text(TextPart::new("Here is my response"))],
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("Hello"))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn valid_tool_message_passes(default_validator: DefaultMessageValidator) {
+fn valid_assistant_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
+    let message = create_message(
+        Role::Assistant,
+        vec![ContentPart::Text(TextPart::new("Here is my response"))],
+        &clock,
+    );
+    assert!(default_validator.validate(&message).is_ok());
+}
+
+#[rstest]
+fn valid_tool_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Tool,
         vec![ContentPart::ToolResult(ToolResultPart::success(
             "call-123",
             json!({"result": "success"}),
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn valid_system_message_passes(default_validator: DefaultMessageValidator) {
+fn valid_system_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::System,
         vec![ContentPart::Text(TextPart::new(
             "You are a helpful assistant",
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
@@ -91,35 +102,54 @@ fn valid_system_message_passes(default_validator: DefaultMessageValidator) {
 // ============================================================================
 
 #[rstest]
-fn empty_text_fails_with_default_config(default_validator: DefaultMessageValidator) {
-    let message = create_message(Role::User, vec![ContentPart::Text(TextPart::new(""))]);
-    let result = default_validator.validate(&message);
-    assert!(result.is_err());
-}
-
-#[rstest]
-fn whitespace_only_text_fails_with_default_config(default_validator: DefaultMessageValidator) {
+fn empty_text_fails_with_default_config(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     let message = create_message(
         Role::User,
-        vec![ContentPart::Text(TextPart::new("   \n\t"))],
+        vec![ContentPart::Text(TextPart::new(""))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(result.is_err());
 }
 
 #[rstest]
-fn empty_text_passes_with_lenient_config(lenient_validator: DefaultMessageValidator) {
-    let message = create_message(Role::User, vec![ContentPart::Text(TextPart::new(""))]);
+fn whitespace_only_text_fails_with_default_config(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
+    let message = create_message(
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("   \n\t"))],
+        &clock,
+    );
+    let result = default_validator.validate(&message);
+    assert!(result.is_err());
+}
+
+#[rstest]
+fn empty_text_passes_with_lenient_config(
+    lenient_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
+    let message = create_message(
+        Role::User,
+        vec![ContentPart::Text(TextPart::new(""))],
+        &clock,
+    );
     assert!(lenient_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn text_exceeding_max_length_fails(strict_validator: DefaultMessageValidator) {
+fn text_exceeding_max_length_fails(strict_validator: DefaultMessageValidator, clock: DefaultClock) {
     // Strict config has max_text_length of 10_000
     let long_text = "x".repeat(10_001);
     let message = create_message(
         Role::User,
         vec![ContentPart::Text(TextPart::new(long_text))],
+        &clock,
     );
     let result = strict_validator.validate(&message);
     assert!(result.is_err());
@@ -130,7 +160,7 @@ fn text_exceeding_max_length_fails(strict_validator: DefaultMessageValidator) {
 // ============================================================================
 
 #[rstest]
-fn valid_tool_call_passes(default_validator: DefaultMessageValidator) {
+fn valid_tool_call_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Assistant,
         vec![ContentPart::ToolCall(ToolCallPart::new(
@@ -138,12 +168,16 @@ fn valid_tool_call_passes(default_validator: DefaultMessageValidator) {
             "read_file",
             json!({"path": "/tmp/test.txt"}),
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn tool_call_without_call_id_fails(default_validator: DefaultMessageValidator) {
+fn tool_call_without_call_id_fails(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     let message = create_message(
         Role::Assistant,
         vec![ContentPart::ToolCall(ToolCallPart::new(
@@ -151,6 +185,7 @@ fn tool_call_without_call_id_fails(default_validator: DefaultMessageValidator) {
             "read_file",
             json!({}),
         ))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(matches!(
@@ -160,7 +195,7 @@ fn tool_call_without_call_id_fails(default_validator: DefaultMessageValidator) {
 }
 
 #[rstest]
-fn tool_call_without_name_fails(default_validator: DefaultMessageValidator) {
+fn tool_call_without_name_fails(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Assistant,
         vec![ContentPart::ToolCall(ToolCallPart::new(
@@ -168,6 +203,7 @@ fn tool_call_without_name_fails(default_validator: DefaultMessageValidator) {
             "",
             json!({}),
         ))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(result.is_err());
@@ -178,37 +214,43 @@ fn tool_call_without_name_fails(default_validator: DefaultMessageValidator) {
 // ============================================================================
 
 #[rstest]
-fn valid_tool_result_passes(default_validator: DefaultMessageValidator) {
+fn valid_tool_result_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Tool,
         vec![ContentPart::ToolResult(ToolResultPart::success(
             "call-123",
             json!({"output": "file contents"}),
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn tool_result_failure_passes(default_validator: DefaultMessageValidator) {
+fn tool_result_failure_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Tool,
         vec![ContentPart::ToolResult(ToolResultPart::failure(
             "call-123",
             "File not found",
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn tool_result_without_call_id_fails(default_validator: DefaultMessageValidator) {
+fn tool_result_without_call_id_fails(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     let message = create_message(
         Role::Tool,
         vec![ContentPart::ToolResult(ToolResultPart::success(
             "",
             json!({}),
         ))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(result.is_err());
@@ -219,35 +261,41 @@ fn tool_result_without_call_id_fails(default_validator: DefaultMessageValidator)
 // ============================================================================
 
 #[rstest]
-fn valid_attachment_passes(default_validator: DefaultMessageValidator) {
+fn valid_attachment_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::User,
         vec![ContentPart::Attachment(AttachmentPart::new(
             "text/plain",
             "SGVsbG8gV29ybGQ=",
         ))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn attachment_without_mime_type_fails(default_validator: DefaultMessageValidator) {
+fn attachment_without_mime_type_fails(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     let message = create_message(
         Role::User,
         vec![ContentPart::Attachment(AttachmentPart::new("", "data"))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(result.is_err());
 }
 
 #[rstest]
-fn attachment_without_data_fails(default_validator: DefaultMessageValidator) {
+fn attachment_without_data_fails(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::User,
         vec![ContentPart::Attachment(AttachmentPart::new(
             "text/plain",
             "",
         ))],
+        &clock,
     );
     let result = default_validator.validate(&message);
     assert!(result.is_err());
@@ -258,7 +306,7 @@ fn attachment_without_data_fails(default_validator: DefaultMessageValidator) {
 // ============================================================================
 
 #[rstest]
-fn multiple_valid_parts_pass(default_validator: DefaultMessageValidator) {
+fn multiple_valid_parts_pass(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Assistant,
         vec![
@@ -266,18 +314,20 @@ fn multiple_valid_parts_pass(default_validator: DefaultMessageValidator) {
             ContentPart::ToolCall(ToolCallPart::new("call-1", "tool_a", json!({}))),
             ContentPart::ToolCall(ToolCallPart::new("call-2", "tool_b", json!({}))),
         ],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn multiple_errors_collected(default_validator: DefaultMessageValidator) {
+fn multiple_errors_collected(default_validator: DefaultMessageValidator, clock: DefaultClock) {
     let message = create_message(
         Role::Assistant,
         vec![
             ContentPart::Text(TextPart::new("")), // Invalid: empty text
             ContentPart::ToolCall(ToolCallPart::new("", "tool", json!({}))), // Invalid: no call_id
         ],
+        &clock,
     );
     let result = default_validator.validate(&message);
 
@@ -296,7 +346,7 @@ fn multiple_errors_collected(default_validator: DefaultMessageValidator) {
 // ============================================================================
 
 #[rstest]
-fn message_exceeding_max_content_parts_fails() {
+fn message_exceeding_max_content_parts_fails(clock: DefaultClock) {
     // Strict config has max_content_parts of 20
     let config = ValidationConfig::strict();
     let validator = DefaultMessageValidator::with_config(config);
@@ -306,7 +356,7 @@ fn message_exceeding_max_content_parts_fails() {
         .map(|i| ContentPart::Text(TextPart::new(format!("Part {i}"))))
         .collect();
 
-    let message = create_message(Role::User, parts);
+    let message = create_message(Role::User, parts, &clock);
     let result = validator.validate(&message);
     assert!(matches!(
         result,
@@ -322,16 +372,20 @@ fn message_exceeding_max_content_parts_fails() {
 // ============================================================================
 
 #[rstest]
-fn message_within_size_limit_passes(default_validator: DefaultMessageValidator) {
+fn message_within_size_limit_passes(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
     let message = create_message(
         Role::User,
         vec![ContentPart::Text(TextPart::new("Hello, world!"))],
+        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn message_exceeding_size_limit_fails() {
+fn message_exceeding_size_limit_fails(clock: DefaultClock) {
     // Create a config with a very small size limit
     let config = ValidationConfig {
         max_message_size_bytes: 100,
@@ -344,6 +398,7 @@ fn message_exceeding_size_limit_fails() {
     let message = create_message(
         Role::User,
         vec![ContentPart::Text(TextPart::new(large_text))],
+        &clock,
     );
 
     let result = validator.validate(&message);
@@ -358,14 +413,25 @@ fn message_exceeding_size_limit_fails() {
 // ============================================================================
 
 #[rstest]
-fn validate_structure_checks_id_and_content(default_validator: DefaultMessageValidator) {
-    let message = create_message(Role::User, vec![ContentPart::Text(TextPart::new("test"))]);
+fn validate_structure_checks_id_and_content(
+    default_validator: DefaultMessageValidator,
+    clock: DefaultClock,
+) {
+    let message = create_message(
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("test"))],
+        &clock,
+    );
     assert!(default_validator.validate_structure(&message).is_ok());
 }
 
 #[rstest]
-fn validate_content_checks_parts(default_validator: DefaultMessageValidator) {
-    let message = create_message(Role::User, vec![ContentPart::Text(TextPart::new("test"))]);
+fn validate_content_checks_parts(default_validator: DefaultMessageValidator, clock: DefaultClock) {
+    let message = create_message(
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("test"))],
+        &clock,
+    );
     assert!(default_validator.validate_content(&message).is_ok());
 }
 
