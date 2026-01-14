@@ -14,10 +14,9 @@ documented at `.claude/skills/execplans/SKILL.md`.
 
 After this change, Corbusier will have a type-safe canonical message format
 that unifies messages from any agent backend (Claude Code software development
-kit (SDK), Codex, etc.)
-into a single schema. Users will be able to store and retrieve conversation
-messages with guaranteed structure validation, immutability guarantees, and
-schema versioning support for future migrations.
+kit (SDK), Codex, etc.) into a single schema. Users will be able to store and
+retrieve conversation messages with guaranteed structure validation, immutability
+guarantees, and schema versioning support for future migrations.
 
 Observable success: unit tests pass demonstrating message creation, validation,
 and rejection of malformed input; behavioural tests verify end-to-end scenarios

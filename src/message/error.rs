@@ -162,8 +162,8 @@ pub enum RepositoryError {
     #[error("database error: {0}")]
     Database(Arc<dyn std::error::Error + Send + Sync>),
 
-    /// A serialisation error occurred.
-    #[error("serialisation error: {0}")]
+    /// A serialization error occurred.
+    #[error("serialization error: {0}")]
     Serialisation(String),
 
     /// A connection error occurred.
@@ -178,7 +178,7 @@ impl RepositoryError {
         Self::Database(Arc::new(err))
     }
 
-    /// Creates a serialisation error.
+    /// Creates a serialization error.
     #[must_use]
     pub fn serialisation(message: impl Into<String>) -> Self {
         Self::Serialisation(message.into())

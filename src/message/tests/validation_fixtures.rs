@@ -28,6 +28,22 @@ pub fn clock() -> DefaultClock {
     DefaultClock
 }
 
+/// Factory fixture for creating test messages with a given role and content.
+#[fixture]
+pub fn message_factory(clock: DefaultClock) -> impl Fn(Role, Vec<ContentPart>) -> Message {
+    move |role, content| {
+        Message::new(
+            ConversationId::new(),
+            role,
+            content,
+            SequenceNumber::new(1),
+            &clock,
+        )
+        .expect("test message should build")
+    }
+}
+
+/// Helper function for creating test messages (legacy compatibility).
 pub fn create_message(role: Role, content: Vec<ContentPart>, clock: &DefaultClock) -> Message {
     Message::new(
         ConversationId::new(),
