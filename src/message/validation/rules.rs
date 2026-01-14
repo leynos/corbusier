@@ -228,7 +228,7 @@ mod tests {
     // the Message constructors (Message::new and MessageBuilder) always generate non-nil
     // UUIDs via MessageId::new(). There is no public API to create a Message with a nil
     // ID, making the nil ID branch in validate_message_id unreachable in normal usage.
-    // The validation exists as a defensive check for potential future serialisation
+    // The validation exists as a defensive check for potential future serialization
     // round-trips or deserialization of external data.
 
     #[rstest]

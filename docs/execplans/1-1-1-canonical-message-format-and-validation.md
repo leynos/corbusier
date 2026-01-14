@@ -435,7 +435,7 @@ Estimated total: ~1700 lines across ~20 files.
 
 ### Crate Dependencies
 
-    serde = "1.0"          # Serialisation framework
+    serde = "1.0"          # Serialization framework
     serde_json = "1.0"     # JSON support
     chrono = "0.4"         # Date/time handling
     uuid = "1.0"           # UUID generation
