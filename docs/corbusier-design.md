@@ -1178,9 +1178,11 @@ due to:
 
 ##### Compatibility Requirements
 
-Diesel is compatible with the Tokio runtime via `tokio::task::spawn_blocking`
-for async integration. Connection pooling is handled through `r2d2`, which
-provides robust connection management independent of async runtimes.
+Diesel is a synchronous ORM and must be isolated from async executor threads
+to prevent blocking. Use `tokio::task::spawn_blocking` to offload all Diesel
+operations to a dedicated thread pool. Connection pooling is handled through
+`r2d2`, which provides robust connection management independent of async
+runtimes.
 
 #### 3.2.2 Async Runtime
 
@@ -1384,7 +1386,7 @@ Selected as the primary database for production deployments due to:
 An in-memory repository implementation is provided for development and testing:
 
 - **Zero Configuration**: No external database required for local development
-- **Thread-safe**: Uses `Arc<RwLock<HashMap>>` for concurrent access
+- **Thread-safe**: Uses `Arc<std::sync::RwLock<HashMap>>` for concurrent access
 - **Schema Parity**: Implements the same `MessageRepository` trait as PostgreSQL
 
 #### 3.5.2 Data Persistence Strategies
@@ -1476,7 +1478,7 @@ connections and execute queries with Diesel's type-safe query DSL:
 
 ```toml
 [dependencies]
-diesel = { version = "2.2", features = ["postgres", "chrono", "uuid", "serde_json", "r2d2"] }
+diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 ```
 
 ### 3.6 Development & Deployment
@@ -6084,7 +6086,8 @@ impl MigrationManager {
             conn.run_pending_migrations(MIGRATIONS)?;
             Ok(())
         })
-        .await?
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)? // Convert JoinError
     }
 }
 ```
@@ -9584,16 +9587,16 @@ sequenceDiagram
 | MCP Protocol         | JSON-RPC testing      | Custom MCP test client | Protocol compliance         |
 | Database Integration | Repository testing    | SQLite test database   | Data persistence validation |
 
-###### Database Integration Testing
+###### Repository Behaviour Testing
 
-Many databases allow you to configure an in-memory backend which means that you
-get the correct behavior in your tests, plus they are fast and will
+The in-memory repository adapter allows testing repository behaviour without
+database infrastructure. This approach provides fast, deterministic tests that
 automatically clean up after themselves.
 
 ```rust
-// Database integration test setup
+// Repository behaviour test (in-memory adapter)
 #[tokio::test]
-async fn test_conversation_repository_integration() {
+async fn test_conversation_repository_behaviour() {
     // Use in-memory repository for testing - no database setup required
     let repo = InMemoryMessageRepository::new();
 

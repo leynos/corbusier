@@ -14,7 +14,7 @@ fn create_test_message(sequence: u64) -> Message {
     Message::new(
         ConversationId::new(),
         Role::User,
-        vec![ContentPart::Text(TextPart::new("Test content".to_owned()))],
+        vec![ContentPart::Text(TextPart::new("Test content"))],
         SequenceNumber::new(sequence),
         &clock,
     )
@@ -44,7 +44,7 @@ fn try_from_domain_preserves_all_fields() {
     let message = Message::new(
         ConversationId::new(),
         Role::Assistant,
-        vec![ContentPart::Text(TextPart::new("Response".to_owned()))],
+        vec![ContentPart::Text(TextPart::new("Response"))],
         SequenceNumber::new(42),
         &clock,
     )
@@ -69,8 +69,7 @@ fn try_from_domain_preserves_all_fields() {
 
 #[rstest]
 fn try_from_domain_handles_large_sequence_within_i64() {
-    // i64::MAX is 9_223_372_036_854_775_807
-    let max_i64_as_u64: u64 = 9_223_372_036_854_775_807;
+    let max_i64_as_u64: u64 = i64::MAX as u64;
     let message = create_test_message(max_i64_as_u64);
 
     let result = NewMessage::try_from_domain(&message);
@@ -111,7 +110,7 @@ fn try_from_domain_serializes_role_correctly(#[case] role: Role, #[case] expecte
     let message = Message::new(
         ConversationId::new(),
         role,
-        vec![ContentPart::Text(TextPart::new("Content".to_owned()))],
+        vec![ContentPart::Text(TextPart::new("Content"))],
         SequenceNumber::new(1),
         &clock,
     )
@@ -128,7 +127,7 @@ fn try_from_domain_serializes_metadata_correctly() {
     let message = Message::new(
         ConversationId::new(),
         Role::User,
-        vec![ContentPart::Text(TextPart::new("Test".to_owned()))],
+        vec![ContentPart::Text(TextPart::new("Test"))],
         SequenceNumber::new(1),
         &clock,
     )

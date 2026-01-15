@@ -27,7 +27,7 @@ mockable = { version = "3.0", default-features = false, features = ["clock"] }
 diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 
 # Async runtime
-tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 rstest = "0.24"

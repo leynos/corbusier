@@ -79,8 +79,9 @@ fn setup_repository(
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     let url = cluster.connection().database_url(db_name);
     let manager = ConnectionManager::<PgConnection>::new(url);
+    // Use pool size of 1 for test isolation and deterministic behaviour
     let pool = Pool::builder()
-        .max_size(2)
+        .max_size(1)
         .build(manager)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     Ok(PostgresMessageRepository::new(pool))
@@ -106,6 +107,24 @@ fn cleanup_database(cluster: &TestCluster, db_name: &str) {
     }
 }
 
+/// Guard that ensures test database cleanup runs even if test panics.
+struct CleanupGuard<'a> {
+    cluster: &'a TestCluster,
+    db_name: String,
+}
+
+impl<'a> CleanupGuard<'a> {
+    const fn new(cluster: &'a TestCluster, db_name: String) -> Self {
+        Self { cluster, db_name }
+    }
+}
+
+impl Drop for CleanupGuard<'_> {
+    fn drop(&mut self) {
+        cleanup_database(self.cluster, &self.db_name);
+    }
+}
+
 // ============================================================================
 // Basic CRUD Operations
 // ============================================================================
@@ -114,6 +133,7 @@ fn cleanup_database(cluster: &TestCluster, db_name: &str) {
 fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_store_retrieve_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -138,14 +158,13 @@ fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::User);
     assert_eq!(retrieved.sequence_number().value(), 1);
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
 fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_find_none_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let rt = test_runtime();
@@ -153,14 +172,13 @@ fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster
         .block_on(repo.find_by_id(MessageId::new()))
         .expect("query ok");
     assert!(result.is_none());
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
 fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_find_conv_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -185,14 +203,13 @@ fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'static T
     assert_eq!(messages[0].sequence_number().value(), 1);
     assert_eq!(messages[1].sequence_number().value(), 2);
     assert_eq!(messages[2].sequence_number().value(), 3);
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
 fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_exists_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -209,8 +226,6 @@ fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster) {
     // After store
     rt.block_on(repo.store(&message)).expect("store");
     assert!(rt.block_on(repo.exists(msg_id)).expect("exists check"));
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 // ============================================================================
@@ -221,6 +236,7 @@ fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster) {
 fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_next_seq_empty_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -230,14 +246,13 @@ fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'static Test
         .expect("next_sequence_number");
 
     assert_eq!(next.value(), 1);
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
 fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_next_seq_incr_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -258,8 +273,6 @@ fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static TestC
         .expect("next_sequence_number");
 
     assert_eq!(next.value(), 6); // max(5) + 1
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 // ============================================================================
@@ -270,6 +283,7 @@ fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static TestC
 fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_dup_msg_id_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -297,14 +311,13 @@ fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCluster)
         matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == msg_id),
         "Expected DuplicateMessage error, got: {result:?}"
     );
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
 fn store_rejects_duplicate_sequence_in_conversation(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_dup_seq_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
@@ -331,8 +344,6 @@ fn store_rejects_duplicate_sequence_in_conversation(shared_test_cluster: &'stati
         ),
         "Expected DuplicateSequence error, got: {result:?}"
     );
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
@@ -341,6 +352,7 @@ fn store_allows_same_sequence_in_different_conversations(
 ) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_diff_conv_seq_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv1 = ConversationId::new();
@@ -361,8 +373,6 @@ fn store_allows_same_sequence_in_different_conversations(
     // Verify both exist
     assert!(rt.block_on(repo.exists(msg1.id())).expect("exists check"));
     assert!(rt.block_on(repo.exists(msg2.id())).expect("exists check"));
-
-    cleanup_database(shared_test_cluster, &db_name);
 }
 
 // ============================================================================

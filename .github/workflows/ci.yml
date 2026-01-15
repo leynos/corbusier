@@ -28,11 +28,19 @@ jobs:
             !**/dist/**
       - name: Lint
         run: make lint
+      - name: Cache pg-embed-setup-unpriv
+        id: cache-pg-embed
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/pg_embedded_setup_unpriv
+          key: pg-embed-setup-unpriv-0.2
       - name: Install PostgreSQL test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y tzdata
-          cargo install pg-embed-setup-unpriv
+          if [ ! -f ~/.cargo/bin/pg_embedded_setup_unpriv ]; then
+            cargo install pg-embed-setup-unpriv
+          fi
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@aebb3f5b831102e2a10ef909c83d7d50ea86c332
         with:

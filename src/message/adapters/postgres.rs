@@ -24,6 +24,13 @@ pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 /// Pooled connection type for internal use.
 type PooledConn = PooledConnection<ConnectionManager<PgConnection>>;
 
+/// Identifiers needed for semantic error mapping in insert operations.
+struct InsertIds {
+    msg_id: MessageId,
+    conv_id: ConversationId,
+    seq_num: SequenceNumber,
+}
+
 /// `PostgreSQL` implementation of [`MessageRepository`].
 ///
 /// Uses Diesel ORM with connection pooling via r2d2. Thread-safe for
@@ -77,12 +84,21 @@ impl PostgresMessageRepository {
         let pool = self.pool.clone();
         let new_message = NewMessage::try_from_domain(message)?;
         let audit_ctx = audit.clone();
+        let msg_id = message.id();
+        let conv_id = message.conversation_id();
+        let seq_num = message.sequence_number();
+
+        let ids = InsertIds {
+            msg_id,
+            conv_id,
+            seq_num,
+        };
 
         Self::run_blocking(move || {
             let mut conn = Self::get_conn(&pool)?;
             conn.transaction::<_, RepositoryError, _>(|tx_conn| {
                 Self::set_audit_context(tx_conn, &audit_ctx)?;
-                Self::insert_message(tx_conn, &new_message)?;
+                Self::insert_message(tx_conn, &new_message, &ids)?;
                 Ok(())
             })
         })
@@ -118,12 +134,48 @@ impl PostgresMessageRepository {
     // ========================================================================
 
     /// Inserts a message into the database.
-    fn insert_message(conn: &mut PgConnection, new_message: &NewMessage) -> RepositoryResult<()> {
+    ///
+    /// Maps constraint violations to semantic error types when possible.
+    /// Pre-checks in `store()` should catch most duplicates with proper IDs,
+    /// but this handles race conditions where the constraint catches duplicates
+    /// that slipped past the pre-check.
+    fn insert_message(
+        conn: &mut PgConnection,
+        new_message: &NewMessage,
+        ids: &InsertIds,
+    ) -> RepositoryResult<()> {
         diesel::insert_into(messages::table)
             .values(new_message)
             .execute(conn)
-            .map_err(RepositoryError::database)?;
+            .map_err(|e| Self::map_insert_error(e, ids))?;
         Ok(())
+    }
+
+    /// Maps Diesel errors to semantic repository errors.
+    ///
+    /// Inspects unique constraint violations to determine if they represent
+    /// duplicate message IDs or duplicate sequence numbers, returning the
+    /// appropriate error variant with the relevant identifiers.
+    fn map_insert_error(err: diesel::result::Error, ids: &InsertIds) -> RepositoryError {
+        use diesel::result::DatabaseErrorKind;
+        let diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info) =
+            err
+        else {
+            return RepositoryError::database(err);
+        };
+
+        let Some(constraint) = info.constraint_name() else {
+            return RepositoryError::database(err);
+        };
+
+        match constraint {
+            "messages_id_unique" | "messages_pkey" => RepositoryError::DuplicateMessage(ids.msg_id),
+            "messages_conversation_sequence_unique" => RepositoryError::DuplicateSequence {
+                conversation_id: ids.conv_id,
+                sequence: ids.seq_num,
+            },
+            _ => RepositoryError::database(err),
+        }
     }
 
     /// Sets a single `PostgreSQL` session variable for audit context.
@@ -239,7 +291,12 @@ impl MessageRepository for PostgresMessageRepository {
                 });
             }
 
-            Self::insert_message(&mut conn, &new_message)
+            let ids = InsertIds {
+                msg_id,
+                conv_id,
+                seq_num,
+            };
+            Self::insert_message(&mut conn, &new_message, &ids)
         })
         .await
     }
