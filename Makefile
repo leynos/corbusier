@@ -8,7 +8,8 @@ BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
-TEST_FLAGS ?= $(CARGO_FLAGS)
+# Exclude postgres-tests feature from test runs (requires external PostgreSQL infrastructure)
+TEST_FLAGS ?= --all-targets
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 
@@ -22,6 +23,9 @@ clean: ## Remove build artifacts
 
 test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) nextest run $(TEST_FLAGS) $(BUILD_JOBS)
+
+test-postgres: ## Run PostgreSQL integration tests (requires pg-embed-setup-unpriv)
+	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test --features postgres-tests $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)

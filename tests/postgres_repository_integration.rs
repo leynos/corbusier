@@ -5,7 +5,20 @@
 //! error handling.
 //!
 //! Uses `pg-embed-setup-unpriv` for embedded `PostgreSQL` lifecycle management.
+//!
+//! # Running these tests
+//!
+//! These tests require `pg-embed-setup-unpriv` infrastructure which needs:
+//! 1. The `pg_embedded_setup_unpriv` binary installed
+//! 2. Proper permissions for the worker process
+//!
+//! Run with: `cargo test --test postgres_repository_integration`
+//!
+//! Or set `PG_EMBEDDED_WORKER` to the path of the worker binary.
 
+// Skip this entire test module unless the `postgres-tests` feature is enabled.
+// This prevents CI failures in environments without PostgreSQL infrastructure.
+#![cfg(feature = "postgres-tests")]
 #![expect(
     clippy::expect_used,
     reason = "Test code uses expect for assertion clarity"
@@ -30,6 +43,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use pg_embedded_setup_unpriv::{TestCluster, test_support::shared_test_cluster};
 use rstest::rstest;
+use tokio::runtime::Runtime;
 
 /// SQL to create the base schema for tests.
 const CREATE_SCHEMA_SQL: &str =
@@ -41,6 +55,14 @@ const ADD_CONSTRAINTS_SQL: &str =
 
 /// Template database name for pre-migrated schema.
 const TEMPLATE_DB: &str = "corbusier_test_template";
+
+/// Creates a tokio runtime for async operations in tests.
+fn test_runtime() -> Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("failed to create test runtime")
+}
 
 /// Ensures the template database exists with the schema applied.
 fn ensure_template(cluster: &TestCluster) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -102,9 +124,7 @@ fn cleanup_database(cluster: &TestCluster, db_name: &str) {
 // ============================================================================
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
+fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_store_retrieve_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -115,13 +135,15 @@ async fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
     let message = create_test_message(conv_id, 1);
     let msg_id = message.id();
 
+    let rt = test_runtime();
+
     // Store
-    repo.store(&message).await.expect("store should succeed");
+    rt.block_on(repo.store(&message))
+        .expect("store should succeed");
 
     // Retrieve by ID
-    let retrieved = repo
-        .find_by_id(msg_id)
-        .await
+    let retrieved = rt
+        .block_on(repo.find_by_id(msg_id))
         .expect("find_by_id should succeed")
         .expect("message should exist");
 
@@ -134,23 +156,22 @@ async fn store_and_retrieve_message(shared_test_cluster: &'static TestCluster) {
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster) {
+fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_find_none_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
-    let result = repo.find_by_id(MessageId::new()).await.expect("query ok");
+    let rt = test_runtime();
+    let result = rt
+        .block_on(repo.find_by_id(MessageId::new()))
+        .expect("query ok");
     assert!(result.is_none());
 
     cleanup_database(shared_test_cluster, &db_name);
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'static TestCluster) {
+fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_find_conv_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -163,14 +184,14 @@ async fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'st
     let msg1 = create_test_message(conv_id, 1);
     let msg2 = create_test_message(conv_id, 2);
 
-    repo.store(&msg3).await.expect("store msg3");
-    repo.store(&msg1).await.expect("store msg1");
-    repo.store(&msg2).await.expect("store msg2");
+    let rt = test_runtime();
+    rt.block_on(repo.store(&msg3)).expect("store msg3");
+    rt.block_on(repo.store(&msg1)).expect("store msg1");
+    rt.block_on(repo.store(&msg2)).expect("store msg2");
 
     // Retrieve should return in sequence order
-    let messages = repo
-        .find_by_conversation(conv_id)
-        .await
+    let messages = rt
+        .block_on(repo.find_by_conversation(conv_id))
         .expect("find_by_conversation");
 
     assert_eq!(messages.len(), 3);
@@ -182,9 +203,7 @@ async fn find_by_conversation_returns_ordered_messages(shared_test_cluster: &'st
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster) {
+fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_exists_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -195,12 +214,14 @@ async fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster
     let message = create_test_message(conv_id, 1);
     let msg_id = message.id();
 
+    let rt = test_runtime();
+
     // Before store
-    assert!(!repo.exists(msg_id).await.expect("exists check"));
+    assert!(!rt.block_on(repo.exists(msg_id)).expect("exists check"));
 
     // After store
-    repo.store(&message).await.expect("store");
-    assert!(repo.exists(msg_id).await.expect("exists check"));
+    rt.block_on(repo.store(&message)).expect("store");
+    assert!(rt.block_on(repo.exists(msg_id)).expect("exists check"));
 
     cleanup_database(shared_test_cluster, &db_name);
 }
@@ -210,17 +231,15 @@ async fn exists_returns_correct_status(shared_test_cluster: &'static TestCluster
 // ============================================================================
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'static TestCluster) {
+fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_next_seq_empty_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    let next = repo
-        .next_sequence_number(conv_id)
-        .await
+    let rt = test_runtime();
+    let next = rt
+        .block_on(repo.next_sequence_number(conv_id))
         .expect("next_sequence_number");
 
     assert_eq!(next.value(), 1);
@@ -229,9 +248,7 @@ async fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'stati
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static TestCluster) {
+fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_next_seq_incr_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -239,20 +256,18 @@ async fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static
     let conv_id = ConversationId::new();
     insert_conversation(shared_test_cluster, &db_name, conv_id);
 
+    let rt = test_runtime();
+
     // Store messages with sequence 1, 2, 5 (gap)
-    repo.store(&create_test_message(conv_id, 1))
-        .await
+    rt.block_on(repo.store(&create_test_message(conv_id, 1)))
         .expect("store 1");
-    repo.store(&create_test_message(conv_id, 2))
-        .await
+    rt.block_on(repo.store(&create_test_message(conv_id, 2)))
         .expect("store 2");
-    repo.store(&create_test_message(conv_id, 5))
-        .await
+    rt.block_on(repo.store(&create_test_message(conv_id, 5)))
         .expect("store 5");
 
-    let next = repo
-        .next_sequence_number(conv_id)
-        .await
+    let next = rt
+        .block_on(repo.next_sequence_number(conv_id))
         .expect("next_sequence_number");
 
     assert_eq!(next.value(), 6); // max(5) + 1
@@ -265,9 +280,7 @@ async fn next_sequence_number_returns_max_plus_one(shared_test_cluster: &'static
 // ============================================================================
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCluster) {
+fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_dup_msg_id_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -278,8 +291,10 @@ async fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCl
     let message = create_test_message(conv_id, 1);
     let msg_id = message.id();
 
+    let rt = test_runtime();
+
     // First store succeeds
-    repo.store(&message).await.expect("first store");
+    rt.block_on(repo.store(&message)).expect("first store");
 
     // Create another message with the same ID but different sequence
     let clock = DefaultClock;
@@ -290,7 +305,7 @@ async fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCl
         .expect("duplicate message");
 
     // Second store should fail with DuplicateMessage
-    let result = repo.store(&duplicate).await;
+    let result = rt.block_on(repo.store(&duplicate));
     assert!(
         matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == msg_id),
         "Expected DuplicateMessage error, got: {result:?}"
@@ -300,11 +315,7 @@ async fn store_rejects_duplicate_message_id(shared_test_cluster: &'static TestCl
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn store_rejects_duplicate_sequence_in_conversation(
-    shared_test_cluster: &'static TestCluster,
-) {
+fn store_rejects_duplicate_sequence_in_conversation(shared_test_cluster: &'static TestCluster) {
     ensure_template(shared_test_cluster).expect("template setup");
     let db_name = format!("test_dup_seq_{}", uuid::Uuid::new_v4());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
@@ -314,13 +325,15 @@ async fn store_rejects_duplicate_sequence_in_conversation(
 
     // First message with sequence 1
     let msg1 = create_test_message(conv_id, 1);
-    repo.store(&msg1).await.expect("first store");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&msg1)).expect("first store");
 
     // Second message with same sequence 1 but different ID
     let msg2 = create_test_message(conv_id, 1);
 
     // Should fail with DuplicateSequence
-    let result = repo.store(&msg2).await;
+    let result = rt.block_on(repo.store(&msg2));
     assert!(
         matches!(
             result,
@@ -336,9 +349,7 @@ async fn store_rejects_duplicate_sequence_in_conversation(
 }
 
 #[rstest]
-#[tokio::test]
-#[ignore = "Requires embedded PostgreSQL infrastructure (set PG_EMBEDDED_WORKER)"]
-async fn store_allows_same_sequence_in_different_conversations(
+fn store_allows_same_sequence_in_different_conversations(
     shared_test_cluster: &'static TestCluster,
 ) {
     ensure_template(shared_test_cluster).expect("template setup");
@@ -354,13 +365,15 @@ async fn store_allows_same_sequence_in_different_conversations(
     let msg1 = create_test_message(conv1, 1);
     let msg2 = create_test_message(conv2, 1);
 
+    let rt = test_runtime();
+
     // Both should succeed
-    repo.store(&msg1).await.expect("store in conv1");
-    repo.store(&msg2).await.expect("store in conv2");
+    rt.block_on(repo.store(&msg1)).expect("store in conv1");
+    rt.block_on(repo.store(&msg2)).expect("store in conv2");
 
     // Verify both exist
-    assert!(repo.exists(msg1.id()).await.expect("exists check"));
-    assert!(repo.exists(msg2.id()).await.expect("exists check"));
+    assert!(rt.block_on(repo.exists(msg1.id())).expect("exists check"));
+    assert!(rt.block_on(repo.exists(msg2.id())).expect("exists check"));
 
     cleanup_database(shared_test_cluster, &db_name);
 }
