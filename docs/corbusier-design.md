@@ -5689,6 +5689,188 @@ be using JSONB.
 }
 ```
 
+###### Canonical Message Domain Model
+
+For screen readers: The following class diagram illustrates the canonical message
+domain model, showing the Message aggregate root and its related value objects,
+including content parts, metadata, and identity types.
+
+```mermaid
+classDiagram
+    class Message {
+        -MessageId id
+        -ConversationId conversation_id
+        -Role role
+        -Vec~ContentPart~ content
+        -MessageMetadata metadata
+        -DateTime~Utc~ created_at
+        -SequenceNumber sequence_number
+        +new(...) Result
+        +new_with_id(...) Result
+        +id() MessageId
+        +conversation_id() ConversationId
+        +role() Role
+        +content() Vec~ContentPart~
+        +metadata() MessageMetadata
+        +created_at() DateTime~Utc~
+        +sequence_number() SequenceNumber
+        +builder(...) MessageBuilder
+    }
+
+    class MessageBuilder {
+        -Option~MessageId~ id
+        -ConversationId conversation_id
+        -Role role
+        -Vec~ContentPart~ content
+        -MessageMetadata metadata
+        -SequenceNumber sequence_number
+        +new(...) MessageBuilder
+        +with_id(id) MessageBuilder
+        +with_content(part) MessageBuilder
+        +with_content_parts(parts) MessageBuilder
+        +with_metadata(metadata) MessageBuilder
+        +build(clock) Result
+    }
+
+    class MessageBuilderError {
+        <<enum>>
+        EmptyContent
+    }
+
+    class ContentPart {
+        <<enum>>
+        Text
+        ToolCall
+        ToolResult
+        Attachment
+    }
+
+    class TextPart {
+        +String text
+        +new(text) TextPart
+        +is_empty() bool
+        +len() usize
+    }
+
+    class ToolCallPart {
+        +String call_id
+        +String name
+        +Value arguments
+        +new(call_id, name, args) ToolCallPart
+        +is_valid() bool
+    }
+
+    class ToolResultPart {
+        +String call_id
+        +Value content
+        +bool success
+        +success(call_id, content) ToolResultPart
+        +failure(call_id, error) ToolResultPart
+        +is_valid() bool
+    }
+
+    class AttachmentPart {
+        +String mime_type
+        +Option~String~ name
+        +String data
+        +Option~u64~ size_bytes
+        +new(mime_type, data) AttachmentPart
+        +with_name(name) AttachmentPart
+        +with_size(size) AttachmentPart
+        +is_valid() bool
+    }
+
+    class MessageMetadata {
+        +Option~String~ agent_backend
+        +Option~TurnId~ turn_id
+        +Option~SlashCommandExpansion~ expansion
+        +HashMap~String, Value~ extensions
+        +empty() MessageMetadata
+        +with_agent_backend(backend) MessageMetadata
+        +with_turn_id(turn_id) MessageMetadata
+        +with_slash_command_expansion(exp) MessageMetadata
+        +with_extension(key, value) MessageMetadata
+        +is_empty() bool
+    }
+
+    class SlashCommandExpansion {
+        +String command
+        +HashMap~String, Value~ parameters
+        +String expanded_content
+        +new(command, content) SlashCommandExpansion
+        +with_parameter(key, value) SlashCommandExpansion
+    }
+
+    class Role {
+        <<enum>>
+        User
+        Assistant
+        Tool
+        System
+        +can_call_tools() bool
+        +is_human() bool
+        +is_system() bool
+        +is_tool() bool
+    }
+
+    class MessageId {
+        -Uuid value
+        +new() MessageId
+        +from_uuid(uuid) MessageId
+        +into_inner() Uuid
+    }
+
+    class ConversationId {
+        -Uuid value
+        +new() ConversationId
+        +from_uuid(uuid) ConversationId
+        +into_inner() Uuid
+    }
+
+    class TurnId {
+        -Uuid value
+        +new() TurnId
+        +from_uuid(uuid) TurnId
+        +into_inner() Uuid
+    }
+
+    class SequenceNumber {
+        -u64 value
+        +new(value) SequenceNumber
+        +value() u64
+        +next() SequenceNumber
+    }
+
+    class Clock {
+        <<interface>>
+        +utc() DateTime~Utc~
+    }
+
+    Message o-- MessageId
+    Message o-- ConversationId
+    Message o-- Role
+    Message o-- MessageMetadata
+    Message o-- SequenceNumber
+    Message "1" o-- "*" ContentPart
+
+    ContentPart o-- TextPart
+    ContentPart o-- ToolCallPart
+    ContentPart o-- ToolResultPart
+    ContentPart o-- AttachmentPart
+
+    MessageMetadata o-- TurnId
+    MessageMetadata o-- SlashCommandExpansion
+
+    MessageBuilder --> Message
+    MessageBuilder ..> MessageBuilderError
+
+    SequenceNumber ..> Message
+```
+
+_Figure 6.2.1.2a: Canonical message domain model class diagram showing the
+Message aggregate root with its value objects, content parts, and identity
+types._
+
 ##### 6.2.1.3 Indexing Strategy
 
 ###### Primary Indexes
