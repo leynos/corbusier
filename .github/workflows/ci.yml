@@ -13,6 +13,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
+      PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_embedded_setup_unpriv
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - name: Setup Rust
