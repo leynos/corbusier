@@ -24,7 +24,7 @@ async-trait = "0.1"
 mockable = { version = "3.0", default-features = false, features = ["clock"] }
 
 # Database (Diesel ORM for PostgreSQL)
-diesel = { version = "2.2.6", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
+diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 
 # Async runtime
 tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
@@ -32,9 +32,10 @@ tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
 [dev-dependencies]
 rstest = "0.24"
 mockall = "0.13"
+eyre = "0.6"
 
 # Embedded PostgreSQL for integration testing
-# pg-embed-setup-unpriv = { version = "0.2", features = ["diesel-support"] }
+pg-embed-setup-unpriv = { version = "0.2", features = ["diesel-support"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

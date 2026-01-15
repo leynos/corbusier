@@ -9,6 +9,7 @@ mod content_tests;
 mod error_tests;
 mod id_tests;
 mod message_tests;
+mod models_tests;
 mod role_tests;
 mod validation_config_tests;
 mod validation_content_tests;

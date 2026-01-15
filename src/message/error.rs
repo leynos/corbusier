@@ -206,6 +206,11 @@ impl RepositoryError {
 
 impl From<diesel::result::Error> for RepositoryError {
     fn from(err: diesel::result::Error) -> Self {
+        // All Diesel errors are converted to database errors.
+        // Unique constraint violations are identified but cannot provide
+        // semantic errors (DuplicateMessage/DuplicateSequence) since the
+        // constraint error doesn't include the specific IDs. Callers should
+        // use pre-check validation to get semantic errors with correct identifiers.
         Self::database(err)
     }
 }

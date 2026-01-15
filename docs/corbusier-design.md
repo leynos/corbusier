@@ -1184,7 +1184,7 @@ provides robust connection management independent of async runtimes.
 
 #### 3.2.2 Async Runtime
 
-##### Tokio 1.x (Latest)
+##### Tokio 1.43
 
 Tokio is a runtime for writing reliable asynchronous applications with Rust. It
 provides async I/O, networking, scheduling, timers, and more.
@@ -1207,7 +1207,7 @@ them to their needs.
 
 #### 3.2.3 Database Access Layer
 
-##### Diesel 2.2.x (Latest)
+##### Diesel 2.3
 
 Diesel is a safe, extensible ORM and Query Builder for Rust. It provides
 compile-time guarantees about your queries and type-safe query construction
@@ -1226,7 +1226,7 @@ with pure Rust PostgreSQL driver support.
 
 #### 3.2.4 Observability and Logging
 
-##### Tracing 0.1.x (Latest)
+##### Tracing 0.1
 
 tracing is a framework for instrumenting Rust programs to collect structured,
 event-based diagnostic information. tracing is maintained by the Tokio project,
@@ -1251,10 +1251,10 @@ you to also send your logs for further analysis.
 
 | Framework | Version | Runtime          | TLS Backend       | Database Support   |
 | --------- | ------- | ---------------- | ----------------- | ------------------ |
-| Actix Web | 4.12.1  | Tokio            | rustls/native-tls | Via Diesel         |
-| Diesel    | 2.2.x   | Tokio (blocking) | N/A               | PostgreSQL         |
-| Tracing   | 0.1.x   | Runtime Agnostic | N/A               | N/A                |
-| Tokio     | 1.x     | Self             | N/A               | N/A                |
+| Actix Web | 4.x     | Tokio            | rustls/native-tls | Via Diesel         |
+| Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL         |
+| Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A                |
+| Tokio     | 1.43    | Self             | N/A               | N/A                |
 
 ### 3.3 Open Source Dependencies
 
@@ -1262,16 +1262,16 @@ you to also send your logs for further analysis.
 
 | Crate              | Version | Purpose                   | Registry  |
 | ------------------ | ------- | ------------------------- | --------- |
-| actix-web          | 4.12.1  | HTTP server framework     | crates.io |
-| tokio              | 1.x     | Async runtime             | crates.io |
-| diesel             | 2.2.x   | Database ORM              | crates.io |
-| diesel-r2d2        | 2.2.x   | Connection pooling        | crates.io |
-| tracing            | 0.1.x   | Structured logging        | crates.io |
-| tracing-subscriber | 0.3.x   | Log formatting and output | crates.io |
+| actix-web          | 4.x     | HTTP server framework     | crates.io |
+| tokio              | 1.43    | Async runtime             | crates.io |
+| diesel             | 2.3     | Database ORM              | crates.io |
+| r2d2               | 0.8     | Connection pooling        | crates.io |
+| tracing            | 0.1     | Structured logging        | crates.io |
+| tracing-subscriber | 0.3     | Log formatting and output | crates.io |
 | serde              | 1.x     | Serialization framework   | crates.io |
 | serde_json         | 1.x     | JSON serialization        | crates.io |
 | anyhow             | 1.x     | Error handling            | crates.io |
-| thiserror          | 1.x     | Error derive macros       | crates.io |
+| thiserror          | 2.x     | Error derive macros       | crates.io |
 | uuid               | 1.x     | UUID generation           | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies
@@ -3549,7 +3549,7 @@ temporal queries for debugging and compliance, and enables system state
 reconstruction from historical events. This pattern aligns with the requirement
 for comprehensive audit trails across all agent interactions.
 
-##### In-Memory Repository for Development
+##### In-Memory Repository for Testing
 
 An in-memory repository implementation provides zero-configuration development
 environments while maintaining compatibility with the PostgreSQL production
@@ -6051,7 +6051,7 @@ Migrations are managed through the Diesel CLI (`diesel migration`), which
 generates timestamped migration directories with `up.sql` and `down.sql` files.
 
 ```rust
-// Migration management with Diesel CLI
+// Illustrative example - Migration management with Diesel CLI
 // Run from command line: diesel migration run
 // Generate new migration: diesel migration generate create_messages
 
@@ -6066,10 +6066,25 @@ pub struct MigrationManager {
 }
 
 impl MigrationManager {
+    /// Runs pending migrations synchronously.
+    ///
+    /// When invoked from async contexts (e.g., Tokio runtime), wrap this
+    /// call in `tokio::task::spawn_blocking` to avoid blocking the executor.
     pub fn run_migrations(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.pool.get()?;
         conn.run_pending_migrations(MIGRATIONS)?;
         Ok(())
+    }
+
+    /// Async wrapper for running migrations from Tokio contexts.
+    pub async fn run_migrations_async(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let pool = self.pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+            conn.run_pending_migrations(MIGRATIONS)?;
+            Ok(())
+        })
+        .await?
     }
 }
 ```
@@ -6240,8 +6255,8 @@ SELECT cron.schedule('archive-events', '0 2 * * 0', 'SELECT archive_old_events()
 
 The pool has a maximum connection limit that it will not exceed; if `get()`
 is called when at this limit and all connections are checked out, the task will
-be made to wait until a connection becomes available. You can configure the
-connection limit, and other parameters, using `Pool::builder()`.
+be made to wait until a connection becomes available. The connection limit, and
+other parameters, are configurable via `Pool::builder()`.
 
 ```rust
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -6265,7 +6280,13 @@ pub fn create_database_pool(database_url: &str) -> Result<PgPool, r2d2::Error> {
 
 ###### Repository Pattern Implementation
 
+The following illustrative example demonstrates the repository pattern with
+Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
+`row_to_message`, and `RepositoryError` are context-dependent and defined
+in the actual implementation.
+
 ```rust
+// Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};

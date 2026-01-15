@@ -128,7 +128,11 @@ impl PostgresMessageRepository {
 
     /// Sets a single `PostgreSQL` session variable for audit context.
     ///
-    /// Uses parameterised SQL to avoid injection vulnerabilities.
+    /// Uses a parameterised value binding to prevent injection of the UUID.
+    /// The key name is interpolated via `format!` but is always a controlled
+    /// static string from the audit context fields, not user input.
+    /// `PostgreSQL` does not support parameterised identifiers, so key
+    /// interpolation is the only option.
     fn set_session_uuid(
         conn: &mut PgConnection,
         key: &str,
@@ -199,9 +203,42 @@ impl MessageRepository for PostgresMessageRepository {
     async fn store(&self, message: &Message) -> RepositoryResult<()> {
         let pool = self.pool.clone();
         let new_message = NewMessage::try_from_domain(message)?;
+        let msg_id = message.id();
+        let conv_id = message.conversation_id();
+        let seq_num = message.sequence_number();
 
         Self::run_blocking(move || {
             let mut conn = Self::get_conn(&pool)?;
+
+            // Pre-check for duplicate message ID to provide semantic error
+            let id_exists: i64 = messages::table
+                .filter(messages::id.eq(msg_id.into_inner()))
+                .count()
+                .get_result(&mut conn)
+                .map_err(RepositoryError::database)?;
+
+            if id_exists > 0 {
+                return Err(RepositoryError::DuplicateMessage(msg_id));
+            }
+
+            // Pre-check for duplicate sequence number in conversation
+            let seq_exists: i64 = messages::table
+                .filter(messages::conversation_id.eq(conv_id.into_inner()))
+                .filter(
+                    messages::sequence_number.eq(i64::try_from(seq_num.value())
+                        .map_err(|e| RepositoryError::serialization(e.to_string()))?),
+                )
+                .count()
+                .get_result(&mut conn)
+                .map_err(RepositoryError::database)?;
+
+            if seq_exists > 0 {
+                return Err(RepositoryError::DuplicateSequence {
+                    conversation_id: conv_id,
+                    sequence: seq_num,
+                });
+            }
+
             Self::insert_message(&mut conn, &new_message)
         })
         .await
