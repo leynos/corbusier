@@ -197,14 +197,12 @@ fn validate_attachment_part(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::domain::{ConversationId, Role, SequenceNumber};
+    use crate::message::{
+        domain::{ConversationId, Role, SequenceNumber},
+        tests::validation_fixtures::clock,
+    };
     use mockable::DefaultClock;
-    use rstest::{fixture, rstest};
-
-    #[fixture]
-    fn clock() -> DefaultClock {
-        DefaultClock
-    }
+    use rstest::rstest;
 
     fn create_message_with_content(content: Vec<ContentPart>, clock: &DefaultClock) -> Message {
         Message::new(

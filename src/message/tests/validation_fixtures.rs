@@ -1,7 +1,7 @@
 //! Shared fixtures and helpers for validation tests.
 
 use crate::message::{
-    domain::{ContentPart, ConversationId, Message, Role, SequenceNumber},
+    domain::{ContentPart, ConversationId, Message, MessageBuilderError, Role, SequenceNumber},
     ports::validator::ValidationConfig,
     validation::service::DefaultMessageValidator,
 };
@@ -29,8 +29,12 @@ pub fn clock() -> DefaultClock {
 }
 
 /// Factory fixture for creating test messages with a given role and content.
+///
+/// Returns a `Result` to allow tests to handle construction failures explicitly.
 #[fixture]
-pub fn message_factory(clock: DefaultClock) -> impl Fn(Role, Vec<ContentPart>) -> Message {
+pub fn message_factory(
+    clock: DefaultClock,
+) -> impl Fn(Role, Vec<ContentPart>) -> Result<Message, MessageBuilderError> {
     move |role, content| {
         Message::new(
             ConversationId::new(),
@@ -39,6 +43,5 @@ pub fn message_factory(clock: DefaultClock) -> impl Fn(Role, Vec<ContentPart>) -
             SequenceNumber::new(1),
             &clock,
         )
-        .expect("test message should build")
     }
 }
