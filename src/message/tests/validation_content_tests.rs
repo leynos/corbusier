@@ -36,7 +36,10 @@ fn whitespace_only_text_fails_with_default_config(
         vec![ContentPart::Text(TextPart::new("   \n\t"))],
     );
     let result = default_validator.validate(&message);
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(ValidationError::InvalidContentPart { index: 0, .. })
+    ));
 }
 
 #[rstest]
@@ -60,7 +63,10 @@ fn text_exceeding_max_length_fails(
         vec![ContentPart::Text(TextPart::new(long_text))],
     );
     let result = strict_validator.validate(&message);
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(ValidationError::InvalidContentPart { index: 0, .. })
+    ));
 }
 
 // ============================================================================

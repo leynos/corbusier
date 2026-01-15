@@ -164,7 +164,7 @@ pub enum RepositoryError {
 
     /// A serialization error occurred.
     #[error("serialization error: {0}")]
-    Serialisation(String),
+    Serialization(String),
 
     /// A connection error occurred.
     #[error("connection error: {0}")]
@@ -180,8 +180,8 @@ impl RepositoryError {
 
     /// Creates a serialization error.
     #[must_use]
-    pub fn serialisation(message: impl Into<String>) -> Self {
-        Self::Serialisation(message.into())
+    pub fn serialization(message: impl Into<String>) -> Self {
+        Self::Serialization(message.into())
     }
 
     /// Creates a connection error.

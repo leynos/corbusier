@@ -10,52 +10,23 @@ use rstest::rstest;
 use serde_json::json;
 
 #[rstest]
-fn valid_text_message_passes(
+#[case::user(Role::User, ContentPart::Text(TextPart::new("Hello")))]
+#[case::assistant(
+    Role::Assistant,
+    ContentPart::Text(TextPart::new("Here is my response"))
+)]
+#[case::tool(Role::Tool, ContentPart::ToolResult(ToolResultPart::success("call-123", json!({"result": "success"}))))]
+#[case::system(
+    Role::System,
+    ContentPart::Text(TextPart::new("You are a helpful assistant"))
+)]
+fn valid_message_with_role_passes(
     default_validator: DefaultMessageValidator,
     message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+    #[case] role: Role,
+    #[case] content: ContentPart,
 ) {
-    let message = message_factory(Role::User, vec![ContentPart::Text(TextPart::new("Hello"))]);
-    assert!(default_validator.validate(&message).is_ok());
-}
-
-#[rstest]
-fn valid_assistant_message_passes(
-    default_validator: DefaultMessageValidator,
-    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
-) {
-    let message = message_factory(
-        Role::Assistant,
-        vec![ContentPart::Text(TextPart::new("Here is my response"))],
-    );
-    assert!(default_validator.validate(&message).is_ok());
-}
-
-#[rstest]
-fn valid_tool_message_passes(
-    default_validator: DefaultMessageValidator,
-    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
-) {
-    let message = message_factory(
-        Role::Tool,
-        vec![ContentPart::ToolResult(ToolResultPart::success(
-            "call-123",
-            json!({"result": "success"}),
-        ))],
-    );
-    assert!(default_validator.validate(&message).is_ok());
-}
-
-#[rstest]
-fn valid_system_message_passes(
-    default_validator: DefaultMessageValidator,
-    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
-) {
-    let message = message_factory(
-        Role::System,
-        vec![ContentPart::Text(TextPart::new(
-            "You are a helpful assistant",
-        ))],
-    );
+    let message = message_factory(role, vec![content]);
     assert!(default_validator.validate(&message).is_ok());
 }
 
