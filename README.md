@@ -89,6 +89,9 @@ make lint
 # Run tests
 make test
 
+# Run PostgreSQL integration tests (requires pg-embed-setup-unpriv)
+make test-postgres
+
 # Build the project
 make build
 ```
