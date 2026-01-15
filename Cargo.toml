@@ -34,8 +34,7 @@ rstest = "0.24"
 mockall = "0.13"
 
 # Embedded PostgreSQL for integration testing
-# TODO: Update path/version once pg-embedded-setup-unpriv is published or available
-# pg-embedded-setup-unpriv = { version = "0.1", features = ["diesel-support"] }
+# pg-embed-setup-unpriv = { version = "0.2", features = ["diesel-support"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
