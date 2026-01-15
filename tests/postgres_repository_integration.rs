@@ -57,15 +57,31 @@ fn ensure_template(cluster: &TestCluster) -> Result<(), Box<dyn std::error::Erro
         .ensure_template_exists(TEMPLATE_DB, |db_name| {
             let url = cluster.connection().database_url(db_name);
             let mut conn = PgConnection::establish(&url).map_err(|e| eyre::eyre!("{e}"))?;
-            diesel::sql_query(CREATE_SCHEMA_SQL)
-                .execute(&mut conn)
-                .map_err(|e| eyre::eyre!("{e}"))?;
-            diesel::sql_query(ADD_CONSTRAINTS_SQL)
-                .execute(&mut conn)
-                .map_err(|e| eyre::eyre!("{e}"))?;
+            // Execute each SQL file statement-by-statement since diesel::sql_query
+            // cannot execute multiple statements in a single call
+            execute_sql_statements(&mut conn, CREATE_SCHEMA_SQL)?;
+            execute_sql_statements(&mut conn, ADD_CONSTRAINTS_SQL)?;
             Ok(())
         })
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    Ok(())
+}
+
+/// Executes multiple SQL statements from a single string.
+///
+/// Splits on semicolons and executes each non-empty statement individually.
+/// Comments (lines starting with --) are preserved within statements.
+fn execute_sql_statements(conn: &mut PgConnection, sql: &str) -> eyre::Result<()> {
+    for statement in sql.split(';') {
+        let trimmed = statement.trim();
+        // Skip empty statements and comment-only lines
+        if trimmed.is_empty() || trimmed.lines().all(|line| line.trim().starts_with("--")) {
+            continue;
+        }
+        diesel::sql_query(trimmed)
+            .execute(conn)
+            .map_err(|e| eyre::eyre!("SQL error: {e}\nStatement: {trimmed}"))?;
+    }
     Ok(())
 }
 
