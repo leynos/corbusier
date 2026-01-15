@@ -4,7 +4,6 @@
 //! without database dependencies. Not suitable for production use.
 
 use std::collections::HashMap;
-use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
@@ -14,23 +13,6 @@ use crate::message::{
     error::RepositoryError,
     ports::repository::{MessageRepository, RepositoryResult},
 };
-
-/// Error indicating a duplicate message ID was detected.
-///
-/// Used by the in-memory adapter to report uniqueness violations
-/// in a backend-agnostic way via [`RepositoryError::database`].
-#[derive(Debug)]
-struct DuplicateIdError {
-    id: MessageId,
-}
-
-impl fmt::Display for DuplicateIdError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "message with id {} already exists", self.id)
-    }
-}
-
-impl std::error::Error for DuplicateIdError {}
 
 /// In-memory implementation of [`MessageRepository`].
 ///
@@ -82,10 +64,22 @@ impl MessageRepository for InMemoryMessageRepository {
             .write()
             .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
 
+        // Check for duplicate message ID
         if guard.contains_key(&message.id()) {
-            return Err(RepositoryError::database(DuplicateIdError {
-                id: message.id(),
-            }));
+            return Err(RepositoryError::DuplicateMessage(message.id()));
+        }
+
+        // Check for duplicate sequence number within the same conversation
+        let has_duplicate_seq = guard.values().any(|m| {
+            m.conversation_id() == message.conversation_id()
+                && m.sequence_number() == message.sequence_number()
+        });
+
+        if has_duplicate_seq {
+            return Err(RepositoryError::DuplicateSequence {
+                conversation_id: message.conversation_id(),
+                sequence: message.sequence_number(),
+            });
         }
 
         guard.insert(message.id(), message.clone());

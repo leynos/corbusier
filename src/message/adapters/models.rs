@@ -111,6 +111,43 @@ pub struct NewMessage {
     pub sequence_number: i64,
 }
 
+impl NewMessage {
+    /// Creates a `NewMessage` from a domain `Message`.
+    ///
+    /// Serializes the message content and metadata to JSONB and converts
+    /// the sequence number to `i64`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::message::error::RepositoryError::Serialization`] if:
+    /// - Content or metadata cannot be serialized to JSON
+    /// - Sequence number overflows `i64`
+    pub fn try_from_domain(
+        message: &crate::message::domain::Message,
+    ) -> crate::message::ports::repository::RepositoryResult<Self> {
+        use crate::message::error::RepositoryError;
+
+        let content = serde_json::to_value(message.content())
+            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+
+        let metadata = serde_json::to_value(message.metadata())
+            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+
+        let sequence_number = i64::try_from(message.sequence_number().value())
+            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+
+        Ok(Self {
+            id: message.id().into_inner(),
+            conversation_id: message.conversation_id().into_inner(),
+            role: message.role().as_str().to_owned(),
+            content,
+            metadata,
+            created_at: message.created_at(),
+            sequence_number,
+        })
+    }
+}
+
 // ============================================================================
 // Domain Event Models
 // ============================================================================

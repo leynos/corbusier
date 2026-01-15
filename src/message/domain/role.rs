@@ -44,12 +44,7 @@ pub enum Role {
 
 impl fmt::Display for Role {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::User => write!(f, "user"),
-            Self::Assistant => write!(f, "assistant"),
-            Self::Tool => write!(f, "tool"),
-            Self::System => write!(f, "system"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -94,6 +89,20 @@ impl Role {
     }
 }
 
+/// Parses a role from its string representation.
+///
+/// The conversion is **case-sensitive** and only accepts the exact lowercase
+/// strings: `"user"`, `"assistant"`, `"tool"`, and `"system"`.
+///
+/// # Examples
+///
+/// ```
+/// use corbusier::message::domain::Role;
+///
+/// assert!(Role::try_from("user").is_ok());
+/// assert!(Role::try_from("User").is_err()); // Case-sensitive
+/// assert!(Role::try_from("USER").is_err());
+/// ```
 impl TryFrom<&str> for Role {
     type Error = ParseRoleError;
 

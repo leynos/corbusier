@@ -75,7 +75,7 @@ impl PostgresMessageRepository {
         audit: &AuditContext,
     ) -> RepositoryResult<()> {
         let pool = self.pool.clone();
-        let new_message = Self::message_to_insertable(message)?;
+        let new_message = NewMessage::try_from_domain(message)?;
         let audit_ctx = audit.clone();
 
         Self::run_blocking(move || {
@@ -172,24 +172,6 @@ impl PostgresMessageRepository {
         RepositoryError::serialization(e.to_string())
     }
 
-    /// Converts a domain Message to an insertable database record.
-    fn message_to_insertable(message: &Message) -> RepositoryResult<NewMessage> {
-        let content = serde_json::to_value(message.content()).map_err(Self::ser_err)?;
-        let metadata = serde_json::to_value(message.metadata()).map_err(Self::ser_err)?;
-        let sequence_number =
-            i64::try_from(message.sequence_number().value()).map_err(Self::ser_err)?;
-
-        Ok(NewMessage {
-            id: message.id().into_inner(),
-            conversation_id: message.conversation_id().into_inner(),
-            role: message.role().as_str().to_owned(),
-            content,
-            metadata,
-            created_at: message.created_at(),
-            sequence_number,
-        })
-    }
-
     /// Converts a database row to a domain Message.
     fn row_to_message(row: MessageRow) -> RepositoryResult<Message> {
         let role = Role::try_from(row.role.as_str()).map_err(Self::ser_err)?;
@@ -216,7 +198,7 @@ impl PostgresMessageRepository {
 impl MessageRepository for PostgresMessageRepository {
     async fn store(&self, message: &Message) -> RepositoryResult<()> {
         let pool = self.pool.clone();
-        let new_message = Self::message_to_insertable(message)?;
+        let new_message = NewMessage::try_from_domain(message)?;
 
         Self::run_blocking(move || {
             let mut conn = Self::get_conn(&pool)?;
@@ -232,17 +214,14 @@ impl MessageRepository for PostgresMessageRepository {
         Self::run_blocking(move || {
             let mut conn = Self::get_conn(&pool)?;
 
-            let result = messages::table
+            messages::table
                 .filter(messages::id.eq(uuid))
                 .select(MessageRow::as_select())
                 .first::<MessageRow>(&mut conn)
                 .optional()
-                .map_err(RepositoryError::database)?;
-
-            match result {
-                Some(row) => Ok(Some(Self::row_to_message(row)?)),
-                None => Ok(None),
-            }
+                .map_err(RepositoryError::database)?
+                .map(Self::row_to_message)
+                .transpose()
         })
         .await
     }
@@ -285,7 +264,10 @@ impl MessageRepository for PostgresMessageRepository {
                 .first(&mut conn)
                 .map_err(RepositoryError::database)?;
 
-            let next = max_seq.unwrap_or(0).saturating_add(1);
+            let current = max_seq.unwrap_or(0);
+            let next = current.checked_add(1).ok_or_else(|| {
+                RepositoryError::serialization("sequence number overflow: maximum i64 reached")
+            })?;
             let next_u64 = u64::try_from(next).map_err(Self::ser_err)?;
 
             Ok(SequenceNumber::new(next_u64))

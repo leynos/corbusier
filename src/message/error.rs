@@ -158,6 +158,19 @@ pub enum RepositoryError {
     #[error("message not found: {0}")]
     NotFound(MessageId),
 
+    /// A message with this ID already exists.
+    #[error("duplicate message: {0}")]
+    DuplicateMessage(MessageId),
+
+    /// A message with this sequence number already exists in the conversation.
+    #[error("duplicate sequence number {sequence} in conversation {conversation_id}")]
+    DuplicateSequence {
+        /// The conversation containing the conflict.
+        conversation_id: super::domain::ConversationId,
+        /// The conflicting sequence number.
+        sequence: SequenceNumber,
+    },
+
     /// A database error occurred.
     #[error("database error: {0}")]
     Database(Arc<dyn std::error::Error + Send + Sync>),

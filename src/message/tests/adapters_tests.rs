@@ -83,10 +83,34 @@ async fn store_rejects_duplicate_message_id(repo: InMemoryMessageRepository, clo
 
     // Second store with same message fails
     let result = repo.store(&message).await;
-    assert!(result.is_err());
 
-    // Verify error is Database variant (from our DuplicateIdError)
-    assert!(matches!(result, Err(RepositoryError::Database(_))));
+    // Verify error is DuplicateMessage variant with correct ID
+    assert!(matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == message.id()));
+}
+
+#[rstest]
+#[tokio::test]
+async fn store_rejects_duplicate_sequence_number(
+    repo: InMemoryMessageRepository,
+    clock: DefaultClock,
+) {
+    let conversation_id = ConversationId::new();
+
+    // Create two messages with the same sequence number but different IDs
+    let message1 = make_message(conversation_id, 1, &clock);
+    let message2 = make_message(conversation_id, 1, &clock); // Same seq, different ID
+
+    // First store succeeds
+    repo.store(&message1).await.expect("first store");
+
+    // Second store with same sequence fails
+    let result = repo.store(&message2).await;
+
+    // Verify error is DuplicateSequence variant
+    assert!(
+        matches!(result, Err(RepositoryError::DuplicateSequence { conversation_id: cid, sequence })
+            if cid == conversation_id && sequence.value() == 1)
+    );
 }
 
 #[rstest]

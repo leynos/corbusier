@@ -214,12 +214,15 @@ impl Message {
     /// Reconstructs a message from persisted storage.
     ///
     /// This method is used by repository adapters to reconstruct domain
-    /// objects from database rows. It bypasses the normal construction
-    /// validation since the data has already been validated at storage time.
+    /// objects from database rows. While it bypasses high-level construction
+    /// validation (e.g., builder pattern checks, timestamp generation), it
+    /// still enforces essential domain invariants such as non-empty content.
     ///
     /// # Errors
     ///
-    /// Returns [`MessageBuilderError::EmptyContent`] if content is empty.
+    /// Returns [`MessageBuilderError::EmptyContent`] if the content vector
+    /// is empty, as this violates the domain invariant that all messages
+    /// must contain at least one content part.
     #[expect(
         clippy::too_many_arguments,
         reason = "Reconstruction requires all persisted fields"
