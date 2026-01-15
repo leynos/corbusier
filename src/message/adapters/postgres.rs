@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
 use super::audit_context::AuditContext;
 use super::models::{MessageRow, NewMessage};
@@ -21,10 +21,15 @@ use crate::message::{
 /// `PostgreSQL` connection pool type.
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
+/// Pooled connection type for internal use.
+type PooledConn = PooledConnection<ConnectionManager<PgConnection>>;
+
 /// `PostgreSQL` implementation of [`MessageRepository`].
 ///
 /// Uses Diesel ORM with connection pooling via r2d2. Thread-safe for
-/// concurrent access.
+/// concurrent access. All database operations are offloaded to a blocking
+/// thread pool via [`tokio::task::spawn_blocking`] to avoid blocking
+/// the async runtime.
 ///
 /// # Example
 ///
@@ -64,67 +69,115 @@ impl PostgresMessageRepository {
     /// # Errors
     ///
     /// Returns `RepositoryError` if the database operation fails.
-    pub fn store_with_audit(
+    pub async fn store_with_audit(
         &self,
         message: &Message,
         audit: &AuditContext,
     ) -> RepositoryResult<()> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
+        let pool = self.pool.clone();
+        let new_message = Self::message_to_insertable(message)?;
+        let audit_ctx = audit.clone();
 
-        conn.transaction::<_, RepositoryError, _>(|tx_conn| {
-            // Set audit context as session variables for trigger capture
-            Self::set_audit_context(tx_conn, audit)?;
-
-            // Insert the message
-            let new_message = Self::message_to_insertable(message)?;
-            diesel::insert_into(messages::table)
-                .values(&new_message)
-                .execute(tx_conn)
-                .map_err(RepositoryError::database)?;
-
-            Ok(())
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
+            conn.transaction::<_, RepositoryError, _>(|tx_conn| {
+                Self::set_audit_context(tx_conn, &audit_ctx)?;
+                Self::insert_message(tx_conn, &new_message)?;
+                Ok(())
+            })
         })
+        .await
+    }
+
+    // ========================================================================
+    // Blocking operation helpers
+    // ========================================================================
+
+    /// Runs a blocking database operation on a dedicated thread pool.
+    ///
+    /// Wraps the closure in [`tokio::task::spawn_blocking`] to prevent
+    /// blocking the async executor's worker threads.
+    async fn run_blocking<F, T>(f: F) -> RepositoryResult<T>
+    where
+        F: FnOnce() -> RepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        tokio::task::spawn_blocking(f)
+            .await
+            .map_err(|e| RepositoryError::connection(format!("task join error: {e}")))?
+    }
+
+    /// Obtains a connection from the pool.
+    fn get_conn(pool: &PgPool) -> RepositoryResult<PooledConn> {
+        pool.get()
+            .map_err(|e| RepositoryError::connection(e.to_string()))
+    }
+
+    // ========================================================================
+    // SQL execution helpers
+    // ========================================================================
+
+    /// Inserts a message into the database.
+    fn insert_message(conn: &mut PgConnection, new_message: &NewMessage) -> RepositoryResult<()> {
+        diesel::insert_into(messages::table)
+            .values(new_message)
+            .execute(conn)
+            .map_err(RepositoryError::database)?;
+        Ok(())
+    }
+
+    /// Sets a single `PostgreSQL` session variable for audit context.
+    ///
+    /// Uses parameterised SQL to avoid injection vulnerabilities.
+    fn set_session_uuid(
+        conn: &mut PgConnection,
+        key: &str,
+        value: uuid::Uuid,
+    ) -> RepositoryResult<()> {
+        // Use bind parameter for the value to prevent SQL injection.
+        // The key is a controlled static string, not user input.
+        diesel::sql_query(format!("SET LOCAL app.{key} = $1"))
+            .bind::<diesel::sql_types::Uuid, _>(value)
+            .execute(conn)
+            .map_err(RepositoryError::database)?;
+        Ok(())
     }
 
     /// Sets `PostgreSQL` session variables for audit context.
+    ///
+    /// Each audit field is set via a parameterised query using [`Self::set_session_uuid`]
+    /// to ensure values are safely bound rather than interpolated.
     fn set_audit_context(conn: &mut PgConnection, audit: &AuditContext) -> RepositoryResult<()> {
         if let Some(correlation_id) = audit.correlation_id {
-            diesel::sql_query(format!("SET LOCAL app.correlation_id = '{correlation_id}'"))
-                .execute(conn)
-                .map_err(RepositoryError::database)?;
+            Self::set_session_uuid(conn, "correlation_id", correlation_id)?;
         }
-
         if let Some(causation_id) = audit.causation_id {
-            diesel::sql_query(format!("SET LOCAL app.causation_id = '{causation_id}'"))
-                .execute(conn)
-                .map_err(RepositoryError::database)?;
+            Self::set_session_uuid(conn, "causation_id", causation_id)?;
         }
-
         if let Some(user_id) = audit.user_id {
-            diesel::sql_query(format!("SET LOCAL app.user_id = '{user_id}'"))
-                .execute(conn)
-                .map_err(RepositoryError::database)?;
+            Self::set_session_uuid(conn, "user_id", user_id)?;
         }
-
         if let Some(session_id) = audit.session_id {
-            diesel::sql_query(format!("SET LOCAL app.session_id = '{session_id}'"))
-                .execute(conn)
-                .map_err(RepositoryError::database)?;
+            Self::set_session_uuid(conn, "session_id", session_id)?;
         }
-
         Ok(())
+    }
+
+    // ========================================================================
+    // Conversion helpers
+    // ========================================================================
+
+    /// Wraps a serialization/conversion error for consistent error handling.
+    fn ser_err<E: std::fmt::Display>(e: E) -> RepositoryError {
+        RepositoryError::serialization(e.to_string())
     }
 
     /// Converts a domain Message to an insertable database record.
     fn message_to_insertable(message: &Message) -> RepositoryResult<NewMessage> {
-        let content = serde_json::to_value(message.content())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
-
-        let metadata = serde_json::to_value(message.metadata())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+        let content = serde_json::to_value(message.content()).map_err(Self::ser_err)?;
+        let metadata = serde_json::to_value(message.metadata()).map_err(Self::ser_err)?;
+        let sequence_number =
+            i64::try_from(message.sequence_number().value()).map_err(Self::ser_err)?;
 
         Ok(NewMessage {
             id: message.id().into_inner(),
@@ -133,26 +186,19 @@ impl PostgresMessageRepository {
             content,
             metadata,
             created_at: message.created_at(),
-            sequence_number: i64::try_from(message.sequence_number().value())
-                .map_err(|e| RepositoryError::serialization(e.to_string()))?,
+            sequence_number,
         })
     }
 
     /// Converts a database row to a domain Message.
     fn row_to_message(row: MessageRow) -> RepositoryResult<Message> {
-        let role = Role::try_from(row.role.as_str())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+        let role = Role::try_from(row.role.as_str()).map_err(Self::ser_err)?;
+        let content: Vec<ContentPart> =
+            serde_json::from_value(row.content).map_err(Self::ser_err)?;
+        let metadata: MessageMetadata =
+            serde_json::from_value(row.metadata).map_err(Self::ser_err)?;
+        let sequence_number = u64::try_from(row.sequence_number).map_err(Self::ser_err)?;
 
-        let content: Vec<ContentPart> = serde_json::from_value(row.content)
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
-
-        let metadata: MessageMetadata = serde_json::from_value(row.metadata)
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
-
-        let sequence_number = u64::try_from(row.sequence_number)
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
-
-        // Reconstruct message using internal constructor
         Message::from_persisted(
             MessageId::from_uuid(row.id),
             ConversationId::from_uuid(row.conversation_id),
@@ -162,100 +208,106 @@ impl PostgresMessageRepository {
             row.created_at,
             SequenceNumber::new(sequence_number),
         )
-        .map_err(|e| RepositoryError::serialization(e.to_string()))
+        .map_err(Self::ser_err)
     }
 }
 
 #[async_trait]
 impl MessageRepository for PostgresMessageRepository {
     async fn store(&self, message: &Message) -> RepositoryResult<()> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
-
+        let pool = self.pool.clone();
         let new_message = Self::message_to_insertable(message)?;
 
-        diesel::insert_into(messages::table)
-            .values(&new_message)
-            .execute(&mut conn)
-            .map_err(RepositoryError::database)?;
-
-        Ok(())
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
+            Self::insert_message(&mut conn, &new_message)
+        })
+        .await
     }
 
     async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
+        let pool = self.pool.clone();
+        let uuid = id.into_inner();
 
-        let result = messages::table
-            .filter(messages::id.eq(id.into_inner()))
-            .select(MessageRow::as_select())
-            .first::<MessageRow>(&mut conn)
-            .optional()
-            .map_err(RepositoryError::database)?;
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
 
-        match result {
-            Some(row) => Ok(Some(Self::row_to_message(row)?)),
-            None => Ok(None),
-        }
+            let result = messages::table
+                .filter(messages::id.eq(uuid))
+                .select(MessageRow::as_select())
+                .first::<MessageRow>(&mut conn)
+                .optional()
+                .map_err(RepositoryError::database)?;
+
+            match result {
+                Some(row) => Ok(Some(Self::row_to_message(row)?)),
+                None => Ok(None),
+            }
+        })
+        .await
     }
 
     async fn find_by_conversation(
         &self,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
+        let pool = self.pool.clone();
+        let uuid = conversation_id.into_inner();
 
-        let rows = messages::table
-            .filter(messages::conversation_id.eq(conversation_id.into_inner()))
-            .order(messages::sequence_number.asc())
-            .select(MessageRow::as_select())
-            .load::<MessageRow>(&mut conn)
-            .map_err(RepositoryError::database)?;
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
 
-        rows.into_iter().map(Self::row_to_message).collect()
+            let rows = messages::table
+                .filter(messages::conversation_id.eq(uuid))
+                .order(messages::sequence_number.asc())
+                .select(MessageRow::as_select())
+                .load::<MessageRow>(&mut conn)
+                .map_err(RepositoryError::database)?;
+
+            rows.into_iter().map(Self::row_to_message).collect()
+        })
+        .await
     }
 
     async fn next_sequence_number(
         &self,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
+        let pool = self.pool.clone();
+        let uuid = conversation_id.into_inner();
 
-        let max_seq: Option<i64> = messages::table
-            .filter(messages::conversation_id.eq(conversation_id.into_inner()))
-            .select(diesel::dsl::max(messages::sequence_number))
-            .first(&mut conn)
-            .map_err(RepositoryError::database)?;
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
 
-        let next = max_seq.unwrap_or(0).saturating_add(1);
-        let next_u64 =
-            u64::try_from(next).map_err(|e| RepositoryError::serialization(e.to_string()))?;
+            let max_seq: Option<i64> = messages::table
+                .filter(messages::conversation_id.eq(uuid))
+                .select(diesel::dsl::max(messages::sequence_number))
+                .first(&mut conn)
+                .map_err(RepositoryError::database)?;
 
-        Ok(SequenceNumber::new(next_u64))
+            let next = max_seq.unwrap_or(0).saturating_add(1);
+            let next_u64 = u64::try_from(next).map_err(Self::ser_err)?;
+
+            Ok(SequenceNumber::new(next_u64))
+        })
+        .await
     }
 
     async fn exists(&self, id: MessageId) -> RepositoryResult<bool> {
-        let mut conn = self
-            .pool
-            .get()
-            .map_err(|e| RepositoryError::connection(e.to_string()))?;
+        let pool = self.pool.clone();
+        let uuid = id.into_inner();
 
-        let count: i64 = messages::table
-            .filter(messages::id.eq(id.into_inner()))
-            .count()
-            .get_result(&mut conn)
-            .map_err(RepositoryError::database)?;
+        Self::run_blocking(move || {
+            let mut conn = Self::get_conn(&pool)?;
 
-        Ok(count > 0)
+            let count: i64 = messages::table
+                .filter(messages::id.eq(uuid))
+                .count()
+                .get_result(&mut conn)
+                .map_err(RepositoryError::database)?;
+
+            Ok(count > 0)
+        })
+        .await
     }
 }

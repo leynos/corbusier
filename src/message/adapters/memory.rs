@@ -4,6 +4,7 @@
 //! without database dependencies. Not suitable for production use.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
@@ -13,6 +14,23 @@ use crate::message::{
     error::RepositoryError,
     ports::repository::{MessageRepository, RepositoryResult},
 };
+
+/// Error indicating a duplicate message ID was detected.
+///
+/// Used by the in-memory adapter to report uniqueness violations
+/// in a backend-agnostic way via [`RepositoryError::database`].
+#[derive(Debug)]
+struct DuplicateIdError {
+    id: MessageId,
+}
+
+impl fmt::Display for DuplicateIdError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "message with id {} already exists", self.id)
+    }
+}
+
+impl std::error::Error for DuplicateIdError {}
 
 /// In-memory implementation of [`MessageRepository`].
 ///
@@ -41,9 +59,9 @@ impl InMemoryMessageRepository {
 
     /// Returns the number of stored messages.
     ///
-    /// # Panics
-    ///
-    /// Panics if the internal lock is poisoned.
+    /// Returns `0` if the internal lock is poisoned, matching the fallback
+    /// behaviour of an empty repository. For error-propagating access, use
+    /// the repository trait methods instead.
     #[must_use]
     pub fn len(&self) -> usize {
         self.messages.read().map(|guard| guard.len()).unwrap_or(0)
@@ -65,10 +83,9 @@ impl MessageRepository for InMemoryMessageRepository {
             .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
 
         if guard.contains_key(&message.id()) {
-            return Err(RepositoryError::Database(Arc::new(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                format!("message with id {} already exists", message.id()),
-            ))));
+            return Err(RepositoryError::database(DuplicateIdError {
+                id: message.id(),
+            }));
         }
 
         guard.insert(message.id(), message.clone());
