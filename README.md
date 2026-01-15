@@ -86,11 +86,8 @@ make fmt
 # Run linter
 make lint
 
-# Run tests
+# Run tests (includes PostgreSQL integration tests)
 make test
-
-# Run PostgreSQL integration tests (requires pg-embed-setup-unpriv)
-make test-postgres
 
 # Build the project
 make build

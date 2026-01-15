@@ -29,11 +29,6 @@ diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_j
 # Async runtime
 tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
 
-[features]
-default = []
-# Enable PostgreSQL integration tests (requires pg-embed-setup-unpriv infrastructure)
-postgres-tests = []
-
 [dev-dependencies]
 rstest = "0.24"
 mockall = "0.13"

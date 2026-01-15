@@ -5,20 +5,7 @@
 //! error handling.
 //!
 //! Uses `pg-embed-setup-unpriv` for embedded `PostgreSQL` lifecycle management.
-//!
-//! # Running these tests
-//!
-//! These tests require `pg-embed-setup-unpriv` infrastructure which needs:
-//! 1. The `pg_embedded_setup_unpriv` binary installed
-//! 2. Proper permissions for the worker process
-//!
-//! Run with: `cargo test --test postgres_repository_integration`
-//!
-//! Or set `PG_EMBEDDED_WORKER` to the path of the worker binary.
 
-// Skip this entire test module unless the `postgres-tests` feature is enabled.
-// This prevents CI failures in environments without PostgreSQL infrastructure.
-#![cfg(feature = "postgres-tests")]
 #![expect(
     clippy::expect_used,
     reason = "Test code uses expect for assertion clarity"
