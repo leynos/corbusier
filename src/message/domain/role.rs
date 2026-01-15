@@ -3,6 +3,18 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Error returned when parsing an invalid role string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseRoleError(String);
+
+impl fmt::Display for ParseRoleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid role: '{}'", self.0)
+    }
+}
+
+impl std::error::Error for ParseRoleError {}
+
 /// The role of a message participant in a conversation.
 ///
 /// Corbusier uses four roles to classify message sources, enabling consistent
@@ -42,6 +54,19 @@ impl fmt::Display for Role {
 }
 
 impl Role {
+    /// Returns the string representation of this role.
+    ///
+    /// This matches the serialized form used in database storage.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Assistant => "assistant",
+            Self::Tool => "tool",
+            Self::System => "system",
+        }
+    }
+
     /// Returns `true` if this role can initiate tool calls.
     ///
     /// Only assistant messages may contain tool call requests.
@@ -66,5 +91,19 @@ impl Role {
     #[must_use]
     pub const fn is_tool(&self) -> bool {
         matches!(self, Self::Tool)
+    }
+}
+
+impl TryFrom<&str> for Role {
+    type Error = ParseRoleError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "user" => Ok(Self::User),
+            "assistant" => Ok(Self::Assistant),
+            "tool" => Ok(Self::Tool),
+            "system" => Ok(Self::System),
+            _ => Err(ParseRoleError(s.to_owned())),
+        }
     }
 }

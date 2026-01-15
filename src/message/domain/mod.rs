@@ -13,4 +13,4 @@ pub use content::{AttachmentPart, ContentPart, TextPart, ToolCallPart, ToolResul
 pub use ids::{ConversationId, MessageId, SequenceNumber, TurnId};
 pub use message::{Message, MessageBuilder, MessageBuilderError};
 pub use metadata::{MessageMetadata, SlashCommandExpansion};
-pub use role::Role;
+pub use role::{ParseRoleError, Role};

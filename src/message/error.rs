@@ -191,6 +191,12 @@ impl RepositoryError {
     }
 }
 
+impl From<diesel::result::Error> for RepositoryError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::database(err)
+    }
+}
+
 /// Errors that can occur during schema version upgrades.
 #[derive(Debug, Error)]
 pub enum SchemaUpgradeError {

@@ -5691,9 +5691,9 @@ be using JSONB.
 
 ###### Canonical Message Domain Model
 
-For screen readers: The following class diagram illustrates the canonical message
-domain model, showing the Message aggregate root and its related value objects,
-including content parts, metadata, and identity types.
+For screen readers: The following class diagram illustrates the canonical
+message domain model, showing the Message aggregate root and its related value
+objects, including content parts, metadata, and identity types.
 
 ```mermaid
 classDiagram
