@@ -224,12 +224,25 @@ mod tests {
         assert!(validate_message_id(&message).is_ok());
     }
 
-    // Note: A negative test for validate_message_id (nil ID rejection) is omitted because
-    // the Message constructors (Message::new and MessageBuilder) always generate non-nil
-    // UUIDs via MessageId::new(). There is no public API to create a Message with a nil
-    // ID, making the nil ID branch in validate_message_id unreachable in normal usage.
-    // The validation exists as a defensive check for potential future serialization
-    // round-trips or deserialization of external data.
+    #[rstest]
+    fn validate_message_id_rejects_nil_id(clock: DefaultClock) {
+        // Create a valid message, then deserialize a modified version with nil ID.
+        // This tests the defensive validation for external data/deserialization.
+        let message =
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
+        let mut json_value: serde_json::Value = serde_json::to_value(&message).expect("serialize");
+        *json_value
+            .get_mut("id")
+            .expect("message should have id field") =
+            serde_json::json!("00000000-0000-0000-0000-000000000000");
+        let nil_id_message: Message =
+            serde_json::from_value(json_value).expect("deserialize with nil ID");
+
+        assert!(matches!(
+            validate_message_id(&nil_id_message),
+            Err(ValidationError::MissingMessageId)
+        ));
+    }
 
     #[rstest]
     fn validate_content_not_empty_accepts_non_empty(clock: DefaultClock) {
