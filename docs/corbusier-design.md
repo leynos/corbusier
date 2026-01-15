@@ -5703,18 +5703,18 @@ classDiagram
         -Role role
         -Vec~ContentPart~ content
         -MessageMetadata metadata
-        -DateTime_Utc_ created_at
+        -DateTime~Utc~ created_at
         -SequenceNumber sequence_number
-        +new(conversation_id: ConversationId, role: Role, content: Vec~ContentPart~, sequence_number: SequenceNumber, clock: Clock) Result~Message, MessageBuilderError~
-        +new_with_id(id: MessageId, conversation_id: ConversationId, role: Role, content: Vec~ContentPart~, sequence_number: SequenceNumber, clock: Clock) Result~Message, MessageBuilderError~
+        +new(...) Result
+        +new_with_id(...) Result
         +id() MessageId
         +conversation_id() ConversationId
         +role() Role
         +content() Vec~ContentPart~
         +metadata() MessageMetadata
-        +created_at() DateTime_Utc_
+        +created_at() DateTime~Utc~
         +sequence_number() SequenceNumber
-        +builder(conversation_id: ConversationId, role: Role, sequence_number: SequenceNumber) MessageBuilder
+        +builder(...) MessageBuilder
     }
 
     class MessageBuilder {
@@ -5724,12 +5724,12 @@ classDiagram
         -Vec~ContentPart~ content
         -MessageMetadata metadata
         -SequenceNumber sequence_number
-        +new(conversation_id: ConversationId, role: Role, sequence_number: SequenceNumber) MessageBuilder
-        +with_id(id: MessageId) MessageBuilder
-        +with_content(part: ContentPart) MessageBuilder
-        +with_content_parts(parts: IntoIterator_ContentPart_) MessageBuilder
-        +with_metadata(metadata: MessageMetadata) MessageBuilder
-        +build(clock: Clock) Result~Message, MessageBuilderError~
+        +new(...) MessageBuilder
+        +with_id(id) MessageBuilder
+        +with_content(part) MessageBuilder
+        +with_content_parts(parts) MessageBuilder
+        +with_metadata(metadata) MessageBuilder
+        +build(clock) Result
     }
 
     class MessageBuilderError {
@@ -5747,7 +5747,7 @@ classDiagram
 
     class TextPart {
         +String text
-        +new(text: String) TextPart
+        +new(text) TextPart
         +is_empty() bool
         +len() usize
     }
@@ -5756,7 +5756,7 @@ classDiagram
         +String call_id
         +String name
         +Value arguments
-        +new(call_id: String, name: String, arguments: Value) ToolCallPart
+        +new(call_id, name, args) ToolCallPart
         +is_valid() bool
     }
 
@@ -5764,8 +5764,8 @@ classDiagram
         +String call_id
         +Value content
         +bool success
-        +success(call_id: String, content: Value) ToolResultPart
-        +failure(call_id: String, error: String) ToolResultPart
+        +success(call_id, content) ToolResultPart
+        +failure(call_id, error) ToolResultPart
         +is_valid() bool
     }
 
@@ -5774,22 +5774,22 @@ classDiagram
         +Option~String~ name
         +String data
         +Option~u64~ size_bytes
-        +new(mime_type: String, data: String) AttachmentPart
-        +with_name(name: String) AttachmentPart
-        +with_size(size_bytes: u64) AttachmentPart
+        +new(mime_type, data) AttachmentPart
+        +with_name(name) AttachmentPart
+        +with_size(size) AttachmentPart
         +is_valid() bool
     }
 
     class MessageMetadata {
         +Option~String~ agent_backend
         +Option~TurnId~ turn_id
-        +Option~SlashCommandExpansion~ slash_command_expansion
+        +Option~SlashCommandExpansion~ expansion
         +HashMap~String, Value~ extensions
         +empty() MessageMetadata
-        +with_agent_backend(agent_backend: String) MessageMetadata
-        +with_turn_id(turn_id: TurnId) MessageMetadata
-        +with_slash_command_expansion(expansion: SlashCommandExpansion) MessageMetadata
-        +with_extension(key: String, value: Value) MessageMetadata
+        +with_agent_backend(backend) MessageMetadata
+        +with_turn_id(turn_id) MessageMetadata
+        +with_slash_command_expansion(exp) MessageMetadata
+        +with_extension(key, value) MessageMetadata
         +is_empty() bool
     }
 
@@ -5797,8 +5797,8 @@ classDiagram
         +String command
         +HashMap~String, Value~ parameters
         +String expanded_content
-        +new(command: String, expanded_content: String) SlashCommandExpansion
-        +with_parameter(key: String, value: Value) SlashCommandExpansion
+        +new(command, content) SlashCommandExpansion
+        +with_parameter(key, value) SlashCommandExpansion
     }
 
     class Role {
@@ -5816,34 +5816,34 @@ classDiagram
     class MessageId {
         -Uuid value
         +new() MessageId
-        +from_uuid(uuid: Uuid) MessageId
+        +from_uuid(uuid) MessageId
         +into_inner() Uuid
     }
 
     class ConversationId {
         -Uuid value
         +new() ConversationId
-        +from_uuid(uuid: Uuid) ConversationId
+        +from_uuid(uuid) ConversationId
         +into_inner() Uuid
     }
 
     class TurnId {
         -Uuid value
         +new() TurnId
-        +from_uuid(uuid: Uuid) TurnId
+        +from_uuid(uuid) TurnId
         +into_inner() Uuid
     }
 
     class SequenceNumber {
         -u64 value
-        +new(value: u64) SequenceNumber
+        +new(value) SequenceNumber
         +value() u64
         +next() SequenceNumber
     }
 
     class Clock {
         <<interface>>
-        +utc() DateTime_Utc_
+        +utc() DateTime~Utc~
     }
 
     Message o-- MessageId

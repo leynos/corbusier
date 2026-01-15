@@ -110,17 +110,17 @@ Thresholds that trigger escalation:
   layer-based (src/domain/, src/ports/)
   Rationale: Aligns with AGENTS.md "group by feature, not layer" and
   hexagonal architecture skill guidance for smaller projects.
-  Date/Author: Initial plan
+  Date/Author: Initial plan.
 
 - Decision: Use mockable crate for Clock abstraction
   Rationale: Documented in docs/reliable-testing-in-rust-via-dependency-
   injection.md as the preferred approach; avoids environment mutation.
-  Date/Author: Initial plan
+  Date/Author: Initial plan.
 
 - Decision: Store ContentPart as serde tagged enum with snake_case
   Rationale: Matches the JSONB "type" field pattern in
   corbusier-design.md section 6.2.1.2.
-  Date/Author: Initial plan
+  Date/Author: Initial plan.
 
 ## Outcomes & Retrospective
 

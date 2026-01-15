@@ -38,7 +38,7 @@ pub fn validate_content_not_empty(message: &Message) -> Result<(), ValidationErr
 ///
 /// # Errors
 ///
-/// Returns `ValidationError::MessageTooLarge` if the serialised message
+/// Returns `ValidationError::MessageTooLarge` if the serialized message
 /// exceeds the configured limit.
 pub fn validate_message_size(
     message: &Message,

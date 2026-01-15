@@ -1,56 +1,60 @@
 //! Unit tests for validation service - structure validation tests.
 
-use super::validation_fixtures::{clock, create_message, default_validator};
+use super::validation_fixtures::{default_validator, message_factory};
 use crate::message::{
-    domain::{ContentPart, Role, TextPart, ToolResultPart},
+    domain::{ContentPart, Message, Role, TextPart, ToolResultPart},
     ports::validator::MessageValidator,
     validation::service::DefaultMessageValidator,
 };
-use mockable::DefaultClock;
 use rstest::rstest;
 use serde_json::json;
 
 #[rstest]
-fn valid_text_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("Hello"))],
-        &clock,
-    );
+fn valid_text_message_passes(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(Role::User, vec![ContentPart::Text(TextPart::new("Hello"))]);
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn valid_assistant_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
+fn valid_assistant_message_passes(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(
         Role::Assistant,
         vec![ContentPart::Text(TextPart::new("Here is my response"))],
-        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn valid_tool_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
+fn valid_tool_message_passes(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(
         Role::Tool,
         vec![ContentPart::ToolResult(ToolResultPart::success(
             "call-123",
             json!({"result": "success"}),
         ))],
-        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn valid_system_message_passes(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
+fn valid_system_message_passes(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(
         Role::System,
         vec![ContentPart::Text(TextPart::new(
             "You are a helpful assistant",
         ))],
-        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
@@ -58,22 +62,17 @@ fn valid_system_message_passes(default_validator: DefaultMessageValidator, clock
 #[rstest]
 fn validate_structure_checks_id_and_content(
     default_validator: DefaultMessageValidator,
-    clock: DefaultClock,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
 ) {
-    let message = create_message(
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("test"))],
-        &clock,
-    );
+    let message = message_factory(Role::User, vec![ContentPart::Text(TextPart::new("test"))]);
     assert!(default_validator.validate_structure(&message).is_ok());
 }
 
 #[rstest]
-fn validate_content_checks_parts(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("test"))],
-        &clock,
-    );
+fn validate_content_checks_parts(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(Role::User, vec![ContentPart::Text(TextPart::new("test"))]);
     assert!(default_validator.validate_content(&message).is_ok());
 }

@@ -1,13 +1,12 @@
 //! Unit tests for validation service - limits and multi-part tests.
 
-use super::validation_fixtures::{clock, create_message, default_validator, strict_validator};
+use super::validation_fixtures::{default_validator, message_factory, strict_validator};
 use crate::message::{
-    domain::{ContentPart, Role, TextPart, ToolCallPart},
+    domain::{ContentPart, Message, Role, TextPart, ToolCallPart},
     error::ValidationError,
     ports::validator::{MessageValidator, ValidationConfig},
     validation::service::DefaultMessageValidator,
 };
-use mockable::DefaultClock;
 use rstest::rstest;
 use serde_json::json;
 
@@ -16,28 +15,32 @@ use serde_json::json;
 // ============================================================================
 
 #[rstest]
-fn multiple_valid_parts_pass(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
+fn multiple_valid_parts_pass(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(
         Role::Assistant,
         vec![
             ContentPart::Text(TextPart::new("Here are the results:")),
             ContentPart::ToolCall(ToolCallPart::new("call-1", "tool_a", json!({}))),
             ContentPart::ToolCall(ToolCallPart::new("call-2", "tool_b", json!({}))),
         ],
-        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn multiple_errors_collected(default_validator: DefaultMessageValidator, clock: DefaultClock) {
-    let message = create_message(
+fn multiple_errors_collected(
+    default_validator: DefaultMessageValidator,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
+) {
+    let message = message_factory(
         Role::Assistant,
         vec![
             ContentPart::Text(TextPart::new("")), // Invalid: empty text
             ContentPart::ToolCall(ToolCallPart::new("", "tool", json!({}))), // Invalid: no call_id
         ],
-        &clock,
     );
     let result = default_validator.validate(&message);
 
@@ -58,7 +61,7 @@ fn multiple_errors_collected(default_validator: DefaultMessageValidator, clock: 
 #[rstest]
 fn message_exceeding_max_content_parts_fails(
     strict_validator: DefaultMessageValidator,
-    clock: DefaultClock,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
 ) {
     // Strict config has max_content_parts of 20
     // Create 21 content parts (exceeds limit of 20)
@@ -66,7 +69,7 @@ fn message_exceeding_max_content_parts_fails(
         .map(|i| ContentPart::Text(TextPart::new(format!("Part {i}"))))
         .collect();
 
-    let message = create_message(Role::User, parts, &clock);
+    let message = message_factory(Role::User, parts);
     let result = strict_validator.validate(&message);
     assert!(matches!(
         result,
@@ -84,18 +87,17 @@ fn message_exceeding_max_content_parts_fails(
 #[rstest]
 fn message_within_size_limit_passes(
     default_validator: DefaultMessageValidator,
-    clock: DefaultClock,
+    message_factory: impl Fn(Role, Vec<ContentPart>) -> Message,
 ) {
-    let message = create_message(
+    let message = message_factory(
         Role::User,
         vec![ContentPart::Text(TextPart::new("Hello, world!"))],
-        &clock,
     );
     assert!(default_validator.validate(&message).is_ok());
 }
 
 #[rstest]
-fn message_exceeding_size_limit_fails(clock: DefaultClock) {
+fn message_exceeding_size_limit_fails(message_factory: impl Fn(Role, Vec<ContentPart>) -> Message) {
     // Create a config with a very small size limit
     let config = ValidationConfig {
         max_message_size_bytes: 100,
@@ -103,12 +105,11 @@ fn message_exceeding_size_limit_fails(clock: DefaultClock) {
     };
     let validator = DefaultMessageValidator::with_config(config);
 
-    // Create a message that exceeds 100 bytes when serialised
+    // Create a message that exceeds 100 bytes when serialized
     let large_text = "x".repeat(200);
-    let message = create_message(
+    let message = message_factory(
         Role::User,
         vec![ContentPart::Text(TextPart::new(large_text))],
-        &clock,
     );
 
     let result = validator.validate(&message);
