@@ -80,7 +80,7 @@ fn map_constraint_to_duplicate_error(constraint: &str, ids: &InsertIds) -> Optio
 ///
 /// The key name is interpolated via `format!` but is always a controlled
 /// static string from the audit context fields, not user input.
-/// `PostgreSQL` does not support parameterised identifiers or values in
+/// `PostgreSQL` does not support parameterized identifiers or values in
 /// SET statements, so both key and value must be interpolated.
 ///
 /// # Security
