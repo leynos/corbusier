@@ -1,6 +1,12 @@
 //! Audit context tests for `PostgreSQL` message repository.
 //!
 //! Tests `store_with_audit` session variable propagation.
+//!
+//! Note: Full `audit_logs` table verification requires a database trigger that
+//! captures session variables (`app.correlation_id`, etc.) into the `audit_logs`
+//! table on INSERT. The current tests verify the session variables are set
+//! correctly via `SET LOCAL` SQL commands; actual `audit_logs` table assertions
+//! will be added when the trigger is implemented.
 
 use crate::postgres::helpers::{
     CleanupGuard, clock, ensure_template, insert_conversation, setup_repository, test_runtime,

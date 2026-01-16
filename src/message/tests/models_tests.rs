@@ -80,7 +80,7 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
 
 #[rstest]
 fn try_from_domain_handles_large_sequence_within_i64(clock: DefaultClock) {
-    let max_i64_as_u64: u64 = i64::MAX as u64;
+    let max_i64_as_u64: u64 = u64::try_from(i64::MAX).expect("i64::MAX should fit in u64");
     let message = create_test_message(&clock, max_i64_as_u64);
 
     let result = NewMessage::try_from_domain(&message);
@@ -325,7 +325,8 @@ fn row_to_message_handles_max_valid_sequence_number() {
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
-    assert_eq!(message.sequence_number().value(), i64::MAX as u64);
+    let expected_value = u64::try_from(i64::MAX).expect("i64::MAX should fit in u64");
+    assert_eq!(message.sequence_number().value(), expected_value);
 }
 
 #[rstest]

@@ -8880,12 +8880,11 @@ sequenceDiagram
 
 ###### Trace Context Propagation
 
-| Boundary            | Propagation Method | Context Format        | Implementation        |
-| ------------------- | ------------------ | --------------------- | --------------------- |
-| HTTP Requests       | HTTP Headers       | W3C Trace Context     | Actix-Web middleware  |
-| Agent Backends      | SDK Integration    | OpenTelemetry context | Custom propagation    |
-| Tool Execution      | MCP Protocol       | Custom headers        | MCP middleware        |
-| Database Operations | Diesel integration | Span context          | Query instrumentation |
+| Boundary       | Propagation Method | Context Format        | Implementation       |
+| -------------- | ------------------ | --------------------- | -------------------- |
+| HTTP Requests  | HTTP Headers       | W3C Trace Context     | Actix-Web middleware |
+| Agent Backends | SDK Integration    | OpenTelemetry context | Custom propagation   |
+| Tool Execution | MCP Protocol       | Custom headers        | MCP middleware       |
 
 ##### 6.5.1.4 Alert Management System
 
