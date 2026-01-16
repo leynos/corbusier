@@ -28,6 +28,10 @@ pub const CREATE_SCHEMA_SQL: &str =
 pub const ADD_CONSTRAINTS_SQL: &str =
     include_str!("../../migrations/2025-01-15-000001_add_message_uniqueness_constraints/up.sql");
 
+/// SQL to add audit trigger.
+pub const ADD_AUDIT_TRIGGER_SQL: &str =
+    include_str!("../../migrations/2025-01-16-000000_add_audit_trigger/up.sql");
+
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
 
@@ -55,6 +59,7 @@ pub fn ensure_template(
             let mut conn = PgConnection::establish(&url).map_err(|e| eyre::eyre!("{e}"))?;
             execute_sql_statements(&mut conn, CREATE_SCHEMA_SQL)?;
             execute_sql_statements(&mut conn, ADD_CONSTRAINTS_SQL)?;
+            execute_sql_statements(&mut conn, ADD_AUDIT_TRIGGER_SQL)?;
             Ok(())
         })
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
@@ -173,4 +178,47 @@ pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: Conver
     .bind::<diesel::sql_types::Uuid, _>(conv_id.into_inner())
     .execute(&mut conn)
     .expect("insert conversation");
+}
+
+/// Row from the `audit_logs` table for verification.
+#[expect(dead_code, reason = "Fields are populated by Diesel but not all read in tests")]
+#[derive(diesel::QueryableByName, Debug)]
+pub struct AuditLogRow {
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub id: uuid::Uuid,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub table_name: String,
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub operation: String,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Uuid>)]
+    pub row_id: Option<uuid::Uuid>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Uuid>)]
+    pub correlation_id: Option<uuid::Uuid>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Uuid>)]
+    pub causation_id: Option<uuid::Uuid>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Uuid>)]
+    pub user_id: Option<uuid::Uuid>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Uuid>)]
+    pub session_id: Option<uuid::Uuid>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub application_name: Option<String>,
+}
+
+/// Fetches the audit log entry for a specific message row ID.
+pub fn fetch_audit_log_for_message(
+    cluster: &TestCluster,
+    db_name: &str,
+    message_id: uuid::Uuid,
+) -> Option<AuditLogRow> {
+    let url = cluster.connection().database_url(db_name);
+    let mut conn = PgConnection::establish(&url).expect("connection");
+
+    diesel::sql_query(
+        "SELECT id, table_name, operation, row_id, correlation_id, causation_id, \
+         user_id, session_id, application_name \
+         FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
+    )
+    .bind::<diesel::sql_types::Uuid, _>(message_id)
+    .get_result::<AuditLogRow>(&mut conn)
+    .ok()
 }

@@ -1,15 +1,11 @@
 //! Audit context tests for `PostgreSQL` message repository.
 //!
-//! Tests `store_with_audit` session variable propagation.
-//!
-//! Note: Full `audit_logs` table verification requires a database trigger that
-//! captures session variables (`app.correlation_id`, etc.) into the `audit_logs`
-//! table on INSERT. The current tests verify the session variables are set
-//! correctly via `SET LOCAL` SQL commands; actual `audit_logs` table assertions
-//! will be added when the trigger is implemented.
+//! Tests `store_with_audit` session variable propagation and `audit_logs` table
+//! verification via the database trigger.
 
 use crate::postgres::helpers::{
-    CleanupGuard, clock, ensure_template, insert_conversation, setup_repository, test_runtime,
+    CleanupGuard, clock, ensure_template, fetch_audit_log_for_message, insert_conversation,
+    setup_repository, test_runtime,
 };
 use corbusier::message::{
     adapters::audit_context::AuditContext,
@@ -43,11 +39,16 @@ fn store_with_audit_sets_session_variables(
     )
     .expect("valid message");
 
+    let correlation_id = uuid::Uuid::new_v4();
+    let causation_id = uuid::Uuid::new_v4();
+    let user_id = uuid::Uuid::new_v4();
+    let session_id = uuid::Uuid::new_v4();
+
     let audit = AuditContext::empty()
-        .with_correlation_id(uuid::Uuid::new_v4())
-        .with_causation_id(uuid::Uuid::new_v4())
-        .with_user_id(uuid::Uuid::new_v4())
-        .with_session_id(uuid::Uuid::new_v4());
+        .with_correlation_id(correlation_id)
+        .with_causation_id(causation_id)
+        .with_user_id(user_id)
+        .with_session_id(session_id);
 
     let rt = test_runtime();
 
@@ -60,6 +61,19 @@ fn store_with_audit_sets_session_variables(
         .expect("exists");
 
     assert_eq!(retrieved.id(), message.id());
+
+    // Verify audit_logs entry was created with correct context
+    let audit_log =
+        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
+            .expect("audit log entry should exist");
+
+    assert_eq!(audit_log.table_name, "messages");
+    assert_eq!(audit_log.operation, "INSERT");
+    assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
+    assert_eq!(audit_log.correlation_id, Some(correlation_id));
+    assert_eq!(audit_log.causation_id, Some(causation_id));
+    assert_eq!(audit_log.user_id, Some(user_id));
+    assert_eq!(audit_log.session_id, Some(session_id));
 }
 
 #[rstest]
@@ -93,6 +107,19 @@ fn store_with_audit_handles_empty_context(
         .expect("store_with_audit with empty context");
 
     assert!(rt.block_on(repo.exists(message.id())).expect("exists"));
+
+    // Verify audit_logs entry was created with NULL context fields
+    let audit_log =
+        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
+            .expect("audit log entry should exist");
+
+    assert_eq!(audit_log.table_name, "messages");
+    assert_eq!(audit_log.operation, "INSERT");
+    assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
+    assert!(audit_log.correlation_id.is_none());
+    assert!(audit_log.causation_id.is_none());
+    assert!(audit_log.user_id.is_none());
+    assert!(audit_log.session_id.is_none());
 }
 
 #[rstest]
@@ -117,11 +144,25 @@ fn store_with_audit_handles_partial_context(
     )
     .expect("msg");
 
-    let audit = AuditContext::empty().with_correlation_id(uuid::Uuid::new_v4());
+    let correlation_id = uuid::Uuid::new_v4();
+    let audit = AuditContext::empty().with_correlation_id(correlation_id);
 
     let rt = test_runtime();
     rt.block_on(repo.store_with_audit(&message, &audit))
         .expect("store_with_audit with partial context");
 
     assert!(rt.block_on(repo.exists(message.id())).expect("exists"));
+
+    // Verify audit_logs entry was created with only correlation_id set
+    let audit_log =
+        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
+            .expect("audit log entry should exist");
+
+    assert_eq!(audit_log.table_name, "messages");
+    assert_eq!(audit_log.operation, "INSERT");
+    assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
+    assert_eq!(audit_log.correlation_id, Some(correlation_id));
+    assert!(audit_log.causation_id.is_none());
+    assert!(audit_log.user_id.is_none());
+    assert!(audit_log.session_id.is_none());
 }
