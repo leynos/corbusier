@@ -1,0 +1,336 @@
+//! Serialization round-trip tests for `PostgreSQL` message repository.
+//!
+//! Tests role parsing, JSONB content, metadata, and UUID handling.
+
+#![expect(
+    clippy::indexing_slicing,
+    reason = "Test code uses indexing after length checks"
+)]
+
+use crate::postgres::helpers::{
+    CleanupGuard, RoleResult, clock, ensure_template, insert_conversation, setup_repository,
+    test_runtime,
+};
+use corbusier::message::{
+    domain::{
+        AttachmentPart, ContentPart, ConversationId, Message, MessageId, MessageMetadata, Role,
+        SequenceNumber, TextPart, ToolCallPart, ToolResultPart,
+    },
+    ports::repository::MessageRepository,
+};
+use diesel::prelude::*;
+use mockable::DefaultClock;
+use pg_embedded_setup_unpriv::TestCluster;
+use pg_embedded_setup_unpriv::test_support::shared_test_cluster;
+use rstest::rstest;
+
+// ============================================================================
+// Role Round-Trip Tests
+// ============================================================================
+
+#[rstest]
+#[case(Role::User, "user")]
+#[case(Role::Assistant, "assistant")]
+#[case(Role::Tool, "tool")]
+#[case(Role::System, "system")]
+fn role_round_trip_through_persistence(
+    clock: DefaultClock,
+    shared_test_cluster: &'static TestCluster,
+    #[case] role: Role,
+    #[case] expected_str: &str,
+) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_role_rt_{}_{}", expected_str, uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let message = Message::new(
+        conv_id,
+        role,
+        vec![ContentPart::Text(TextPart::new("Role test"))],
+        SequenceNumber::new(1),
+        &clock,
+    )
+    .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&message)).expect("store");
+
+    let url = shared_test_cluster.connection().database_url(&db_name);
+    let mut conn = PgConnection::establish(&url).expect("connection");
+    let stored_role: String = diesel::sql_query("SELECT role FROM messages WHERE id = $1")
+        .bind::<diesel::sql_types::Uuid, _>(message.id().into_inner())
+        .get_result::<RoleResult>(&mut conn)
+        .expect("query")
+        .role;
+
+    assert_eq!(stored_role, expected_str);
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(message.id()))
+        .expect("find")
+        .expect("exists");
+
+    assert_eq!(retrieved.role(), role);
+}
+
+// ============================================================================
+// JSONB Round-Trip Tests
+// ============================================================================
+
+#[rstest]
+fn content_jsonb_round_trip_with_multiple_parts(
+    clock: DefaultClock,
+    shared_test_cluster: &'static TestCluster,
+) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_jsonb_content_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let content = vec![
+        ContentPart::Text(TextPart::new("Hello world")),
+        ContentPart::Attachment(AttachmentPart::new("image/png", "iVBORw0KGgo=")),
+        ContentPart::ToolCall(ToolCallPart::new(
+            "call_123",
+            "search",
+            serde_json::json!({"query": "test"}),
+        )),
+    ];
+
+    let message = Message::new(
+        conv_id,
+        Role::Assistant,
+        content,
+        SequenceNumber::new(1),
+        &clock,
+    )
+    .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&message)).expect("store");
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(message.id()))
+        .expect("find")
+        .expect("exists");
+
+    assert_eq!(retrieved.content().len(), 3);
+
+    match &retrieved.content()[0] {
+        ContentPart::Text(text) => assert_eq!(text.text, "Hello world"),
+        other => panic!("Expected Text, got {other:?}"),
+    }
+
+    match &retrieved.content()[1] {
+        ContentPart::Attachment(att) => {
+            assert_eq!(att.mime_type, "image/png");
+            assert_eq!(att.data, "iVBORw0KGgo=");
+        }
+        other => panic!("Expected Attachment, got {other:?}"),
+    }
+
+    match &retrieved.content()[2] {
+        ContentPart::ToolCall(call) => {
+            assert_eq!(call.call_id, "call_123");
+            assert_eq!(call.name, "search");
+            assert_eq!(call.arguments, serde_json::json!({"query": "test"}));
+        }
+        other => panic!("Expected ToolCall, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_tool_result_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let success_result =
+        ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
+    let failure_result = ToolResultPart::failure("call_789", "Network timeout");
+
+    let message = Message::new(
+        conv_id,
+        Role::Tool,
+        vec![
+            ContentPart::ToolResult(success_result),
+            ContentPart::ToolResult(failure_result),
+        ],
+        SequenceNumber::new(1),
+        &clock,
+    )
+    .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&message)).expect("store");
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(message.id()))
+        .expect("find")
+        .expect("exists");
+
+    assert_eq!(retrieved.content().len(), 2);
+
+    match &retrieved.content()[0] {
+        ContentPart::ToolResult(result) => {
+            assert_eq!(result.call_id, "call_456");
+            assert!(result.success);
+            assert_eq!(
+                result.content,
+                serde_json::json!({"result": "found 42 items"})
+            );
+        }
+        other => panic!("Expected ToolResult, got {other:?}"),
+    }
+
+    match &retrieved.content()[1] {
+        ContentPart::ToolResult(result) => {
+            assert_eq!(result.call_id, "call_789");
+            assert!(!result.success);
+        }
+        other => panic!("Expected ToolResult, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_metadata_jsonb_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let metadata = MessageMetadata::with_agent_backend("claude-3-opus");
+
+    let message = Message::builder(conv_id, Role::Assistant, SequenceNumber::new(1))
+        .with_content(ContentPart::Text(TextPart::new("Response")))
+        .with_metadata(metadata)
+        .build(&clock)
+        .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&message)).expect("store");
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(message.id()))
+        .expect("find")
+        .expect("exists");
+
+    assert_eq!(
+        retrieved.metadata().agent_backend,
+        Some("claude-3-opus".to_owned())
+    );
+}
+
+// ============================================================================
+// Domain Invariant Tests
+// ============================================================================
+
+#[rstest]
+fn from_persisted_preserves_all_domain_invariants(
+    clock: DefaultClock,
+    shared_test_cluster: &'static TestCluster,
+) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_from_persisted_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let original = Message::new(
+        conv_id,
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("Test content"))],
+        SequenceNumber::new(42),
+        &clock,
+    )
+    .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&original)).expect("store");
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(original.id()))
+        .expect("find")
+        .expect("exists");
+
+    assert!(
+        !retrieved.id().into_inner().is_nil(),
+        "ID should not be nil"
+    );
+    assert!(
+        !retrieved.conversation_id().into_inner().is_nil(),
+        "Conversation ID should not be nil"
+    );
+    assert!(
+        !retrieved.content().is_empty(),
+        "Content should not be empty"
+    );
+    assert_eq!(retrieved.sequence_number().value(), 42);
+
+    // Tighter tolerance for local database operations
+    let time_diff = (original.created_at() - retrieved.created_at())
+        .num_milliseconds()
+        .abs();
+    assert!(
+        time_diff < 100,
+        "Timestamp should be preserved within 100ms, diff was {time_diff}ms"
+    );
+}
+
+// ============================================================================
+// UUID Handling Tests
+// ============================================================================
+
+#[rstest]
+fn uuid_round_trip_preserves_values(
+    clock: DefaultClock,
+    shared_test_cluster: &'static TestCluster,
+) {
+    ensure_template(shared_test_cluster).expect("template setup");
+    let db_name = format!("test_uuid_rt_{}", uuid::Uuid::new_v4());
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+
+    let conv_id = ConversationId::new();
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
+
+    let specific_msg_id = MessageId::from_uuid(
+        uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("valid uuid"),
+    );
+
+    let message = Message::builder(conv_id, Role::User, SequenceNumber::new(1))
+        .with_id(specific_msg_id)
+        .with_content(ContentPart::Text(TextPart::new("UUID test")))
+        .build(&clock)
+        .expect("valid message");
+
+    let rt = test_runtime();
+    rt.block_on(repo.store(&message)).expect("store");
+
+    let retrieved = rt
+        .block_on(repo.find_by_id(specific_msg_id))
+        .expect("find")
+        .expect("exists");
+
+    assert_eq!(
+        retrieved.id().into_inner().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
+    );
+    assert_eq!(retrieved.conversation_id(), conv_id);
+}

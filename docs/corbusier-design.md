@@ -1186,7 +1186,7 @@ runtimes.
 
 #### 3.2.2 Async Runtime
 
-##### Tokio 1.43
+##### Tokio 1.49.0
 
 Tokio is a runtime for writing reliable asynchronous applications with Rust. It
 provides async I/O, networking, scheduling, timers, and more.
@@ -1256,7 +1256,7 @@ you to also send your logs for further analysis.
 | Actix Web | 4.x     | Tokio            | rustls/native-tls | Via Diesel         |
 | Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL         |
 | Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A                |
-| Tokio     | 1.43    | Self             | N/A               | N/A                |
+| Tokio     | 1.49.0  | Self             | N/A               | N/A                |
 
 ### 3.3 Open Source Dependencies
 
@@ -1265,7 +1265,7 @@ you to also send your logs for further analysis.
 | Crate              | Version | Purpose                   | Registry  |
 | ------------------ | ------- | ------------------------- | --------- |
 | actix-web          | 4.x     | HTTP server framework     | crates.io |
-| tokio              | 1.43    | Async runtime             | crates.io |
+| tokio              | 1.49.0  | Async runtime             | crates.io |
 | diesel             | 2.3     | Database ORM              | crates.io |
 | r2d2               | 0.8     | Connection pooling        | crates.io |
 | tracing            | 0.1     | Structured logging        | crates.io |

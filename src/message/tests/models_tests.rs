@@ -6,24 +6,29 @@ use crate::message::{
     error::RepositoryError,
 };
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
+
+/// Provides a [`DefaultClock`] for test fixtures.
+#[fixture]
+fn clock() -> DefaultClock {
+    DefaultClock
+}
 
 /// Creates a valid test message with the given sequence number.
-fn create_test_message(sequence: u64) -> Message {
-    let clock = DefaultClock;
+fn create_test_message(clock: &DefaultClock, sequence: u64) -> Message {
     Message::new(
         ConversationId::new(),
         Role::User,
         vec![ContentPart::Text(TextPart::new("Test content"))],
         SequenceNumber::new(sequence),
-        &clock,
+        clock,
     )
     .expect("valid message")
 }
 
 #[rstest]
-fn try_from_domain_succeeds_for_valid_message() {
-    let message = create_test_message(1);
+fn try_from_domain_succeeds_for_valid_message(clock: DefaultClock) {
+    let message = create_test_message(&clock, 1);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -39,8 +44,7 @@ fn try_from_domain_succeeds_for_valid_message() {
 }
 
 #[rstest]
-fn try_from_domain_preserves_all_fields() {
-    let clock = DefaultClock;
+fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
     let message = Message::new(
         ConversationId::new(),
         Role::Assistant,
@@ -68,9 +72,9 @@ fn try_from_domain_preserves_all_fields() {
 }
 
 #[rstest]
-fn try_from_domain_handles_large_sequence_within_i64() {
+fn try_from_domain_handles_large_sequence_within_i64(clock: DefaultClock) {
     let max_i64_as_u64: u64 = i64::MAX as u64;
-    let message = create_test_message(max_i64_as_u64);
+    let message = create_test_message(&clock, max_i64_as_u64);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -80,10 +84,10 @@ fn try_from_domain_handles_large_sequence_within_i64() {
 }
 
 #[rstest]
-fn try_from_domain_fails_for_sequence_overflow() {
+fn try_from_domain_fails_for_sequence_overflow(clock: DefaultClock) {
     // Sequence number larger than i64::MAX
     let overflow_value: u64 = u64::MAX;
-    let message = create_test_message(overflow_value);
+    let message = create_test_message(&clock, overflow_value);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -105,8 +109,11 @@ fn try_from_domain_fails_for_sequence_overflow() {
 #[case(Role::Assistant, "assistant")]
 #[case(Role::Tool, "tool")]
 #[case(Role::System, "system")]
-fn try_from_domain_serializes_role_correctly(#[case] role: Role, #[case] expected: &str) {
-    let clock = DefaultClock;
+fn try_from_domain_serializes_role_correctly(
+    clock: DefaultClock,
+    #[case] role: Role,
+    #[case] expected: &str,
+) {
     let message = Message::new(
         ConversationId::new(),
         role,
@@ -122,8 +129,7 @@ fn try_from_domain_serializes_role_correctly(#[case] role: Role, #[case] expecte
 }
 
 #[rstest]
-fn try_from_domain_serializes_metadata_correctly() {
-    let clock = DefaultClock;
+fn try_from_domain_serializes_metadata_correctly(clock: DefaultClock) {
     let message = Message::new(
         ConversationId::new(),
         Role::User,

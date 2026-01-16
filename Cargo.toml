@@ -5,23 +5,23 @@ edition = "2024"
 
 [dependencies]
 # Serialisation
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 
 # Date/time handling
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.43", features = ["serde"] }
 
 # UUID generation
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.19.0", features = ["v4", "serde"] }
 
 # Error handling
-thiserror = "2.0"
+thiserror = "2.0.17"
 
 # Async trait support
-async-trait = "0.1"
+async-trait = "0.1.89"
 
 # Clock abstraction for deterministic testing
-mockable = { version = "3.0", default-features = false, features = ["clock"] }
+mockable = { version = "3.0.0", default-features = false, features = ["clock"] }
 
 # Database (Diesel ORM for PostgreSQL)
 diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
@@ -30,12 +30,12 @@ diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_j
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
-rstest = "0.24"
-mockall = "0.13"
-eyre = "0.6"
+rstest = "0.26.1"
+mockall = "0.14.0"
+eyre = "0.6.12"
 
 # Embedded PostgreSQL for integration testing
-pg-embed-setup-unpriv = { version = "0.2", features = ["diesel-support"] }
+pg-embed-setup-unpriv = { version = "0.2.0", features = ["diesel-support"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

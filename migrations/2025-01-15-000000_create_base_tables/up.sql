@@ -57,5 +57,7 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_conversation_sequence ON messages(conversation_id, sequence_number);
 CREATE INDEX idx_domain_events_aggregate ON domain_events(aggregate_id, aggregate_type);
-CREATE INDEX idx_domain_events_correlation ON domain_events(correlation_id);
+-- Partial index excludes NULL values for space efficiency
+CREATE INDEX idx_domain_events_correlation ON domain_events(correlation_id)
+    WHERE correlation_id IS NOT NULL;
 CREATE INDEX idx_audit_logs_table_row ON audit_logs(table_name, row_id);
