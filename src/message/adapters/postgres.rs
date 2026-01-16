@@ -180,20 +180,25 @@ impl PostgresMessageRepository {
 
     /// Sets a single `PostgreSQL` session variable for audit context.
     ///
-    /// Uses a parameterised value binding to prevent injection of the UUID.
     /// The key name is interpolated via `format!` but is always a controlled
     /// static string from the audit context fields, not user input.
-    /// `PostgreSQL` does not support parameterised identifiers, so key
-    /// interpolation is the only option.
+    /// `PostgreSQL` does not support parameterised identifiers or values in
+    /// SET statements, so both key and value must be interpolated.
+    ///
+    /// # Safety
+    ///
+    /// UUID values are formatted using their canonical hyphenated representation
+    /// which contains only hexadecimal digits and hyphens, making SQL injection
+    /// impossible.
     fn set_session_uuid(
         conn: &mut PgConnection,
         key: &str,
         value: uuid::Uuid,
     ) -> RepositoryResult<()> {
-        // Use bind parameter for the value to prevent SQL injection.
-        // The key is a controlled static string, not user input.
-        diesel::sql_query(format!("SET LOCAL app.{key} = $1"))
-            .bind::<diesel::sql_types::Uuid, _>(value)
+        // PostgreSQL SET does not support parameter binding ($1).
+        // UUID hyphenated format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) contains
+        // only hex digits and hyphens, so it is safe to interpolate directly.
+        diesel::sql_query(format!("SET LOCAL app.{key} = '{value}'"))
             .execute(conn)
             .map_err(RepositoryError::database)?;
         Ok(())

@@ -21,30 +21,29 @@ fn duplicate_message_id_rejected(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
     let msg = Message::new(
         conversation_id,
         Role::User,
         vec![ContentPart::Text(TextPart::new("Original message"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("msg");
+    )?;
 
-    rt.block_on(repo.store(&msg)).expect("first store");
+    rt.block_on(repo.store(&msg))?;
 
     let dup_id_msg = Message::builder(conversation_id, Role::User, SequenceNumber::new(2))
         .with_id(msg.id())
         .with_content(ContentPart::Text(TextPart::new("Different content")))
-        .build(&clock)
-        .expect("dup id msg");
+        .build(&clock)?;
 
     let result = rt.block_on(repo.store(&dup_id_msg));
     assert!(
         matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == msg.id()),
         "Should reject duplicate message ID"
     );
+    Ok(())
 }
 
 /// Tests that duplicate sequence numbers in the same conversation are rejected.
@@ -54,18 +53,17 @@ fn duplicate_sequence_in_conversation_rejected(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
     let msg = Message::new(
         conversation_id,
         Role::User,
         vec![ContentPart::Text(TextPart::new("Original message"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("msg");
+    )?;
 
-    rt.block_on(repo.store(&msg)).expect("first store");
+    rt.block_on(repo.store(&msg))?;
 
     let dup_seq_msg = Message::new(
         conversation_id,
@@ -73,8 +71,7 @@ fn duplicate_sequence_in_conversation_rejected(
         vec![ContentPart::Text(TextPart::new("Response"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("dup seq msg");
+    )?;
 
     let result = rt.block_on(repo.store(&dup_seq_msg));
     assert!(
@@ -87,6 +84,7 @@ fn duplicate_sequence_in_conversation_rejected(
         ),
         "Should reject duplicate sequence number in same conversation"
     );
+    Ok(())
 }
 
 /// Tests exists check in decision flow.
@@ -96,24 +94,24 @@ fn exists_check_for_idempotent_operations(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
     let msg = Message::new(
         conversation_id,
         Role::User,
         vec![ContentPart::Text(TextPart::new("Message"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("msg");
+    )?;
 
-    let exists_before = rt.block_on(repo.exists(msg.id())).expect("exists check");
+    let exists_before = rt.block_on(repo.exists(msg.id()))?;
     assert!(!exists_before, "Should not exist before store");
 
     if !exists_before {
-        rt.block_on(repo.store(&msg)).expect("store");
+        rt.block_on(repo.store(&msg))?;
     }
 
-    let exists_after = rt.block_on(repo.exists(msg.id())).expect("exists check");
+    let exists_after = rt.block_on(repo.exists(msg.id()))?;
     assert!(exists_after, "Should exist after store");
+    Ok(())
 }

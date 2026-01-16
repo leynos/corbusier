@@ -24,16 +24,14 @@ fn stores_messages_in_order(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
-    store_conversation_messages(&rt, &repo, &clock, conversation_id)
-        .expect("store conversation messages");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
+    store_conversation_messages(&rt, &repo, &clock, conversation_id)?;
 
-    let messages = rt
-        .block_on(repo.find_by_conversation(conversation_id))
-        .expect("find conversation");
+    let messages = rt.block_on(repo.find_by_conversation(conversation_id))?;
 
     verify_message_ordering(&messages);
+    Ok(())
 }
 
 /// Tests that roles are preserved through storage and retrieval.
@@ -43,16 +41,14 @@ fn preserves_roles(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
-    store_conversation_messages(&rt, &repo, &clock, conversation_id)
-        .expect("store conversation messages");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
+    store_conversation_messages(&rt, &repo, &clock, conversation_id)?;
 
-    let messages = rt
-        .block_on(repo.find_by_conversation(conversation_id))
-        .expect("find conversation");
+    let messages = rt.block_on(repo.find_by_conversation(conversation_id))?;
 
     verify_role_preservation(&messages);
+    Ok(())
 }
 
 /// Tests individual message retrieval by ID.
@@ -66,18 +62,17 @@ fn allows_individual_retrieval(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
-    let stored = store_conversation_messages(&rt, &repo, &clock, conversation_id)
-        .expect("store conversation messages");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
+    let stored = store_conversation_messages(&rt, &repo, &clock, conversation_id)?;
     let first_message = &stored[0];
 
     let retrieved = rt
-        .block_on(repo.find_by_id(first_message.id()))
-        .expect("find by id")
+        .block_on(repo.find_by_id(first_message.id()))?
         .expect("exists");
 
     assert_eq!(retrieved.id(), first_message.id());
+    Ok(())
 }
 
 /// Tests that repository correctly handles concurrent-like access patterns.
@@ -87,8 +82,8 @@ fn concurrent_access_pattern_with_cloned_repository(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) {
-    let rt = runtime.expect("runtime creation");
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let rt = runtime?;
     let repo_clone = repo.clone();
 
     let msg1 = Message::new(
@@ -97,9 +92,8 @@ fn concurrent_access_pattern_with_cloned_repository(
         vec![ContentPart::Text(TextPart::new("From original"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("msg1");
-    rt.block_on(repo.store(&msg1)).expect("store via original");
+    )?;
+    rt.block_on(repo.store(&msg1))?;
 
     let msg2 = Message::new(
         conversation_id,
@@ -107,18 +101,13 @@ fn concurrent_access_pattern_with_cloned_repository(
         vec![ContentPart::Text(TextPart::new("From clone"))],
         SequenceNumber::new(2),
         &clock,
-    )
-    .expect("msg2");
-    rt.block_on(repo_clone.store(&msg2))
-        .expect("store via clone");
+    )?;
+    rt.block_on(repo_clone.store(&msg2))?;
 
-    let from_original = rt
-        .block_on(repo.find_by_conversation(conversation_id))
-        .expect("find via original");
-    let from_clone = rt
-        .block_on(repo_clone.find_by_conversation(conversation_id))
-        .expect("find via clone");
+    let from_original = rt.block_on(repo.find_by_conversation(conversation_id))?;
+    let from_clone = rt.block_on(repo_clone.find_by_conversation(conversation_id))?;
 
     assert_eq!(from_original.len(), 2);
     assert_eq!(from_clone.len(), 2);
+    Ok(())
 }
