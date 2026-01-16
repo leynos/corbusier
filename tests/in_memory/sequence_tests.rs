@@ -19,6 +19,10 @@ use tokio::runtime::Runtime;
     clippy::indexing_slicing,
     reason = "Test verifies length before access"
 )]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn generation_across_conversations(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,

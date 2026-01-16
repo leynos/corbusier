@@ -16,6 +16,10 @@ use tokio::runtime::Runtime;
 
 /// Tests that duplicate message IDs are rejected.
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn duplicate_message_id_rejected(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,
@@ -48,6 +52,10 @@ fn duplicate_message_id_rejected(
 
 /// Tests that duplicate sequence numbers in the same conversation are rejected.
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn duplicate_sequence_in_conversation_rejected(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,
@@ -89,6 +97,10 @@ fn duplicate_sequence_in_conversation_rejected(
 
 /// Tests exists check in decision flow.
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn exists_check_for_idempotent_operations(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,

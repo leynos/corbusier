@@ -1,18 +1,10 @@
 //! Shared test helpers for `PostgreSQL` integration tests.
 
-#![expect(
-    clippy::expect_used,
-    reason = "Test helper code uses expect for assertion clarity"
-)]
-#![expect(
-    clippy::string_slice,
-    reason = "Block comment detection uses ASCII-only patterns where slicing is safe"
-)]
-
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
+use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
@@ -42,6 +34,10 @@ pub fn clock() -> DefaultClock {
 }
 
 /// Creates a tokio runtime for async operations in tests.
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper panics on runtime creation failure"
+)]
 pub fn test_runtime() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -57,48 +53,16 @@ pub fn ensure_template(
         .ensure_template_exists(TEMPLATE_DB, |db_name| {
             let url = cluster.connection().database_url(db_name);
             let mut conn = PgConnection::establish(&url).map_err(|e| eyre::eyre!("{e}"))?;
-            execute_sql_statements(&mut conn, CREATE_SCHEMA_SQL)?;
-            execute_sql_statements(&mut conn, ADD_CONSTRAINTS_SQL)?;
-            execute_sql_statements(&mut conn, ADD_AUDIT_TRIGGER_SQL)?;
+            conn.batch_execute(CREATE_SCHEMA_SQL)
+                .map_err(|e| eyre::eyre!("SQL error: {e}"))?;
+            conn.batch_execute(ADD_CONSTRAINTS_SQL)
+                .map_err(|e| eyre::eyre!("SQL error: {e}"))?;
+            conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
+                .map_err(|e| eyre::eyre!("SQL error: {e}"))?;
             Ok(())
         })
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     Ok(())
-}
-
-/// Executes multiple SQL statements from a single string.
-///
-/// Splits on semicolons and executes each non-empty statement individually.
-/// Handles both `--` line comments and `/* */` block comments.
-pub fn execute_sql_statements(conn: &mut PgConnection, sql: &str) -> eyre::Result<()> {
-    for statement in sql.split(';') {
-        let trimmed = statement.trim();
-        // Skip empty statements, comment-only lines, and block comments
-        if trimmed.is_empty()
-            || trimmed.lines().all(|line| line.trim().starts_with("--"))
-            || is_block_comment_only(trimmed)
-        {
-            continue;
-        }
-        diesel::sql_query(trimmed)
-            .execute(conn)
-            .map_err(|e| eyre::eyre!("SQL error: {e}\nStatement: {trimmed}"))?;
-    }
-    Ok(())
-}
-
-/// Returns true if the string contains only a block comment.
-fn is_block_comment_only(s: &str) -> bool {
-    let trimmed = s.trim();
-    if !trimmed.starts_with("/*") {
-        return false;
-    }
-    // Check if it ends with */ and has no other content
-    if let Some(end_pos) = trimmed.find("*/") {
-        let after_comment = &trimmed[end_pos + 2..];
-        return after_comment.trim().is_empty();
-    }
-    false
 }
 
 /// Creates a test database from template and returns a repository.
@@ -119,6 +83,10 @@ pub fn setup_repository(
 }
 
 /// Creates a test message with the given conversation and sequence.
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper panics on invalid test message"
+)]
 pub fn create_test_message(
     clock: &DefaultClock,
     conversation_id: ConversationId,
@@ -167,6 +135,7 @@ pub struct RoleResult {
 }
 
 /// Inserts a conversation record to satisfy the foreign key constraint.
+#[expect(clippy::expect_used, reason = "Test helper panics on insert failure")]
 pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: ConversationId) {
     let url = cluster.connection().database_url(db_name);
     let mut conn = PgConnection::establish(&url).expect("connection");
@@ -181,7 +150,10 @@ pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: Conver
 }
 
 /// Row from the `audit_logs` table for verification.
-#[expect(dead_code, reason = "Fields are populated by Diesel but not all read in tests")]
+#[expect(
+    dead_code,
+    reason = "Fields are populated by Diesel but not all read in tests"
+)]
 #[derive(diesel::QueryableByName, Debug)]
 pub struct AuditLogRow {
     #[diesel(sql_type = diesel::sql_types::Uuid)]
@@ -205,6 +177,10 @@ pub struct AuditLogRow {
 }
 
 /// Fetches the audit log entry for a specific message row ID.
+#[expect(
+    clippy::expect_used,
+    reason = "Test helper panics on connection failure"
+)]
 pub fn fetch_audit_log_for_message(
     cluster: &TestCluster,
     db_name: &str,

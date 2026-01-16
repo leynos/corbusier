@@ -5,11 +5,6 @@
 //! - `sequence_tests`: Sequence number management
 //! - `constraint_tests`: Duplicate detection, exists checks
 
-#![expect(
-    clippy::panic_in_result_fn,
-    reason = "Test functions use assertions for verification while returning Result for error propagation"
-)]
-
 mod in_memory {
     pub mod helpers;
 

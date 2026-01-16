@@ -57,6 +57,10 @@ fn preserves_roles(
     clippy::indexing_slicing,
     reason = "Test accesses first element after store_conversation_messages returns 4 elements"
 )]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn allows_individual_retrieval(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,
@@ -77,6 +81,10 @@ fn allows_individual_retrieval(
 
 /// Tests that repository correctly handles concurrent-like access patterns.
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn concurrent_access_pattern_with_cloned_repository(
     runtime: io::Result<Runtime>,
     repo: InMemoryMessageRepository,

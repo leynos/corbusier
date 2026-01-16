@@ -5,7 +5,7 @@
 
 use crate::message::{
     adapters::models::{MessageRow, NewConversation, NewMessage},
-    adapters::postgres::PostgresMessageRepository,
+    adapters::postgres::row_to_message,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
 };
@@ -72,9 +72,9 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
     assert_eq!(new_message.sequence_number, 42);
     assert_eq!(new_message.created_at, message.created_at());
 
-    // Verify content is serialised correctly
+    // Verify content is serialized correctly
     let content: Vec<ContentPart> =
-        serde_json::from_value(new_message.content).expect("content should deserialise");
+        serde_json::from_value(new_message.content).expect("content should deserialize");
     assert_eq!(content.len(), 1);
 }
 
@@ -260,7 +260,7 @@ fn row_to_message_converts_valid_row() {
     let expected_id = row.id;
     let expected_conv_id = row.conversation_id;
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
@@ -281,7 +281,7 @@ fn row_to_message_parses_all_role_variants(#[case] role_str: &str, #[case] expec
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     assert_eq!(
@@ -297,7 +297,7 @@ fn row_to_message_fails_for_invalid_role() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_err());
     match result.expect_err("should fail for invalid role") {
@@ -318,7 +318,7 @@ fn row_to_message_fails_for_empty_content() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_err());
     match result.expect_err("should fail for empty content") {
@@ -339,7 +339,7 @@ fn row_to_message_fails_for_malformed_content_json() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_err());
     match result.expect_err("should fail for malformed JSON") {
@@ -355,7 +355,7 @@ fn row_to_message_fails_for_negative_sequence_number() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_err());
     match result.expect_err("should fail for negative sequence") {
@@ -376,7 +376,7 @@ fn row_to_message_handles_max_valid_sequence_number() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
@@ -392,7 +392,7 @@ fn row_to_message_preserves_timestamp() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
@@ -409,7 +409,7 @@ fn row_to_message_deserializes_complex_content() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
@@ -423,7 +423,7 @@ fn row_to_message_deserializes_metadata_with_agent_backend() {
         ..create_valid_message_row()
     };
 
-    let result = PostgresMessageRepository::row_to_message(row);
+    let result = row_to_message(row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
