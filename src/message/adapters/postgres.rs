@@ -229,7 +229,20 @@ impl PostgresMessageRepository {
     }
 
     /// Converts a database row to a domain Message.
-    fn row_to_message(row: MessageRow) -> RepositoryResult<Message> {
+    ///
+    /// This function deserializes the role, content, and metadata from their
+    /// stored representations and reconstructs the domain Message using
+    /// [`Message::from_persisted`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RepositoryError::Serialization`] if:
+    /// - The role string is not a valid [`Role`] variant
+    /// - The content JSONB cannot be deserialized to `Vec<ContentPart>`
+    /// - The metadata JSONB cannot be deserialized to [`MessageMetadata`]
+    /// - The sequence number is negative (invalid for `u64`)
+    /// - The content is empty (domain invariant violation)
+    pub(crate) fn row_to_message(row: MessageRow) -> RepositoryResult<Message> {
         let role = Role::try_from(row.role.as_str()).map_err(Self::ser_err)?;
         let content: Vec<ContentPart> =
             serde_json::from_value(row.content).map_err(Self::ser_err)?;

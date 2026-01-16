@@ -1,12 +1,19 @@
-//! Tests for adapter model types, specifically `NewMessage::try_from_domain`.
+//! Tests for adapter model types.
+//!
+//! Covers `NewMessage`, `MessageRow`, `NewConversation`, and `row_to_message`
+//! constructors, field preservation, and conversion semantics.
 
 use crate::message::{
-    adapters::models::NewMessage,
+    adapters::models::{MessageRow, NewConversation, NewMessage},
+    adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
 };
+use chrono::Utc;
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
+use serde_json::json;
+use uuid::Uuid;
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -143,4 +150,229 @@ fn try_from_domain_serializes_metadata_correctly(clock: DefaultClock) {
 
     // Verify metadata is valid JSON
     assert!(new_message.metadata.is_object());
+}
+
+// ============================================================================
+// NewConversation Tests
+// ============================================================================
+
+#[rstest]
+fn new_conversation_sets_default_state() {
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+
+    let conv = NewConversation::new(id, now);
+
+    assert_eq!(conv.id, id);
+    assert_eq!(conv.state, "active");
+    assert!(conv.task_id.is_none());
+    assert_eq!(conv.created_at, now);
+    assert_eq!(conv.updated_at, now);
+}
+
+#[rstest]
+fn new_conversation_has_empty_context() {
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+
+    let conv = NewConversation::new(id, now);
+
+    assert!(conv.context.is_object());
+    let context_obj = conv.context.as_object().expect("context should be object");
+    assert!(context_obj.is_empty());
+}
+
+// ============================================================================
+// MessageRow to Domain Conversion Tests (row_to_message)
+// ============================================================================
+
+/// Creates a valid [`MessageRow`] for testing.
+fn create_valid_message_row() -> MessageRow {
+    MessageRow {
+        id: Uuid::new_v4(),
+        conversation_id: Uuid::new_v4(),
+        role: "user".to_owned(),
+        content: json!([{"type": "text", "text": "Hello world"}]),
+        metadata: json!({}),
+        created_at: Utc::now(),
+        sequence_number: 1,
+    }
+}
+
+#[rstest]
+fn row_to_message_converts_valid_row() {
+    let row = create_valid_message_row();
+    let expected_id = row.id;
+    let expected_conv_id = row.conversation_id;
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(message.id().into_inner(), expected_id);
+    assert_eq!(message.conversation_id().into_inner(), expected_conv_id);
+    assert_eq!(message.role(), Role::User);
+    assert_eq!(message.sequence_number().value(), 1);
+}
+
+#[rstest]
+#[case("user", Role::User)]
+#[case("assistant", Role::Assistant)]
+#[case("tool", Role::Tool)]
+#[case("system", Role::System)]
+fn row_to_message_parses_all_role_variants(#[case] role_str: &str, #[case] expected_role: Role) {
+    let row = MessageRow {
+        role: role_str.to_owned(),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    assert_eq!(
+        result.expect("conversion should succeed").role(),
+        expected_role
+    );
+}
+
+#[rstest]
+fn row_to_message_fails_for_invalid_role() {
+    let row = MessageRow {
+        role: "invalid_role".to_owned(),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_err());
+    match result.expect_err("should fail for invalid role") {
+        RepositoryError::Serialization(msg) => {
+            assert!(
+                msg.contains("invalid_role"),
+                "error should mention role: {msg}"
+            );
+        }
+        other => panic!("expected Serialization error, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn row_to_message_fails_for_empty_content() {
+    let row = MessageRow {
+        content: json!([]),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_err());
+    match result.expect_err("should fail for empty content") {
+        RepositoryError::Serialization(msg) => {
+            assert!(
+                msg.contains("empty") || msg.contains("content"),
+                "error should mention empty content: {msg}"
+            );
+        }
+        other => panic!("expected Serialization error, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn row_to_message_fails_for_malformed_content_json() {
+    let row = MessageRow {
+        content: json!("not an array"),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_err());
+    match result.expect_err("should fail for malformed JSON") {
+        RepositoryError::Serialization(_) => {}
+        other => panic!("expected Serialization error, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn row_to_message_fails_for_negative_sequence_number() {
+    let row = MessageRow {
+        sequence_number: -1,
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_err());
+    match result.expect_err("should fail for negative sequence") {
+        RepositoryError::Serialization(msg) => {
+            assert!(
+                msg.contains("out of range") || msg.contains("negative"),
+                "error should mention range: {msg}"
+            );
+        }
+        other => panic!("expected Serialization error, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn row_to_message_handles_max_valid_sequence_number() {
+    let row = MessageRow {
+        sequence_number: i64::MAX,
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(message.sequence_number().value(), i64::MAX as u64);
+}
+
+#[rstest]
+fn row_to_message_preserves_timestamp() {
+    let timestamp = Utc::now();
+    let row = MessageRow {
+        created_at: timestamp,
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(message.created_at(), timestamp);
+}
+
+#[rstest]
+fn row_to_message_deserializes_complex_content() {
+    let row = MessageRow {
+        content: json!([
+            {"type": "text", "text": "Hello"},
+            {"type": "tool_call", "call_id": "call_123", "name": "search", "arguments": {"q": "test"}}
+        ]),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(message.content().len(), 2);
+}
+
+#[rstest]
+fn row_to_message_deserializes_metadata_with_agent_backend() {
+    let row = MessageRow {
+        metadata: json!({"agent_backend": "claude-3-opus"}),
+        ..create_valid_message_row()
+    };
+
+    let result = PostgresMessageRepository::row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(
+        message.metadata().agent_backend,
+        Some("claude-3-opus".to_owned())
+    );
 }
