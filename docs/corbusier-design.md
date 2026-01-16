@@ -1381,7 +1381,7 @@ Selected as the primary database for production deployments due to:
 - **Scalability**: Proven performance for concurrent read/write operations
 - **Diesel Integration**: Native support via the `diesel::pg` backend module
 
-##### In-Memory Repository for Development
+##### In-memory repository for development
 
 An in-memory repository implementation is provided for development and testing:
 
@@ -3551,7 +3551,7 @@ temporal queries for debugging and compliance, and enables system state
 reconstruction from historical events. This pattern aligns with the requirement
 for comprehensive audit trails across all agent interactions.
 
-##### In-Memory Repository for Testing
+##### In-memory repository for testing
 
 An in-memory repository implementation provides zero-configuration development
 environments while maintaining compatibility with the PostgreSQL production
@@ -7078,13 +7078,13 @@ pub struct BatchProcessor {
 
 impl BatchProcessor {
     pub async fn batch_insert_messages(&self, messages: Vec<Message>) -> Result<(), RepositoryError> {
-        const BATCH_SIZE: usize = 1000;
         let pool = self.pool.clone();
+        let batch_size = self.batch_size;
 
         tokio::task::spawn_blocking(move || {
             let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
 
-            for chunk in messages.chunks(BATCH_SIZE) {
+            for chunk in messages.chunks(batch_size) {
                 let new_messages: Vec<NewMessage> = chunk
                     .iter()
                     .map(NewMessage::try_from_domain)

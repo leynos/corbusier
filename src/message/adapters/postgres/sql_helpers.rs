@@ -83,7 +83,7 @@ fn map_constraint_to_duplicate_error(constraint: &str, ids: &InsertIds) -> Optio
 /// `PostgreSQL` does not support parameterised identifiers or values in
 /// SET statements, so both key and value must be interpolated.
 ///
-/// # Safety
+/// # Security
 ///
 /// UUID values are formatted using their canonical hyphenated representation
 /// which contains only hexadecimal digits and hyphens, making SQL injection

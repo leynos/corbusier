@@ -1,6 +1,6 @@
 //! Tests for `MessageRow` to domain `Message` conversion via `row_to_message`.
 //!
-//! Covers role parsing, content deserialisation, sequence number handling,
+//! Covers role parsing, content deserialization, sequence number handling,
 //! timestamp preservation, and error cases for malformed data.
 
 use crate::message::{

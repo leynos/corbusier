@@ -27,8 +27,8 @@ fn clock() -> DefaultClock {
 /// Returns a closure that creates valid [`Message`] instances with the specified
 /// sequence number, using the injected clock for timestamp generation.
 ///
-/// The closure returns `Result` to avoid using `.expect()` outside test scope,
-/// which Clippy's `allow-expect-in-tests` does not cover for `#[fixture]` functions.
+/// The closure returns `Result` so test code can use `.expect()` with descriptive
+/// messages when the fixture is called.
 #[fixture]
 fn message_factory(clock: DefaultClock) -> impl Fn(u64) -> Result<Message, MessageBuilderError> {
     move |sequence| {
@@ -43,14 +43,10 @@ fn message_factory(clock: DefaultClock) -> impl Fn(u64) -> Result<Message, Messa
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for fixture errors"
-)]
 fn try_from_domain_succeeds_for_valid_message(
     message_factory: impl Fn(u64) -> Result<Message, MessageBuilderError>,
-) -> Result<(), MessageBuilderError> {
-    let message = message_factory(1)?;
+) {
+    let message = message_factory(1).expect("fixture should create valid message");
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -63,7 +59,6 @@ fn try_from_domain_succeeds_for_valid_message(
     );
     assert_eq!(new_message.role, "user");
     assert_eq!(new_message.sequence_number, 1);
-    Ok(())
 }
 
 #[rstest]
@@ -95,35 +90,26 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for fixture errors"
-)]
 fn try_from_domain_handles_large_sequence_within_i64(
     message_factory: impl Fn(u64) -> Result<Message, MessageBuilderError>,
-) -> Result<(), MessageBuilderError> {
+) {
     let max_i64_as_u64: u64 = u64::try_from(i64::MAX).expect("i64::MAX should fit in u64");
-    let message = message_factory(max_i64_as_u64)?;
+    let message = message_factory(max_i64_as_u64).expect("fixture should create valid message");
 
     let result = NewMessage::try_from_domain(&message);
 
     assert!(result.is_ok());
     let new_message = result.expect("conversion should succeed");
     assert_eq!(new_message.sequence_number, i64::MAX);
-    Ok(())
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for fixture errors"
-)]
 fn try_from_domain_fails_for_sequence_overflow(
     message_factory: impl Fn(u64) -> Result<Message, MessageBuilderError>,
-) -> Result<(), MessageBuilderError> {
+) {
     // Sequence number larger than i64::MAX
     let overflow_value: u64 = u64::MAX;
-    let message = message_factory(overflow_value)?;
+    let message = message_factory(overflow_value).expect("fixture should create valid message");
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -138,7 +124,6 @@ fn try_from_domain_fails_for_sequence_overflow(
         }
         other => panic!("expected Serialization error, got {other:?}"),
     }
-    Ok(())
 }
 
 /// Placeholder test documenting JSON serialization failure coverage.
