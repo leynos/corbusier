@@ -111,6 +111,61 @@ fn try_from_domain_fails_for_sequence_overflow(clock: DefaultClock) {
     }
 }
 
+/// Placeholder test documenting JSON serialization failure coverage.
+///
+/// # Why This Test Is Ignored
+///
+/// The `NewMessage::try_from_domain` function has three potential serialization
+/// failure points:
+///
+/// 1. **Content serialization** (`serde_json::to_value(message.content())`)
+/// 2. **Metadata serialization** (`serde_json::to_value(message.metadata())`)
+/// 3. **Sequence number conversion** (`i64::try_from(...)`)
+///
+/// Path (3) is exercised by `try_from_domain_fails_for_sequence_overflow` above,
+/// which validates that `RepositoryError::Serialization` is correctly constructed
+/// and returned for conversion failures.
+///
+/// Paths (1) and (2) cannot fail under normal conditions because:
+///
+/// - `ContentPart` variants (`TextPart`, `ToolCallPart`, `ToolResultPart`,
+///   `AttachmentPart`) use `#[derive(Serialize)]` with stable field types
+///   (`String`, `serde_json::Value`, `bool`, `Option<T>`)
+/// - `MessageMetadata` similarly uses only stable serializable types
+/// - `serde_json::to_value` for these types only fails on recursion limits
+///   (default 128 levels) or I/O errors (not applicable for in-memory
+///   serialization)
+///
+/// To test these paths would require either:
+///
+/// - Injecting a mock `Serialize` implementation via `cfg(test)` conditionals
+///   in the domain layer (breaks domain/adapter separation)
+/// - Using `unsafe` to corrupt memory layout (inappropriate for unit tests)
+/// - Constructing pathologically deep structures exceeding recursion limits
+///   (not representative of real-world failures)
+///
+/// # Decision
+///
+/// JSON serialization failure for content/metadata is **deferred** because:
+///
+/// 1. The `RepositoryError::Serialization` variant construction is already
+///    exercised by the sequence overflow test
+/// 2. A serialization failure in `serde_json::to_value` for these types would
+///    indicate a critical serde bug, not a domain logic failure
+/// 3. The domain types are designed to be always-serializable by construction
+///
+/// If the domain API evolves to support custom content types with fallible
+/// serialization, this test should be implemented.
+#[test]
+#[ignore = "JSON serialization failure for content/metadata requires domain API changes for failure injection"]
+fn try_from_domain_json_serialization_failure_placeholder() {
+    // This test documents that JSON serialization failure paths exist but cannot
+    // be exercised without domain layer changes. See docstring for rationale.
+    //
+    // The sequence overflow test above validates RepositoryError::Serialization
+    // construction and error handling for the same code path pattern.
+}
+
 #[rstest]
 #[case(Role::User, "user")]
 #[case(Role::Assistant, "assistant")]
