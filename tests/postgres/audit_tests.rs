@@ -118,6 +118,7 @@ fn store_with_audit_captures_context(
     // Verify audit_logs entry was created with correct context
     let audit_log =
         fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
+            .expect("audit log query should succeed")
             .expect("audit log entry should exist");
 
     assert_eq!(audit_log.table_name, "messages");

@@ -11,6 +11,7 @@ mod id_tests;
 mod message_tests;
 mod models_tests;
 mod role_tests;
+mod row_to_message_tests;
 mod validation_config_tests;
 mod validation_content_tests;
 pub(crate) mod validation_fixtures;

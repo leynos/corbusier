@@ -140,10 +140,10 @@ pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: Conver
     let url = cluster.connection().database_url(db_name);
     let mut conn = PgConnection::establish(&url).expect("connection");
 
-    diesel::sql_query(
-        "INSERT INTO conversations (id, context, state, created_at, updated_at) \
-         VALUES ($1, '{}', 'active', NOW(), NOW())",
-    )
+    diesel::sql_query(concat!(
+        "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
+        "VALUES ($1, '{}', 'active', NOW(), NOW())",
+    ))
     .bind::<diesel::sql_types::Uuid, _>(conv_id.into_inner())
     .execute(&mut conn)
     .expect("insert conversation");
@@ -177,6 +177,8 @@ pub struct AuditLogRow {
 }
 
 /// Fetches the audit log entry for a specific message row ID.
+///
+/// Returns `Ok(Some(row))` if found, `Ok(None)` if not found, or `Err` on query failure.
 #[expect(
     clippy::expect_used,
     reason = "Test helper panics on connection failure"
@@ -185,16 +187,20 @@ pub fn fetch_audit_log_for_message(
     cluster: &TestCluster,
     db_name: &str,
     message_id: uuid::Uuid,
-) -> Option<AuditLogRow> {
+) -> Result<Option<AuditLogRow>, diesel::result::Error> {
     let url = cluster.connection().database_url(db_name);
     let mut conn = PgConnection::establish(&url).expect("connection");
 
-    diesel::sql_query(
-        "SELECT id, table_name, operation, row_id, correlation_id, causation_id, \
-         user_id, session_id, application_name \
-         FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
-    )
+    match diesel::sql_query(concat!(
+        "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
+        "user_id, session_id, application_name ",
+        "FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
+    ))
     .bind::<diesel::sql_types::Uuid, _>(message_id)
     .get_result::<AuditLogRow>(&mut conn)
-    .ok()
+    {
+        Ok(row) => Ok(Some(row)),
+        Err(diesel::result::Error::NotFound) => Ok(None),
+        Err(e) => Err(e),
+    }
 }

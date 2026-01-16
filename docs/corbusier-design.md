@@ -1178,8 +1178,8 @@ due to:
 
 ##### Compatibility Requirements
 
-Diesel is a synchronous ORM and must be isolated from async executor threads
-to prevent blocking. Use `tokio::task::spawn_blocking` to offload all Diesel
+Diesel is a synchronous ORM and must be isolated from async executor threads to
+prevent blocking. Use `tokio::task::spawn_blocking` to offload all Diesel
 operations to a dedicated thread pool. Connection pooling is handled through
 `r2d2`, which provides robust connection management independent of async
 runtimes.
@@ -1223,7 +1223,8 @@ with pure Rust PostgreSQL driver support.
   ensuring type safety for parameters and return types
 - **Connection Pooling via r2d2**: Uses the battle-tested `r2d2` crate for
   connection pool management with configurable limits and timeouts
-- **Async Integration**: Works with async runtimes via `tokio::task::spawn_blocking`
+- **Async Integration**: Works with async runtimes via
+  `tokio::task::spawn_blocking`
   to offload blocking database operations to a dedicated thread pool
 
 #### 3.2.4 Observability and Logging
@@ -1251,12 +1252,12 @@ you to also send your logs for further analysis.
 
 #### 3.2.5 Framework Compatibility Matrix
 
-| Framework | Version | Runtime          | TLS Backend       | Database Support   |
-| --------- | ------- | ---------------- | ----------------- | ------------------ |
-| Actix Web | 4.x     | Tokio            | rustls/native-tls | Via Diesel         |
-| Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL         |
-| Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A                |
-| Tokio     | 1.49.0  | Self             | N/A               | N/A                |
+| Framework | Version | Runtime          | TLS Backend       | Database Support |
+| --------- | ------- | ---------------- | ----------------- | ---------------- |
+| Actix Web | 4.x     | Tokio            | rustls/native-tls | Via Diesel       |
+| Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL       |
+| Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A              |
+| Tokio     | 1.49.0  | Self             | N/A               | N/A              |
 
 ### 3.3 Open Source Dependencies
 
@@ -1473,8 +1474,8 @@ graph TB
 
 ##### Diesel Configuration Example
 
-Create a database connection pool with `r2d2::Pool` setting maximum
-connections and execute queries with Diesel's type-safe query DSL:
+Create a database connection pool with `r2d2::Pool` setting maximum connections
+and execute queries with Diesel's type-safe query DSL:
 
 ```toml
 [dependencies]
@@ -6256,9 +6257,9 @@ SELECT cron.schedule('archive-events', '0 2 * * 0', 'SELECT archive_old_events()
 
 ###### Connection Pool Configuration
 
-The pool has a maximum connection limit that it will not exceed; if `get()`
-is called when at this limit and all connections are checked out, the task will
-be made to wait until a connection becomes available. The connection limit, and
+The pool has a maximum connection limit that it will not exceed; if `get()` is
+called when at this limit and all connections are checked out, the task will be
+made to wait until a connection becomes available. The connection limit, and
 other parameters, are configurable via `Pool::builder()`.
 
 ```rust
@@ -6285,8 +6286,8 @@ pub fn create_database_pool(database_url: &str) -> Result<PgPool, r2d2::Error> {
 
 The following illustrative example demonstrates the repository pattern with
 Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
-`row_to_message`, and `RepositoryError` are context-dependent and defined
-in the actual implementation.
+`row_to_message`, and `RepositoryError` are context-dependent and defined in
+the actual implementation.
 
 ```rust
 // Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation

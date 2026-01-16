@@ -100,8 +100,9 @@ fn set_session_uuid(conn: &mut PgConnection, key: &str, value: uuid::Uuid) -> Re
 
 /// Sets `PostgreSQL` session variables for audit context.
 ///
-/// Each audit field is set via a parameterised query using [`set_session_uuid`]
-/// to ensure values are safely bound rather than interpolated.
+/// Each audit field is set via [`set_session_uuid`], which interpolates UUID
+/// values directly into the SET statement. This is safe because UUID formatting
+/// produces only hexadecimal digits and hyphens, preventing SQL injection.
 pub(super) fn set_audit_context(
     conn: &mut PgConnection,
     audit: &AuditContext,
