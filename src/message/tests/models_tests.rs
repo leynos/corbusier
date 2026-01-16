@@ -21,21 +21,27 @@ fn clock() -> DefaultClock {
     DefaultClock
 }
 
-/// Creates a valid test message with the given sequence number.
-fn create_test_message(clock: &DefaultClock, sequence: u64) -> Message {
-    Message::new(
-        ConversationId::new(),
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("Test content"))],
-        SequenceNumber::new(sequence),
-        clock,
-    )
-    .expect("valid message")
+/// Factory fixture for creating test messages with configurable sequence numbers.
+///
+/// Returns a closure that creates valid [`Message`] instances with the specified
+/// sequence number, using the injected clock for timestamp generation.
+#[fixture]
+fn message_factory(clock: DefaultClock) -> impl Fn(u64) -> Message {
+    move |sequence| {
+        Message::new(
+            ConversationId::new(),
+            Role::User,
+            vec![ContentPart::Text(TextPart::new("Test content"))],
+            SequenceNumber::new(sequence),
+            &clock,
+        )
+        .expect("valid message")
+    }
 }
 
 #[rstest]
-fn try_from_domain_succeeds_for_valid_message(clock: DefaultClock) {
-    let message = create_test_message(&clock, 1);
+fn try_from_domain_succeeds_for_valid_message(message_factory: impl Fn(u64) -> Message) {
+    let message = message_factory(1);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -79,9 +85,9 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
 }
 
 #[rstest]
-fn try_from_domain_handles_large_sequence_within_i64(clock: DefaultClock) {
+fn try_from_domain_handles_large_sequence_within_i64(message_factory: impl Fn(u64) -> Message) {
     let max_i64_as_u64: u64 = u64::try_from(i64::MAX).expect("i64::MAX should fit in u64");
-    let message = create_test_message(&clock, max_i64_as_u64);
+    let message = message_factory(max_i64_as_u64);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -91,10 +97,10 @@ fn try_from_domain_handles_large_sequence_within_i64(clock: DefaultClock) {
 }
 
 #[rstest]
-fn try_from_domain_fails_for_sequence_overflow(clock: DefaultClock) {
+fn try_from_domain_fails_for_sequence_overflow(message_factory: impl Fn(u64) -> Message) {
     // Sequence number larger than i64::MAX
     let overflow_value: u64 = u64::MAX;
-    let message = create_test_message(&clock, overflow_value);
+    let message = message_factory(overflow_value);
 
     let result = NewMessage::try_from_domain(&message);
 
@@ -241,8 +247,12 @@ fn new_conversation_has_empty_context() {
 // MessageRow to Domain Conversion Tests (row_to_message)
 // ============================================================================
 
-/// Creates a valid [`MessageRow`] for testing.
-fn create_valid_message_row() -> MessageRow {
+/// Provides a valid [`MessageRow`] for testing row-to-domain conversions.
+///
+/// Tests can override individual fields using struct update syntax:
+/// `MessageRow { role: "assistant".to_owned(), ..message_row() }`.
+#[fixture]
+fn message_row() -> MessageRow {
     MessageRow {
         id: Uuid::new_v4(),
         conversation_id: Uuid::new_v4(),
@@ -255,12 +265,11 @@ fn create_valid_message_row() -> MessageRow {
 }
 
 #[rstest]
-fn row_to_message_converts_valid_row() {
-    let row = create_valid_message_row();
-    let expected_id = row.id;
-    let expected_conv_id = row.conversation_id;
+fn row_to_message_converts_valid_row(message_row: MessageRow) {
+    let expected_id = message_row.id;
+    let expected_conv_id = message_row.conversation_id;
 
-    let result = row_to_message(row);
+    let result = row_to_message(message_row);
 
     assert!(result.is_ok());
     let message = result.expect("conversion should succeed");
@@ -275,10 +284,14 @@ fn row_to_message_converts_valid_row() {
 #[case("assistant", Role::Assistant)]
 #[case("tool", Role::Tool)]
 #[case("system", Role::System)]
-fn row_to_message_parses_all_role_variants(#[case] role_str: &str, #[case] expected_role: Role) {
+fn row_to_message_parses_all_role_variants(
+    message_row: MessageRow,
+    #[case] role_str: &str,
+    #[case] expected_role: Role,
+) {
     let row = MessageRow {
         role: role_str.to_owned(),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -291,10 +304,10 @@ fn row_to_message_parses_all_role_variants(#[case] role_str: &str, #[case] expec
 }
 
 #[rstest]
-fn row_to_message_fails_for_invalid_role() {
+fn row_to_message_fails_for_invalid_role(message_row: MessageRow) {
     let row = MessageRow {
         role: "invalid_role".to_owned(),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -312,10 +325,10 @@ fn row_to_message_fails_for_invalid_role() {
 }
 
 #[rstest]
-fn row_to_message_fails_for_empty_content() {
+fn row_to_message_fails_for_empty_content(message_row: MessageRow) {
     let row = MessageRow {
         content: json!([]),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -333,10 +346,10 @@ fn row_to_message_fails_for_empty_content() {
 }
 
 #[rstest]
-fn row_to_message_fails_for_malformed_content_json() {
+fn row_to_message_fails_for_malformed_content_json(message_row: MessageRow) {
     let row = MessageRow {
         content: json!("not an array"),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -349,10 +362,10 @@ fn row_to_message_fails_for_malformed_content_json() {
 }
 
 #[rstest]
-fn row_to_message_fails_for_negative_sequence_number() {
+fn row_to_message_fails_for_negative_sequence_number(message_row: MessageRow) {
     let row = MessageRow {
         sequence_number: -1,
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -370,10 +383,10 @@ fn row_to_message_fails_for_negative_sequence_number() {
 }
 
 #[rstest]
-fn row_to_message_handles_max_valid_sequence_number() {
+fn row_to_message_handles_max_valid_sequence_number(message_row: MessageRow) {
     let row = MessageRow {
         sequence_number: i64::MAX,
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -385,11 +398,11 @@ fn row_to_message_handles_max_valid_sequence_number() {
 }
 
 #[rstest]
-fn row_to_message_preserves_timestamp() {
+fn row_to_message_preserves_timestamp(message_row: MessageRow) {
     let timestamp = Utc::now();
     let row = MessageRow {
         created_at: timestamp,
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -400,13 +413,13 @@ fn row_to_message_preserves_timestamp() {
 }
 
 #[rstest]
-fn row_to_message_deserializes_complex_content() {
+fn row_to_message_deserializes_complex_content(message_row: MessageRow) {
     let row = MessageRow {
         content: json!([
             {"type": "text", "text": "Hello"},
             {"type": "tool_call", "call_id": "call_123", "name": "search", "arguments": {"q": "test"}}
         ]),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
@@ -417,10 +430,10 @@ fn row_to_message_deserializes_complex_content() {
 }
 
 #[rstest]
-fn row_to_message_deserializes_metadata_with_agent_backend() {
+fn row_to_message_deserializes_metadata_with_agent_backend(message_row: MessageRow) {
     let row = MessageRow {
         metadata: json!({"agent_backend": "claude-3-opus"}),
-        ..create_valid_message_row()
+        ..message_row
     };
 
     let result = row_to_message(row);
