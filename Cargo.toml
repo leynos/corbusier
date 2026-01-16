@@ -24,7 +24,7 @@ async-trait = "0.1"
 mockable = { version = "3.0", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
-rstest = "0.24"
+rstest = "0.26"
 mockall = "0.13"
 
 [lints.clippy]
