@@ -1162,10 +1162,9 @@ concerns.
 
 #### 3.2.1 Core Web Framework
 
-##### Actix Web 4.12.1
+##### Actix Web 4.x
 
-Latest stable version available on crates.io selected for the HTTP API surface
-due to:
+The Actix Web 4 series is selected for the HTTP API surface due to:
 
 - One of the fastest web frameworks available according to the TechEmpower
   Framework Benchmark, with the lowest latency
