@@ -1162,9 +1162,9 @@ concerns.
 
 #### 3.2.1 Core Web Framework
 
-##### Actix Web 4.x
+##### Actix Web 4.12.1
 
-The Actix Web 4 series is selected for the HTTP API surface due to:
+Actix Web 4.12.1 is selected for the HTTP API surface due to:
 
 - One of the fastest web frameworks available according to the TechEmpower
   Framework Benchmark, with the lowest latency
@@ -1253,7 +1253,7 @@ you to also send your logs for further analysis.
 
 | Framework | Version | Runtime          | TLS Backend       | Database Support |
 | --------- | ------- | ---------------- | ----------------- | ---------------- |
-| Actix Web | 4.x     | Tokio            | rustls/native-tls | Via Diesel       |
+| Actix Web | 4.12.1  | Tokio            | rustls/native-tls | Via Diesel       |
 | Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL       |
 | Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A              |
 | Tokio     | 1.49.0  | Self             | N/A               | N/A              |
