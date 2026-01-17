@@ -1262,38 +1262,36 @@ you to also send your logs for further analysis.
 
 #### 3.3.1 Core Dependencies
 
-| Crate              | Version | Purpose                   | Registry  |
-| ------------------ | ------- | ------------------------- | --------- |
-| actix-web          | 4.x     | HTTP server framework     | crates.io |
-| tokio              | 1.49.0  | Async runtime             | crates.io |
-| diesel             | 2.3     | Database ORM              | crates.io |
-| r2d2               | 0.8     | Connection pooling        | crates.io |
-| tracing            | 0.1     | Structured logging        | crates.io |
-| tracing-subscriber | 0.3     | Log formatting and output | crates.io |
-| serde              | 1.x     | Serialization framework   | crates.io |
-| serde_json         | 1.x     | JSON serialization        | crates.io |
-| anyhow             | 1.x     | Error handling            | crates.io |
-| thiserror          | 2.x     | Error derive macros       | crates.io |
-| uuid               | 1.x     | UUID generation           | crates.io |
+| Crate       | Version  | Purpose                              | Registry  |
+| ----------- | -------- | ------------------------------------ | --------- |
+| serde       | 1.0.228  | Serialization framework              | crates.io |
+| serde_json  | 1.0.149  | JSON serialization                   | crates.io |
+| chrono      | 0.4.43   | Date/time handling                   | crates.io |
+| uuid        | 1.19.0   | UUID generation                      | crates.io |
+| thiserror   | 2.0.17   | Error derive macros                  | crates.io |
+| async-trait | 0.1.89   | Async trait support                  | crates.io |
+| mockable    | 3.0.0    | Clock abstraction for testing        | crates.io |
+| diesel      | 2.3.5    | Database ORM (with r2d2 pooling)     | crates.io |
+| tokio       | 1.49.0   | Async runtime                        | crates.io |
 
-#### 3.3.2 MCP Protocol Dependencies
+#### 3.3.2 MCP Protocol Dependencies (Planned)
+
+MCP protocol support will require additional dependencies when implemented:
 
 | Crate        | Version | Purpose                     | Registry  |
 | ------------ | ------- | --------------------------- | --------- |
 | jsonrpc-core | 18.x    | JSON-RPC 2.0 implementation | crates.io |
-| async-trait  | 0.1.x   | Async trait support         | crates.io |
 | futures      | 0.3.x   | Future utilities            | crates.io |
 | tokio-util   | 0.7.x   | Tokio utilities             | crates.io |
 
 #### 3.3.3 Development and Testing Dependencies
 
-| Crate         | Version | Purpose                 | Registry  |
-| ------------- | ------- | ----------------------- | --------- |
-| cargo-nextest | Latest  | Fast test runner        | crates.io |
-| criterion     | 0.5.x   | Benchmarking            | crates.io |
-| mockall       | 0.12.x  | Mock generation         | crates.io |
-| tempfile      | 3.x     | Temporary file handling | crates.io |
-| wiremock      | 0.6.x   | HTTP mocking            | crates.io |
+| Crate                 | Version | Purpose                       | Registry  |
+| --------------------- | ------- | ----------------------------- | --------- |
+| rstest                | 0.26.1  | Parameterized test fixtures   | crates.io |
+| mockall               | 0.14.0  | Mock generation               | crates.io |
+| eyre                  | 0.6.12  | Error reporting for tests     | crates.io |
+| pg-embed-setup-unpriv | 0.2.0   | Embedded PostgreSQL for tests | crates.io |
 
 #### 3.3.4 Version Management Strategy
 
@@ -1344,11 +1342,10 @@ visit modelcontextprotocol.io.
 
 ##### Current MCP Version
 
-Protocol Revision: 2024-11-05 (Current) with the next version of the Model
-Context Protocol specification to be released on November 25th, 2025, with a
-release candidate (RC) available on November 11th, 2025. We're building in a
-14-day RC validation window so client implementors and SDK maintainers can
-thoroughly test the protocol changes.
+Protocol Revision: 2025-11-25. The production-ready specification released on
+November 25, 2025 (following the November 11, 2025 release candidate). On
+December 9, 2025, governance of the protocol transitioned to the Agentic AI
+Foundation.
 
 #### 3.4.4 External Tool Integration
 
@@ -7059,9 +7056,9 @@ impl DatabaseManager {
 
 ###### Efficient Batch Operations
 
-Our PostgreSQL-based implementation processes 10K events/second with proper
-indexing and partitioning. The append-only nature makes it extremely fast - no
-updates, no deletes, just inserts.
+The PostgreSQL-based implementation processes 10K events/second with proper
+indexing and partitioning. The append-only nature makes it fast—no updates,
+no deletes, just inserts.
 
 ```rust
 use diesel::prelude::*;
