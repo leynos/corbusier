@@ -18,5 +18,6 @@ mod postgres {
     mod crud_tests;
     mod sequence_tests;
     mod serialization_tests;
+    mod sql_helpers_tests;
     mod uniqueness_tests;
 }

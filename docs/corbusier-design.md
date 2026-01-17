@@ -1223,8 +1223,8 @@ with pure Rust PostgreSQL driver support.
 - **Connection Pooling via r2d2**: Uses the battle-tested `r2d2` crate for
   connection pool management with configurable limits and timeouts
 - **Async Integration**: Works with async runtimes via
-  `tokio::task::spawn_blocking`
-  to offload blocking database operations to a dedicated thread pool
+  `tokio::task::spawn_blocking` to offload blocking database operations to a
+  dedicated thread pool
 
 #### 3.2.4 Observability and Logging
 
@@ -1262,17 +1262,17 @@ you to also send your logs for further analysis.
 
 #### 3.3.1 Core Dependencies
 
-| Crate       | Version  | Purpose                              | Registry  |
-| ----------- | -------- | ------------------------------------ | --------- |
-| serde       | 1.0.228  | Serialization framework              | crates.io |
-| serde_json  | 1.0.149  | JSON serialization                   | crates.io |
-| chrono      | 0.4.43   | Date/time handling                   | crates.io |
-| uuid        | 1.19.0   | UUID generation                      | crates.io |
-| thiserror   | 2.0.17   | Error derive macros                  | crates.io |
-| async-trait | 0.1.89   | Async trait support                  | crates.io |
-| mockable    | 3.0.0    | Clock abstraction for testing        | crates.io |
-| diesel      | 2.3.5    | Database ORM (with r2d2 pooling)     | crates.io |
-| tokio       | 1.49.0   | Async runtime                        | crates.io |
+| Crate       | Version | Purpose                          | Registry  |
+| ----------- | ------- | -------------------------------- | --------- |
+| serde       | 1.0.228 | Serialization framework          | crates.io |
+| serde_json  | 1.0.149 | JSON serialization               | crates.io |
+| chrono      | 0.4.43  | Date/time handling               | crates.io |
+| uuid        | 1.19.0  | UUID generation                  | crates.io |
+| thiserror   | 2.0.17  | Error derive macros              | crates.io |
+| async-trait | 0.1.89  | Async trait support              | crates.io |
+| mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
+| diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
+| tokio       | 1.49.0  | Async runtime                    | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)
 
@@ -7057,8 +7057,8 @@ impl DatabaseManager {
 ###### Efficient Batch Operations
 
 The PostgreSQL-based implementation processes 10K events/second with proper
-indexing and partitioning. The append-only nature makes it fast—no updates,
-no deletes, just inserts.
+indexing and partitioning. The append-only nature makes it fast—no updates, no
+deletes, just inserts.
 
 ```rust
 use diesel::prelude::*;
