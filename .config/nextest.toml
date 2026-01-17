@@ -21,6 +21,7 @@ postgres = { max-threads = 1 }
 
 # PostgreSQL integration tests must run serially to avoid race conditions
 # during cluster initialization ("another server might be running" errors).
+# The binary filter matches tests from tests/postgres.rs (binary name "postgres").
 [[profile.default.overrides]]
-filter = 'test(/^postgres::/)'
+filter = 'binary(postgres)'
 test-group = 'postgres'
