@@ -103,6 +103,10 @@ pub fn create_test_message(
 }
 
 /// Cleans up a test database.
+#[expect(
+    clippy::print_stderr,
+    reason = "Test cleanup warnings are informational"
+)]
 pub fn cleanup_database(cluster: &TestCluster, db_name: &str) {
     if let Err(e) = cluster.drop_database(db_name) {
         eprintln!("Warning: failed to drop test database {db_name}: {e}");

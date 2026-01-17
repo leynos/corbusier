@@ -6,11 +6,6 @@
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 //! - `serialization_tests`: Role parsing, JSONB round-trips, audit context
 
-#![expect(
-    clippy::print_stderr,
-    reason = "Test cleanup warnings are informational"
-)]
-
 mod postgres {
     pub mod helpers;
 

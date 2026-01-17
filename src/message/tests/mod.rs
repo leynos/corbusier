@@ -6,6 +6,8 @@
 mod adapters_tests;
 mod audit_context_tests;
 mod content_tests;
+mod conversation_row_tests;
+mod domain_event_tests;
 mod error_tests;
 mod id_tests;
 mod message_tests;

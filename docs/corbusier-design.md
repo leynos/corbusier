@@ -1342,10 +1342,10 @@ visit modelcontextprotocol.io.
 
 ##### Current MCP Version
 
-Protocol Revision: 2025-11-25. The production-ready specification released on
-November 25, 2025 (following the November 11, 2025 release candidate). On
+Protocol Revision: 2025-11-25[^1]. The production-ready specification released
+on November 25, 2025 (following the November 11, 2025 release candidate). On
 December 9, 2025, governance of the protocol transitioned to the Agentic AI
-Foundation.
+Foundation[^2].
 
 #### 3.4.4 External Tool Integration
 
@@ -1380,11 +1380,18 @@ Selected as the primary database for production deployments due to:
 
 ##### In-memory repository for development
 
-An in-memory repository implementation is provided for development and testing:
+An in-memory repository implementation is provided for rapid development and
+unit testing:
 
 - **Zero Configuration**: No external database required for local development
 - **Thread-safe**: Uses `Arc<std::sync::RwLock<HashMap>>` for concurrent access
 - **Schema Parity**: Implements the same `MessageRepository` trait as PostgreSQL
+
+Use the in-memory repository for quick iteration during development and for
+unit tests that do not require persistence. For integration tests requiring
+database features (constraints, triggers, transactions), use embedded
+PostgreSQL via `pg-embed-setup-unpriv`. SQLite is not used in the current
+implementation.
 
 #### 3.5.2 Data Persistence Strategies
 
@@ -1461,12 +1468,12 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
-| Environment | Database   | Connection Pool    | Backup Strategy          |
-| ----------- | ---------- | ------------------ | ------------------------ |
-| Development | SQLite     | Single connection  | File copy                |
-| Testing     | SQLite     | Per-test isolation | In-memory                |
-| Staging     | PostgreSQL | 10 connections     | Daily snapshots          |
-| Production  | PostgreSQL | 50 connections     | Continuous WAL archiving |
+| Environment | Database                 | Connection Pool    | Backup Strategy          |
+| ----------- | ------------------------ | ------------------ | ------------------------ |
+| Development | In-memory or embedded PG | Single connection  | None (ephemeral)         |
+| Testing     | Embedded PostgreSQL      | Per-test isolation | None (ephemeral)         |
+| Staging     | PostgreSQL               | 10 connections     | Daily snapshots          |
+| Production  | PostgreSQL               | 50 connections     | Continuous WAL archiving |
 
 ##### Diesel Configuration Example
 
@@ -11856,3 +11863,11 @@ studies showing substantial improvements in concurrent request handling.
 | **VPA**   | Vertical Pod Autoscaler                      |
 | **WAL**   | Write-Ahead Logging                          |
 | **WCAG**  | Web Content Accessibility Guidelines         |
+
+______________________________________________________________________
+
+[^1]: [Model Context Protocol Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/)
+    (see also [2025-11-11 Release Candidate](https://spec.modelcontextprotocol.io/specification/2025-11-11/))
+
+[^2]: [Agentic AI Foundation Announcement](https://www.anthropic.com/news/agentic-ai-foundation)
+    (December 9, 2025 governance transition)

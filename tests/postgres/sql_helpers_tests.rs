@@ -128,30 +128,87 @@ fn insert_message_maps_duplicate_sequence_constraint(
 // Audit Context Setting Tests
 // ============================================================================
 
-/// Tests that `set_audit_context` sets all provided fields in `PostgreSQL` session variables.
+/// Expected audit context values for parameterized tests.
+#[expect(
+    clippy::struct_field_names,
+    reason = "Field names match AuditContext fields for clarity"
+)]
+struct ExpectedAuditContext {
+    correlation_id: Option<Uuid>,
+    causation_id: Option<Uuid>,
+    user_id: Option<Uuid>,
+    session_id: Option<Uuid>,
+}
+
+impl ExpectedAuditContext {
+    /// Creates an [`AuditContext`] from expected values.
+    const fn to_audit_context(&self) -> AuditContext {
+        let mut audit = AuditContext::empty();
+        if let Some(id) = self.correlation_id {
+            audit = audit.with_correlation_id(id);
+        }
+        if let Some(id) = self.causation_id {
+            audit = audit.with_causation_id(id);
+        }
+        if let Some(id) = self.user_id {
+            audit = audit.with_user_id(id);
+        }
+        if let Some(id) = self.session_id {
+            audit = audit.with_session_id(id);
+        }
+        audit
+    }
+}
+
+/// Tests that `set_audit_context` correctly sets `PostgreSQL` session variables.
+///
+/// Parameterized across three scenarios:
+/// - Full context: all fields populated
+/// - Empty context: all fields `None`
+/// - Partial context: only `correlation_id` and `user_id` populated
 #[rstest]
-fn set_audit_context_sets_all_fields(
+#[case::full_context(
+    ExpectedAuditContext {
+        correlation_id: Some(Uuid::new_v4()),
+        causation_id: Some(Uuid::new_v4()),
+        user_id: Some(Uuid::new_v4()),
+        session_id: Some(Uuid::new_v4()),
+    },
+    "full"
+)]
+#[case::empty_context(
+    ExpectedAuditContext {
+        correlation_id: None,
+        causation_id: None,
+        user_id: None,
+        session_id: None,
+    },
+    "empty"
+)]
+#[case::partial_context(
+    ExpectedAuditContext {
+        correlation_id: Some(Uuid::new_v4()),
+        causation_id: None,
+        user_id: Some(Uuid::new_v4()),
+        session_id: None,
+    },
+    "partial"
+)]
+fn set_audit_context_propagates_fields(
     shared_test_cluster: &'static TestCluster,
     clock: DefaultClock,
+    #[case] expected: ExpectedAuditContext,
+    #[case] scenario: &str,
 ) {
-    let db_name = "sql_helpers_audit_all";
+    let db_name = format!("sql_helpers_audit_{scenario}");
     ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
+    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
+    let repo = setup_repository(shared_test_cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id);
 
-    let correlation_id = Uuid::new_v4();
-    let causation_id = Uuid::new_v4();
-    let user_id = Uuid::new_v4();
-    let session_id = Uuid::new_v4();
-
-    let audit = AuditContext::empty()
-        .with_correlation_id(correlation_id)
-        .with_causation_id(causation_id)
-        .with_user_id(user_id)
-        .with_session_id(session_id);
+    let audit = expected.to_audit_context();
 
     let message = Message::new(
         conv_id,
@@ -168,102 +225,14 @@ fn set_audit_context_sets_all_fields(
 
     // Verify via audit log
     let audit_log =
-        fetch_audit_log_for_message(shared_test_cluster, db_name, message.id().into_inner())
+        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
             .expect("fetch audit log")
             .expect("audit log should exist");
 
-    assert_eq!(audit_log.correlation_id, Some(correlation_id));
-    assert_eq!(audit_log.causation_id, Some(causation_id));
-    assert_eq!(audit_log.user_id, Some(user_id));
-    assert_eq!(audit_log.session_id, Some(session_id));
-}
-
-/// Tests that `set_audit_context` handles empty audit context (no fields set).
-#[rstest]
-fn set_audit_context_handles_empty_context(
-    shared_test_cluster: &'static TestCluster,
-    clock: DefaultClock,
-) {
-    let db_name = "sql_helpers_audit_empty";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
-
-    let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
-
-    let audit = AuditContext::empty();
-
-    let message = Message::new(
-        conv_id,
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("Empty audit test"))],
-        SequenceNumber::new(1),
-        &clock,
-    )
-    .expect("valid message");
-
-    let rt = test_runtime();
-    rt.block_on(repo.store_with_audit(&message, &audit))
-        .expect("store with empty audit");
-
-    // Verify via audit log - all audit fields should be None
-    let audit_log =
-        fetch_audit_log_for_message(shared_test_cluster, db_name, message.id().into_inner())
-            .expect("fetch audit log")
-            .expect("audit log should exist");
-
-    assert_eq!(audit_log.correlation_id, None);
-    assert_eq!(audit_log.causation_id, None);
-    assert_eq!(audit_log.user_id, None);
-    assert_eq!(audit_log.session_id, None);
-}
-
-/// Tests that `set_audit_context` handles partial audit context (some fields set).
-#[rstest]
-fn set_audit_context_handles_partial_context(
-    shared_test_cluster: &'static TestCluster,
-    clock: DefaultClock,
-) {
-    let db_name = "sql_helpers_audit_partial";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
-
-    let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
-
-    let correlation_id = Uuid::new_v4();
-    let user_id = Uuid::new_v4();
-
-    // Only set correlation_id and user_id
-    let audit = AuditContext::empty()
-        .with_correlation_id(correlation_id)
-        .with_user_id(user_id);
-
-    let message = Message::new(
-        conv_id,
-        Role::User,
-        vec![ContentPart::Text(TextPart::new("Partial audit test"))],
-        SequenceNumber::new(1),
-        &clock,
-    )
-    .expect("valid message");
-
-    let rt = test_runtime();
-    rt.block_on(repo.store_with_audit(&message, &audit))
-        .expect("store with partial audit");
-
-    // Verify via audit log
-    let audit_log =
-        fetch_audit_log_for_message(shared_test_cluster, db_name, message.id().into_inner())
-            .expect("fetch audit log")
-            .expect("audit log should exist");
-
-    assert_eq!(audit_log.correlation_id, Some(correlation_id));
-    assert_eq!(audit_log.causation_id, None);
-    assert_eq!(audit_log.user_id, Some(user_id));
-    assert_eq!(audit_log.session_id, None);
+    assert_eq!(audit_log.correlation_id, expected.correlation_id);
+    assert_eq!(audit_log.causation_id, expected.causation_id);
+    assert_eq!(audit_log.user_id, expected.user_id);
+    assert_eq!(audit_log.session_id, expected.session_id);
 }
 
 // ============================================================================
