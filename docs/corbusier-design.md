@@ -1162,9 +1162,10 @@ concerns.
 
 #### 3.2.1 Core Web Framework
 
-##### Actix Web 4.12.1
+##### Actix Web (version TBD)
 
-Actix Web 4.12.1 is selected for the HTTP API surface due to:
+Actix Web is planned for the HTTP API surface, with the exact version to be
+confirmed in Cargo.toml before implementation, due to:
 
 - One of the fastest web frameworks available according to the TechEmpower
   Framework Benchmark, with the lowest latency
@@ -1253,7 +1254,7 @@ you to also send your logs for further analysis.
 
 | Framework | Version | Runtime          | TLS Backend       | Database Support |
 | --------- | ------- | ---------------- | ----------------- | ---------------- |
-| Actix Web | 4.12.1  | Tokio            | rustls/native-tls | Via Diesel       |
+| Actix Web | TBD     | Tokio            | rustls/native-tls | Via Diesel       |
 | Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL       |
 | Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A              |
 | Tokio     | 1.49.0  | Self             | N/A               | N/A              |
@@ -4236,8 +4237,8 @@ pub enum ChangeType {
 One of the fastest web frameworks available according to the TechEmpower
 Framework Benchmark. One of the fastest web frameworks available according to
 the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix
-Web 4.12.1, providing high-performance REST endpoints and real-time streaming
-capabilities.
+Web (version to be pinned in Cargo.toml), providing high-performance REST
+endpoints and real-time streaming capabilities.
 
 ```mermaid
 graph TB
@@ -7063,10 +7064,10 @@ impl DatabaseManager {
 
 ###### Efficient Batch Operations
 
-The PostgreSQL-based implementation targets 10K events/second throughput with
-proper indexing and partitioning (benchmark conditions: single-node PostgreSQL
-14+, SSD storage, batch inserts of 100 events). The append-only nature
-contributes to performance—no updates, no deletes, just inserts.
+The PostgreSQL-based implementation targets up to 10K events/second throughput
+under benchmark conditions with proper indexing and partitioning (single-node
+PostgreSQL 14+, SSD storage, batch inserts of 100 events). The append-only
+nature contributes to performance—no updates, no deletes, just inserts.
 
 ```rust
 use diesel::prelude::*;

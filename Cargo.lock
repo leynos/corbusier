@@ -396,6 +396,7 @@ dependencies = [
  "mockable",
  "mockall",
  "pg-embed-setup-unpriv",
+ "postgresql_embedded",
  "rstest 0.26.1",
  "serde",
  "serde_json",

@@ -21,7 +21,7 @@ CREATE TABLE messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     sequence_number BIGINT NOT NULL,
     -- Enforce per-conversation sequence uniqueness at the database level
-    UNIQUE (conversation_id, sequence_number)
+    CONSTRAINT messages_conversation_sequence_unique UNIQUE (conversation_id, sequence_number)
 );
 
 -- Domain events table for event sourcing and audit trails
