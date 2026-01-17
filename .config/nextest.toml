@@ -21,7 +21,7 @@ postgres = { max-threads = 1 }
 
 # PostgreSQL integration tests must run serially to avoid race conditions
 # during cluster initialization ("another server might be running" errors).
-# The binary filter matches tests from tests/postgres.rs (binary name "postgres").
+# The test-group constraint ensures only one postgres test runs at a time.
 [[profile.default.overrides]]
-filter = 'binary(postgres)'
+filter = 'binary_id(~postgres)'
 test-group = 'postgres'
