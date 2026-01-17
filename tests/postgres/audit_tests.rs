@@ -90,7 +90,7 @@ fn store_with_audit_captures_context(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -103,7 +103,7 @@ fn store_with_audit_captures_context(
 
     let audit = create_audit_context(&expected);
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     rt.block_on(repo.store_with_audit(&message, &audit))
         .expect("store_with_audit");

@@ -19,7 +19,9 @@ CREATE TABLE messages (
     content JSONB NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sequence_number BIGINT NOT NULL
+    sequence_number BIGINT NOT NULL,
+    -- Enforce per-conversation sequence uniqueness at the database level
+    UNIQUE (conversation_id, sequence_number)
 );
 
 -- Domain events table for event sourcing and audit trails
@@ -55,7 +57,8 @@ CREATE TABLE audit_logs (
 
 -- Indexes for common query patterns
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX idx_messages_conversation_sequence ON messages(conversation_id, sequence_number);
+-- Note: The UNIQUE constraint on (conversation_id, sequence_number) automatically
+-- creates an index, so no explicit idx_messages_conversation_sequence is needed.
 CREATE INDEX idx_domain_events_aggregate ON domain_events(aggregate_id, aggregate_type);
 -- Partial index excludes NULL values for space efficiency
 CREATE INDEX idx_domain_events_correlation ON domain_events(correlation_id)

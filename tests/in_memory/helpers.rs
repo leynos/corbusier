@@ -116,20 +116,18 @@ pub fn store_conversation_messages(
 }
 
 /// Verifies message ordering in a retrieved conversation.
-#[expect(clippy::indexing_slicing, reason = "Test helper after length check")]
 pub fn verify_message_ordering(messages: &[Message]) {
     assert_eq!(messages.len(), 4);
-    assert_eq!(messages[0].sequence_number().value(), 1);
-    assert_eq!(messages[1].sequence_number().value(), 2);
-    assert_eq!(messages[2].sequence_number().value(), 3);
-    assert_eq!(messages[3].sequence_number().value(), 4);
+    let expected_sequences = [1_u64, 2, 3, 4];
+    for (message, expected) in messages.iter().zip(expected_sequences.iter()) {
+        assert_eq!(message.sequence_number().value(), *expected);
+    }
 }
 
 /// Verifies role preservation in retrieved messages.
-#[expect(clippy::indexing_slicing, reason = "Test helper after length check")]
 pub fn verify_role_preservation(messages: &[Message]) {
-    assert_eq!(messages[0].role(), Role::User);
-    assert_eq!(messages[1].role(), Role::Assistant);
-    assert_eq!(messages[2].role(), Role::Tool);
-    assert_eq!(messages[3].role(), Role::Assistant);
+    let expected_roles = [Role::User, Role::Assistant, Role::Tool, Role::Assistant];
+    for (message, expected) in messages.iter().zip(expected_roles.iter()) {
+        assert_eq!(message.role(), *expected);
+    }
 }

@@ -18,7 +18,7 @@ fn next_sequence_number_returns_one_for_empty(shared_test_cluster: &'static Test
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     let next = rt
         .block_on(repo.next_sequence_number(conv_id))
         .expect("next_sequence_number");
@@ -37,15 +37,15 @@ fn next_sequence_number_returns_max_plus_one(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
-    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 1)))
+    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 1).expect("test message")))
         .expect("store 1");
-    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 2)))
+    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 2).expect("test message")))
         .expect("store 2");
-    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 5)))
+    rt.block_on(repo.store(&create_test_message(&clock, conv_id, 5).expect("test message")))
         .expect("store 5");
 
     let next = rt

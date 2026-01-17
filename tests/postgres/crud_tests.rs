@@ -26,12 +26,12 @@ fn store_and_retrieve_message(clock: DefaultClock, shared_test_cluster: &'static
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let message = create_test_message(&clock, conv_id, 1);
+    let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     rt.block_on(repo.store(&message))
         .expect("store should succeed");
@@ -54,7 +54,7 @@ fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster
     let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     let result = rt
         .block_on(repo.find_by_id(MessageId::new()))
         .expect("query ok");
@@ -72,13 +72,13 @@ fn find_by_conversation_returns_ordered_messages(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let msg3 = create_test_message(&clock, conv_id, 3);
-    let msg1 = create_test_message(&clock, conv_id, 1);
-    let msg2 = create_test_message(&clock, conv_id, 2);
+    let msg3 = create_test_message(&clock, conv_id, 3).expect("test message");
+    let msg1 = create_test_message(&clock, conv_id, 1).expect("test message");
+    let msg2 = create_test_message(&clock, conv_id, 2).expect("test message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&msg3)).expect("store msg3");
     rt.block_on(repo.store(&msg1)).expect("store msg1");
     rt.block_on(repo.store(&msg2)).expect("store msg2");
@@ -101,12 +101,12 @@ fn exists_returns_correct_status(clock: DefaultClock, shared_test_cluster: &'sta
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let message = create_test_message(&clock, conv_id, 1);
+    let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     assert!(!rt.block_on(repo.exists(msg_id)).expect("exists check"));
 

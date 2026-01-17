@@ -25,12 +25,12 @@ fn store_rejects_duplicate_message_id(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let message = create_test_message(&clock, conv_id, 1);
+    let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     rt.block_on(repo.store(&message)).expect("first store");
 
@@ -58,14 +58,14 @@ fn store_rejects_duplicate_sequence_in_conversation(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
-    let msg1 = create_test_message(&clock, conv_id, 1);
+    let msg1 = create_test_message(&clock, conv_id, 1).expect("test message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&msg1)).expect("first store");
 
-    let msg2 = create_test_message(&clock, conv_id, 1);
+    let msg2 = create_test_message(&clock, conv_id, 1).expect("test message");
 
     let result = rt.block_on(repo.store(&msg2));
     assert!(
@@ -92,13 +92,13 @@ fn store_allows_same_sequence_in_different_conversations(
 
     let conv1 = ConversationId::new();
     let conv2 = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv1);
-    insert_conversation(shared_test_cluster, &db_name, conv2);
+    insert_conversation(shared_test_cluster, &db_name, conv1).expect("conversation insert");
+    insert_conversation(shared_test_cluster, &db_name, conv2).expect("conversation insert");
 
-    let msg1 = create_test_message(&clock, conv1, 1);
-    let msg2 = create_test_message(&clock, conv2, 1);
+    let msg1 = create_test_message(&clock, conv1, 1).expect("test message");
+    let msg2 = create_test_message(&clock, conv2, 1).expect("test message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     rt.block_on(repo.store(&msg1)).expect("store in conv1");
     rt.block_on(repo.store(&msg2)).expect("store in conv2");

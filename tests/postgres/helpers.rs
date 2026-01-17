@@ -34,15 +34,15 @@ pub fn clock() -> DefaultClock {
 }
 
 /// Creates a tokio runtime for async operations in tests.
-#[expect(
-    clippy::expect_used,
-    reason = "Test helper panics on runtime creation failure"
-)]
-pub fn test_runtime() -> Runtime {
+///
+/// # Errors
+///
+/// Returns an error if the runtime cannot be created.
+pub fn test_runtime() -> Result<Runtime, Box<dyn std::error::Error + Send + Sync>> {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .expect("failed to create test runtime")
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
 }
 
 /// Ensures the template database exists with the schema applied.
@@ -83,15 +83,15 @@ pub fn setup_repository(
 }
 
 /// Creates a test message with the given conversation and sequence.
-#[expect(
-    clippy::expect_used,
-    reason = "Test helper panics on invalid test message"
-)]
+///
+/// # Errors
+///
+/// Returns an error if message creation fails.
 pub fn create_test_message(
     clock: &DefaultClock,
     conversation_id: ConversationId,
     sequence: u64,
-) -> Message {
+) -> Result<Message, Box<dyn std::error::Error + Send + Sync>> {
     Message::new(
         conversation_id,
         Role::User,
@@ -99,18 +99,21 @@ pub fn create_test_message(
         SequenceNumber::new(sequence),
         clock,
     )
-    .expect("valid test message")
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
 }
 
 /// Cleans up a test database.
-#[expect(
-    clippy::print_stderr,
-    reason = "Test cleanup warnings are informational"
-)]
-pub fn cleanup_database(cluster: &TestCluster, db_name: &str) {
-    if let Err(e) = cluster.drop_database(db_name) {
-        eprintln!("Warning: failed to drop test database {db_name}: {e}");
-    }
+///
+/// # Errors
+///
+/// Returns an error if database cleanup fails.
+pub fn cleanup_database(
+    cluster: &TestCluster,
+    db_name: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    cluster
+        .drop_database(db_name)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
 }
 
 /// Guard that ensures test database cleanup runs even if test panics.
@@ -123,11 +126,22 @@ impl<'a> CleanupGuard<'a> {
     pub const fn new(cluster: &'a TestCluster, db_name: String) -> Self {
         Self { cluster, db_name }
     }
+
+    /// Explicitly cleanup the test database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if database cleanup fails.
+    #[expect(dead_code, reason = "Available for tests that need explicit cleanup")]
+    pub fn cleanup(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        cleanup_database(self.cluster, &self.db_name)
+    }
 }
 
 impl Drop for CleanupGuard<'_> {
     fn drop(&mut self) {
-        cleanup_database(self.cluster, &self.db_name);
+        // Best-effort cleanup in Drop; errors are silently ignored.
+        drop(cleanup_database(self.cluster, &self.db_name));
     }
 }
 
@@ -139,10 +153,18 @@ pub struct RoleResult {
 }
 
 /// Inserts a conversation record to satisfy the foreign key constraint.
-#[expect(clippy::expect_used, reason = "Test helper panics on insert failure")]
-pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: ConversationId) {
+///
+/// # Errors
+///
+/// Returns an error if connection or insert fails.
+pub fn insert_conversation(
+    cluster: &TestCluster,
+    db_name: &str,
+    conv_id: ConversationId,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).expect("connection");
+    let mut conn = PgConnection::establish(&url)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
     diesel::sql_query(concat!(
         "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
@@ -150,7 +172,9 @@ pub fn insert_conversation(cluster: &TestCluster, db_name: &str, conv_id: Conver
     ))
     .bind::<diesel::sql_types::Uuid, _>(conv_id.into_inner())
     .execute(&mut conn)
-    .expect("insert conversation");
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+
+    Ok(())
 }
 
 /// Row from the `audit_logs` table for verification.
@@ -183,17 +207,18 @@ pub struct AuditLogRow {
 /// Fetches the audit log entry for a specific message row ID.
 ///
 /// Returns `Ok(Some(row))` if found, `Ok(None)` if not found, or `Err` on query failure.
-#[expect(
-    clippy::expect_used,
-    reason = "Test helper panics on connection failure"
-)]
+///
+/// # Errors
+///
+/// Returns an error if connection or query fails.
 pub fn fetch_audit_log_for_message(
     cluster: &TestCluster,
     db_name: &str,
     message_id: uuid::Uuid,
-) -> Result<Option<AuditLogRow>, diesel::result::Error> {
+) -> Result<Option<AuditLogRow>, Box<dyn std::error::Error + Send + Sync>> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).expect("connection");
+    let mut conn = PgConnection::establish(&url)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
     match diesel::sql_query(concat!(
         "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
@@ -205,6 +230,6 @@ pub fn fetch_audit_log_for_message(
     {
         Ok(row) => Ok(Some(row)),
         Err(diesel::result::Error::NotFound) => Ok(None),
-        Err(e) => Err(e),
+        Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
     }
 }

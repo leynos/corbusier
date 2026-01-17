@@ -35,7 +35,7 @@ fn insert_message_maps_duplicate_id_constraint(
     let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
+    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
 
     let msg_id = MessageId::new();
     let message1 = Message::new_with_id(
@@ -58,7 +58,7 @@ fn insert_message_maps_duplicate_id_constraint(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     // Store first message
     rt.block_on(repo.store(&message1)).expect("first store");
@@ -85,7 +85,7 @@ fn insert_message_maps_duplicate_sequence_constraint(
     let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
+    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
 
     let message1 = Message::new(
         conv_id,
@@ -105,7 +105,7 @@ fn insert_message_maps_duplicate_sequence_constraint(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
 
     // Store first message
     rt.block_on(repo.store(&message1)).expect("first store");
@@ -206,7 +206,7 @@ fn set_audit_context_propagates_fields(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let audit = expected.to_audit_context();
 
@@ -219,7 +219,7 @@ fn set_audit_context_propagates_fields(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store_with_audit(&message, &audit))
         .expect("store with audit");
 
@@ -251,7 +251,7 @@ fn insert_message_succeeds_for_valid_message(
     let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id);
+    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -262,7 +262,7 @@ fn insert_message_succeeds_for_valid_message(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message))
         .expect("store should succeed");
 
@@ -300,7 +300,7 @@ fn insert_message_wraps_generic_database_errors(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     let result = rt.block_on(repo.store(&message));
 
     // Should get a Database error (not DuplicateMessage or DuplicateSequence)

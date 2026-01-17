@@ -2,11 +2,6 @@
 //!
 //! Tests role parsing, JSONB content, metadata, and UUID handling.
 
-#![expect(
-    clippy::indexing_slicing,
-    reason = "Test code uses indexing after length checks"
-)]
-
 use crate::postgres::helpers::{
     CleanupGuard, RoleResult, clock, ensure_template, insert_conversation, setup_repository,
     test_runtime,
@@ -45,7 +40,7 @@ fn role_round_trip_through_persistence(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -56,7 +51,7 @@ fn role_round_trip_through_persistence(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
     let url = shared_test_cluster.connection().database_url(&db_name);
@@ -92,7 +87,7 @@ fn content_jsonb_round_trip_with_multiple_parts(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let content = vec![
         ContentPart::Text(TextPart::new("Hello world")),
@@ -113,7 +108,7 @@ fn content_jsonb_round_trip_with_multiple_parts(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
     let retrieved = rt
@@ -121,14 +116,19 @@ fn content_jsonb_round_trip_with_multiple_parts(
         .expect("find")
         .expect("exists");
 
-    assert_eq!(retrieved.content().len(), 3);
+    let [first, second, third] = retrieved.content() else {
+        panic!(
+            "Expected 3 content parts, got {}",
+            retrieved.content().len()
+        );
+    };
 
-    match &retrieved.content()[0] {
+    match first {
         ContentPart::Text(text) => assert_eq!(text.text, "Hello world"),
         other => panic!("Expected Text, got {other:?}"),
     }
 
-    match &retrieved.content()[1] {
+    match second {
         ContentPart::Attachment(att) => {
             assert_eq!(att.mime_type, "image/png");
             assert_eq!(att.data, "iVBORw0KGgo=");
@@ -136,7 +136,7 @@ fn content_jsonb_round_trip_with_multiple_parts(
         other => panic!("Expected Attachment, got {other:?}"),
     }
 
-    match &retrieved.content()[2] {
+    match third {
         ContentPart::ToolCall(call) => {
             assert_eq!(call.call_id, "call_123");
             assert_eq!(call.name, "search");
@@ -154,7 +154,7 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let success_result =
         ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
@@ -172,7 +172,7 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
     let retrieved = rt
@@ -180,9 +180,14 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
         .expect("find")
         .expect("exists");
 
-    assert_eq!(retrieved.content().len(), 2);
+    let [first, second] = retrieved.content() else {
+        panic!(
+            "Expected 2 content parts, got {}",
+            retrieved.content().len()
+        );
+    };
 
-    match &retrieved.content()[0] {
+    match first {
         ContentPart::ToolResult(result) => {
             assert_eq!(result.call_id, "call_456");
             assert!(result.success);
@@ -194,7 +199,7 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
         other => panic!("Expected ToolResult, got {other:?}"),
     }
 
-    match &retrieved.content()[1] {
+    match second {
         ContentPart::ToolResult(result) => {
             assert_eq!(result.call_id, "call_789");
             assert!(!result.success);
@@ -211,7 +216,7 @@ fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static 
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let metadata = MessageMetadata::with_agent_backend("claude-3-opus");
 
@@ -221,7 +226,7 @@ fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static 
         .build(&clock)
         .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
     let retrieved = rt
@@ -250,7 +255,7 @@ fn from_persisted_preserves_all_domain_invariants(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let original = Message::new(
         conv_id,
@@ -261,7 +266,7 @@ fn from_persisted_preserves_all_domain_invariants(
     )
     .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&original)).expect("store");
 
     let retrieved = rt
@@ -308,7 +313,7 @@ fn uuid_round_trip_preserves_values(
     let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id);
+    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
 
     let specific_msg_id = MessageId::from_uuid(
         uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("valid uuid"),
@@ -320,7 +325,7 @@ fn uuid_round_trip_preserves_values(
         .build(&clock)
         .expect("valid message");
 
-    let rt = test_runtime();
+    let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
     let retrieved = rt

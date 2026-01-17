@@ -7063,9 +7063,10 @@ impl DatabaseManager {
 
 ###### Efficient Batch Operations
 
-The PostgreSQL-based implementation processes 10K events/second with proper
-indexing and partitioning. The append-only nature makes it fast—no updates, no
-deletes, just inserts.
+The PostgreSQL-based implementation targets 10K events/second throughput with
+proper indexing and partitioning (benchmark conditions: single-node PostgreSQL
+14+, SSD storage, batch inserts of 100 events). The append-only nature
+contributes to performance—no updates, no deletes, just inserts.
 
 ```rust
 use diesel::prelude::*;

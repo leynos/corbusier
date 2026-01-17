@@ -38,3 +38,15 @@ CREATE TRIGGER messages_audit_trigger
     AFTER INSERT OR UPDATE OR DELETE ON messages
     FOR EACH ROW
     EXECUTE FUNCTION capture_audit_context();
+
+-- Trigger on conversations table for all DML operations
+CREATE TRIGGER conversations_audit_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON conversations
+    FOR EACH ROW
+    EXECUTE FUNCTION capture_audit_context();
+
+-- Trigger on domain_events table for all DML operations
+CREATE TRIGGER domain_events_audit_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON domain_events
+    FOR EACH ROW
+    EXECUTE FUNCTION capture_audit_context();
