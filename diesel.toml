@@ -1,0 +1,11 @@
+# Diesel CLI configuration
+# See https://diesel.rs/guides/configuring-diesel-cli
+
+[print_schema]
+file = "src/message/adapters/schema.rs"
+custom_type_derives = ["diesel::query_builder::QueryId"]
+# Preserve custom module documentation when regenerating schema
+patch_file = "diesel_schema_patch.rs"
+
+[migrations_directory]
+dir = "migrations"

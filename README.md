@@ -86,7 +86,7 @@ make fmt
 # Run linter
 make lint
 
-# Run tests
+# Run tests (includes PostgreSQL integration tests)
 make test
 
 # Build the project

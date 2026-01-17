@@ -158,6 +158,19 @@ pub enum RepositoryError {
     #[error("message not found: {0}")]
     NotFound(MessageId),
 
+    /// A message with this ID already exists.
+    #[error("duplicate message: {0}")]
+    DuplicateMessage(MessageId),
+
+    /// A message with this sequence number already exists in the conversation.
+    #[error("duplicate sequence number {sequence} in conversation {conversation_id}")]
+    DuplicateSequence {
+        /// The conversation containing the conflict.
+        conversation_id: super::domain::ConversationId,
+        /// The conflicting sequence number.
+        sequence: SequenceNumber,
+    },
+
     /// A database error occurred.
     #[error("database error: {0}")]
     Database(Arc<dyn std::error::Error + Send + Sync>),
@@ -188,6 +201,17 @@ impl RepositoryError {
     #[must_use]
     pub fn connection(message: impl Into<String>) -> Self {
         Self::Connection(message.into())
+    }
+}
+
+impl From<diesel::result::Error> for RepositoryError {
+    fn from(err: diesel::result::Error) -> Self {
+        // All Diesel errors are converted to database errors.
+        // Unique constraint violations are identified but cannot provide
+        // semantic errors (DuplicateMessage/DuplicateSequence) since the
+        // constraint error doesn't include the specific IDs. Callers should
+        // use pre-check validation to get semantic errors with correct identifiers.
+        Self::database(err)
     }
 }
 

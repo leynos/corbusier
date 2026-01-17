@@ -210,6 +210,46 @@ impl Message {
     ) -> MessageBuilder {
         MessageBuilder::new(conversation_id, role, sequence_number)
     }
+
+    /// Reconstructs a message from persisted storage.
+    ///
+    /// This method is used by repository adapters to reconstruct domain
+    /// objects from database rows. While it bypasses high-level construction
+    /// validation (e.g., builder pattern checks, timestamp generation), it
+    /// still enforces essential domain invariants such as non-empty content.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MessageBuilderError::EmptyContent`] if the content vector
+    /// is empty, as this violates the domain invariant that all messages
+    /// must contain at least one content part.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Reconstruction requires all persisted fields"
+    )]
+    pub fn from_persisted(
+        id: MessageId,
+        conversation_id: ConversationId,
+        role: Role,
+        content: Vec<ContentPart>,
+        metadata: MessageMetadata,
+        created_at: DateTime<Utc>,
+        sequence_number: SequenceNumber,
+    ) -> Result<Self, MessageBuilderError> {
+        if content.is_empty() {
+            return Err(MessageBuilderError::EmptyContent);
+        }
+
+        Ok(Self {
+            id,
+            conversation_id,
+            role,
+            content,
+            metadata,
+            created_at,
+            sequence_number,
+        })
+    }
 }
 
 /// Builder for constructing messages with full control over all fields.

@@ -9,6 +9,7 @@
 //!
 //! - **Domain**: Pure domain types ([`domain::Message`], [`domain::Role`], [`domain::ContentPart`], etc.)
 //! - **Ports**: Abstract trait interfaces ([`ports::repository::MessageRepository`], [`ports::validator::MessageValidator`])
+//! - **Adapters**: Concrete implementations ([`adapters::memory::InMemoryMessageRepository`], [`adapters::postgres::PostgresMessageRepository`])
 //! - **Validation**: Business rule enforcement at ingestion boundaries
 //! - **Versioning**: Schema migration support for evolving event formats
 //!
@@ -32,6 +33,7 @@
 //! validator.validate(&message).expect("validation should pass");
 //! ```
 
+pub mod adapters;
 pub mod domain;
 pub mod error;
 pub mod ports;
