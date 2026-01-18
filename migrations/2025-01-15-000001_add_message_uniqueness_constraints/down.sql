@@ -1,3 +1,2 @@
--- Remove unique constraints
-ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_conversation_sequence_unique;
+-- Remove unique constraints added by this migration.
 ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_id_unique;

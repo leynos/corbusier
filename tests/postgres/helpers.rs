@@ -107,6 +107,8 @@ pub fn cleanup_database(cluster: &ManagedCluster, db_name: &str) -> Result<(), B
 }
 
 /// Guard that ensures test database cleanup runs even if test panics.
+///
+/// Call [`Self::cleanup`] to surface cleanup errors in the test body.
 pub struct CleanupGuard<'a> {
     cluster: &'a ManagedCluster,
     db_name: String,
@@ -124,6 +126,12 @@ impl<'a> CleanupGuard<'a> {
     /// Returns an error if database cleanup fails.
     pub fn cleanup(&self) -> Result<(), BoxError> {
         cleanup_database(self.cluster, &self.db_name)
+    }
+}
+
+impl Drop for CleanupGuard<'_> {
+    fn drop(&mut self) {
+        drop(cleanup_database(self.cluster, &self.db_name));
     }
 }
 

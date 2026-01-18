@@ -26,6 +26,9 @@ mockable = { version = "3.0.0", default-features = false, features = ["clock"] }
 # Database (Diesel ORM for PostgreSQL)
 diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 
+# Capability-based filesystem access
+cap-std = "3.4.5"
+
 # Async runtime
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 

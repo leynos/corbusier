@@ -1273,6 +1273,7 @@ you to also send your logs for further analysis.
 | async-trait | 0.1.89  | Async trait support              | crates.io |
 | mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
 | diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
+| cap-std     | 3.4.5   | Capability-based filesystem      | crates.io |
 | tokio       | 1.49.0  | Async runtime                    | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)

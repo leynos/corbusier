@@ -1,6 +1,9 @@
 //! Cluster lifecycle helpers for `PostgreSQL` integration tests.
 
+use super::helpers::test_runtime;
 use crate::test_helpers::EnvVarGuard;
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir, Permissions, PermissionsExt};
 use diesel::prelude::*;
 use pg_embedded_setup_unpriv::worker_process_test_api::{
     WorkerOperation, WorkerRequest, WorkerRequestArgs, run as run_worker,
@@ -12,6 +15,7 @@ use postgresql_embedded::{PostgreSQL, Settings, Status};
 use rstest::fixture;
 use std::ffi::{OsStr, OsString};
 use std::net::TcpListener;
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -117,7 +121,7 @@ impl ManagedCluster {
     }
 
     fn start_in_process(&mut self) -> Result<(), BoxError> {
-        let runtime = build_runtime()?;
+        let runtime = test_runtime()?;
         let env_guard = EnvVarGuard::set_many(&env_vars_to_os(&self.env_vars));
         let mut postgres = PostgreSQL::new(self.bootstrap.settings.clone());
         runtime.block_on(async {
@@ -240,17 +244,10 @@ pub fn postgres_cluster() -> PostgresCluster {
 }
 
 fn shared_cluster() -> PostgresCluster {
-    SHARED_CLUSTER.get_or_init(|| {
-        ManagedCluster::new()
-            .unwrap_or_else(|err| panic!("SKIP-TEST-CLUSTER: failed to start PostgreSQL: {err}"))
+    SHARED_CLUSTER.get_or_init(|| match ManagedCluster::new() {
+        Ok(cluster) => cluster,
+        Err(err) => panic!("SKIP-TEST-CLUSTER: failed to start PostgreSQL: {err}"),
     })
-}
-
-fn build_runtime() -> Result<Runtime, BoxError> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|err| Box::new(err) as BoxError)
 }
 
 fn quote_identifier(name: &str) -> String {
@@ -265,7 +262,8 @@ fn env_vars_to_os(env_vars: &[(String, Option<String>)]) -> Vec<(OsString, Optio
 }
 
 fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
-    match std::fs::read_to_string(&settings.password_file) {
+    let (dir, file_name) = open_parent_dir(&settings.password_file)?;
+    match dir.read_to_string(file_name) {
         Ok(contents) => {
             let password = contents.trim_end();
             if !password.is_empty() {
@@ -279,8 +277,8 @@ fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
 }
 
 fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError> {
-    let pid_path = settings.data_dir.join("postmaster.pid");
-    let contents = match std::fs::read_to_string(&pid_path) {
+    let data_dir = open_ambient_dir(&settings.data_dir)?;
+    let contents = match data_dir.read_to_string("postmaster.pid") {
         Ok(contents) => contents,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(err) => return Err(Box::new(err) as BoxError),
@@ -338,18 +336,23 @@ fn prepare_pg_worker(worker: &OsString) -> Result<OsString, BoxError> {
     let source = std::path::PathBuf::from(worker);
     let destination_path =
         std::env::temp_dir().join(format!("pg_worker_{pid}", pid = std::process::id()));
+    let (source_dir, source_name) = open_parent_dir(&source)?;
+    let (destination_dir, destination_name) = open_parent_dir(&destination_path)?;
 
-    if destination_path.exists() {
-        std::fs::remove_file(&destination_path).map_err(|err| Box::new(err) as BoxError)?;
+    if destination_dir.exists(destination_name) {
+        destination_dir
+            .remove_file(destination_name)
+            .map_err(|err| Box::new(err) as BoxError)?;
     }
 
-    std::fs::copy(&source, &destination_path).map_err(|err| Box::new(err) as BoxError)?;
+    source_dir
+        .copy(source_name, &destination_dir, destination_name)
+        .map_err(|err| Box::new(err) as BoxError)?;
 
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-
-        std::fs::set_permissions(&destination_path, std::fs::Permissions::from_mode(0o755))
+        destination_dir
+            .set_permissions(destination_name, Permissions::from_mode(0o755))
             .map_err(|err| Box::new(err) as BoxError)?;
     }
 
@@ -358,6 +361,19 @@ fn prepare_pg_worker(worker: &OsString) -> Result<OsString, BoxError> {
         // Another test stored the prepared worker path first.
     }
     Ok(destination)
+}
+
+fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
+    Dir::open_ambient_dir(path, ambient_authority()).map_err(|err| Box::new(err) as BoxError)
+}
+
+fn open_parent_dir(path: &Path) -> Result<(Dir, &OsStr), BoxError> {
+    let file_name = path.file_name().ok_or_else(|| {
+        Box::new(std::io::Error::other("path must include a file name")) as BoxError
+    })?;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let dir = open_ambient_dir(parent)?;
+    Ok((dir, file_name))
 }
 
 fn resolve_pg_port() -> Result<Option<OsString>, BoxError> {
