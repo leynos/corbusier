@@ -30,6 +30,7 @@ mod unix {
     //! Unix implementation of the worker helper.
 
     use super::{BoxError, other_error};
+    use async_trait::async_trait;
     use cap_std::ambient_authority;
     use cap_std::fs::Dir;
     use pg_embedded_setup_unpriv::worker::{PlainSecret, WorkerPayload};
@@ -155,28 +156,57 @@ mod unix {
         Ok(())
     }
 
-    async fn ensure_postgres_setup(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
-        postgres.setup().await.map_err(Box::new)?;
+    #[async_trait]
+    trait PostgresLifecycle {
+        async fn setup(&mut self) -> Result<(), BoxError>;
+        async fn start(&mut self) -> Result<(), BoxError>;
+        fn status(&self) -> Status;
+        fn data_dir(&self) -> &Path;
+    }
+
+    #[async_trait]
+    impl PostgresLifecycle for PostgreSQL {
+        async fn setup(&mut self) -> Result<(), BoxError> {
+            self.setup().await.map_err(Into::into)
+        }
+
+        async fn start(&mut self) -> Result<(), BoxError> {
+            self.start().await.map_err(Into::into)
+        }
+
+        fn status(&self) -> Status {
+            self.status()
+        }
+
+        fn data_dir(&self) -> &Path {
+            self.settings().data_dir.as_path()
+        }
+    }
+
+    async fn ensure_postgres_setup<P: PostgresLifecycle>(postgres: &mut P) -> Result<(), BoxError> {
+        postgres.setup().await?;
         if matches!(postgres.status(), Status::Started) {
             return Ok(());
         }
 
-        let data_dir = postgres.settings().data_dir.clone();
-        if has_valid_data_dir(&data_dir) {
+        let data_dir = postgres.data_dir();
+        if has_valid_data_dir(data_dir) {
             return Ok(());
         }
 
-        reset_data_dir(&data_dir)?;
-        postgres.setup().await.map_err(Box::new)?;
+        reset_data_dir(data_dir)?;
+        postgres.setup().await?;
         Ok(())
     }
 
-    async fn ensure_postgres_started(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
+    async fn ensure_postgres_started<P: PostgresLifecycle>(
+        postgres: &mut P,
+    ) -> Result<(), BoxError> {
         if matches!(postgres.status(), Status::Started) {
             return Ok(());
         }
 
-        postgres.start().await.map_err(Box::new)?;
+        postgres.start().await?;
         Ok(())
     }
 
@@ -193,7 +223,7 @@ mod unix {
     }
 
     fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
-        Dir::open_ambient_dir(path, ambient_authority()).map_err(|err| Box::new(err) as BoxError)
+        Dir::open_ambient_dir(path, ambient_authority()).map_err(Into::into)
     }
 
     fn open_parent_dir(path: &Path) -> Result<(Dir, &OsStr), BoxError> {
@@ -223,9 +253,17 @@ mod unix {
     mod tests {
         //! Unit tests for the Unix worker helper.
 
-        use super::{EnvStore, Operation, PlainSecret, apply_worker_environment_with, other_error};
+        use super::{
+            BoxError, EnvStore, Operation, PlainSecret, PostgresLifecycle, Status,
+            apply_worker_environment_with, ensure_postgres_setup, ensure_postgres_started,
+            has_valid_data_dir, open_ambient_dir, other_error, remove_dir_all,
+        };
+        use async_trait::async_trait;
+        use cap_std::ambient_authority;
+        use cap_std::fs::Dir;
         use std::cell::RefCell;
         use std::ffi::OsStr;
+        use std::path::{Path, PathBuf};
 
         struct RecordingEnv {
             calls: RefCell<Vec<(String, Option<String>)>>,
@@ -249,6 +287,74 @@ mod unix {
             fn remove_var(&self, key: &str) {
                 self.calls.borrow_mut().push((key.to_owned(), None));
             }
+        }
+
+        struct FakePostgres {
+            status: Status,
+            status_after_setup: Option<Status>,
+            data_dir: PathBuf,
+            setup_calls: usize,
+            start_calls: usize,
+        }
+
+        impl FakePostgres {
+            fn new(status: Status, data_dir: PathBuf) -> Self {
+                Self {
+                    status,
+                    status_after_setup: None,
+                    data_dir,
+                    setup_calls: 0,
+                    start_calls: 0,
+                }
+            }
+
+            fn with_status_after_setup(mut self, status: Status) -> Self {
+                self.status_after_setup = Some(status);
+                self
+            }
+        }
+
+        #[async_trait]
+        impl PostgresLifecycle for FakePostgres {
+            async fn setup(&mut self) -> Result<(), BoxError> {
+                self.setup_calls += 1;
+                if let Some(status) = self.status_after_setup {
+                    self.status = status;
+                }
+                Ok(())
+            }
+
+            async fn start(&mut self) -> Result<(), BoxError> {
+                self.start_calls += 1;
+                self.status = Status::Started;
+                Ok(())
+            }
+
+            fn status(&self) -> Status {
+                self.status
+            }
+
+            fn data_dir(&self) -> &Path {
+                self.data_dir.as_path()
+            }
+        }
+
+        fn make_temp_data_dir() -> PathBuf {
+            let name = format!("pg_worker_test_{}", uuid::Uuid::new_v4());
+            let temp_dir = std::env::temp_dir();
+            let dir =
+                Dir::open_ambient_dir(&temp_dir, ambient_authority()).expect("open temp directory");
+            dir.create_dir(&name).expect("create temp data dir");
+            temp_dir.join(name)
+        }
+
+        fn create_valid_marker(data_dir: &Path) {
+            let dir = open_ambient_dir(data_dir).expect("open data dir");
+            dir.create_dir_all("global")
+                .expect("create global directory");
+            let _file = dir
+                .create("global/pg_filenode.map")
+                .expect("create marker file");
         }
 
         #[test]
@@ -301,6 +407,75 @@ mod unix {
             let error = other_error("boom");
             let message = error.to_string();
             assert!(message.contains("boom"));
+        }
+
+        #[tokio::test]
+        async fn ensure_postgres_started_skips_when_started() {
+            let data_dir = make_temp_data_dir();
+            let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
+
+            ensure_postgres_started(&mut postgres)
+                .await
+                .expect("ensure postgres started");
+
+            assert_eq!(postgres.start_calls, 0);
+            remove_dir_all(&data_dir).expect("cleanup data dir");
+        }
+
+        #[tokio::test]
+        async fn ensure_postgres_started_runs_when_stopped() {
+            let data_dir = make_temp_data_dir();
+            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone());
+
+            ensure_postgres_started(&mut postgres)
+                .await
+                .expect("ensure postgres started");
+
+            assert_eq!(postgres.start_calls, 1);
+            remove_dir_all(&data_dir).expect("cleanup data dir");
+        }
+
+        #[tokio::test]
+        async fn ensure_postgres_setup_returns_when_started() {
+            let data_dir = make_temp_data_dir();
+            let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
+
+            ensure_postgres_setup(&mut postgres)
+                .await
+                .expect("ensure postgres setup");
+
+            assert_eq!(postgres.setup_calls, 1);
+            remove_dir_all(&data_dir).expect("cleanup data dir");
+        }
+
+        #[tokio::test]
+        async fn ensure_postgres_setup_skips_reset_when_valid() {
+            let data_dir = make_temp_data_dir();
+            create_valid_marker(&data_dir);
+            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
+                .with_status_after_setup(Status::Stopped);
+
+            ensure_postgres_setup(&mut postgres)
+                .await
+                .expect("ensure postgres setup");
+
+            assert_eq!(postgres.setup_calls, 1);
+            assert!(has_valid_data_dir(&data_dir));
+            remove_dir_all(&data_dir).expect("cleanup data dir");
+        }
+
+        #[tokio::test]
+        async fn ensure_postgres_setup_resets_invalid_data_dir() {
+            let data_dir = make_temp_data_dir();
+            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
+                .with_status_after_setup(Status::Stopped);
+
+            ensure_postgres_setup(&mut postgres)
+                .await
+                .expect("ensure postgres setup");
+
+            assert_eq!(postgres.setup_calls, 2);
+            assert!(!data_dir.exists());
         }
     }
 }
