@@ -10,13 +10,12 @@ use corbusier::message::{
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
-use pg_embedded_setup_unpriv::{TestCluster, test_support::shared_test_cluster};
 use rstest::rstest;
 use uuid::Uuid;
 
 use super::helpers::{
-    CleanupGuard, clock, ensure_template, fetch_audit_log_for_message, insert_conversation,
-    setup_repository, test_runtime,
+    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
+    insert_conversation, postgres_cluster, setup_repository, test_runtime,
 };
 
 // ============================================================================
@@ -26,16 +25,17 @@ use super::helpers::{
 /// Tests that inserting a message with duplicate ID returns `DuplicateMessage` error.
 #[rstest]
 fn insert_message_maps_duplicate_id_constraint(
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     clock: DefaultClock,
 ) {
-    let db_name = "sql_helpers_dup_id";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
+    let db_name = format!("sql_helpers_dup_id_{}", Uuid::new_v4());
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let msg_id = MessageId::new();
     let message1 = Message::new_with_id(
@@ -71,21 +71,26 @@ fn insert_message_maps_duplicate_id_constraint(
         }
         other => panic!("expected DuplicateMessage error, got {other:?}"),
     }
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 /// Tests that inserting a message with duplicate sequence returns `DuplicateSequence` error.
 #[rstest]
 fn insert_message_maps_duplicate_sequence_constraint(
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     clock: DefaultClock,
 ) {
-    let db_name = "sql_helpers_dup_seq";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
+    let db_name = format!("sql_helpers_dup_seq_{}", Uuid::new_v4());
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message1 = Message::new(
         conv_id,
@@ -122,6 +127,10 @@ fn insert_message_maps_duplicate_sequence_constraint(
         }
         other => panic!("expected DuplicateSequence error, got {other:?}"),
     }
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 // ============================================================================
@@ -195,18 +204,19 @@ impl ExpectedAuditContext {
     "partial"
 )]
 fn set_audit_context_propagates_fields(
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     clock: DefaultClock,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
 ) {
-    let db_name = format!("sql_helpers_audit_{scenario}");
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repo");
+    let db_name = format!("sql_helpers_audit_{scenario}_{}", Uuid::new_v4());
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let audit = expected.to_audit_context();
 
@@ -224,15 +234,18 @@ fn set_audit_context_propagates_fields(
         .expect("store with audit");
 
     // Verify via audit log
-    let audit_log =
-        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
-            .expect("fetch audit log")
-            .expect("audit log should exist");
+    let audit_log = fetch_audit_log_for_message(cluster, &db_name, message.id().into_inner())
+        .expect("fetch audit log")
+        .expect("audit log should exist");
 
     assert_eq!(audit_log.correlation_id, expected.correlation_id);
     assert_eq!(audit_log.causation_id, expected.causation_id);
     assert_eq!(audit_log.user_id, expected.user_id);
     assert_eq!(audit_log.session_id, expected.session_id);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 // ============================================================================
@@ -242,16 +255,17 @@ fn set_audit_context_propagates_fields(
 /// Tests that `insert_message` successfully inserts a valid message.
 #[rstest]
 fn insert_message_succeeds_for_valid_message(
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     clock: DefaultClock,
 ) {
-    let db_name = "sql_helpers_insert_valid";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
+    let db_name = format!("sql_helpers_insert_valid_{}", Uuid::new_v4());
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repo");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -275,18 +289,23 @@ fn insert_message_succeeds_for_valid_message(
     assert_eq!(retrieved.id(), message.id());
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::Assistant);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 /// Tests that generic database errors (not constraint violations) are wrapped correctly.
 #[rstest]
 fn insert_message_wraps_generic_database_errors(
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     clock: DefaultClock,
 ) {
-    let db_name = "sql_helpers_insert_fk";
-    ensure_template(shared_test_cluster).expect("template");
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.to_owned());
-    let repo = setup_repository(shared_test_cluster, db_name).expect("repo");
+    let db_name = format!("sql_helpers_insert_fk_{}", Uuid::new_v4());
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repo");
 
     // Don't insert the conversation - this will trigger a foreign key violation
     let conv_id = ConversationId::new();
@@ -310,4 +329,8 @@ fn insert_message_wraps_generic_database_errors(
         }
         other => panic!("expected Database error for FK violation, got {other:?}"),
     }
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }

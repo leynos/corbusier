@@ -46,7 +46,7 @@ pub(super) fn insert_message(
 /// appropriate error variant with the relevant identifiers.
 fn map_insert_error(err: diesel::result::Error, ids: &InsertIds) -> RepositoryError {
     use diesel::result::DatabaseErrorKind;
-    let diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info) = err
+    let diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, info) = &err
     else {
         return RepositoryError::database(err);
     };

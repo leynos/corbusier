@@ -1,32 +1,26 @@
 //! Basic CRUD operation tests for `PostgreSQL` message repository.
 
-#![expect(
-    clippy::indexing_slicing,
-    reason = "Test code uses indexing after length checks"
-)]
-
 use crate::postgres::helpers::{
-    CleanupGuard, clock, create_test_message, ensure_template, insert_conversation,
-    setup_repository, test_runtime,
+    CleanupGuard, PostgresCluster, clock, create_test_message, ensure_template,
+    insert_conversation, postgres_cluster, setup_repository, test_runtime,
 };
 use corbusier::message::{
     domain::{ConversationId, MessageId, Role},
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
-use pg_embedded_setup_unpriv::TestCluster;
-use pg_embedded_setup_unpriv::test_support::shared_test_cluster;
 use rstest::rstest;
 
 #[rstest]
-fn store_and_retrieve_message(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn store_and_retrieve_message(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_store_retrieve_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
@@ -45,34 +39,44 @@ fn store_and_retrieve_message(clock: DefaultClock, shared_test_cluster: &'static
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::User);
     assert_eq!(retrieved.sequence_number().value(), 1);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 #[rstest]
-fn find_by_id_returns_none_for_missing(shared_test_cluster: &'static TestCluster) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn find_by_id_returns_none_for_missing(postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_find_none_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let rt = test_runtime().expect("tokio runtime");
     let result = rt
         .block_on(repo.find_by_id(MessageId::new()))
         .expect("query ok");
     assert!(result.is_none());
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 #[rstest]
 fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
 ) {
-    ensure_template(shared_test_cluster).expect("template setup");
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_find_conv_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let msg3 = create_test_message(&clock, conv_id, 3).expect("test message");
     let msg1 = create_test_message(&clock, conv_id, 1).expect("test message");
@@ -88,20 +92,28 @@ fn find_by_conversation_returns_ordered_messages(
         .expect("find_by_conversation");
 
     assert_eq!(messages.len(), 3);
-    assert_eq!(messages[0].sequence_number().value(), 1);
-    assert_eq!(messages[1].sequence_number().value(), 2);
-    assert_eq!(messages[2].sequence_number().value(), 3);
+    let [first, second, third] = messages.as_slice() else {
+        panic!("Expected 3 messages, got {}", messages.len());
+    };
+    assert_eq!(first.sequence_number().value(), 1);
+    assert_eq!(second.sequence_number().value(), 2);
+    assert_eq!(third.sequence_number().value(), 3);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 #[rstest]
-fn exists_returns_correct_status(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn exists_returns_correct_status(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_exists_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
@@ -112,4 +124,8 @@ fn exists_returns_correct_status(clock: DefaultClock, shared_test_cluster: &'sta
 
     rt.block_on(repo.store(&message)).expect("store");
     assert!(rt.block_on(repo.exists(msg_id)).expect("exists check"));
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }

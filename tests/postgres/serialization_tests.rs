@@ -3,8 +3,8 @@
 //! Tests role parsing, JSONB content, metadata, and UUID handling.
 
 use crate::postgres::helpers::{
-    CleanupGuard, RoleResult, clock, ensure_template, insert_conversation, setup_repository,
-    test_runtime,
+    CleanupGuard, PostgresCluster, RoleResult, clock, ensure_template, insert_conversation,
+    postgres_cluster, setup_repository, test_runtime,
 };
 use corbusier::message::{
     domain::{
@@ -15,8 +15,6 @@ use corbusier::message::{
 };
 use diesel::prelude::*;
 use mockable::DefaultClock;
-use pg_embedded_setup_unpriv::TestCluster;
-use pg_embedded_setup_unpriv::test_support::shared_test_cluster;
 use rstest::rstest;
 
 // ============================================================================
@@ -30,17 +28,18 @@ use rstest::rstest;
 #[case(Role::System, "system")]
 fn role_round_trip_through_persistence(
     clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     #[case] role: Role,
     #[case] expected_str: &str,
 ) {
-    ensure_template(shared_test_cluster).expect("template setup");
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_role_rt_{}_{}", expected_str, uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -54,7 +53,7 @@ fn role_round_trip_through_persistence(
     let rt = test_runtime().expect("tokio runtime");
     rt.block_on(repo.store(&message)).expect("store");
 
-    let url = shared_test_cluster.connection().database_url(&db_name);
+    let url = cluster.connection().database_url(&db_name);
     let mut conn = PgConnection::establish(&url).expect("connection");
     let stored_role: String = diesel::sql_query("SELECT role FROM messages WHERE id = $1")
         .bind::<diesel::sql_types::Uuid, _>(message.id().into_inner())
@@ -63,13 +62,18 @@ fn role_round_trip_through_persistence(
         .role;
 
     assert_eq!(stored_role, expected_str);
+    drop(conn);
 
     let retrieved = rt
         .block_on(repo.find_by_id(message.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     assert_eq!(retrieved.role(), role);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 // ============================================================================
@@ -79,15 +83,16 @@ fn role_round_trip_through_persistence(
 #[rstest]
 fn content_jsonb_round_trip_with_multiple_parts(
     clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
 ) {
-    ensure_template(shared_test_cluster).expect("template setup");
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_jsonb_content_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let content = vec![
         ContentPart::Text(TextPart::new("Hello world")),
@@ -114,7 +119,7 @@ fn content_jsonb_round_trip_with_multiple_parts(
     let retrieved = rt
         .block_on(repo.find_by_id(message.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     let [first, second, third] = retrieved.content() else {
         panic!(
@@ -144,17 +149,22 @@ fn content_jsonb_round_trip_with_multiple_parts(
         }
         other => panic!("Expected ToolCall, got {other:?}"),
     }
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 #[rstest]
-fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn tool_result_jsonb_round_trip(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_tool_result_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let success_result =
         ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
@@ -178,7 +188,7 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
     let retrieved = rt
         .block_on(repo.find_by_id(message.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     let [first, second] = retrieved.content() else {
         panic!(
@@ -206,17 +216,22 @@ fn tool_result_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'stat
         }
         other => panic!("Expected ToolResult, got {other:?}"),
     }
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 #[rstest]
-fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static TestCluster) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn metadata_jsonb_round_trip(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_metadata_jsonb_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let metadata = MessageMetadata::with_agent_backend("claude-3-opus");
 
@@ -232,12 +247,16 @@ fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static 
     let retrieved = rt
         .block_on(repo.find_by_id(message.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     assert_eq!(
         retrieved.metadata().agent_backend,
         Some("claude-3-opus".to_owned())
     );
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 // ============================================================================
@@ -247,15 +266,16 @@ fn metadata_jsonb_round_trip(clock: DefaultClock, shared_test_cluster: &'static 
 #[rstest]
 fn from_persisted_preserves_all_domain_invariants(
     clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
 ) {
-    ensure_template(shared_test_cluster).expect("template setup");
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_from_persisted_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let original = Message::new(
         conv_id,
@@ -272,7 +292,7 @@ fn from_persisted_preserves_all_domain_invariants(
     let retrieved = rt
         .block_on(repo.find_by_id(original.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     assert!(
         !retrieved.id().into_inner().is_nil(),
@@ -296,6 +316,10 @@ fn from_persisted_preserves_all_domain_invariants(
         time_diff < 100,
         "Timestamp should be preserved within 100ms, diff was {time_diff}ms"
     );
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
 
 // ============================================================================
@@ -303,17 +327,15 @@ fn from_persisted_preserves_all_domain_invariants(
 // ============================================================================
 
 #[rstest]
-fn uuid_round_trip_preserves_values(
-    clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
-) {
-    ensure_template(shared_test_cluster).expect("template setup");
+fn uuid_round_trip_preserves_values(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_uuid_rt_{}", uuid::Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let specific_msg_id = MessageId::from_uuid(
         uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("valid uuid"),
@@ -331,11 +353,15 @@ fn uuid_round_trip_preserves_values(
     let retrieved = rt
         .block_on(repo.find_by_id(specific_msg_id))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     assert_eq!(
         retrieved.id().into_inner().to_string(),
         "550e8400-e29b-41d4-a716-446655440000"
     );
     assert_eq!(retrieved.conversation_id(), conv_id);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }

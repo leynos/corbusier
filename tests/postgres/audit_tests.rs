@@ -4,8 +4,8 @@
 //! verification via the database trigger.
 
 use crate::postgres::helpers::{
-    CleanupGuard, clock, ensure_template, fetch_audit_log_for_message, insert_conversation,
-    setup_repository, test_runtime,
+    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
+    insert_conversation, postgres_cluster, setup_repository, test_runtime,
 };
 use corbusier::message::{
     adapters::audit_context::AuditContext,
@@ -13,8 +13,6 @@ use corbusier::message::{
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
-use pg_embedded_setup_unpriv::TestCluster;
-use pg_embedded_setup_unpriv::test_support::shared_test_cluster;
 use rstest::rstest;
 use uuid::Uuid;
 
@@ -80,17 +78,18 @@ const fn create_audit_context(expected: &ExpectedAuditContext) -> AuditContext {
 )]
 fn store_with_audit_captures_context(
     clock: DefaultClock,
-    shared_test_cluster: &'static TestCluster,
+    postgres_cluster: PostgresCluster,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
 ) {
-    ensure_template(shared_test_cluster).expect("template setup");
+    let cluster = postgres_cluster;
+    ensure_template(cluster).expect("template setup");
     let db_name = format!("test_audit_{scenario}_{}", Uuid::new_v4());
-    let _guard = CleanupGuard::new(shared_test_cluster, db_name.clone());
-    let repo = setup_repository(shared_test_cluster, &db_name).expect("repository setup");
+    let guard = CleanupGuard::new(cluster, db_name.clone());
+    let repo = setup_repository(cluster, &db_name).expect("repository setup");
 
     let conv_id = ConversationId::new();
-    insert_conversation(shared_test_cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
 
     let message = Message::new(
         conv_id,
@@ -111,15 +110,14 @@ fn store_with_audit_captures_context(
     let retrieved = rt
         .block_on(repo.find_by_id(message.id()))
         .expect("find")
-        .expect("exists");
+        .expect("message should exist");
 
     assert_eq!(retrieved.id(), message.id());
 
     // Verify audit_logs entry was created with correct context
-    let audit_log =
-        fetch_audit_log_for_message(shared_test_cluster, &db_name, message.id().into_inner())
-            .expect("audit log query should succeed")
-            .expect("audit log entry should exist");
+    let audit_log = fetch_audit_log_for_message(cluster, &db_name, message.id().into_inner())
+        .expect("audit log query should succeed")
+        .expect("audit log entry should exist");
 
     assert_eq!(audit_log.table_name, "messages");
     assert_eq!(audit_log.operation, "INSERT");
@@ -128,4 +126,8 @@ fn store_with_audit_captures_context(
     assert_eq!(audit_log.causation_id, expected.causation);
     assert_eq!(audit_log.user_id, expected.user);
     assert_eq!(audit_log.session_id, expected.session);
+
+    drop(repo);
+
+    guard.cleanup().expect("cleanup database");
 }
