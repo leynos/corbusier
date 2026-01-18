@@ -1292,7 +1292,7 @@ MCP protocol support will require additional dependencies when implemented:
 | rstest                | 0.26.1  | Parameterized test fixtures   | crates.io |
 | mockall               | 0.14.0  | Mock generation               | crates.io |
 | eyre                  | 0.6.12  | Error reporting for tests     | crates.io |
-| pg-embed-setup-unpriv | 0.2.0   | Embedded PostgreSQL for tests | crates.io |
+| pg-embed-setup-unpriv | 0.3.0   | Embedded PostgreSQL for tests | crates.io |
 
 #### 3.3.4 Version Management Strategy
 
