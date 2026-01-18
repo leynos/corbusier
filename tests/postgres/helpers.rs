@@ -15,15 +15,15 @@ use tokio::runtime::Runtime;
 
 /// SQL to create the base schema for tests.
 pub const CREATE_SCHEMA_SQL: &str =
-    include_str!("../../migrations/2025-01-15-000000_create_base_tables/up.sql");
+    include_str!("../../migrations/2026-01-15-000000_create_base_tables/up.sql");
 
 /// SQL to add uniqueness constraints.
 pub const ADD_CONSTRAINTS_SQL: &str =
-    include_str!("../../migrations/2025-01-15-000001_add_message_uniqueness_constraints/up.sql");
+    include_str!("../../migrations/2026-01-15-000001_add_message_uniqueness_constraints/up.sql");
 
 /// SQL to add audit trigger.
 pub const ADD_AUDIT_TRIGGER_SQL: &str =
-    include_str!("../../migrations/2025-01-16-000000_add_audit_trigger/up.sql");
+    include_str!("../../migrations/2026-01-16-000000_add_audit_trigger/up.sql");
 
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
