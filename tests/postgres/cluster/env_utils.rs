@@ -2,6 +2,7 @@
 
 use super::BoxError;
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
+use camino::{Utf8Path, Utf8PathBuf};
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
 use std::ffi::OsString;
 use std::net::TcpListener;
@@ -16,6 +17,23 @@ pub(super) fn env_vars_to_os(
 }
 
 pub(super) fn worker_env_changes() -> Result<Vec<(OsString, Option<OsString>)>, BoxError> {
+    worker_env_changes_impl(
+        detect_execution_privileges,
+        locate_pg_worker_path,
+        prepare_pg_worker,
+    )
+}
+
+fn worker_env_changes_impl<D, L, P>(
+    detect_privileges: D,
+    locate_worker: L,
+    prepare_worker: P,
+) -> Result<Vec<(OsString, Option<OsString>)>, BoxError>
+where
+    D: Fn() -> ExecutionPrivileges,
+    L: Fn() -> Option<Utf8PathBuf>,
+    P: Fn(&Utf8Path) -> Result<Utf8PathBuf, BoxError>,
+{
     let port_override = resolve_pg_port()?;
 
     let mut changes = Vec::new();
@@ -23,22 +41,25 @@ pub(super) fn worker_env_changes() -> Result<Vec<(OsString, Option<OsString>)>, 
         changes.push((OsString::from("PG_PORT"), Some(port)));
     }
 
-    if matches!(detect_execution_privileges(), ExecutionPrivileges::Root)
-        && std::env::var_os("PG_EMBEDDED_WORKER").is_none()
-    {
-        let worker_path = locate_pg_worker_path().ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "PG_EMBEDDED_WORKER is not set and pg_worker binary was not found",
-            )) as BoxError
-        })?;
-
-        let prepared_worker = prepare_pg_worker(&worker_path)?;
-        changes.push((
-            OsString::from("PG_EMBEDDED_WORKER"),
-            Some(OsString::from(prepared_worker.as_str())),
-        ));
+    if !matches!(detect_privileges(), ExecutionPrivileges::Root) {
+        return Ok(changes);
     }
+
+    if std::env::var_os("PG_EMBEDDED_WORKER").is_some() {
+        return Ok(changes);
+    }
+
+    let worker_path = locate_worker().ok_or_else(|| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "PG_EMBEDDED_WORKER is not set and pg_worker binary was not found",
+        )) as BoxError
+    })?;
+    let prepared_path = prepare_worker(&worker_path)?;
+    changes.push((
+        OsString::from("PG_EMBEDDED_WORKER"),
+        Some(OsString::from(prepared_path.as_str())),
+    ));
 
     Ok(changes)
 }
@@ -56,4 +77,116 @@ fn resolve_pg_port() -> Result<Option<OsString>, BoxError> {
     drop(listener);
 
     Ok(Some(OsString::from(port.to_string())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::worker_env_changes_impl;
+    use crate::test_helpers::EnvVarGuard;
+    use camino::Utf8PathBuf;
+    use pg_embedded_setup_unpriv::ExecutionPrivileges;
+    use std::ffi::OsString;
+    use std::io;
+
+    fn dummy_worker_path() -> Utf8PathBuf {
+        let base = Utf8PathBuf::from(std::env::temp_dir().to_string_lossy().into_owned());
+        base.join(format!("pg_worker_test_{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn preserves_existing_pg_port() {
+        let guard = EnvVarGuard::set_many(&[
+            (OsString::from("PG_PORT"), Some(OsString::from("54321"))),
+            (OsString::from("PG_EMBEDDED_WORKER"), None),
+        ]);
+
+        let changes = worker_env_changes_impl(
+            || ExecutionPrivileges::Unprivileged,
+            || None,
+            |_| Ok(dummy_worker_path()),
+        )
+        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+
+        let pg_port = OsString::from("PG_PORT");
+        let has_pg_port = changes.iter().any(|(key, _)| key == &pg_port);
+        assert!(
+            !has_pg_port,
+            "expected no PG_PORT override when PG_PORT is already set",
+        );
+        drop(guard);
+    }
+
+    #[test]
+    fn non_root_does_not_emit_pg_embedded_worker() {
+        let guard = EnvVarGuard::set_many(&[
+            (OsString::from("PG_PORT"), None),
+            (OsString::from("PG_EMBEDDED_WORKER"), None),
+        ]);
+
+        let changes = worker_env_changes_impl(
+            || ExecutionPrivileges::Unprivileged,
+            || Some(dummy_worker_path()),
+            |_| Ok(dummy_worker_path()),
+        )
+        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+
+        let worker_key = OsString::from("PG_EMBEDDED_WORKER");
+        let has_worker = changes.iter().any(|(key, _)| key == &worker_key);
+        assert!(
+            !has_worker,
+            "expected no PG_EMBEDDED_WORKER change for non-root execution",
+        );
+        drop(guard);
+    }
+
+    #[test]
+    fn root_without_worker_yields_not_found() {
+        let guard = EnvVarGuard::set_many(&[
+            (OsString::from("PG_PORT"), None),
+            (OsString::from("PG_EMBEDDED_WORKER"), None),
+        ]);
+
+        let result = worker_env_changes_impl(
+            || ExecutionPrivileges::Root,
+            || None,
+            |_| Ok(dummy_worker_path()),
+        );
+
+        let Err(error) = result else {
+            panic!("expected worker lookup failure for root execution");
+        };
+        let Some(io_err) = error.downcast_ref::<io::Error>() else {
+            panic!("expected io::Error for missing pg_worker");
+        };
+
+        assert_eq!(io_err.kind(), io::ErrorKind::NotFound);
+        drop(guard);
+    }
+
+    #[test]
+    fn root_sets_pg_embedded_worker_when_discoverable() {
+        let guard = EnvVarGuard::set_many(&[
+            (OsString::from("PG_PORT"), None),
+            (OsString::from("PG_EMBEDDED_WORKER"), None),
+        ]);
+        let expected_path = dummy_worker_path();
+        let expected_os = OsString::from(expected_path.as_str());
+
+        let changes = worker_env_changes_impl(
+            || ExecutionPrivileges::Root,
+            || Some(expected_path.clone()),
+            |_| Ok(expected_path.clone()),
+        )
+        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+
+        let worker_key = OsString::from("PG_EMBEDDED_WORKER");
+        let worker_value = changes
+            .iter()
+            .find(|(key, _)| key == &worker_key)
+            .and_then(|(_, value)| value.clone())
+            .unwrap_or_else(|| panic!("expected PG_EMBEDDED_WORKER to be set"));
+
+        assert_eq!(worker_value, expected_os);
+        drop(guard);
+    }
 }

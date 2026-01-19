@@ -21,6 +21,8 @@ pub(super) fn open_parent_dir(path: &Utf8Path) -> Result<(Dir, &str), BoxError> 
 
 pub(super) fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
     let password_path_string = settings.password_file.to_string_lossy();
+    // settings.password_file is expected to be UTF-8, so lossy conversion is
+    // acceptable for Utf8Path::new(password_path_string.as_ref()).
     let password_path = Utf8Path::new(password_path_string.as_ref());
     let (dir, file_name_str) = open_parent_dir(password_path)?;
     let file_name = Utf8Path::new(file_name_str);
@@ -47,13 +49,14 @@ pub(super) fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError
         Err(err) => return Err(Box::new(err) as BoxError),
     };
 
-    let port_line = contents.lines().nth(3).map(str::trim);
-    let Some(port_value) = port_line else {
-        return Ok(());
-    };
-    let Ok(port) = port_value.parse::<u16>() else {
-        return Ok(());
-    };
+    let port_line = contents.lines().nth(3).map(str::trim).ok_or_else(|| {
+        Box::new(std::io::Error::other("postmaster.pid missing port line")) as BoxError
+    })?;
+    let port = port_line.parse::<u16>().map_err(|err| {
+        Box::new(std::io::Error::other(format!(
+            "failed to parse postmaster.pid port: {err}"
+        ))) as BoxError
+    })?;
     settings.port = port;
     Ok(())
 }

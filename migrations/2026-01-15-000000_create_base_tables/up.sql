@@ -1,6 +1,10 @@
 -- Create base tables for message persistence
 -- Follows corbusier-design.md section 6.2.3
 
+-- Requires superuser or managed-service roles (e.g. azure_pg_admin,
+-- cloudsqlsuperuser, or the appropriate RDS role). IF NOT EXISTS avoids errors
+-- when the extension is pre-provisioned; ensure deploys use a privileged
+-- account or have a DBA enable pgcrypto ahead of time.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Conversations table stores conversation metadata

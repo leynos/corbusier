@@ -1,6 +1,5 @@
 //! Basic CRUD operation tests for `PostgreSQL` message repository.
 
-use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
     CleanupGuard, PostgresCluster, clock, create_test_message, ensure_template,
     insert_conversation, postgres_cluster, setup_repository, test_runtime,
@@ -22,161 +21,173 @@ struct CrudTestContext {
     rt: Runtime,
 }
 
-fn test_error(message: impl Into<String>) -> BoxError {
-    Box::new(std::io::Error::other(message.into()))
-}
-
 impl CrudTestContext {
-    fn cleanup(self) -> Result<(), BoxError> {
+    fn cleanup(self) {
         drop(self.repo);
-        self.guard.cleanup()
+        if let Err(err) = self.guard.cleanup() {
+            panic!("failed to cleanup CRUD test database: {err}");
+        }
     }
 }
 
 #[fixture]
-fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
+fn crud_context(postgres_cluster: PostgresCluster) -> CrudTestContext {
     let cluster = postgres_cluster;
-    ensure_template(cluster)?;
+    if let Err(err) = ensure_template(cluster) {
+        panic!("failed to ensure postgres template: {err}");
+    }
     let db_name = format!("test_crud_{}", uuid::Uuid::new_v4());
     let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name)?;
-    let rt = test_runtime()?;
-    Ok(CrudTestContext {
+    let repo = match setup_repository(cluster, &db_name) {
+        Ok(repo) => repo,
+        Err(err) => panic!("failed to setup postgres repository: {err}"),
+    };
+    let rt = match test_runtime() {
+        Ok(rt) => rt,
+        Err(err) => panic!("failed to create runtime: {err}"),
+    };
+    CrudTestContext {
         cluster,
         db_name,
         guard,
         repo,
         rt,
-    })
+    }
 }
 
 #[rstest]
-fn store_and_retrieve_message(
-    clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
-) -> Result<(), BoxError> {
-    let context = crud_context?;
+fn store_and_retrieve_message(clock: DefaultClock, crud_context: CrudTestContext) {
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(context.cluster, &context.db_name, conv_id)?;
+    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
+        panic!("failed to insert conversation: {err}");
+    }
 
-    let message = create_test_message(&clock, conv_id, 1)?;
+    let message = match create_test_message(&clock, conv_id, 1) {
+        Ok(message) => message,
+        Err(err) => panic!("failed to create test message: {err}"),
+    };
     let msg_id = message.id();
 
-    context.rt.block_on(context.repo.store(&message))?;
-
-    let retrieved = context
-        .rt
-        .block_on(context.repo.find_by_id(msg_id))?
-        .expect("message should exist");
-
-    if retrieved.id() != msg_id {
-        return Err(test_error("retrieved message id does not match"));
-    }
-    if retrieved.conversation_id() != conv_id {
-        return Err(test_error("retrieved conversation id does not match"));
-    }
-    if retrieved.role() != Role::User {
-        return Err(test_error("retrieved role does not match"));
-    }
-    if retrieved.sequence_number().value() != 1 {
-        return Err(test_error("retrieved sequence number does not match"));
+    if let Err(err) = context.rt.block_on(context.repo.store(&message)) {
+        panic!("failed to store message: {err}");
     }
 
-    context.cleanup()?;
-    Ok(())
+    let retrieved_opt = match context.rt.block_on(context.repo.find_by_id(msg_id)) {
+        Ok(retrieved) => retrieved,
+        Err(err) => panic!("failed to load message: {err}"),
+    };
+    let Some(retrieved) = retrieved_opt else {
+        panic!("message should exist");
+    };
+
+    assert_eq!(retrieved.id(), msg_id);
+    assert_eq!(retrieved.conversation_id(), conv_id);
+    assert_eq!(retrieved.role(), Role::User);
+    assert_eq!(retrieved.sequence_number().value(), 1);
+
+    context.cleanup();
 }
 
 #[rstest]
-fn find_by_id_returns_none_for_missing(
-    crud_context: Result<CrudTestContext, BoxError>,
-) -> Result<(), BoxError> {
-    let context = crud_context?;
+fn find_by_id_returns_none_for_missing(crud_context: CrudTestContext) {
+    let context = crud_context;
 
-    let result = context
+    let result = match context
         .rt
-        .block_on(context.repo.find_by_id(MessageId::new()))?;
-    if result.is_some() {
-        return Err(test_error("expected missing message to return None"));
-    }
+        .block_on(context.repo.find_by_id(MessageId::new()))
+    {
+        Ok(result) => result,
+        Err(err) => panic!("failed to load missing message: {err}"),
+    };
+    assert!(result.is_none());
 
-    context.cleanup()?;
-    Ok(())
+    context.cleanup();
 }
 
 #[rstest]
 fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
-) -> Result<(), BoxError> {
-    let context = crud_context?;
+    crud_context: CrudTestContext,
+) {
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(context.cluster, &context.db_name, conv_id)?;
+    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
+        panic!("failed to insert conversation: {err}");
+    }
 
-    let msg3 = create_test_message(&clock, conv_id, 3)?;
-    let msg1 = create_test_message(&clock, conv_id, 1)?;
-    let msg2 = create_test_message(&clock, conv_id, 2)?;
+    let msg3 = match create_test_message(&clock, conv_id, 3) {
+        Ok(message) => message,
+        Err(err) => panic!("failed to create message 3: {err}"),
+    };
+    let msg1 = match create_test_message(&clock, conv_id, 1) {
+        Ok(message) => message,
+        Err(err) => panic!("failed to create message 1: {err}"),
+    };
+    let msg2 = match create_test_message(&clock, conv_id, 2) {
+        Ok(message) => message,
+        Err(err) => panic!("failed to create message 2: {err}"),
+    };
 
-    context.rt.block_on(context.repo.store(&msg3))?;
-    context.rt.block_on(context.repo.store(&msg1))?;
-    context.rt.block_on(context.repo.store(&msg2))?;
+    if let Err(err) = context.rt.block_on(context.repo.store(&msg3)) {
+        panic!("failed to store message 3: {err}");
+    }
+    if let Err(err) = context.rt.block_on(context.repo.store(&msg1)) {
+        panic!("failed to store message 1: {err}");
+    }
+    if let Err(err) = context.rt.block_on(context.repo.store(&msg2)) {
+        panic!("failed to store message 2: {err}");
+    }
 
-    let messages = context
+    let messages = match context
         .rt
-        .block_on(context.repo.find_by_conversation(conv_id))?;
+        .block_on(context.repo.find_by_conversation(conv_id))
+    {
+        Ok(messages) => messages,
+        Err(err) => panic!("failed to fetch messages: {err}"),
+    };
 
-    if messages.len() != 3 {
-        return Err(test_error(format!(
-            "expected 3 messages, got {}",
-            messages.len()
-        )));
-    }
-    let first = messages
-        .first()
-        .ok_or_else(|| test_error("missing first message"))?;
-    let second = messages
-        .get(1)
-        .ok_or_else(|| test_error("missing second message"))?;
-    let third = messages
-        .get(2)
-        .ok_or_else(|| test_error("missing third message"))?;
-    if first.sequence_number().value() != 1 {
-        return Err(test_error("first message sequence should be 1"));
-    }
-    if second.sequence_number().value() != 2 {
-        return Err(test_error("second message sequence should be 2"));
-    }
-    if third.sequence_number().value() != 3 {
-        return Err(test_error("third message sequence should be 3"));
-    }
+    assert_eq!(messages.len(), 3);
+    let sequence_numbers: Vec<_> = messages
+        .iter()
+        .map(|message| message.sequence_number().value())
+        .collect();
+    assert_eq!(sequence_numbers, vec![1, 2, 3]);
 
-    context.cleanup()?;
-    Ok(())
+    context.cleanup();
 }
 
 #[rstest]
-fn exists_returns_correct_status(
-    clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
-) -> Result<(), BoxError> {
-    let context = crud_context?;
+fn exists_returns_correct_status(clock: DefaultClock, crud_context: CrudTestContext) {
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(context.cluster, &context.db_name, conv_id)?;
+    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
+        panic!("failed to insert conversation: {err}");
+    }
 
-    let message = create_test_message(&clock, conv_id, 1)?;
+    let message = match create_test_message(&clock, conv_id, 1) {
+        Ok(message) => message,
+        Err(err) => panic!("failed to create message: {err}"),
+    };
     let msg_id = message.id();
 
-    if context.rt.block_on(context.repo.exists(msg_id))? {
-        return Err(test_error("expected missing message to return false"));
-    }
+    let exists_before = match context.rt.block_on(context.repo.exists(msg_id)) {
+        Ok(exists) => exists,
+        Err(err) => panic!("failed to check message existence: {err}"),
+    };
+    assert!(!exists_before);
 
-    context.rt.block_on(context.repo.store(&message))?;
-    if !context.rt.block_on(context.repo.exists(msg_id))? {
-        return Err(test_error("expected existing message to return true"));
+    if let Err(err) = context.rt.block_on(context.repo.store(&message)) {
+        panic!("failed to store message: {err}");
     }
+    let exists_after = match context.rt.block_on(context.repo.exists(msg_id)) {
+        Ok(exists) => exists,
+        Err(err) => panic!("failed to check message existence: {err}"),
+    };
+    assert!(exists_after);
 
-    context.cleanup()?;
-    Ok(())
+    context.cleanup();
 }

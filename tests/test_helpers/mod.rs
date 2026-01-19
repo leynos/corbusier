@@ -4,6 +4,8 @@ use std::env;
 use std::ffi::OsString;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+pub use crate::worker_locator::locate_pg_worker_path;
+
 static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 /// Guard that applies a scoped environment variable update.

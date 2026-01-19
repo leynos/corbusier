@@ -140,7 +140,7 @@ impl Drop for CleanupGuard<'_> {
 /// Expected audit context values for parameterized tests.
 #[expect(
     clippy::struct_field_names,
-    reason = "Field names match AuditContext fields for clarity"
+    reason = "Field names mirror AuditContext for clarity in test expectations"
 )]
 pub struct ExpectedAuditContext {
     pub correlation_id: Option<Uuid>,

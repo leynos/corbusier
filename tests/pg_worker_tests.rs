@@ -1,9 +1,12 @@
 //! Behavioural tests for the `pg_worker` binary.
 
+mod worker_locator;
+
 #[cfg(unix)]
 mod unix_tests {
     //! Behavioural tests for Unix `pg_worker` execution.
 
+    use crate::worker_locator::locate_pg_worker_path;
     use cap_std::ambient_authority;
     use cap_std::fs::Dir;
     use eyre::{Result, ensure, eyre};
@@ -14,32 +17,13 @@ mod unix_tests {
     use std::process::{Command, Output};
 
     fn worker_path() -> Result<PathBuf> {
-        std::env::var_os("CARGO_BIN_EXE_pg_worker")
-            .map(PathBuf::from)
-            .or_else(locate_pg_worker_near_target)
-            .or_else(locate_pg_worker_in_path)
+        locate_pg_worker_path()
+            .map(camino::Utf8PathBuf::into_std_path_buf)
             .ok_or_else(|| {
-                eyre!("CARGO_BIN_EXE_pg_worker is not set; ensure the pg_worker binary is built")
+                eyre!(
+                    "pg_worker binary not found; set CARGO_BIN_EXE_pg_worker, PG_EMBEDDED_WORKER, or add it to PATH"
+                )
             })
-    }
-
-    fn locate_pg_worker_near_target() -> Option<PathBuf> {
-        let exe = std::env::current_exe().ok()?;
-        let deps_dir = exe.parent()?;
-        let target_dir = deps_dir.parent()?;
-        let worker_path = target_dir.join("pg_worker");
-        worker_path.is_file().then_some(worker_path)
-    }
-
-    fn locate_pg_worker_in_path() -> Option<PathBuf> {
-        let path = std::env::var_os("PATH")?;
-        for dir in std::env::split_paths(&path) {
-            let candidate = dir.join("pg_worker");
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-        None
     }
 
     fn run_worker(args: &[OsString]) -> Result<Output> {
@@ -82,6 +66,24 @@ mod unix_tests {
         ensure!(
             stderr.contains("missing operation argument"),
             "expected missing operation argument error"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn successful_setup_exits_zero() -> Result<()> {
+        let Some(config_path) = std::env::var_os("PG_WORKER_TEST_CONFIG") else {
+            return Ok(());
+        };
+
+        let args = [OsString::from("setup"), config_path];
+        let output = run_worker(&args)?;
+        ensure!(
+            output.status.success(),
+            "pg_worker setup failed.\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
         );
         Ok(())
     }

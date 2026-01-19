@@ -1392,7 +1392,8 @@ unit testing:
 Use the in-memory repository for quick iteration during development and for
 unit tests that do not require persistence. For integration tests requiring
 database features (constraints, triggers, transactions), use embedded
-PostgreSQL via `pg-embed-setup-unpriv`. SQLite is not used in the current
+PostgreSQL via `pg-embed-setup-unpriv`. SQLite is used for local development
+and lightweight test scenarios, but it is excluded from the production
 persistence layer implementation.
 
 #### 3.5.2 Data Persistence Strategies
@@ -4477,7 +4478,7 @@ graph TB
     PG_ADAPTER --> CONV_MODEL
     PG_ADAPTER --> MSG_MODEL
     PG_ADAPTER --> TASK_MODEL
-    SQLITE_ADAPTER --> EVENT_MODEL
+    MEMORY_ADAPTER --> EVENT_MODEL
 ```
 
 ##### Schema Design

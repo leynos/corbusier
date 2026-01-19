@@ -8,7 +8,7 @@
 //! The operation must be `setup`, `start`, or `stop`. The config payload is a
 //! JSON-encoded [`pg_embedded_setup_unpriv::worker::WorkerPayload`].
 
-pub(crate) type BoxError = Box<dyn std::error::Error>;
+type BoxError = Box<dyn std::error::Error>;
 
 fn main() -> Result<(), BoxError> {
     #[cfg(unix)]
@@ -41,14 +41,14 @@ mod unix {
     use std::path::{Path, PathBuf};
     use tokio::runtime::Builder;
 
-    pub(crate) enum Operation {
+    enum Operation {
         Setup,
         Start,
         Stop,
     }
 
     impl Operation {
-        pub(crate) fn parse(arg: &OsStr) -> Result<Self, BoxError> {
+        fn parse(arg: &OsStr) -> Result<Self, BoxError> {
             match arg.to_string_lossy().as_ref() {
                 "setup" => Ok(Self::Setup),
                 "start" => Ok(Self::Start),
@@ -100,7 +100,7 @@ mod unix {
         apply_worker_environment_with(&ProcessEnv, environment);
     }
 
-    pub(crate) trait EnvStore {
+    trait EnvStore {
         fn set_var(&self, key: &str, value: &str);
         fn remove_var(&self, key: &str);
     }
@@ -125,7 +125,7 @@ mod unix {
         }
     }
 
-    pub(crate) fn apply_worker_environment_with<E: EnvStore>(
+    fn apply_worker_environment_with<E: EnvStore>(
         env_store: &E,
         environment: &[(String, Option<PlainSecret>)],
     ) {
@@ -165,7 +165,7 @@ mod unix {
     }
 
     #[async_trait]
-    pub(crate) trait PostgresLifecycle {
+    trait PostgresLifecycle {
         async fn setup(&mut self) -> Result<(), BoxError>;
         async fn start(&mut self) -> Result<(), BoxError>;
         fn status(&self) -> Status;
@@ -191,9 +191,7 @@ mod unix {
         }
     }
 
-    pub(crate) async fn ensure_postgres_setup<P: PostgresLifecycle>(
-        postgres: &mut P,
-    ) -> Result<(), BoxError> {
+    async fn ensure_postgres_setup<P: PostgresLifecycle>(postgres: &mut P) -> Result<(), BoxError> {
         postgres.setup().await?;
         if matches!(postgres.status(), Status::Started) {
             return Ok(());
@@ -209,7 +207,7 @@ mod unix {
         Ok(())
     }
 
-    pub(crate) async fn ensure_postgres_started<P: PostgresLifecycle>(
+    async fn ensure_postgres_started<P: PostgresLifecycle>(
         postgres: &mut P,
     ) -> Result<(), BoxError> {
         if matches!(postgres.status(), Status::Started) {
@@ -220,7 +218,7 @@ mod unix {
         Ok(())
     }
 
-    pub(crate) fn has_valid_data_dir(data_dir: &Path) -> bool {
+    fn has_valid_data_dir(data_dir: &Path) -> bool {
         data_dir.join("global").join("pg_filenode.map").exists()
     }
 
@@ -232,7 +230,7 @@ mod unix {
         }
     }
 
-    pub(crate) fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
+    fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
         Dir::open_ambient_dir(path, ambient_authority()).map_err(Into::into)
     }
 
@@ -253,27 +251,23 @@ mod unix {
         Ok(buffer)
     }
 
-    pub(crate) fn remove_dir_all(path: &Path) -> Result<(), std::io::Error> {
+    fn remove_dir_all(path: &Path) -> Result<(), std::io::Error> {
         let (dir, name) =
             open_parent_dir(path).map_err(|err| std::io::Error::other(err.to_string()))?;
         dir.remove_dir_all(name)
     }
+
+    #[cfg(test)]
+    mod tests {
+        //! Unit tests for the Unix worker helper.
+
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/bin/pg_worker/tests.rs"
+        ));
+    }
 }
 
-#[cfg(all(test, unix))]
-pub(crate) use pg_embedded_setup_unpriv::worker::PlainSecret;
-#[cfg(all(test, unix))]
-pub(crate) use postgresql_embedded::Status;
-#[cfg(all(test, unix))]
-pub(crate) use unix::{
-    EnvStore, Operation, PostgresLifecycle, apply_worker_environment_with, ensure_postgres_setup,
-    ensure_postgres_started, has_valid_data_dir, open_ambient_dir, remove_dir_all,
-};
-
-#[cfg(all(test, unix))]
-#[path = "pg_worker/tests.rs"]
-mod tests;
-
-pub(crate) fn other_error(message: impl Into<String>) -> BoxError {
+fn other_error(message: impl Into<String>) -> BoxError {
     Box::new(std::io::Error::other(message.into()))
 }

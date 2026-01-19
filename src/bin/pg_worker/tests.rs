@@ -1,5 +1,3 @@
-//! Unit tests for the Unix worker helper.
-
 use super::{
     BoxError, EnvStore, Operation, PlainSecret, PostgresLifecycle, Status,
     apply_worker_environment_with, ensure_postgres_setup, ensure_postgres_started,
@@ -11,6 +9,7 @@ use cap_std::fs::Dir;
 use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use tokio::runtime::Builder;
 
 struct RecordingEnv {
     calls: RefCell<Vec<(String, Option<String>)>>,
@@ -101,6 +100,23 @@ fn create_valid_marker(data_dir: &Path) -> Result<(), BoxError> {
     Ok(())
 }
 
+struct TempDataDirGuard {
+    path: PathBuf,
+}
+
+impl Drop for TempDataDirGuard {
+    fn drop(&mut self) {
+        drop(remove_dir_all(&self.path));
+    }
+}
+
+fn build_runtime() -> Result<tokio::runtime::Runtime, BoxError> {
+    Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| Box::new(err) as BoxError)
+}
+
 #[test]
 fn parse_accepts_supported_operations() {
     assert!(matches!(
@@ -121,7 +137,9 @@ fn parse_accepts_supported_operations() {
 fn parse_rejects_unknown_operation() {
     let result = Operation::parse(OsStr::new("unknown"));
     assert!(result.is_err());
-    let message = result.err().expect("error should be present").to_string();
+    let message = result
+        .err()
+        .map_or_else(|| panic!("error should be present"), |err| err.to_string());
     assert!(message.contains("unknown pg_worker operation"));
 }
 
@@ -153,12 +171,16 @@ fn other_error_reports_message() {
     assert!(message.contains("boom"));
 }
 
-#[tokio::test]
-async fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
+#[test]
+fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
+    let _guard = TempDataDirGuard {
+        path: data_dir.clone(),
+    };
     let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
+    let runtime = build_runtime()?;
 
-    ensure_postgres_started(&mut postgres).await?;
+    runtime.block_on(ensure_postgres_started(&mut postgres))?;
 
     if postgres.start_calls != 0 {
         return Err(other_error(format!(
@@ -166,16 +188,16 @@ async fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
             postgres.start_calls
         )));
     }
-    remove_dir_all(&data_dir).map_err(Box::new)?;
     Ok(())
 }
 
-#[tokio::test]
-async fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
+#[test]
+fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone());
+    let runtime = build_runtime()?;
 
-    ensure_postgres_started(&mut postgres).await?;
+    runtime.block_on(ensure_postgres_started(&mut postgres))?;
 
     if postgres.start_calls != 1 {
         return Err(other_error(format!(
@@ -187,12 +209,13 @@ async fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
     Ok(())
 }
 
-#[tokio::test]
-async fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
+#[test]
+fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
     let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
+    let runtime = build_runtime()?;
 
-    ensure_postgres_setup(&mut postgres).await?;
+    runtime.block_on(ensure_postgres_setup(&mut postgres))?;
 
     if postgres.setup_calls != 1 {
         return Err(other_error(format!(
@@ -204,14 +227,15 @@ async fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
     Ok(())
 }
 
-#[tokio::test]
-async fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> {
+#[test]
+fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
     create_valid_marker(&data_dir)?;
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
         .with_status_after_setup(Status::Stopped);
+    let runtime = build_runtime()?;
 
-    ensure_postgres_setup(&mut postgres).await?;
+    runtime.block_on(ensure_postgres_setup(&mut postgres))?;
 
     if postgres.setup_calls != 1 {
         return Err(other_error(format!(
@@ -226,13 +250,14 @@ async fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> 
     Ok(())
 }
 
-#[tokio::test]
-async fn ensure_postgres_setup_resets_invalid_data_dir() -> Result<(), BoxError> {
+#[test]
+fn ensure_postgres_setup_resets_invalid_data_dir() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
         .with_status_after_setup(Status::Stopped);
+    let runtime = build_runtime()?;
 
-    ensure_postgres_setup(&mut postgres).await?;
+    runtime.block_on(ensure_postgres_setup(&mut postgres))?;
 
     if postgres.setup_calls != 2 {
         return Err(other_error(format!(
