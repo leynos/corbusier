@@ -1,3 +1,5 @@
+//! Tests for `pg_worker` lifecycle and environment helpers, verifying setup/start
+//! behaviour and data directory validation.
 use super::{
     BoxError, EnvStore, Operation, PlainSecret, PostgresLifecycle, Status,
     apply_worker_environment_with, ensure_postgres_setup, ensure_postgres_started,
@@ -104,6 +106,12 @@ struct TempDataDirGuard {
     path: PathBuf,
 }
 
+impl TempDataDirGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
 impl Drop for TempDataDirGuard {
     fn drop(&mut self) {
         drop(remove_dir_all(&self.path));
@@ -137,9 +145,7 @@ fn parse_accepts_supported_operations() {
 fn parse_rejects_unknown_operation() {
     let result = Operation::parse(OsStr::new("unknown"));
     assert!(result.is_err());
-    let message = result
-        .err()
-        .map_or_else(|| panic!("error should be present"), |err| err.to_string());
+    let message = result.expect_err("error should be present").to_string();
     assert!(message.contains("unknown pg_worker operation"));
 }
 
@@ -174,9 +180,7 @@ fn other_error_reports_message() {
 #[test]
 fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
-    let _guard = TempDataDirGuard {
-        path: data_dir.clone(),
-    };
+    let _guard = TempDataDirGuard::new(data_dir.clone());
     let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
     let runtime = build_runtime()?;
 
@@ -194,6 +198,7 @@ fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
 #[test]
 fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
+    let _guard = TempDataDirGuard::new(data_dir.clone());
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone());
     let runtime = build_runtime()?;
 
@@ -205,7 +210,6 @@ fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
             postgres.start_calls
         )));
     }
-    remove_dir_all(&data_dir).map_err(Box::new)?;
     Ok(())
 }
 
@@ -230,6 +234,7 @@ fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
 #[test]
 fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
+    let _guard = TempDataDirGuard::new(data_dir.clone());
     create_valid_marker(&data_dir)?;
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
         .with_status_after_setup(Status::Stopped);
@@ -246,7 +251,6 @@ fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> {
     if !has_valid_data_dir(&data_dir) {
         return Err(other_error("expected valid data directory"));
     }
-    remove_dir_all(&data_dir).map_err(Box::new)?;
     Ok(())
 }
 

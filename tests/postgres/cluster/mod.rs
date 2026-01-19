@@ -50,10 +50,11 @@ pub struct ManagedCluster {
 
 impl ManagedCluster {
     fn new() -> Result<Self, BoxError> {
-        let worker_env = worker_env_changes()?;
+        let (worker_env, port_guard) = worker_env_changes()?;
         let worker_guard = EnvVarGuard::set_many(&worker_env);
         let mut bootstrap = bootstrap_for_tests().map_err(|err| Box::new(err) as BoxError)?;
         drop(worker_guard);
+        drop(port_guard);
         sync_password_from_file(&mut bootstrap.settings)?;
         let env_vars = bootstrap.environment.to_env();
         let mut cluster = Self {

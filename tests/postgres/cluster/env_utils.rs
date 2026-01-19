@@ -7,6 +7,8 @@ use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges}
 use std::ffi::OsString;
 use std::net::TcpListener;
 
+type WorkerEnvChanges = (Vec<(OsString, Option<OsString>)>, Option<TcpListener>);
+
 pub(super) fn env_vars_to_os(
     env_vars: &[(String, Option<String>)],
 ) -> Vec<(OsString, Option<OsString>)> {
@@ -16,7 +18,7 @@ pub(super) fn env_vars_to_os(
         .collect()
 }
 
-pub(super) fn worker_env_changes() -> Result<Vec<(OsString, Option<OsString>)>, BoxError> {
+pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
     worker_env_changes_impl(
         detect_execution_privileges,
         locate_pg_worker_path,
@@ -28,7 +30,7 @@ fn worker_env_changes_impl<D, L, P>(
     detect_privileges: D,
     locate_worker: L,
     prepare_worker: P,
-) -> Result<Vec<(OsString, Option<OsString>)>, BoxError>
+) -> Result<WorkerEnvChanges, BoxError>
 where
     D: Fn() -> ExecutionPrivileges,
     L: Fn() -> Option<Utf8PathBuf>,
@@ -37,16 +39,19 @@ where
     let port_override = resolve_pg_port()?;
 
     let mut changes = Vec::new();
-    if let Some(port) = port_override {
+    let port_guard = if let Some((port, listener)) = port_override {
         changes.push((OsString::from("PG_PORT"), Some(port)));
-    }
+        Some(listener)
+    } else {
+        None
+    };
 
     if !matches!(detect_privileges(), ExecutionPrivileges::Root) {
-        return Ok(changes);
+        return Ok((changes, port_guard));
     }
 
     if std::env::var_os("PG_EMBEDDED_WORKER").is_some() {
-        return Ok(changes);
+        return Ok((changes, port_guard));
     }
 
     let worker_path = locate_worker().ok_or_else(|| {
@@ -61,10 +66,10 @@ where
         Some(OsString::from(prepared_path.as_str())),
     ));
 
-    Ok(changes)
+    Ok((changes, port_guard))
 }
 
-fn resolve_pg_port() -> Result<Option<OsString>, BoxError> {
+fn resolve_pg_port() -> Result<Option<(OsString, TcpListener)>, BoxError> {
     if std::env::var_os("PG_PORT").is_some() {
         return Ok(None);
     }
@@ -74,9 +79,8 @@ fn resolve_pg_port() -> Result<Option<OsString>, BoxError> {
         .local_addr()
         .map(|addr| addr.port())
         .map_err(|err| Box::new(err) as BoxError)?;
-    drop(listener);
 
-    Ok(Some(OsString::from(port.to_string())))
+    Ok(Some((OsString::from(port.to_string()), listener)))
 }
 
 #[cfg(test)]
@@ -100,7 +104,7 @@ mod tests {
             (OsString::from("PG_EMBEDDED_WORKER"), None),
         ]);
 
-        let changes = worker_env_changes_impl(
+        let (changes, _listener) = worker_env_changes_impl(
             || ExecutionPrivileges::Unprivileged,
             || None,
             |_| Ok(dummy_worker_path()),
@@ -123,7 +127,7 @@ mod tests {
             (OsString::from("PG_EMBEDDED_WORKER"), None),
         ]);
 
-        let changes = worker_env_changes_impl(
+        let (changes, _listener) = worker_env_changes_impl(
             || ExecutionPrivileges::Unprivileged,
             || Some(dummy_worker_path()),
             |_| Ok(dummy_worker_path()),
@@ -152,7 +156,7 @@ mod tests {
             |_| Ok(dummy_worker_path()),
         );
 
-        let Err(error) = result else {
+        let Err(error) = result.map(|(changes, _listener)| changes) else {
             panic!("expected worker lookup failure for root execution");
         };
         let Some(io_err) = error.downcast_ref::<io::Error>() else {
@@ -172,7 +176,7 @@ mod tests {
         let expected_path = dummy_worker_path();
         let expected_os = OsString::from(expected_path.as_str());
 
-        let changes = worker_env_changes_impl(
+        let (changes, _listener) = worker_env_changes_impl(
             || ExecutionPrivileges::Root,
             || Some(expected_path.clone()),
             |_| Ok(expected_path.clone()),

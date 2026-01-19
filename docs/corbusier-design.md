@@ -1389,12 +1389,13 @@ unit testing:
 - **Thread-safe**: Uses `Arc<std::sync::RwLock<HashMap>>` for concurrent access
 - **Schema Parity**: Implements the same `MessageRepository` trait as PostgreSQL
 
-Use the in-memory repository for quick iteration during development and for
-unit tests that do not require persistence. For integration tests requiring
-database features (constraints, triggers, transactions), use embedded
-PostgreSQL via `pg-embed-setup-unpriv`. SQLite is used for local development
-and lightweight test scenarios, but it is excluded from the production
-persistence layer implementation.
+Use the in-memory repository for fast local iteration and unit tests that do
+not need persistence. SQLite is the default zero-configuration local database
+for lightweight development and tests that require a file-backed database. For
+integration tests that need database features (constraints, triggers,
+transactions), use embedded PostgreSQL via `pg-embed-setup-unpriv`. SQLite
+remains a local-only option and is excluded from the production persistence
+layer implementation.
 
 #### 3.5.2 Data Persistence Strategies
 

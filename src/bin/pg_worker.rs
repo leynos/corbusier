@@ -41,6 +41,7 @@ mod unix {
     use std::path::{Path, PathBuf};
     use tokio::runtime::Builder;
 
+    #[derive(Debug)]
     enum Operation {
         Setup,
         Start,
@@ -258,14 +259,8 @@ mod unix {
     }
 
     #[cfg(test)]
-    mod tests {
-        //! Unit tests for the Unix worker helper.
-
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/bin/pg_worker/tests.rs"
-        ));
-    }
+    #[path = "../pg_worker/tests.rs"]
+    mod tests;
 }
 
 fn other_error(message: impl Into<String>) -> BoxError {

@@ -1,5 +1,6 @@
 //! Basic CRUD operation tests for `PostgreSQL` message repository.
 
+use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
     CleanupGuard, PostgresCluster, clock, create_test_message, ensure_template,
     insert_conversation, postgres_cluster, setup_repository, test_runtime,
@@ -22,77 +23,67 @@ struct CrudTestContext {
 }
 
 impl CrudTestContext {
-    fn cleanup(self) {
+    fn cleanup(self) -> Result<(), BoxError> {
         drop(self.repo);
-        if let Err(err) = self.guard.cleanup() {
-            panic!("failed to cleanup CRUD test database: {err}");
-        }
+        self.guard.cleanup()
     }
 }
 
 #[fixture]
-fn crud_context(postgres_cluster: PostgresCluster) -> CrudTestContext {
+fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
     let cluster = postgres_cluster;
-    if let Err(err) = ensure_template(cluster) {
-        panic!("failed to ensure postgres template: {err}");
-    }
+    ensure_template(cluster)?;
     let db_name = format!("test_crud_{}", uuid::Uuid::new_v4());
     let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = match setup_repository(cluster, &db_name) {
-        Ok(repo) => repo,
-        Err(err) => panic!("failed to setup postgres repository: {err}"),
-    };
-    let rt = match test_runtime() {
-        Ok(rt) => rt,
-        Err(err) => panic!("failed to create runtime: {err}"),
-    };
-    CrudTestContext {
+    let repo = setup_repository(cluster, &db_name)?;
+    let rt = test_runtime()?;
+    Ok(CrudTestContext {
         cluster,
         db_name,
         guard,
         repo,
         rt,
-    }
+    })
 }
 
 #[rstest]
-fn store_and_retrieve_message(clock: DefaultClock, crud_context: CrudTestContext) {
-    let context = crud_context;
+fn store_and_retrieve_message(
+    clock: DefaultClock,
+    crud_context: Result<CrudTestContext, BoxError>,
+) {
+    let context = crud_context.expect("failed to create CRUD test context");
 
     let conv_id = ConversationId::new();
-    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
-        panic!("failed to insert conversation: {err}");
-    }
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("failed to insert conversation");
 
-    let message = match create_test_message(&clock, conv_id, 1) {
-        Ok(message) => message,
-        Err(err) => panic!("failed to create test message: {err}"),
-    };
+    let message = create_test_message(&clock, conv_id, 1).expect("failed to create test message");
     let msg_id = message.id();
 
-    if let Err(err) = context.rt.block_on(context.repo.store(&message)) {
-        panic!("failed to store message: {err}");
-    }
+    context
+        .rt
+        .block_on(context.repo.store(&message))
+        .expect("failed to store message");
 
-    let retrieved_opt = match context.rt.block_on(context.repo.find_by_id(msg_id)) {
-        Ok(retrieved) => retrieved,
-        Err(err) => panic!("failed to load message: {err}"),
-    };
-    let Some(retrieved) = retrieved_opt else {
-        panic!("message should exist");
-    };
+    let retrieved_opt = context
+        .rt
+        .block_on(context.repo.find_by_id(msg_id))
+        .expect("failed to load message");
+    let retrieved = retrieved_opt.expect("message should exist");
 
     assert_eq!(retrieved.id(), msg_id);
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::User);
     assert_eq!(retrieved.sequence_number().value(), 1);
 
-    context.cleanup();
+    context
+        .cleanup()
+        .expect("failed to cleanup CRUD test database");
 }
 
 #[rstest]
-fn find_by_id_returns_none_for_missing(crud_context: CrudTestContext) {
-    let context = crud_context;
+fn find_by_id_returns_none_for_missing(crud_context: Result<CrudTestContext, BoxError>) {
+    let context = crud_context.expect("failed to create CRUD test context");
 
     let result = match context
         .rt
@@ -103,15 +94,17 @@ fn find_by_id_returns_none_for_missing(crud_context: CrudTestContext) {
     };
     assert!(result.is_none());
 
-    context.cleanup();
+    context
+        .cleanup()
+        .expect("failed to cleanup CRUD test database");
 }
 
 #[rstest]
 fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    crud_context: CrudTestContext,
+    crud_context: Result<CrudTestContext, BoxError>,
 ) {
-    let context = crud_context;
+    let context = crud_context.expect("failed to create CRUD test context");
 
     let conv_id = ConversationId::new();
     if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
@@ -156,12 +149,17 @@ fn find_by_conversation_returns_ordered_messages(
         .collect();
     assert_eq!(sequence_numbers, vec![1, 2, 3]);
 
-    context.cleanup();
+    context
+        .cleanup()
+        .expect("failed to cleanup CRUD test database");
 }
 
 #[rstest]
-fn exists_returns_correct_status(clock: DefaultClock, crud_context: CrudTestContext) {
-    let context = crud_context;
+fn exists_returns_correct_status(
+    clock: DefaultClock,
+    crud_context: Result<CrudTestContext, BoxError>,
+) {
+    let context = crud_context.expect("failed to create CRUD test context");
 
     let conv_id = ConversationId::new();
     if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
@@ -189,5 +187,7 @@ fn exists_returns_correct_status(clock: DefaultClock, crud_context: CrudTestCont
     };
     assert!(exists_after);
 
-    context.cleanup();
+    context
+        .cleanup()
+        .expect("failed to cleanup CRUD test database");
 }
