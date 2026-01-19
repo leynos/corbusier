@@ -15,8 +15,8 @@ documented at `.claude/skills/execplans/SKILL.md`.
 After this change, Corbusier will have a type-safe canonical message format
 that unifies messages from any agent backend (Claude Code software development
 kit (SDK), Codex, etc.) into a single schema. Users will be able to store and
-retrieve conversation messages with guaranteed structure validation, immutability
-guarantees, and schema versioning support for future migrations.
+retrieve conversation messages with guaranteed structure validation,
+immutability guarantees, and schema versioning support for future migrations.
 
 Observable success: unit tests pass demonstrating message creation, validation,
 and rejection of malformed input; behavioural tests verify end-to-end scenarios
@@ -57,29 +57,21 @@ Thresholds that trigger escalation:
 
 ## Risks
 
-- Risk: NewType boilerplate explosion
-  Severity: medium
-  Likelihood: medium
-  Mitigation: Use newtype wrappers for homogeneous types; keep custom impls
-  minimal. Monitor file sizes.
+- Risk: NewType boilerplate explosion.
+  Severity: medium; Likelihood: medium; Mitigation: Use newtype wrappers for
+  homogeneous types; keep custom impls minimal. Monitor file sizes.
 
-- Risk: Serde configuration complexity for tagged enums
-  Severity: low
-  Likelihood: medium
-  Mitigation: Write unit tests for each ContentPart variant early;
-  verify round-trip serialization.
+- Risk: Serde configuration complexity for tagged enums.
+  Severity: low; Likelihood: medium; Mitigation: Write unit tests for each
+  ContentPart variant early; verify round-trip serialization.
 
-- Risk: Clock abstraction adds complexity
-  Severity: low
-  Likelihood: low
-  Mitigation: Use mockable crate's Clock trait as documented in
-  docs/reliable-testing-in-rust-via-dependency-injection.md.
+- Risk: Clock abstraction adds complexity.
+  Severity: low; Likelihood: low; Mitigation: Use mockable crate's Clock trait
+  as documented in docs/reliable-testing-in-rust-via-dependency-injection.md.
 
-- Risk: rstest-bdd (Behaviour-Driven Development (BDD)) learning curve
-  Severity: medium
-  Likelihood: medium
-  Mitigation: Start with simple scenarios; refer to
-  docs/rstest-bdd-users-guide.md for patterns.
+- Risk: rstest-bdd (Behaviour-Driven Development (BDD)) learning curve.
+  Severity: medium; Likelihood: medium; Mitigation: Start with simple
+  scenarios; refer to docs/rstest-bdd-users-guide.md for patterns.
 
 ## Progress
 
@@ -107,20 +99,18 @@ Thresholds that trigger escalation:
 ## Decision Log
 
 - Decision: Use feature-based module layout (src/message/) rather than
-  layer-based (src/domain/, src/ports/)
-  Rationale: Aligns with AGENTS.md "group by feature, not layer" and
-  hexagonal architecture skill guidance for smaller projects.
-  Date/Author: Initial plan.
+  layer-based (src/domain/, src/ports/). Rationale: Aligns with AGENTS.md
+  "group by feature, not layer" and hexagonal architecture skill guidance for
+  smaller projects. Date/Author: Initial plan.
 
-- Decision: Use mockable crate for Clock abstraction
+- Decision: Use mockable crate for Clock abstraction.
   Rationale: Documented in docs/reliable-testing-in-rust-via-dependency-
   injection.md as the preferred approach; avoids environment mutation.
   Date/Author: Initial plan.
 
-- Decision: Store ContentPart as serde tagged enum with snake_case
-  Rationale: Matches the JSONB "type" field pattern in
-  corbusier-design.md section 6.2.1.2.
-  Date/Author: Initial plan.
+- Decision: Store ContentPart as serde tagged enum with snake_case.
+  Rationale: Matches the JSONB "type" field pattern in corbusier-design.md
+  section 6.2.1.2. Date/Author: Initial plan.
 
 ## Outcomes & Retrospective
 

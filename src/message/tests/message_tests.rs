@@ -151,6 +151,93 @@ fn message_builder_empty_content_fails(clock: DefaultClock) {
 }
 
 // ============================================================================
+// from_persisted tests
+// ============================================================================
+
+#[test]
+fn message_from_persisted_reconstructs_valid_message() {
+    use chrono::Utc;
+
+    let id = MessageId::new();
+    let conversation_id = ConversationId::new();
+    let role = Role::Assistant;
+    let content = vec![ContentPart::Text(TextPart::new("Persisted response"))];
+    let metadata = MessageMetadata::with_agent_backend("claude");
+    let created_at = Utc::now();
+    let sequence_number = SequenceNumber::new(42);
+
+    let message = Message::from_persisted(
+        id,
+        conversation_id,
+        role,
+        content.clone(),
+        metadata.clone(),
+        created_at,
+        sequence_number,
+    )
+    .expect("should reconstruct valid message");
+
+    assert_eq!(message.id(), id);
+    assert_eq!(message.conversation_id(), conversation_id);
+    assert_eq!(message.role(), role);
+    assert_eq!(message.content().len(), 1);
+    assert_eq!(message.metadata(), &metadata);
+    assert_eq!(message.created_at(), created_at);
+    assert_eq!(message.sequence_number(), sequence_number);
+}
+
+#[test]
+fn message_from_persisted_with_empty_content_fails() {
+    use chrono::Utc;
+
+    let result = Message::from_persisted(
+        MessageId::new(),
+        ConversationId::new(),
+        Role::User,
+        vec![], // Empty content
+        MessageMetadata::empty(),
+        Utc::now(),
+        SequenceNumber::new(1),
+    );
+
+    assert!(matches!(result, Err(MessageBuilderError::EmptyContent)));
+}
+
+#[test]
+fn message_from_persisted_preserves_all_fields() {
+    use chrono::{TimeZone, Utc};
+
+    let id = MessageId::new();
+    let conversation_id = ConversationId::new();
+    let specific_time = Utc.with_ymd_and_hms(2024, 6, 15, 10, 30, 0).unwrap();
+    let metadata = MessageMetadata::with_agent_backend("test-backend");
+
+    let message = Message::from_persisted(
+        id,
+        conversation_id,
+        Role::Tool,
+        vec![ContentPart::ToolResult(
+            crate::message::domain::ToolResultPart::success("call-123", json!({"result": "ok"})),
+        )],
+        metadata,
+        specific_time,
+        SequenceNumber::new(999),
+    )
+    .expect("valid persisted message");
+
+    // Verify all fields are preserved exactly as provided
+    assert_eq!(message.id(), id);
+    assert_eq!(message.conversation_id(), conversation_id);
+    assert_eq!(message.role(), Role::Tool);
+    assert_eq!(message.created_at(), specific_time);
+    assert_eq!(message.sequence_number().value(), 999);
+    assert_eq!(
+        message.metadata().agent_backend,
+        Some("test-backend".to_owned())
+    );
+}
+
+// ============================================================================
 // Serialization tests
 // ============================================================================
 

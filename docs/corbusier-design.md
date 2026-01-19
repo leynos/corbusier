@@ -1162,10 +1162,10 @@ concerns.
 
 #### 3.2.1 Core Web Framework
 
-##### Actix Web 4.12.1
+##### Actix Web (version TBD)
 
-Latest stable version available on crates.io selected for the HTTP API surface
-due to:
+Actix Web is planned for the HTTP API surface, with the exact version to be
+confirmed in Cargo.toml before implementation, due to:
 
 - One of the fastest web frameworks available according to the TechEmpower
   Framework Benchmark, with the lowest latency
@@ -1178,13 +1178,15 @@ due to:
 
 ##### Compatibility Requirements
 
-SQLx is compatible with the async-std, tokio, and actix runtimes; and, the
-native-tls and rustls TLS backends. When adding the dependency, you must choose
-a runtime feature that is runtime + tls.
+Diesel is a synchronous ORM and must be isolated from async executor threads to
+prevent blocking. Use `tokio::task::spawn_blocking` to offload all Diesel
+operations to a dedicated thread pool. Connection pooling is handled through
+`r2d2`, which provides robust connection management independent of async
+runtimes.
 
 #### 3.2.2 Async Runtime
 
-##### Tokio 1.x (Latest)
+##### Tokio 1.49.0
 
 Tokio is a runtime for writing reliable asynchronous applications with Rust. It
 provides async I/O, networking, scheduling, timers, and more.
@@ -1207,24 +1209,27 @@ them to their needs.
 
 #### 3.2.3 Database Access Layer
 
-##### SQLx 0.8.x (Latest)
+##### Diesel 2.3
 
-Database Agnostic support for PostgreSQL, MySQL, MariaDB, SQLite. Pure Rust
-with Postgres and MySQL/MariaDB drivers written in pure Rust using zero unsafe
-code.
+Diesel is a safe, extensible ORM and Query Builder for Rust. It provides
+compile-time guarantees about your queries and type-safe query construction
+with pure Rust PostgreSQL driver support.
 
 ##### Key Features
 
-- Supports compile-time checked queries. It does not provide a Rust API or DSL
-  for building queries. Instead, it provides macros that take regular SQL as
-  input and ensure that it is valid for your database
-- Built-in connection pooling with sqlx::Pool
-- Runtime Agnostic. Works on different runtimes (async-std / tokio / actix) and
-  TLS backends (native-tls, rustls)
+- **Compile-time Query Validation**: Diesel validates queries at compile time,
+  catching SQL errors before runtime through its derive macros and DSL
+- **Type-safe Query Builder**: Provides a Rust DSL for building queries,
+  ensuring type safety for parameters and return types
+- **Connection Pooling via r2d2**: Uses the battle-tested `r2d2` crate for
+  connection pool management with configurable limits and timeouts
+- **Async Integration**: Works with async runtimes via
+  `tokio::task::spawn_blocking` to offload blocking database operations to a
+  dedicated thread pool
 
 #### 3.2.4 Observability and Logging
 
-##### Tracing 0.1.x (Latest)
+##### Tracing 0.1
 
 tracing is a framework for instrumenting Rust programs to collect structured,
 event-based diagnostic information. tracing is maintained by the Tokio project,
@@ -1247,48 +1252,48 @@ you to also send your logs for further analysis.
 
 #### 3.2.5 Framework Compatibility Matrix
 
-| Framework | Version | Runtime          | TLS Backend       | Database Support   |
-| --------- | ------- | ---------------- | ----------------- | ------------------ |
-| Actix Web | 4.12.1  | Tokio            | rustls/native-tls | Via SQLx           |
-| SQLx      | 0.8.x   | Tokio            | rustls/native-tls | PostgreSQL, SQLite |
-| Tracing   | 0.1.x   | Runtime Agnostic | N/A               | N/A                |
-| Tokio     | 1.x     | Self             | N/A               | N/A                |
+| Framework | Version | Runtime          | TLS Backend       | Database Support |
+| --------- | ------- | ---------------- | ----------------- | ---------------- |
+| Actix Web | TBD     | Tokio            | rustls/native-tls | Via Diesel       |
+| Diesel    | 2.3     | Tokio (blocking) | N/A               | PostgreSQL       |
+| Tracing   | 0.1     | Runtime Agnostic | N/A               | N/A              |
+| Tokio     | 1.49.0  | Self             | N/A               | N/A              |
 
 ### 3.3 Open Source Dependencies
 
 #### 3.3.1 Core Dependencies
 
-| Crate              | Version | Purpose                   | Registry  |
-| ------------------ | ------- | ------------------------- | --------- |
-| actix-web          | 4.12.1  | HTTP server framework     | crates.io |
-| tokio              | 1.x     | Async runtime             | crates.io |
-| sqlx               | 0.8.x   | Database access           | crates.io |
-| tracing            | 0.1.x   | Structured logging        | crates.io |
-| tracing-subscriber | 0.3.x   | Log formatting and output | crates.io |
-| serde              | 1.x     | Serialization framework   | crates.io |
-| serde_json         | 1.x     | JSON serialization        | crates.io |
-| anyhow             | 1.x     | Error handling            | crates.io |
-| thiserror          | 1.x     | Error derive macros       | crates.io |
-| uuid               | 1.x     | UUID generation           | crates.io |
+| Crate       | Version | Purpose                          | Registry  |
+| ----------- | ------- | -------------------------------- | --------- |
+| serde       | 1.0.228 | Serialization framework          | crates.io |
+| serde_json  | 1.0.149 | JSON serialization               | crates.io |
+| chrono      | 0.4.43  | Date/time handling               | crates.io |
+| uuid        | 1.19.0  | UUID generation                  | crates.io |
+| thiserror   | 2.0.17  | Error derive macros              | crates.io |
+| async-trait | 0.1.89  | Async trait support              | crates.io |
+| mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
+| diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
+| cap-std     | 3.4.5   | Capability-based filesystem      | crates.io |
+| tokio       | 1.49.0  | Async runtime                    | crates.io |
 
-#### 3.3.2 MCP Protocol Dependencies
+#### 3.3.2 MCP Protocol Dependencies (Planned)
+
+MCP protocol support will require additional dependencies when implemented:
 
 | Crate        | Version | Purpose                     | Registry  |
 | ------------ | ------- | --------------------------- | --------- |
 | jsonrpc-core | 18.x    | JSON-RPC 2.0 implementation | crates.io |
-| async-trait  | 0.1.x   | Async trait support         | crates.io |
 | futures      | 0.3.x   | Future utilities            | crates.io |
 | tokio-util   | 0.7.x   | Tokio utilities             | crates.io |
 
 #### 3.3.3 Development and Testing Dependencies
 
-| Crate         | Version | Purpose                 | Registry  |
-| ------------- | ------- | ----------------------- | --------- |
-| cargo-nextest | Latest  | Fast test runner        | crates.io |
-| criterion     | 0.5.x   | Benchmarking            | crates.io |
-| mockall       | 0.12.x  | Mock generation         | crates.io |
-| tempfile      | 3.x     | Temporary file handling | crates.io |
-| wiremock      | 0.6.x   | HTTP mocking            | crates.io |
+| Crate                 | Version | Purpose                       | Registry  |
+| --------------------- | ------- | ----------------------------- | --------- |
+| rstest                | 0.26.1  | Parameterized test fixtures   | crates.io |
+| mockall               | 0.14.0  | Mock generation               | crates.io |
+| eyre                  | 0.6.12  | Error reporting for tests     | crates.io |
+| pg-embed-setup-unpriv | 0.3.0   | Embedded PostgreSQL for tests | crates.io |
 
 #### 3.3.4 Version Management Strategy
 
@@ -1339,11 +1344,10 @@ visit modelcontextprotocol.io.
 
 ##### Current MCP Version
 
-Protocol Revision: 2024-11-05 (Current) with the next version of the Model
-Context Protocol specification to be released on November 25th, 2025, with a
-release candidate (RC) available on November 11th, 2025. We're building in a
-14-day RC validation window so client implementors and SDK maintainers can
-thoroughly test the protocol changes.
+Protocol Revision: 2025-11-25[^1]. The production-ready specification released
+on November 25, 2025 (following the November 11, 2025 release candidate). On
+December 9, 2025, governance of the protocol transitioned to the Agentic AI
+Foundation[^2].
 
 #### 3.4.4 External Tool Integration
 
@@ -1374,16 +1378,22 @@ Selected as the primary database for production deployments due to:
   management
 - **JSON Support**: Native JSONB for storing conversation messages and metadata
 - **Scalability**: Proven performance for concurrent read/write operations
-- **SQLx Integration**: Native support for the Postgres database server
+- **Diesel Integration**: Native support via the `diesel::pg` backend module
 
-##### SQLite 3.20.0+
+##### In-memory repository for development
 
-Version 3.20.0 or newer is recommended for development and testing environments:
+An in-memory repository implementation is provided for rapid development and
+unit testing:
 
-- **Zero Configuration**: Embedded database for local development
-- **File-based Storage**: Simplified deployment for single-user scenarios
-- **SQLx Compatibility**: Support for the self-contained SQLite database engine
-  with SQLite bundled and statically-linked
+- **Zero Configuration**: No external database required for local development
+- **Thread-safe**: Uses `Arc<std::sync::RwLock<HashMap>>` for concurrent access
+- **Schema Parity**: Implements the same `MessageRepository` trait as PostgreSQL
+
+Use the in-memory repository for quick iteration during development and for
+unit tests that do not require persistence. For integration tests requiring
+database features (constraints, triggers, transactions), use embedded
+PostgreSQL via `pg-embed-setup-unpriv`. SQLite is not used in the current
+implementation.
 
 #### 3.5.2 Data Persistence Strategies
 
@@ -1460,21 +1470,21 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
-| Environment | Database   | Connection Pool    | Backup Strategy          |
-| ----------- | ---------- | ------------------ | ------------------------ |
-| Development | SQLite     | Single connection  | File copy                |
-| Testing     | SQLite     | Per-test isolation | In-memory                |
-| Staging     | PostgreSQL | 10 connections     | Daily snapshots          |
-| Production  | PostgreSQL | 50 connections     | Continuous WAL archiving |
+| Environment | Database                 | Connection Pool    | Backup Strategy          |
+| ----------- | ------------------------ | ------------------ | ------------------------ |
+| Development | In-memory or embedded PG | Single connection  | None (ephemeral)         |
+| Testing     | Embedded PostgreSQL      | Per-test isolation | None (ephemeral)         |
+| Staging     | PostgreSQL               | 10 connections     | Daily snapshots          |
+| Production  | PostgreSQL               | 50 connections     | Continuous WAL archiving |
 
-##### SQLx Configuration Example
+##### Diesel Configuration Example
 
-Create a database connection pool with PgPoolOptions setting maximum
-connections and execute queries with fetch_all:
+Create a database connection pool with `r2d2::Pool` setting maximum connections
+and execute queries with Diesel's type-safe query DSL:
 
 ```toml
 [dependencies]
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid"] }
+diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 ```
 
 ### 3.6 Development & Deployment
@@ -3345,7 +3355,7 @@ synchronized across all system components through the event bus architecture.
   frameworks available according to the TechEmpower Framework Benchmark,
   providing powerful, pragmatic, and extremely fast web framework capabilities
   for Rust. The component leverages Tokio for asynchronous message processing
-  and SQLx for conversation persistence with PostgreSQL backend.
+  and Diesel ORM for conversation persistence with PostgreSQL backend.
 - **Key Interfaces and APIs:** Exposes RESTful HTTP endpoints for conversation
   management (`POST /conversations/{id}/messages`,
   `GET /conversations/{id}/history`) and WebSocket/SSE connections for
@@ -3547,11 +3557,11 @@ temporal queries for debugging and compliance, and enables system state
 reconstruction from historical events. This pattern aligns with the requirement
 for comprehensive audit trails across all agent interactions.
 
-##### SQLite for Development
+##### In-memory repository for testing
 
-SQLite provides zero-configuration development environments while maintaining
-compatibility with the PostgreSQL production schema through SQLx's
-database-agnostic query interface.
+An in-memory repository implementation provides zero-configuration development
+environments while maintaining compatibility with the PostgreSQL production
+interface through the shared `MessageRepository` trait.
 
 #### 5.3.4 Caching Strategy Justification
 
@@ -4228,8 +4238,8 @@ pub enum ChangeType {
 One of the fastest web frameworks available according to the TechEmpower
 Framework Benchmark. One of the fastest web frameworks available according to
 the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix
-Web 4.12.1, providing high-performance REST endpoints and real-time streaming
-capabilities.
+Web (version to be pinned in Cargo.toml), providing high-performance REST
+endpoints and real-time streaming capabilities.
 
 ```mermaid
 graph TB
@@ -5691,9 +5701,9 @@ be using JSONB.
 
 ###### Canonical Message Domain Model
 
-For screen readers: The following class diagram illustrates the canonical message
-domain model, showing the Message aggregate root and its related value objects,
-including content parts, metadata, and identity types.
+For screen readers: The following class diagram illustrates the canonical
+message domain model, showing the Message aggregate root and its related value
+objects, including content parts, metadata, and identity types.
 
 ```mermaid
 classDiagram
@@ -6038,43 +6048,52 @@ graph TB
 
 ###### Schema Evolution Strategy
 
-SQLx provides connection pooling through sqlx::Pool. Create a pool using
-database-specific options (e.g., PgPoolOptions for PostgreSQL). Key
-configuration parameters: max_connections: Maximum simultaneous connections
-(align with database limits) min_connections: Pre-established connections to
-reduce latency max_lifetime: Duration before replacing connections (prevents
-stale states) idle_timeout: Time before closing unused connections
-acquire_timeout: Wait time for connection acquisition
+Diesel provides connection pooling through `r2d2::Pool`. Create a pool using
+`ConnectionManager<PgConnection>` for PostgreSQL. Key configuration parameters:
+`max_size`: Maximum simultaneous connections (align with database limits),
+`min_idle`: Minimum idle connections to maintain, `connection_timeout`: Wait
+time for connection acquisition, `idle_timeout`: Time before closing unused
+connections.
+
+Migrations are managed through the Diesel CLI (`diesel migration`), which
+generates timestamped migration directories with `up.sql` and `down.sql` files.
 
 ```rust
-// Migration management with SQLx
-use sqlx::migrate::MigrateDatabase;
-use sqlx::{Postgres, Pool};
+// Illustrative example - Migration management with Diesel CLI
+// Run from command line: diesel migration run
+// Generate new migration: diesel migration generate create_messages
+
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
 pub struct MigrationManager {
-    pool: Pool<Postgres>,
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl MigrationManager {
-    pub async fn run_migrations(&self) -> Result<(), sqlx::Error> {
-        sqlx::migrate!("./migrations")
-            .run(&self.pool)
-            .await?;
+    /// Runs pending migrations synchronously.
+    ///
+    /// When invoked from async contexts (e.g., Tokio runtime), wrap this
+    /// call in `tokio::task::spawn_blocking` to avoid blocking the executor.
+    pub fn run_migrations(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut conn = self.pool.get()?;
+        conn.run_pending_migrations(MIGRATIONS)?;
         Ok(())
     }
-    
-    pub async fn create_migration(&self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // Generate migration files with timestamp
-        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-        let filename = format!("{}_{}.sql", timestamp, name);
-        
-        // Create up and down migration files
-        std::fs::write(
-            format!("migrations/{}", filename),
-            "-- Add migration SQL here\n"
-        )?;
-        
-        Ok(())
+
+    /// Async wrapper for running migrations from Tokio contexts.
+    pub async fn run_migrations_async(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let pool = self.pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get()?;
+            conn.run_pending_migrations(MIGRATIONS)?;
+            Ok(())
+        })
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)? // Convert JoinError
     }
 }
 ```
@@ -6243,92 +6262,110 @@ SELECT cron.schedule('archive-events', '0 2 * * 0', 'SELECT archive_old_events()
 
 ###### Connection Pool Configuration
 
-The pool has a maximum connection limit that it will not exceed; if acquire()
-is called when at this limit and all connections are checked out, the task will
-be made to wait until a connection becomes available. You can configure the
-connection limit, and other parameters, using PoolOptions.
+The pool has a maximum connection limit that it will not exceed; if `get()` is
+called when at this limit and all connections are checked out, the task will be
+made to wait until a connection becomes available. The connection limit, and
+other parameters, are configurable via `Pool::builder()`.
 
 ```rust
-use sqlx::postgres::PgPoolOptions;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
 use std::time::Duration;
 
-pub async fn create_database_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
-    PgPoolOptions::new()
-        .max_connections(50)
-        .min_connections(5)
-        .max_lifetime(Duration::from_secs(3600)) // 1 hour
-        .idle_timeout(Duration::from_secs(600))  // 10 minutes
-        .acquire_timeout(Duration::from_secs(30))
-        .test_before_acquire(true)
-        .connect(database_url)
-        .await
+pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+
+pub fn create_database_pool(database_url: &str) -> Result<PgPool, r2d2::Error> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    Pool::builder()
+        .max_size(50)
+        .min_idle(Some(5))
+        .max_lifetime(Some(Duration::from_secs(3600))) // 1 hour
+        .idle_timeout(Some(Duration::from_secs(600)))  // 10 minutes
+        .connection_timeout(Duration::from_secs(30))
+        .test_on_check_out(true)
+        .build(manager)
 }
 ```
 
 ###### Repository Pattern Implementation
 
+The following illustrative example demonstrates the repository pattern with
+Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
+`row_to_message`, and `RepositoryError` are context-dependent and defined in
+the actual implementation.
+
 ```rust
-#[async_trait::async_trait]
-pub trait ConversationRepository: Send + Sync {
-    async fn save(&self, conversation: &Conversation) -> Result<()>;
-    async fn find_by_id(&self, id: ConversationId) -> Result<Option<Conversation>>;
-    async fn find_by_task_id(&self, task_id: TaskId) -> Result<Option<Conversation>>;
-    async fn append_message(&self, conversation_id: ConversationId, message: &Message) -> Result<()>;
-    async fn get_messages(&self, conversation_id: ConversationId, limit: Option<usize>) -> Result<Vec<Message>>;
+// Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
+use async_trait::async_trait;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+
+pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+
+#[async_trait]
+pub trait MessageRepository: Send + Sync {
+    async fn store(&self, message: &Message) -> RepositoryResult<()>;
+    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>>;
+    async fn find_by_conversation(&self, conversation_id: ConversationId) -> RepositoryResult<Vec<Message>>;
+    async fn next_sequence_number(&self, conversation_id: ConversationId) -> RepositoryResult<SequenceNumber>;
+    async fn exists(&self, id: MessageId) -> RepositoryResult<bool>;
 }
 
-pub struct PostgresConversationRepository {
+#[derive(Debug, Clone)]
+pub struct PostgresMessageRepository {
     pool: PgPool,
 }
 
-impl PostgresConversationRepository {
-    pub fn new(pool: PgPool) -> Self {
+impl PostgresMessageRepository {
+    pub const fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// Runs a blocking database operation on a dedicated thread pool.
+    async fn run_blocking<F, T>(f: F) -> RepositoryResult<T>
+    where
+        F: FnOnce() -> RepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        tokio::task::spawn_blocking(f)
+            .await
+            .map_err(|e| RepositoryError::connection(format!("task join error: {e}")))?
     }
 }
 
-#[async_trait::async_trait]
-impl ConversationRepository for PostgresConversationRepository {
-    async fn save(&self, conversation: &Conversation) -> Result<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO conversations (id, task_id, context, state, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (id) DO UPDATE SET
-                context = EXCLUDED.context,
-                state = EXCLUDED.state,
-                updated_at = EXCLUDED.updated_at
-            "#,
-            conversation.id.as_uuid(),
-            conversation.task_id.map(|id| id.as_uuid()),
-            conversation.context,
-            conversation.state.as_str(),
-            conversation.created_at,
-            conversation.updated_at
-        )
-        .execute(&self.pool)
-        .await?;
-        
-        Ok(())
+#[async_trait]
+impl MessageRepository for PostgresMessageRepository {
+    async fn store(&self, message: &Message) -> RepositoryResult<()> {
+        let pool = self.pool.clone();
+        let new_message = NewMessage::try_from_domain(message)?;
+
+        Self::run_blocking(move || {
+            let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
+            diesel::insert_into(messages::table)
+                .values(&new_message)
+                .execute(&mut conn)
+                .map_err(RepositoryError::database)?;
+            Ok(())
+        })
+        .await
     }
-    
-    async fn append_message(&self, conversation_id: ConversationId, message: &Message) -> Result<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO messages (id, conversation_id, role, content, metadata, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-            message.id.as_uuid(),
-            conversation_id.as_uuid(),
-            message.role.as_str(),
-            message.content,
-            message.metadata,
-            message.created_at
-        )
-        .execute(&self.pool)
-        .await?;
-        
-        Ok(())
+
+    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
+        let pool = self.pool.clone();
+        let uuid = id.into_inner();
+
+        Self::run_blocking(move || {
+            let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
+            messages::table
+                .filter(messages::id.eq(uuid))
+                .select(MessageRow::as_select())
+                .first::<MessageRow>(&mut conn)
+                .optional()
+                .map_err(RepositoryError::database)?
+                .map(Self::row_to_message)
+                .transpose()
+        })
+        .await
     }
 }
 ```
@@ -6344,7 +6381,7 @@ frequently queried attributes and JSONB for variable parts of your data.
 | ----------------- | ----------------- | ------------------- | ------------------------------- |
 | Application Cache | In-memory HashMap | 5 minutes           | Active conversation context     |
 | Query Cache       | PostgreSQL        | 1 hour              | Frequently accessed read models |
-| Connection Cache  | SQLx Pool         | Connection lifetime | Database connections            |
+| Connection Cache  | r2d2 Pool         | Connection lifetime | Database connections            |
 | Result Cache      | Redis (future)    | 30 minutes          | Expensive query results         |
 
 ```rust
@@ -6898,64 +6935,66 @@ applications which may want to connect to the same database (or even multiple
 instances of the same application in high-availability deployments).
 
 ```rust
-use sqlx::postgres::{PgPoolOptions, PgConnectOptions};
+use diesel::r2d2::{ConnectionManager, Pool, CustomizeConnection};
+use diesel::PgConnection;
 use std::time::Duration;
 
 pub struct DatabaseConfig {
-    pub max_connections: u32,
-    pub min_connections: u32,
+    pub max_size: u32,
+    pub min_idle: u32,
     pub max_lifetime: Duration,
     pub idle_timeout: Duration,
-    pub acquire_timeout: Duration,
-    pub test_before_acquire: bool,
+    pub connection_timeout: Duration,
+    pub test_on_check_out: bool,
 }
 
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            max_connections: 50,
-            min_connections: 5,
+            max_size: 50,
+            min_idle: 5,
             max_lifetime: Duration::from_secs(3600), // 1 hour
             idle_timeout: Duration::from_secs(600),  // 10 minutes
-            acquire_timeout: Duration::from_secs(30),
-            test_before_acquire: true,
+            connection_timeout: Duration::from_secs(30),
+            test_on_check_out: true,
         }
     }
 }
 
-pub async fn create_optimized_pool(
+#[derive(Debug)]
+struct ConnectionCustomizer;
+
+impl CustomizeConnection<PgConnection, r2d2::Error> for ConnectionCustomizer {
+    fn on_acquire(&self, conn: &mut PgConnection) -> Result<(), r2d2::Error> {
+        use diesel::RunQueryDsl;
+        // Set connection-level optimizations
+        diesel::sql_query("SET statement_timeout = '30s'")
+            .execute(conn)
+            .map_err(|e| r2d2::Error::QueryError(e))?;
+        diesel::sql_query("SET lock_timeout = '10s'")
+            .execute(conn)
+            .map_err(|e| r2d2::Error::QueryError(e))?;
+        diesel::sql_query("SET idle_in_transaction_session_timeout = '60s'")
+            .execute(conn)
+            .map_err(|e| r2d2::Error::QueryError(e))?;
+        Ok(())
+    }
+}
+
+pub fn create_optimized_pool(
     database_url: &str,
     config: DatabaseConfig,
-) -> Result<PgPool, sqlx::Error> {
-    let connect_options = database_url.parse::<PgConnectOptions>()?
-        .application_name("corbusier")
-        .statement_cache_capacity(100)
-        .log_statements(tracing::log::LevelFilter::Debug);
-    
-    PgPoolOptions::new()
-        .max_connections(config.max_connections)
-        .min_connections(config.min_connections)
-        .max_lifetime(config.max_lifetime)
-        .idle_timeout(config.idle_timeout)
-        .acquire_timeout(config.acquire_timeout)
-        .test_before_acquire(config.test_before_acquire)
-        .after_connect(|conn, _meta| {
-            Box::pin(async move {
-                // Set connection-level optimizations
-                sqlx::query("SET statement_timeout = '30s'")
-                    .execute(conn)
-                    .await?;
-                sqlx::query("SET lock_timeout = '10s'")
-                    .execute(conn)
-                    .await?;
-                sqlx::query("SET idle_in_transaction_session_timeout = '60s'")
-                    .execute(conn)
-                    .await?;
-                Ok(())
-            })
-        })
-        .connect_with(connect_options)
-        .await
+) -> Result<Pool<ConnectionManager<PgConnection>>, r2d2::Error> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    Pool::builder()
+        .max_size(config.max_size)
+        .min_idle(Some(config.min_idle))
+        .max_lifetime(Some(config.max_lifetime))
+        .idle_timeout(Some(config.idle_timeout))
+        .connection_timeout(config.connection_timeout)
+        .test_on_check_out(config.test_on_check_out)
+        .connection_customizer(Box::new(ConnectionCustomizer))
+        .build(manager)
 }
 ```
 
@@ -6964,6 +7003,12 @@ pub async fn create_optimized_pool(
 ###### Database Connection Routing
 
 ```rust
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+
 pub struct DatabaseManager {
     write_pool: PgPool,
     read_pools: Vec<PgPool>,
@@ -6978,34 +7023,40 @@ impl DatabaseManager {
             current_read_index: AtomicUsize::new(0),
         }
     }
-    
+
     pub fn get_write_pool(&self) -> &PgPool {
         &self.write_pool
     }
-    
+
     pub fn get_read_pool(&self) -> &PgPool {
         if self.read_pools.is_empty() {
             return &self.write_pool;
         }
-        
+
         let index = self.current_read_index.fetch_add(1, Ordering::Relaxed) % self.read_pools.len();
         &self.read_pools[index]
     }
-    
-    pub async fn execute_read_query<T, F>(&self, query_fn: F) -> Result<T, sqlx::Error>
+
+    pub async fn execute_read_query<T, F>(&self, query_fn: F) -> Result<T, RepositoryError>
     where
-        F: FnOnce(&PgPool) -> BoxFuture<'_, Result<T, sqlx::Error>>,
+        F: FnOnce(&PgPool) -> Result<T, RepositoryError> + Send + 'static,
+        T: Send + 'static,
     {
-        let pool = self.get_read_pool();
-        query_fn(pool).await
+        let pool = self.get_read_pool().clone();
+        tokio::task::spawn_blocking(move || query_fn(&pool))
+            .await
+            .map_err(|e| RepositoryError::connection(e.to_string()))?
     }
-    
-    pub async fn execute_write_query<T, F>(&self, query_fn: F) -> Result<T, sqlx::Error>
+
+    pub async fn execute_write_query<T, F>(&self, query_fn: F) -> Result<T, RepositoryError>
     where
-        F: FnOnce(&PgPool) -> BoxFuture<'_, Result<T, sqlx::Error>>,
+        F: FnOnce(&PgPool) -> Result<T, RepositoryError> + Send + 'static,
+        T: Send + 'static,
     {
-        let pool = self.get_write_pool();
-        query_fn(pool).await
+        let pool = self.get_write_pool().clone();
+        tokio::task::spawn_blocking(move || query_fn(&pool))
+            .await
+            .map_err(|e| RepositoryError::connection(e.to_string()))?
     }
 }
 ```
@@ -7014,11 +7065,18 @@ impl DatabaseManager {
 
 ###### Efficient Batch Operations
 
-Our PostgreSQL-based implementation processes 10K events/second with proper
-indexing and partitioning. The append-only nature makes it extremely fast - no
-updates, no deletes, just inserts.
+The PostgreSQL-based implementation targets up to 10K events/second throughput
+under benchmark conditions with proper indexing and partitioning (single-node
+PostgreSQL 14+, SSD storage, batch inserts of 100 events). The append-only
+nature contributes to performance—no updates, no deletes, just inserts.
 
 ```rust
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use std::time::Duration;
+
+pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+
 pub struct BatchProcessor {
     pool: PgPool,
     batch_size: usize,
@@ -7026,55 +7084,54 @@ pub struct BatchProcessor {
 }
 
 impl BatchProcessor {
-    pub async fn batch_insert_messages(&self, messages: Vec<Message>) -> Result<(), sqlx::Error> {
-        const BATCH_SIZE: usize = 1000;
-        
-        for chunk in messages.chunks(BATCH_SIZE) {
-            let mut query_builder = QueryBuilder::new(
-                "INSERT INTO messages (id, conversation_id, role, content, metadata, created_at) "
-            );
-            
-            query_builder.push_values(chunk, |mut b, message| {
-                b.push_bind(message.id.as_uuid())
-                 .push_bind(message.conversation_id.as_uuid())
-                 .push_bind(message.role.as_str())
-                 .push_bind(&message.content)
-                 .push_bind(&message.metadata)
-                 .push_bind(message.created_at);
-            });
-            
-            let query = query_builder.build();
-            query.execute(&self.pool).await?;
-        }
-        
-        Ok(())
+    pub async fn batch_insert_messages(&self, messages: Vec<Message>) -> Result<(), RepositoryError> {
+        let pool = self.pool.clone();
+        let batch_size = self.batch_size;
+
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
+
+            for chunk in messages.chunks(batch_size) {
+                let new_messages: Vec<NewMessage> = chunk
+                    .iter()
+                    .map(NewMessage::try_from_domain)
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                diesel::insert_into(messages::table)
+                    .values(&new_messages)
+                    .execute(&mut conn)
+                    .map_err(RepositoryError::database)?;
+            }
+
+            Ok(())
+        })
+        .await
+        .map_err(|e| RepositoryError::connection(e.to_string()))?
     }
-    
-    pub async fn batch_insert_events(&self, events: Vec<DomainEvent>) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        
-        for chunk in events.chunks(500) {
-            let mut query_builder = QueryBuilder::new(concat!(
-                "INSERT INTO domain_events (id, aggregate_id, aggregate_type, event_type, ",
-                "event_data, event_version, occurred_at) "
-            ));
-            
-            query_builder.push_values(chunk, |mut b, event| {
-                b.push_bind(event.id.as_uuid())
-                 .push_bind(event.aggregate_id.as_uuid())
-                 .push_bind(&event.aggregate_type)
-                 .push_bind(&event.event_type)
-                 .push_bind(&event.event_data)
-                 .push_bind(event.event_version)
-                 .push_bind(event.occurred_at);
-            });
-            
-            let query = query_builder.build();
-            query.execute(&mut *tx).await?;
-        }
-        
-        tx.commit().await?;
-        Ok(())
+
+    pub async fn batch_insert_events(&self, events: Vec<DomainEvent>) -> Result<(), RepositoryError> {
+        let pool = self.pool.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
+
+            conn.transaction::<_, RepositoryError, _>(|tx_conn| {
+                for chunk in events.chunks(500) {
+                    let new_events: Vec<NewDomainEvent> = chunk
+                        .iter()
+                        .map(NewDomainEvent::from_domain)
+                        .collect();
+
+                    diesel::insert_into(domain_events::table)
+                        .values(&new_events)
+                        .execute(tx_conn)
+                        .map_err(RepositoryError::database)?;
+                }
+                Ok(())
+            })
+        })
+        .await
+        .map_err(|e| RepositoryError::connection(e.to_string()))?
     }
 }
 ```
@@ -8830,12 +8887,11 @@ sequenceDiagram
 
 ###### Trace Context Propagation
 
-| Boundary            | Propagation Method | Context Format        | Implementation        |
-| ------------------- | ------------------ | --------------------- | --------------------- |
-| HTTP Requests       | HTTP Headers       | W3C Trace Context     | Actix-Web middleware  |
-| Agent Backends      | SDK Integration    | OpenTelemetry context | Custom propagation    |
-| Tool Execution      | MCP Protocol       | Custom headers        | MCP middleware        |
-| Database Operations | SQLx integration   | Span context          | Query instrumentation |
+| Boundary       | Propagation Method | Context Format        | Implementation       |
+| -------------- | ------------------ | --------------------- | -------------------- |
+| HTTP Requests  | HTTP Headers       | W3C Trace Context     | Actix-Web middleware |
+| Agent Backends | SDK Integration    | OpenTelemetry context | Custom propagation   |
+| Tool Execution | MCP Protocol       | Custom headers        | MCP middleware       |
 
 ##### 6.5.1.4 Alert Management System
 
@@ -9537,40 +9593,40 @@ sequenceDiagram
 | MCP Protocol         | JSON-RPC testing      | Custom MCP test client | Protocol compliance         |
 | Database Integration | Repository testing    | SQLite test database   | Data persistence validation |
 
-###### Database Integration Testing
+###### Repository Behaviour Testing
 
-Many databases allow you to configure an in-memory backend which means that you
-get the correct behavior in your tests, plus they are fast and will
+The in-memory repository adapter allows testing repository behaviour without
+database infrastructure. This approach provides fast, deterministic tests that
 automatically clean up after themselves.
 
 ```rust
-// Database integration test setup
+// Repository behaviour test (in-memory adapter)
 #[tokio::test]
-async fn test_conversation_repository_integration() {
-    // Setup in-memory SQLite database
-    let pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect("sqlite::memory:")
+async fn test_conversation_repository_behaviour() {
+    // Use in-memory repository for testing - no database setup required
+    let repo = InMemoryMessageRepository::new();
+
+    // Create test data
+    let conversation_id = ConversationId::new();
+    let clock = DefaultClock;
+    let message = Message::new(
+        conversation_id,
+        Role::User,
+        vec![ContentPart::Text(TextPart::new("Test message".to_string()))],
+        SequenceNumber::new(1),
+        &clock,
+    )
+    .expect("valid message");
+
+    // Test store and retrieve
+    repo.store(&message).await.expect("Failed to store");
+    let retrieved = repo
+        .find_by_id(message.id())
         .await
-        .expect("Failed to create test database");
-    
-    // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
-    
-    // Test repository operations
-    let repo = PostgresConversationRepository::new(pool);
-    let conversation = create_test_conversation();
-    
-    // Test create and retrieve
-    repo.save(&conversation).await.expect("Failed to save");
-    let retrieved = repo.find_by_id(conversation.id).await
         .expect("Failed to retrieve")
-        .expect("Conversation not found");
-    
-    assert_eq!(conversation.id, retrieved.id);
+        .expect("Message not found");
+
+    assert_eq!(message.id(), retrieved.id());
 }
 ```
 
@@ -11810,3 +11866,11 @@ studies showing substantial improvements in concurrent request handling.
 | **VPA**   | Vertical Pod Autoscaler                      |
 | **WAL**   | Write-Ahead Logging                          |
 | **WCAG**  | Web Content Accessibility Guidelines         |
+
+______________________________________________________________________
+
+[^1]: [Model Context Protocol Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/)
+    (see also [2025-11-11 Release Candidate](https://spec.modelcontextprotocol.io/specification/2025-11-11/))
+
+[^2]: [Agentic AI Foundation Announcement](https://www.anthropic.com/news/agentic-ai-foundation)
+    (December 9, 2025 governance transition)

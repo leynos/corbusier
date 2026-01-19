@@ -1,3 +1,8 @@
+# Configuration for cargo-nextest test runner.
+#
+# This file configures test execution behavior, particularly for tests that
+# require shared resources like the embedded PostgreSQL cluster.
+
 [profile.default]
 # Kill any test once it crosses 60s.
 slow-timeout = { period = "60s", terminate-after = 1, grace-period = "5s" }
@@ -8,3 +13,15 @@ global-timeout = "5m"
 [profile.long]
 slow-timeout = { period = "180s", terminate-after = 1, grace-period = "5s" }
 global-timeout = "15m"
+
+[test-groups]
+# PostgreSQL integration tests share a single embedded PostgreSQL cluster.
+# All tests in this group share one slot, ensuring sequential execution.
+postgres = { max-threads = 1 }
+
+# PostgreSQL integration tests must run serially to avoid race conditions
+# during cluster initialization ("another server might be running" errors).
+# The test-group constraint ensures only one postgres test runs at a time.
+[[profile.default.overrides]]
+filter = 'binary_id(~postgres)'
+test-group = 'postgres'
