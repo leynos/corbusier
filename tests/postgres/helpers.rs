@@ -138,15 +138,11 @@ impl Drop for CleanupGuard<'_> {
 }
 
 /// Expected audit context values for parameterized tests.
-#[expect(
-    clippy::struct_field_names,
-    reason = "Field names mirror AuditContext for clarity in test expectations"
-)]
 pub struct ExpectedAuditContext {
-    pub correlation_id: Option<Uuid>,
-    pub causation_id: Option<Uuid>,
-    pub user_id: Option<Uuid>,
-    pub session_id: Option<Uuid>,
+    pub correlation: Option<Uuid>,
+    pub causation: Option<Uuid>,
+    pub user: Option<Uuid>,
+    pub session: Option<Uuid>,
 }
 
 impl ExpectedAuditContext {
@@ -154,16 +150,16 @@ impl ExpectedAuditContext {
     #[must_use]
     pub const fn to_audit_context(&self) -> AuditContext {
         let mut audit = AuditContext::empty();
-        if let Some(id) = self.correlation_id {
+        if let Some(id) = self.correlation {
             audit = audit.with_correlation_id(id);
         }
-        if let Some(id) = self.causation_id {
+        if let Some(id) = self.causation {
             audit = audit.with_causation_id(id);
         }
-        if let Some(id) = self.user_id {
+        if let Some(id) = self.user {
             audit = audit.with_user_id(id);
         }
-        if let Some(id) = self.session_id {
+        if let Some(id) = self.session {
             audit = audit.with_session_id(id);
         }
         audit

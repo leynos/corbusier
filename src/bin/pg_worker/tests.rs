@@ -216,6 +216,7 @@ fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
 #[test]
 fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
+    let _guard = TempDataDirGuard::new(data_dir.clone());
     let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
     let runtime = build_runtime()?;
 
@@ -227,7 +228,6 @@ fn ensure_postgres_setup_returns_when_started() -> Result<(), BoxError> {
             postgres.setup_calls
         )));
     }
-    remove_dir_all(&data_dir).map_err(Box::new)?;
     Ok(())
 }
 

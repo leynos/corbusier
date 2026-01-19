@@ -85,13 +85,10 @@ fn store_and_retrieve_message(
 fn find_by_id_returns_none_for_missing(crud_context: Result<CrudTestContext, BoxError>) {
     let context = crud_context.expect("failed to create CRUD test context");
 
-    let result = match context
+    let result = context
         .rt
         .block_on(context.repo.find_by_id(MessageId::new()))
-    {
-        Ok(result) => result,
-        Err(err) => panic!("failed to load missing message: {err}"),
-    };
+        .expect("failed to load missing message");
     assert!(result.is_none());
 
     context
@@ -107,40 +104,30 @@ fn find_by_conversation_returns_ordered_messages(
     let context = crud_context.expect("failed to create CRUD test context");
 
     let conv_id = ConversationId::new();
-    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
-        panic!("failed to insert conversation: {err}");
-    }
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("failed to insert conversation");
 
-    let msg3 = match create_test_message(&clock, conv_id, 3) {
-        Ok(message) => message,
-        Err(err) => panic!("failed to create message 3: {err}"),
-    };
-    let msg1 = match create_test_message(&clock, conv_id, 1) {
-        Ok(message) => message,
-        Err(err) => panic!("failed to create message 1: {err}"),
-    };
-    let msg2 = match create_test_message(&clock, conv_id, 2) {
-        Ok(message) => message,
-        Err(err) => panic!("failed to create message 2: {err}"),
-    };
+    let msg3 = create_test_message(&clock, conv_id, 3).expect("failed to create message 3");
+    let msg1 = create_test_message(&clock, conv_id, 1).expect("failed to create message 1");
+    let msg2 = create_test_message(&clock, conv_id, 2).expect("failed to create message 2");
 
-    if let Err(err) = context.rt.block_on(context.repo.store(&msg3)) {
-        panic!("failed to store message 3: {err}");
-    }
-    if let Err(err) = context.rt.block_on(context.repo.store(&msg1)) {
-        panic!("failed to store message 1: {err}");
-    }
-    if let Err(err) = context.rt.block_on(context.repo.store(&msg2)) {
-        panic!("failed to store message 2: {err}");
-    }
+    context
+        .rt
+        .block_on(context.repo.store(&msg3))
+        .expect("failed to store message 3");
+    context
+        .rt
+        .block_on(context.repo.store(&msg1))
+        .expect("failed to store message 1");
+    context
+        .rt
+        .block_on(context.repo.store(&msg2))
+        .expect("failed to store message 2");
 
-    let messages = match context
+    let messages = context
         .rt
         .block_on(context.repo.find_by_conversation(conv_id))
-    {
-        Ok(messages) => messages,
-        Err(err) => panic!("failed to fetch messages: {err}"),
-    };
+        .expect("failed to fetch messages");
 
     assert_eq!(messages.len(), 3);
     let sequence_numbers: Vec<_> = messages
@@ -162,29 +149,26 @@ fn exists_returns_correct_status(
     let context = crud_context.expect("failed to create CRUD test context");
 
     let conv_id = ConversationId::new();
-    if let Err(err) = insert_conversation(context.cluster, &context.db_name, conv_id) {
-        panic!("failed to insert conversation: {err}");
-    }
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("failed to insert conversation");
 
-    let message = match create_test_message(&clock, conv_id, 1) {
-        Ok(message) => message,
-        Err(err) => panic!("failed to create message: {err}"),
-    };
+    let message = create_test_message(&clock, conv_id, 1).expect("failed to create message");
     let msg_id = message.id();
 
-    let exists_before = match context.rt.block_on(context.repo.exists(msg_id)) {
-        Ok(exists) => exists,
-        Err(err) => panic!("failed to check message existence: {err}"),
-    };
+    let exists_before = context
+        .rt
+        .block_on(context.repo.exists(msg_id))
+        .expect("failed to check message existence");
     assert!(!exists_before);
 
-    if let Err(err) = context.rt.block_on(context.repo.store(&message)) {
-        panic!("failed to store message: {err}");
-    }
-    let exists_after = match context.rt.block_on(context.repo.exists(msg_id)) {
-        Ok(exists) => exists,
-        Err(err) => panic!("failed to check message existence: {err}"),
-    };
+    context
+        .rt
+        .block_on(context.repo.store(&message))
+        .expect("failed to store message");
+    let exists_after = context
+        .rt
+        .block_on(context.repo.exists(msg_id))
+        .expect("failed to check message existence");
     assert!(exists_after);
 
     context

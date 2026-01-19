@@ -21,32 +21,32 @@ use uuid::Uuid;
 /// Parameterized across three scenarios:
 /// - Full context: all fields populated
 /// - Empty context: all fields None
-/// - Partial context: only `correlation_id` populated
+/// - Partial context: only `correlation` populated
 #[rstest]
 #[case::full_context(
     ExpectedAuditContext {
-        correlation_id: Some(Uuid::new_v4()),
-        causation_id: Some(Uuid::new_v4()),
-        user_id: Some(Uuid::new_v4()),
-        session_id: Some(Uuid::new_v4()),
+        correlation: Some(Uuid::new_v4()),
+        causation: Some(Uuid::new_v4()),
+        user: Some(Uuid::new_v4()),
+        session: Some(Uuid::new_v4()),
     },
     "full"
 )]
 #[case::empty_context(
     ExpectedAuditContext {
-        correlation_id: None,
-        causation_id: None,
-        user_id: None,
-        session_id: None,
+        correlation: None,
+        causation: None,
+        user: None,
+        session: None,
     },
     "empty"
 )]
 #[case::partial_context(
     ExpectedAuditContext {
-        correlation_id: Some(Uuid::new_v4()),
-        causation_id: None,
-        user_id: None,
-        session_id: None,
+        correlation: Some(Uuid::new_v4()),
+        causation: None,
+        user: None,
+        session: None,
     },
     "partial"
 )]
@@ -96,10 +96,10 @@ fn store_with_audit_captures_context(
     assert_eq!(audit_log.table_name, "messages");
     assert_eq!(audit_log.operation, "INSERT");
     assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
-    assert_eq!(audit_log.correlation_id, expected.correlation_id);
-    assert_eq!(audit_log.causation_id, expected.causation_id);
-    assert_eq!(audit_log.user_id, expected.user_id);
-    assert_eq!(audit_log.session_id, expected.session_id);
+    assert_eq!(audit_log.correlation_id, expected.correlation);
+    assert_eq!(audit_log.causation_id, expected.causation);
+    assert_eq!(audit_log.user_id, expected.user);
+    assert_eq!(audit_log.session_id, expected.session);
 
     drop(repo);
 
