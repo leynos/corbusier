@@ -16,11 +16,30 @@ mod unix_tests {
     fn worker_path() -> Result<PathBuf> {
         std::env::var_os("CARGO_BIN_EXE_pg_worker")
             .map(PathBuf::from)
+            .or_else(locate_pg_worker_near_target)
+            .or_else(locate_pg_worker_in_path)
             .ok_or_else(|| {
-                eyre!(
-                    "CARGO_BIN_EXE_pg_worker is not set; ensure the pg_worker binary is built"
-                )
+                eyre!("CARGO_BIN_EXE_pg_worker is not set; ensure the pg_worker binary is built")
             })
+    }
+
+    fn locate_pg_worker_near_target() -> Option<PathBuf> {
+        let exe = std::env::current_exe().ok()?;
+        let deps_dir = exe.parent()?;
+        let target_dir = deps_dir.parent()?;
+        let worker_path = target_dir.join("pg_worker");
+        worker_path.is_file().then_some(worker_path)
+    }
+
+    fn locate_pg_worker_in_path() -> Option<PathBuf> {
+        let path = std::env::var_os("PATH")?;
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join("pg_worker");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        None
     }
 
     fn run_worker(args: &[OsString]) -> Result<Output> {
@@ -97,8 +116,7 @@ mod unix_tests {
             OsString::from("setup"),
             OsString::from("/tmp/pg_worker_config.json"),
             OsString::from("extra"),
-        ])?
-        ;
+        ])?;
         ensure!(!output.status.success(), "expected failure status");
         let stderr = String::from_utf8_lossy(&output.stderr);
         ensure!(
@@ -114,8 +132,7 @@ mod unix_tests {
         let operations = ["setup", "start", "stop"];
 
         for operation in operations {
-            let output =
-                run_worker(&[OsString::from(operation), config_path.clone().into()])?;
+            let output = run_worker(&[OsString::from(operation), config_path.clone().into()])?;
             ensure!(
                 !output.status.success(),
                 "expected failure status for {operation}"

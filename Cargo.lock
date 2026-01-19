@@ -249,6 +249,7 @@ version = "3.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6dc3090992a735d23219de5c204927163d922f42f575a0189b005c62d37549a"
 dependencies = [
+ "camino",
  "cap-primitives",
  "io-extras",
  "io-lifetimes",

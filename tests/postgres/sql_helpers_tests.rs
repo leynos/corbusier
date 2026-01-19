@@ -1,6 +1,6 @@
 //! Integration tests for internal SQL helper functions.
 //!
-//! These tests require a running PostgreSQL instance and exercise the SQL
+//! These tests require a running `PostgreSQL` instance and exercise the SQL
 //! helpers through the repository stack rather than in isolation.
 
 use corbusier::message::{

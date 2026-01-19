@@ -1,4 +1,4 @@
-//! Filesystem helpers for PostgreSQL test clusters.
+//! Filesystem helpers for `PostgreSQL` test clusters.
 
 use super::BoxError;
 use camino::Utf8Path;
@@ -20,9 +20,10 @@ pub(super) fn open_parent_dir(path: &Utf8Path) -> Result<(Dir, &str), BoxError> 
 }
 
 pub(super) fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
-    let password_path = settings.password_file.to_string_lossy();
-    let password_path = Utf8Path::new(password_path.as_ref());
-    let (dir, file_name) = open_parent_dir(password_path)?;
+    let password_path_string = settings.password_file.to_string_lossy();
+    let password_path = Utf8Path::new(password_path_string.as_ref());
+    let (dir, file_name_str) = open_parent_dir(password_path)?;
+    let file_name = Utf8Path::new(file_name_str);
     match dir.read_to_string(file_name) {
         Ok(contents) => {
             let password = contents.trim_end();
@@ -37,10 +38,10 @@ pub(super) fn sync_password_from_file(settings: &mut Settings) -> Result<(), Box
 }
 
 pub(super) fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError> {
-    let data_dir = settings.data_dir.to_string_lossy();
-    let data_dir = Utf8Path::new(data_dir.as_ref());
-    let data_dir = open_ambient_dir(data_dir)?;
-    let contents = match data_dir.read_to_string("postmaster.pid") {
+    let data_dir_string = settings.data_dir.to_string_lossy();
+    let data_dir_path = Utf8Path::new(data_dir_string.as_ref());
+    let data_dir_handle = open_ambient_dir(data_dir_path)?;
+    let contents = match data_dir_handle.read_to_string(Utf8Path::new("postmaster.pid")) {
         Ok(contents) => contents,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(err) => return Err(Box::new(err) as BoxError),

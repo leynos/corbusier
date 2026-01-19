@@ -26,10 +26,11 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
     }
 
     let temp_dir = utf8_path_from_os(std::env::temp_dir().as_os_str());
-    let destination_path =
-        temp_dir.join(format!("pg_worker_{pid}", pid = std::process::id()));
-    let (source_dir, source_name) = open_parent_dir(worker)?;
-    let (destination_dir, destination_name) = open_parent_dir(&destination_path)?;
+    let destination_path = temp_dir.join(format!("pg_worker_{pid}", pid = std::process::id()));
+    let (source_dir, source_name_str) = open_parent_dir(worker)?;
+    let (destination_dir, destination_name_str) = open_parent_dir(&destination_path)?;
+    let source_name = Utf8Path::new(source_name_str);
+    let destination_name = Utf8Path::new(destination_name_str);
 
     if destination_dir.exists(destination_name) {
         destination_dir
@@ -55,9 +56,9 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
 }
 
 fn locate_pg_worker_near_target() -> Option<Utf8PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let exe = utf8_path_from_os(exe.as_os_str());
-    let deps_dir = exe.parent()?;
+    let exe_path_os = std::env::current_exe().ok()?;
+    let exe_path = utf8_path_from_os(exe_path_os.as_os_str());
+    let deps_dir = exe_path.parent()?;
     let target_dir = deps_dir.parent()?;
     let worker_path = target_dir.join("pg_worker");
     worker_path.is_file().then_some(worker_path)
@@ -65,9 +66,9 @@ fn locate_pg_worker_near_target() -> Option<Utf8PathBuf> {
 
 fn locate_pg_worker_in_path() -> Option<Utf8PathBuf> {
     let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let dir = utf8_path_from_os(dir.as_os_str());
-        let candidate = dir.join("pg_worker");
+    for path_entry in std::env::split_paths(&path) {
+        let path_dir = utf8_path_from_os(path_entry.as_os_str());
+        let candidate = path_dir.join("pg_worker");
         if candidate.is_file() {
             return Some(candidate);
         }
@@ -76,10 +77,10 @@ fn locate_pg_worker_in_path() -> Option<Utf8PathBuf> {
 }
 
 fn locate_pg_worker_from_env() -> Option<Utf8PathBuf> {
-    let worker = std::env::var_os("PG_EMBEDDED_WORKER")?;
-    let worker = utf8_path_from_os(worker.as_os_str());
-    let file_name = worker.file_name()?;
-    (file_name == "pg_worker").then_some(worker)
+    let worker_path_os = std::env::var_os("PG_EMBEDDED_WORKER")?;
+    let worker_path = utf8_path_from_os(worker_path_os.as_os_str());
+    let file_name = worker_path.file_name()?;
+    (file_name == "pg_worker").then_some(worker_path)
 }
 
 fn utf8_path_from_os(value: &OsStr) -> Utf8PathBuf {

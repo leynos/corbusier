@@ -260,18 +260,18 @@ mod unix {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 pub(crate) use pg_embedded_setup_unpriv::worker::PlainSecret;
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 pub(crate) use postgresql_embedded::Status;
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 pub(crate) use unix::{
-    EnvStore, Operation, PostgresLifecycle, apply_worker_environment_with,
-    ensure_postgres_setup, ensure_postgres_started, has_valid_data_dir,
-    open_ambient_dir, remove_dir_all,
+    EnvStore, Operation, PostgresLifecycle, apply_worker_environment_with, ensure_postgres_setup,
+    ensure_postgres_started, has_valid_data_dir, open_ambient_dir, remove_dir_all,
 };
 
 #[cfg(all(test, unix))]
+#[path = "pg_worker/tests.rs"]
 mod tests;
 
 pub(crate) fn other_error(message: impl Into<String>) -> BoxError {

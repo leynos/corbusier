@@ -1,4 +1,4 @@
-//! Environment helpers for PostgreSQL test clusters.
+//! Environment helpers for `PostgreSQL` test clusters.
 
 use super::BoxError;
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
@@ -6,7 +6,9 @@ use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges}
 use std::ffi::OsString;
 use std::net::TcpListener;
 
-pub(super) fn env_vars_to_os(env_vars: &[(String, Option<String>)]) -> Vec<(OsString, Option<OsString>)> {
+pub(super) fn env_vars_to_os(
+    env_vars: &[(String, Option<String>)],
+) -> Vec<(OsString, Option<OsString>)> {
     env_vars
         .iter()
         .map(|(key, value)| (OsString::from(key), value.as_ref().map(OsString::from)))
