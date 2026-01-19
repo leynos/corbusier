@@ -4,34 +4,66 @@ use crate::postgres::helpers::{
     CleanupGuard, PostgresCluster, clock, create_test_message, ensure_template,
     insert_conversation, postgres_cluster, setup_repository, test_runtime,
 };
+use corbusier::message::adapters::postgres::PostgresMessageRepository;
 use corbusier::message::{
     domain::{ConversationId, MessageId, Role},
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
+use tokio::runtime::Runtime;
 
-#[rstest]
-fn store_and_retrieve_message(clock: DefaultClock, postgres_cluster: PostgresCluster) {
+struct CrudTestContext {
+    cluster: PostgresCluster,
+    db_name: String,
+    guard: CleanupGuard<'static>,
+    repo: PostgresMessageRepository,
+    rt: Runtime,
+}
+
+impl CrudTestContext {
+    fn cleanup(self) {
+        drop(self.repo);
+        self.guard.cleanup().expect("cleanup database");
+    }
+}
+
+#[fixture]
+fn crud_context(postgres_cluster: PostgresCluster) -> CrudTestContext {
     let cluster = postgres_cluster;
     ensure_template(cluster).expect("template setup");
-    let db_name = format!("test_store_retrieve_{}", uuid::Uuid::new_v4());
+    let db_name = format!("test_crud_{}", uuid::Uuid::new_v4());
     let guard = CleanupGuard::new(cluster, db_name.clone());
     let repo = setup_repository(cluster, &db_name).expect("repository setup");
+    let rt = test_runtime().expect("tokio runtime");
+    CrudTestContext {
+        cluster,
+        db_name,
+        guard,
+        repo,
+        rt,
+    }
+}
+
+#[rstest]
+fn store_and_retrieve_message(clock: DefaultClock, crud_context: CrudTestContext) {
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("conversation insert");
 
     let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
 
-    let rt = test_runtime().expect("tokio runtime");
-
-    rt.block_on(repo.store(&message))
+    context
+        .rt
+        .block_on(context.repo.store(&message))
         .expect("store should succeed");
 
-    let retrieved = rt
-        .block_on(repo.find_by_id(msg_id))
+    let retrieved = context
+        .rt
+        .block_on(context.repo.find_by_id(msg_id))
         .expect("find_by_id should succeed")
         .expect("message should exist");
 
@@ -40,55 +72,44 @@ fn store_and_retrieve_message(clock: DefaultClock, postgres_cluster: PostgresClu
     assert_eq!(retrieved.role(), Role::User);
     assert_eq!(retrieved.sequence_number().value(), 1);
 
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    context.cleanup();
 }
 
 #[rstest]
-fn find_by_id_returns_none_for_missing(postgres_cluster: PostgresCluster) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let db_name = format!("test_find_none_{}", uuid::Uuid::new_v4());
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repository setup");
+fn find_by_id_returns_none_for_missing(crud_context: CrudTestContext) {
+    let context = crud_context;
 
-    let rt = test_runtime().expect("tokio runtime");
-    let result = rt
-        .block_on(repo.find_by_id(MessageId::new()))
+    let result = context
+        .rt
+        .block_on(context.repo.find_by_id(MessageId::new()))
         .expect("query ok");
     assert!(result.is_none());
 
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    context.cleanup();
 }
 
 #[rstest]
 fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
+    crud_context: CrudTestContext,
 ) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let db_name = format!("test_find_conv_{}", uuid::Uuid::new_v4());
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repository setup");
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("conversation insert");
 
     let msg3 = create_test_message(&clock, conv_id, 3).expect("test message");
     let msg1 = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg2 = create_test_message(&clock, conv_id, 2).expect("test message");
 
-    let rt = test_runtime().expect("tokio runtime");
-    rt.block_on(repo.store(&msg3)).expect("store msg3");
-    rt.block_on(repo.store(&msg1)).expect("store msg1");
-    rt.block_on(repo.store(&msg2)).expect("store msg2");
+    context.rt.block_on(context.repo.store(&msg3)).expect("store msg3");
+    context.rt.block_on(context.repo.store(&msg1)).expect("store msg1");
+    context.rt.block_on(context.repo.store(&msg2)).expect("store msg2");
 
-    let messages = rt
-        .block_on(repo.find_by_conversation(conv_id))
+    let messages = context
+        .rt
+        .block_on(context.repo.find_by_conversation(conv_id))
         .expect("find_by_conversation");
 
     assert_eq!(messages.len(), 3);
@@ -99,33 +120,33 @@ fn find_by_conversation_returns_ordered_messages(
     assert_eq!(second.sequence_number().value(), 2);
     assert_eq!(third.sequence_number().value(), 3);
 
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    context.cleanup();
 }
 
 #[rstest]
-fn exists_returns_correct_status(clock: DefaultClock, postgres_cluster: PostgresCluster) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let db_name = format!("test_exists_{}", uuid::Uuid::new_v4());
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repository setup");
+fn exists_returns_correct_status(clock: DefaultClock, crud_context: CrudTestContext) {
+    let context = crud_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(context.cluster, &context.db_name, conv_id)
+        .expect("conversation insert");
 
     let message = create_test_message(&clock, conv_id, 1).expect("test message");
     let msg_id = message.id();
 
-    let rt = test_runtime().expect("tokio runtime");
+    assert!(!context
+        .rt
+        .block_on(context.repo.exists(msg_id))
+        .expect("exists check"));
 
-    assert!(!rt.block_on(repo.exists(msg_id)).expect("exists check"));
+    context
+        .rt
+        .block_on(context.repo.store(&message))
+        .expect("store");
+    assert!(context
+        .rt
+        .block_on(context.repo.exists(msg_id))
+        .expect("exists check"));
 
-    rt.block_on(repo.store(&message)).expect("store");
-    assert!(rt.block_on(repo.exists(msg_id)).expect("exists check"));
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    context.cleanup();
 }

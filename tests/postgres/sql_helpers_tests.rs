@@ -1,10 +1,9 @@
-//! Unit tests for internal SQL helper functions.
+//! Integration tests for internal SQL helper functions.
 //!
-//! Tests the constraint error mapping and audit context setting functions
-//! in isolation from the full repository operations.
+//! These tests require a running PostgreSQL instance and exercise the SQL
+//! helpers through the repository stack rather than in isolation.
 
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     domain::{ContentPart, ConversationId, Message, MessageId, Role, SequenceNumber, TextPart},
     error::RepositoryError,
     ports::repository::MessageRepository,
@@ -14,8 +13,9 @@ use rstest::rstest;
 use uuid::Uuid;
 
 use super::helpers::{
-    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository, test_runtime,
+    CleanupGuard, ExpectedAuditContext, PostgresCluster, clock, ensure_template,
+    fetch_audit_log_for_message, insert_conversation, postgres_cluster, setup_repository,
+    test_runtime,
 };
 
 // ============================================================================
@@ -136,38 +136,6 @@ fn insert_message_maps_duplicate_sequence_constraint(
 // ============================================================================
 // Audit Context Setting Tests
 // ============================================================================
-
-/// Expected audit context values for parameterized tests.
-#[expect(
-    clippy::struct_field_names,
-    reason = "Field names match AuditContext fields for clarity"
-)]
-struct ExpectedAuditContext {
-    correlation_id: Option<Uuid>,
-    causation_id: Option<Uuid>,
-    user_id: Option<Uuid>,
-    session_id: Option<Uuid>,
-}
-
-impl ExpectedAuditContext {
-    /// Creates an [`AuditContext`] from expected values.
-    const fn to_audit_context(&self) -> AuditContext {
-        let mut audit = AuditContext::empty();
-        if let Some(id) = self.correlation_id {
-            audit = audit.with_correlation_id(id);
-        }
-        if let Some(id) = self.causation_id {
-            audit = audit.with_causation_id(id);
-        }
-        if let Some(id) = self.user_id {
-            audit = audit.with_user_id(id);
-        }
-        if let Some(id) = self.session_id {
-            audit = audit.with_session_id(id);
-        }
-        audit
-    }
-}
 
 /// Tests that `set_audit_context` correctly sets `PostgreSQL` session variables.
 ///

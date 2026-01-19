@@ -1,6 +1,8 @@
 -- Create base tables for message persistence
 -- Follows corbusier-design.md section 6.2.3
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Conversations table stores conversation metadata
 CREATE TABLE conversations (
     id UUID PRIMARY KEY,

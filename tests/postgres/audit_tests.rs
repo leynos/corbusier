@@ -4,43 +4,17 @@
 //! verification via the database trigger.
 
 use crate::postgres::helpers::{
-    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository, test_runtime,
+    CleanupGuard, ExpectedAuditContext, PostgresCluster, clock, ensure_template,
+    fetch_audit_log_for_message, insert_conversation, postgres_cluster, setup_repository,
+    test_runtime,
 };
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
 use rstest::rstest;
 use uuid::Uuid;
-
-/// Expected audit context values for parameterized tests.
-struct ExpectedAuditContext {
-    correlation: Option<Uuid>,
-    causation: Option<Uuid>,
-    user: Option<Uuid>,
-    session: Option<Uuid>,
-}
-
-/// Creates an `AuditContext` from expected values.
-const fn create_audit_context(expected: &ExpectedAuditContext) -> AuditContext {
-    let mut audit = AuditContext::empty();
-    if let Some(id) = expected.correlation {
-        audit = audit.with_correlation_id(id);
-    }
-    if let Some(id) = expected.causation {
-        audit = audit.with_causation_id(id);
-    }
-    if let Some(id) = expected.user {
-        audit = audit.with_user_id(id);
-    }
-    if let Some(id) = expected.session {
-        audit = audit.with_session_id(id);
-    }
-    audit
-}
 
 /// Tests `store_with_audit` correctly propagates audit context to `audit_logs` table.
 ///
@@ -51,28 +25,28 @@ const fn create_audit_context(expected: &ExpectedAuditContext) -> AuditContext {
 #[rstest]
 #[case::full_context(
     ExpectedAuditContext {
-        correlation: Some(Uuid::new_v4()),
-        causation: Some(Uuid::new_v4()),
-        user: Some(Uuid::new_v4()),
-        session: Some(Uuid::new_v4()),
+        correlation_id: Some(Uuid::new_v4()),
+        causation_id: Some(Uuid::new_v4()),
+        user_id: Some(Uuid::new_v4()),
+        session_id: Some(Uuid::new_v4()),
     },
     "full"
 )]
 #[case::empty_context(
     ExpectedAuditContext {
-        correlation: None,
-        causation: None,
-        user: None,
-        session: None,
+        correlation_id: None,
+        causation_id: None,
+        user_id: None,
+        session_id: None,
     },
     "empty"
 )]
 #[case::partial_context(
     ExpectedAuditContext {
-        correlation: Some(Uuid::new_v4()),
-        causation: None,
-        user: None,
-        session: None,
+        correlation_id: Some(Uuid::new_v4()),
+        causation_id: None,
+        user_id: None,
+        session_id: None,
     },
     "partial"
 )]
@@ -100,7 +74,7 @@ fn store_with_audit_captures_context(
     )
     .expect("valid message");
 
-    let audit = create_audit_context(&expected);
+    let audit = expected.to_audit_context();
 
     let rt = test_runtime().expect("tokio runtime");
 
@@ -122,10 +96,10 @@ fn store_with_audit_captures_context(
     assert_eq!(audit_log.table_name, "messages");
     assert_eq!(audit_log.operation, "INSERT");
     assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
-    assert_eq!(audit_log.correlation_id, expected.correlation);
-    assert_eq!(audit_log.causation_id, expected.causation);
-    assert_eq!(audit_log.user_id, expected.user);
-    assert_eq!(audit_log.session_id, expected.session);
+    assert_eq!(audit_log.correlation_id, expected.correlation_id);
+    assert_eq!(audit_log.causation_id, expected.causation_id);
+    assert_eq!(audit_log.user_id, expected.user_id);
+    assert_eq!(audit_log.session_id, expected.session_id);
 
     drop(repo);
 

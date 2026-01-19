@@ -40,6 +40,7 @@ postgresql_embedded = "0.20.0"
 rstest = "0.26.1"
 mockall = "0.14.0"
 eyre = "0.6.12"
+camino = "1.1.6"
 
 [[bin]]
 name = "pg_worker"

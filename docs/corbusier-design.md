@@ -1393,7 +1393,7 @@ Use the in-memory repository for quick iteration during development and for
 unit tests that do not require persistence. For integration tests requiring
 database features (constraints, triggers, transactions), use embedded
 PostgreSQL via `pg-embed-setup-unpriv`. SQLite is not used in the current
-implementation.
+persistence layer implementation.
 
 #### 3.5.2 Data Persistence Strategies
 
@@ -4236,10 +4236,9 @@ pub enum ChangeType {
 ##### Actix Web Integration
 
 One of the fastest web frameworks available according to the TechEmpower
-Framework Benchmark. One of the fastest web frameworks available according to
-the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix
-Web (version to be pinned in Cargo.toml), providing high-performance REST
-endpoints and real-time streaming capabilities.
+Framework Benchmark. The HTTP API layer is built using Actix Web (version to be
+pinned in Cargo.toml), providing high-performance REST endpoints and real-time
+streaming capabilities.
 
 ```mermaid
 graph TB
@@ -4429,7 +4428,8 @@ pub enum StreamEvent {
 
 The persistence layer implements a hybrid approach combining relational data
 for structured entities with JSONB storage for flexible message formats,
-utilizing PostgreSQL for production and SQLite for development environments.
+utilizing PostgreSQL for production and the in-memory repository for
+development environments.
 
 ```mermaid
 graph TB
@@ -4449,7 +4449,7 @@ graph TB
     
     subgraph "Database Adapters"
         PG_ADAPTER[PostgreSQL Adapter]
-        SQLITE_ADAPTER[SQLite Adapter]
+        MEMORY_ADAPTER[In-memory Adapter]
         CACHE_ADAPTER[Cache Adapter]
     end
     
@@ -4471,7 +4471,7 @@ graph TB
     
     CONV_REPO --> PG_ADAPTER
     TASK_REPO --> PG_ADAPTER
-    EVENT_REPO --> SQLITE_ADAPTER
+    EVENT_REPO --> MEMORY_ADAPTER
     AUDIT_REPO --> CACHE_ADAPTER
     
     PG_ADAPTER --> CONV_MODEL

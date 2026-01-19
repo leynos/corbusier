@@ -390,6 +390,7 @@ name = "corbusier"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "camino",
  "cap-std",
  "chrono",
  "diesel",

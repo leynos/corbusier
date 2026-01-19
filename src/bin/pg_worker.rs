@@ -8,7 +8,7 @@
 //! The operation must be `setup`, `start`, or `stop`. The config payload is a
 //! JSON-encoded [`pg_embedded_setup_unpriv::worker::WorkerPayload`].
 
-type BoxError = Box<dyn std::error::Error>;
+pub(crate) type BoxError = Box<dyn std::error::Error>;
 
 fn main() -> Result<(), BoxError> {
     #[cfg(unix)]
@@ -41,14 +41,14 @@ mod unix {
     use std::path::{Path, PathBuf};
     use tokio::runtime::Builder;
 
-    enum Operation {
+    pub(crate) enum Operation {
         Setup,
         Start,
         Stop,
     }
 
     impl Operation {
-        fn parse(arg: &OsStr) -> Result<Self, BoxError> {
+        pub(crate) fn parse(arg: &OsStr) -> Result<Self, BoxError> {
             match arg.to_string_lossy().as_ref() {
                 "setup" => Ok(Self::Setup),
                 "start" => Ok(Self::Start),
@@ -100,7 +100,7 @@ mod unix {
         apply_worker_environment_with(&ProcessEnv, environment);
     }
 
-    trait EnvStore {
+    pub(crate) trait EnvStore {
         fn set_var(&self, key: &str, value: &str);
         fn remove_var(&self, key: &str);
     }
@@ -125,7 +125,7 @@ mod unix {
         }
     }
 
-    fn apply_worker_environment_with<E: EnvStore>(
+    pub(crate) fn apply_worker_environment_with<E: EnvStore>(
         env_store: &E,
         environment: &[(String, Option<PlainSecret>)],
     ) {
@@ -141,11 +141,19 @@ mod unix {
         match operation {
             Operation::Setup => {
                 ensure_postgres_setup(&mut postgres).await?;
+                // In run_operation we forget the PostgreSQL value so its Drop
+                // impl does not stop the database, because we want it to keep
+                // running beyond this function after ensure_postgres_setup
+                // completes.
                 std::mem::forget(postgres);
             }
             Operation::Start => {
                 ensure_postgres_setup(&mut postgres).await?;
                 ensure_postgres_started(&mut postgres).await?;
+                // In run_operation we forget the PostgreSQL value so its Drop
+                // impl does not stop the database, because we want it to keep
+                // running beyond this function after ensure_postgres_setup and
+                // ensure_postgres_started confirm it is ready.
                 std::mem::forget(postgres);
             }
             Operation::Stop => {
@@ -157,7 +165,7 @@ mod unix {
     }
 
     #[async_trait]
-    trait PostgresLifecycle {
+    pub(crate) trait PostgresLifecycle {
         async fn setup(&mut self) -> Result<(), BoxError>;
         async fn start(&mut self) -> Result<(), BoxError>;
         fn status(&self) -> Status;
@@ -183,7 +191,9 @@ mod unix {
         }
     }
 
-    async fn ensure_postgres_setup<P: PostgresLifecycle>(postgres: &mut P) -> Result<(), BoxError> {
+    pub(crate) async fn ensure_postgres_setup<P: PostgresLifecycle>(
+        postgres: &mut P,
+    ) -> Result<(), BoxError> {
         postgres.setup().await?;
         if matches!(postgres.status(), Status::Started) {
             return Ok(());
@@ -199,7 +209,7 @@ mod unix {
         Ok(())
     }
 
-    async fn ensure_postgres_started<P: PostgresLifecycle>(
+    pub(crate) async fn ensure_postgres_started<P: PostgresLifecycle>(
         postgres: &mut P,
     ) -> Result<(), BoxError> {
         if matches!(postgres.status(), Status::Started) {
@@ -210,7 +220,7 @@ mod unix {
         Ok(())
     }
 
-    fn has_valid_data_dir(data_dir: &Path) -> bool {
+    pub(crate) fn has_valid_data_dir(data_dir: &Path) -> bool {
         data_dir.join("global").join("pg_filenode.map").exists()
     }
 
@@ -222,7 +232,7 @@ mod unix {
         }
     }
 
-    fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
+    pub(crate) fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
         Dir::open_ambient_dir(path, ambient_authority()).map_err(Into::into)
     }
 
@@ -243,243 +253,27 @@ mod unix {
         Ok(buffer)
     }
 
-    fn remove_dir_all(path: &Path) -> Result<(), std::io::Error> {
+    pub(crate) fn remove_dir_all(path: &Path) -> Result<(), std::io::Error> {
         let (dir, name) =
             open_parent_dir(path).map_err(|err| std::io::Error::other(err.to_string()))?;
         dir.remove_dir_all(name)
     }
-
-    #[cfg(test)]
-    mod tests {
-        //! Unit tests for the Unix worker helper.
-
-        use super::{
-            BoxError, EnvStore, Operation, PlainSecret, PostgresLifecycle, Status,
-            apply_worker_environment_with, ensure_postgres_setup, ensure_postgres_started,
-            has_valid_data_dir, open_ambient_dir, other_error, remove_dir_all,
-        };
-        use async_trait::async_trait;
-        use cap_std::ambient_authority;
-        use cap_std::fs::Dir;
-        use std::cell::RefCell;
-        use std::ffi::OsStr;
-        use std::path::{Path, PathBuf};
-
-        struct RecordingEnv {
-            calls: RefCell<Vec<(String, Option<String>)>>,
-        }
-
-        impl RecordingEnv {
-            fn new() -> Self {
-                Self {
-                    calls: RefCell::new(Vec::new()),
-                }
-            }
-        }
-
-        impl EnvStore for RecordingEnv {
-            fn set_var(&self, key: &str, value: &str) {
-                self.calls
-                    .borrow_mut()
-                    .push((key.to_owned(), Some(value.to_owned())));
-            }
-
-            fn remove_var(&self, key: &str) {
-                self.calls.borrow_mut().push((key.to_owned(), None));
-            }
-        }
-
-        struct FakePostgres {
-            status: Status,
-            status_after_setup: Option<Status>,
-            data_dir: PathBuf,
-            setup_calls: usize,
-            start_calls: usize,
-        }
-
-        impl FakePostgres {
-            fn new(status: Status, data_dir: PathBuf) -> Self {
-                Self {
-                    status,
-                    status_after_setup: None,
-                    data_dir,
-                    setup_calls: 0,
-                    start_calls: 0,
-                }
-            }
-
-            fn with_status_after_setup(mut self, status: Status) -> Self {
-                self.status_after_setup = Some(status);
-                self
-            }
-        }
-
-        #[async_trait]
-        impl PostgresLifecycle for FakePostgres {
-            async fn setup(&mut self) -> Result<(), BoxError> {
-                self.setup_calls += 1;
-                if let Some(status) = self.status_after_setup {
-                    self.status = status;
-                }
-                Ok(())
-            }
-
-            async fn start(&mut self) -> Result<(), BoxError> {
-                self.start_calls += 1;
-                self.status = Status::Started;
-                Ok(())
-            }
-
-            fn status(&self) -> Status {
-                self.status
-            }
-
-            fn data_dir(&self) -> &Path {
-                self.data_dir.as_path()
-            }
-        }
-
-        fn make_temp_data_dir() -> PathBuf {
-            let name = format!("pg_worker_test_{}", uuid::Uuid::new_v4());
-            let temp_dir = std::env::temp_dir();
-            let dir =
-                Dir::open_ambient_dir(&temp_dir, ambient_authority()).expect("open temp directory");
-            dir.create_dir(&name).expect("create temp data dir");
-            temp_dir.join(name)
-        }
-
-        fn create_valid_marker(data_dir: &Path) {
-            let dir = open_ambient_dir(data_dir).expect("open data dir");
-            dir.create_dir_all("global")
-                .expect("create global directory");
-            let _file = dir
-                .create("global/pg_filenode.map")
-                .expect("create marker file");
-        }
-
-        #[test]
-        fn parse_accepts_supported_operations() {
-            assert!(matches!(
-                Operation::parse(OsStr::new("setup")),
-                Ok(Operation::Setup)
-            ));
-            assert!(matches!(
-                Operation::parse(OsStr::new("start")),
-                Ok(Operation::Start)
-            ));
-            assert!(matches!(
-                Operation::parse(OsStr::new("stop")),
-                Ok(Operation::Stop)
-            ));
-        }
-
-        #[test]
-        fn parse_rejects_unknown_operation() {
-            let result = Operation::parse(OsStr::new("unknown"));
-            assert!(result.is_err());
-            let message = result.err().expect("error should be present").to_string();
-            assert!(message.contains("unknown pg_worker operation"));
-        }
-
-        #[test]
-        fn apply_worker_environment_records_values() {
-            let recorder = RecordingEnv::new();
-            let env_vars = vec![
-                ("ONE".to_owned(), Some(PlainSecret::from("value"))),
-                ("TWO".to_owned(), None),
-            ];
-
-            apply_worker_environment_with(&recorder, &env_vars);
-
-            let calls = recorder.calls.borrow();
-            assert_eq!(calls.len(), 2);
-            assert_eq!(
-                calls.as_slice(),
-                &[
-                    ("ONE".to_owned(), Some("value".to_owned())),
-                    ("TWO".to_owned(), None),
-                ]
-            );
-        }
-
-        #[test]
-        fn other_error_reports_message() {
-            let error = other_error("boom");
-            let message = error.to_string();
-            assert!(message.contains("boom"));
-        }
-
-        #[tokio::test]
-        async fn ensure_postgres_started_skips_when_started() {
-            let data_dir = make_temp_data_dir();
-            let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
-
-            ensure_postgres_started(&mut postgres)
-                .await
-                .expect("ensure postgres started");
-
-            assert_eq!(postgres.start_calls, 0);
-            remove_dir_all(&data_dir).expect("cleanup data dir");
-        }
-
-        #[tokio::test]
-        async fn ensure_postgres_started_runs_when_stopped() {
-            let data_dir = make_temp_data_dir();
-            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone());
-
-            ensure_postgres_started(&mut postgres)
-                .await
-                .expect("ensure postgres started");
-
-            assert_eq!(postgres.start_calls, 1);
-            remove_dir_all(&data_dir).expect("cleanup data dir");
-        }
-
-        #[tokio::test]
-        async fn ensure_postgres_setup_returns_when_started() {
-            let data_dir = make_temp_data_dir();
-            let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
-
-            ensure_postgres_setup(&mut postgres)
-                .await
-                .expect("ensure postgres setup");
-
-            assert_eq!(postgres.setup_calls, 1);
-            remove_dir_all(&data_dir).expect("cleanup data dir");
-        }
-
-        #[tokio::test]
-        async fn ensure_postgres_setup_skips_reset_when_valid() {
-            let data_dir = make_temp_data_dir();
-            create_valid_marker(&data_dir);
-            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
-                .with_status_after_setup(Status::Stopped);
-
-            ensure_postgres_setup(&mut postgres)
-                .await
-                .expect("ensure postgres setup");
-
-            assert_eq!(postgres.setup_calls, 1);
-            assert!(has_valid_data_dir(&data_dir));
-            remove_dir_all(&data_dir).expect("cleanup data dir");
-        }
-
-        #[tokio::test]
-        async fn ensure_postgres_setup_resets_invalid_data_dir() {
-            let data_dir = make_temp_data_dir();
-            let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
-                .with_status_after_setup(Status::Stopped);
-
-            ensure_postgres_setup(&mut postgres)
-                .await
-                .expect("ensure postgres setup");
-
-            assert_eq!(postgres.setup_calls, 2);
-            assert!(!data_dir.exists());
-        }
-    }
 }
 
-fn other_error(message: impl Into<String>) -> BoxError {
+#[cfg(unix)]
+pub(crate) use pg_embedded_setup_unpriv::worker::PlainSecret;
+#[cfg(unix)]
+pub(crate) use postgresql_embedded::Status;
+#[cfg(unix)]
+pub(crate) use unix::{
+    EnvStore, Operation, PostgresLifecycle, apply_worker_environment_with,
+    ensure_postgres_setup, ensure_postgres_started, has_valid_data_dir,
+    open_ambient_dir, remove_dir_all,
+};
+
+#[cfg(all(test, unix))]
+mod tests;
+
+pub(crate) fn other_error(message: impl Into<String>) -> BoxError {
     Box::new(std::io::Error::other(message.into()))
 }

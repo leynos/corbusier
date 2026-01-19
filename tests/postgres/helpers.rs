@@ -3,6 +3,7 @@
 use super::cluster::{BoxError, ManagedCluster};
 pub use super::cluster::{PostgresCluster, postgres_cluster};
 use corbusier::message::{
+    adapters::audit_context::AuditContext,
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
@@ -12,6 +13,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::fixture;
 use tokio::runtime::Runtime;
+use uuid::Uuid;
 
 /// SQL to create the base schema for tests.
 pub const CREATE_SCHEMA_SQL: &str =
@@ -132,6 +134,39 @@ impl<'a> CleanupGuard<'a> {
 impl Drop for CleanupGuard<'_> {
     fn drop(&mut self) {
         drop(cleanup_database(self.cluster, &self.db_name));
+    }
+}
+
+/// Expected audit context values for parameterized tests.
+#[expect(
+    clippy::struct_field_names,
+    reason = "Field names match AuditContext fields for clarity"
+)]
+pub struct ExpectedAuditContext {
+    pub correlation_id: Option<Uuid>,
+    pub causation_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
+    pub session_id: Option<Uuid>,
+}
+
+impl ExpectedAuditContext {
+    /// Creates an [`AuditContext`] from expected values.
+    #[must_use]
+    pub const fn to_audit_context(&self) -> AuditContext {
+        let mut audit = AuditContext::empty();
+        if let Some(id) = self.correlation_id {
+            audit = audit.with_correlation_id(id);
+        }
+        if let Some(id) = self.causation_id {
+            audit = audit.with_causation_id(id);
+        }
+        if let Some(id) = self.user_id {
+            audit = audit.with_user_id(id);
+        }
+        if let Some(id) = self.session_id {
+            audit = audit.with_session_id(id);
+        }
+        audit
     }
 }
 

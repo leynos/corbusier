@@ -13,18 +13,21 @@ mod unix_tests {
     use std::path::PathBuf;
     use std::process::{Command, Output};
 
-    fn worker_path() -> Option<PathBuf> {
-        std::env::var_os("CARGO_BIN_EXE_pg_worker").map(PathBuf::from)
+    fn worker_path() -> Result<PathBuf> {
+        std::env::var_os("CARGO_BIN_EXE_pg_worker")
+            .map(PathBuf::from)
+            .ok_or_else(|| {
+                eyre!(
+                    "CARGO_BIN_EXE_pg_worker is not set; ensure the pg_worker binary is built"
+                )
+            })
     }
 
-    fn run_worker(args: &[OsString]) -> Result<Option<Output>> {
-        let Some(path) = worker_path() else {
-            return Ok(None);
-        };
-        Command::new(path)
+    fn run_worker(args: &[OsString]) -> Result<Output> {
+        let path = worker_path()?;
+        Command::new(&path)
             .args(args)
             .output()
-            .map(Some)
             .map_err(|err| eyre!(err))
     }
 
@@ -54,9 +57,7 @@ mod unix_tests {
 
     #[test]
     fn rejects_missing_operation_argument() -> Result<()> {
-        let Some(output) = run_worker(&[])? else {
-            return Ok(());
-        };
+        let output = run_worker(&[])?;
         ensure!(!output.status.success(), "expected failure status");
         let stderr = String::from_utf8_lossy(&output.stderr);
         ensure!(
@@ -68,9 +69,7 @@ mod unix_tests {
 
     #[test]
     fn rejects_missing_config_argument() -> Result<()> {
-        let Some(output) = run_worker(&[OsString::from("setup")])? else {
-            return Ok(());
-        };
+        let output = run_worker(&[OsString::from("setup")])?;
         ensure!(!output.status.success(), "expected failure status");
         let stderr = String::from_utf8_lossy(&output.stderr);
         ensure!(
@@ -82,9 +81,7 @@ mod unix_tests {
 
     #[test]
     fn rejects_unknown_operation() -> Result<()> {
-        let Some(output) = run_worker(&[OsString::from("unknown")])? else {
-            return Ok(());
-        };
+        let output = run_worker(&[OsString::from("unknown")])?;
         ensure!(!output.status.success(), "expected failure status");
         let stderr = String::from_utf8_lossy(&output.stderr);
         ensure!(
@@ -96,14 +93,12 @@ mod unix_tests {
 
     #[test]
     fn rejects_extra_arguments() -> Result<()> {
-        let Some(output) = run_worker(&[
+        let output = run_worker(&[
             OsString::from("setup"),
             OsString::from("/tmp/pg_worker_config.json"),
             OsString::from("extra"),
         ])?
-        else {
-            return Ok(());
-        };
+        ;
         ensure!(!output.status.success(), "expected failure status");
         let stderr = String::from_utf8_lossy(&output.stderr);
         ensure!(
@@ -119,11 +114,8 @@ mod unix_tests {
         let operations = ["setup", "start", "stop"];
 
         for operation in operations {
-            let Some(output) =
-                run_worker(&[OsString::from(operation), config_path.clone().into()])?
-            else {
-                return Ok(());
-            };
+            let output =
+                run_worker(&[OsString::from(operation), config_path.clone().into()])?;
             ensure!(
                 !output.status.success(),
                 "expected failure status for {operation}"

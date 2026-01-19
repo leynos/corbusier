@@ -1,21 +1,20 @@
 //! Cluster lifecycle helpers for `PostgreSQL` integration tests.
 
+mod env_utils;
+mod fs_utils;
+mod worker_helpers;
+
+use self::env_utils::{env_vars_to_os, worker_env_changes};
+use self::fs_utils::{sync_password_from_file, sync_port_from_pid};
 use super::helpers::test_runtime;
 use crate::test_helpers::EnvVarGuard;
-use cap_std::ambient_authority;
-use cap_std::fs::{Dir, Permissions, PermissionsExt};
 use diesel::prelude::*;
 use pg_embedded_setup_unpriv::worker_process_test_api::{
     WorkerOperation, WorkerRequest, WorkerRequestArgs, run as run_worker,
 };
-use pg_embedded_setup_unpriv::{
-    ExecutionPrivileges, TestBootstrapSettings, bootstrap_for_tests, detect_execution_privileges,
-};
+use pg_embedded_setup_unpriv::{ExecutionPrivileges, TestBootstrapSettings, bootstrap_for_tests};
 use postgresql_embedded::{PostgreSQL, Settings, Status};
 use rstest::fixture;
-use std::ffi::{OsStr, OsString};
-use std::net::TcpListener;
-use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -252,166 +251,4 @@ fn shared_cluster() -> PostgresCluster {
 
 fn quote_identifier(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
-}
-
-fn env_vars_to_os(env_vars: &[(String, Option<String>)]) -> Vec<(OsString, Option<OsString>)> {
-    env_vars
-        .iter()
-        .map(|(key, value)| (OsString::from(key), value.as_ref().map(OsString::from)))
-        .collect()
-}
-
-fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
-    let (dir, file_name) = open_parent_dir(&settings.password_file)?;
-    match dir.read_to_string(file_name) {
-        Ok(contents) => {
-            let password = contents.trim_end();
-            if !password.is_empty() {
-                password.clone_into(&mut settings.password);
-            }
-        }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => return Err(Box::new(err) as BoxError),
-    }
-    Ok(())
-}
-
-fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError> {
-    let data_dir = open_ambient_dir(&settings.data_dir)?;
-    let contents = match data_dir.read_to_string("postmaster.pid") {
-        Ok(contents) => contents,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(err) => return Err(Box::new(err) as BoxError),
-    };
-
-    let port_line = contents.lines().nth(3).map(str::trim);
-    let Some(port_value) = port_line else {
-        return Ok(());
-    };
-    let Ok(port) = port_value.parse::<u16>() else {
-        return Ok(());
-    };
-    settings.port = port;
-    Ok(())
-}
-
-fn worker_env_changes() -> Result<Vec<(OsString, Option<OsString>)>, BoxError> {
-    let port_override = resolve_pg_port()?;
-
-    let mut changes = Vec::new();
-    if let Some(port) = port_override {
-        changes.push((OsString::from("PG_PORT"), Some(port)));
-    }
-
-    if matches!(detect_execution_privileges(), ExecutionPrivileges::Root)
-        && std::env::var_os("PG_EMBEDDED_WORKER").is_none()
-    {
-        let worker_path = locate_pg_worker_path().ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "PG_EMBEDDED_WORKER is not set and pg_worker binary was not found",
-            )) as BoxError
-        })?;
-
-        let prepared_worker = prepare_pg_worker(&worker_path)?;
-        changes.push((OsString::from("PG_EMBEDDED_WORKER"), Some(prepared_worker)));
-    }
-
-    Ok(changes)
-}
-
-fn locate_pg_worker_path() -> Option<OsString> {
-    std::env::var_os("CARGO_BIN_EXE_pg_worker")
-        .or_else(locate_pg_worker_near_target)
-        .or_else(locate_pg_worker_in_path)
-        .or_else(locate_pg_worker_from_env)
-}
-
-fn prepare_pg_worker(worker: &OsString) -> Result<OsString, BoxError> {
-    static WORKER_CACHE: OnceLock<OsString> = OnceLock::new();
-    if let Some(cached) = WORKER_CACHE.get() {
-        return Ok(cached.clone());
-    }
-
-    let source = std::path::PathBuf::from(worker);
-    let destination_path =
-        std::env::temp_dir().join(format!("pg_worker_{pid}", pid = std::process::id()));
-    let (source_dir, source_name) = open_parent_dir(&source)?;
-    let (destination_dir, destination_name) = open_parent_dir(&destination_path)?;
-
-    if destination_dir.exists(destination_name) {
-        destination_dir
-            .remove_file(destination_name)
-            .map_err(|err| Box::new(err) as BoxError)?;
-    }
-
-    source_dir
-        .copy(source_name, &destination_dir, destination_name)
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    #[cfg(unix)]
-    {
-        destination_dir
-            .set_permissions(destination_name, Permissions::from_mode(0o755))
-            .map_err(|err| Box::new(err) as BoxError)?;
-    }
-
-    let destination = destination_path.into_os_string();
-    if WORKER_CACHE.set(destination.clone()).is_err() {
-        // Another test stored the prepared worker path first.
-    }
-    Ok(destination)
-}
-
-fn open_ambient_dir(path: &Path) -> Result<Dir, BoxError> {
-    Dir::open_ambient_dir(path, ambient_authority()).map_err(|err| Box::new(err) as BoxError)
-}
-
-fn open_parent_dir(path: &Path) -> Result<(Dir, &OsStr), BoxError> {
-    let file_name = path.file_name().ok_or_else(|| {
-        Box::new(std::io::Error::other("path must include a file name")) as BoxError
-    })?;
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let dir = open_ambient_dir(parent)?;
-    Ok((dir, file_name))
-}
-
-fn resolve_pg_port() -> Result<Option<OsString>, BoxError> {
-    if std::env::var_os("PG_PORT").is_some() {
-        return Ok(None);
-    }
-
-    let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|err| Box::new(err) as BoxError)?;
-    let port = listener
-        .local_addr()
-        .map(|addr| addr.port())
-        .map_err(|err| Box::new(err) as BoxError)?;
-    drop(listener);
-
-    Ok(Some(OsString::from(port.to_string())))
-}
-
-fn locate_pg_worker_near_target() -> Option<OsString> {
-    let exe = std::env::current_exe().ok()?;
-    let deps_dir = exe.parent()?;
-    let target_dir = deps_dir.parent()?;
-    let worker_path = target_dir.join("pg_worker");
-    worker_path.is_file().then(|| worker_path.into_os_string())
-}
-
-fn locate_pg_worker_in_path() -> Option<OsString> {
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join("pg_worker");
-        if candidate.is_file() {
-            return Some(candidate.into_os_string());
-        }
-    }
-    None
-}
-
-fn locate_pg_worker_from_env() -> Option<OsString> {
-    let worker = std::env::var_os("PG_EMBEDDED_WORKER")?;
-    let file_name = std::path::Path::new(&worker).file_name()?;
-    (file_name == OsStr::new("pg_worker")).then_some(worker)
 }
