@@ -95,7 +95,8 @@ mod tests {
     use std::io;
 
     fn dummy_worker_path() -> Utf8PathBuf {
-        let base = Utf8PathBuf::from(std::env::temp_dir().to_string_lossy().into_owned());
+        let base = Utf8PathBuf::try_from(std::env::temp_dir())
+            .expect("temp directory path is not valid UTF-8");
         base.join(format!("pg_worker_test_{}", uuid::Uuid::new_v4()))
     }
 

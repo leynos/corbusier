@@ -34,7 +34,12 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
         return Ok(path);
     }
 
-    let temp_dir = Utf8PathBuf::from(std::env::temp_dir().to_string_lossy().into_owned());
+    let temp_dir = Utf8PathBuf::try_from(std::env::temp_dir()).map_err(|e| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("temp directory path is not valid UTF-8: {e}"),
+        )) as BoxError
+    })?;
     let mut hasher = DefaultHasher::new();
     key.as_str().hash(&mut hasher);
     let hash = hasher.finish();
@@ -93,7 +98,12 @@ mod tests {
     use std::os::unix::fs::PermissionsExt as StdPermissionsExt;
 
     fn create_temp_dir(prefix: &str) -> Result<Utf8PathBuf, std::io::Error> {
-        let base = Utf8PathBuf::from(std::env::temp_dir().to_string_lossy().into_owned());
+        let base = Utf8PathBuf::try_from(std::env::temp_dir()).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("temp directory path is not valid UTF-8: {e}"),
+            )
+        })?;
         let dir_name = format!("{prefix}_{}", uuid::Uuid::new_v4());
         let base_dir = Dir::open_ambient_dir(&base, ambient_authority())?;
         base_dir.create_dir(&dir_name)?;

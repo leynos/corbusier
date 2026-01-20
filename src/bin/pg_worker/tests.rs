@@ -8,6 +8,7 @@ use super::{
 use async_trait::async_trait;
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
+use rstest::{fixture, rstest};
 use std::cell::RefCell;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -125,6 +126,25 @@ fn build_runtime() -> Result<tokio::runtime::Runtime, BoxError> {
         .map_err(|err| Box::new(err) as BoxError)
 }
 
+struct TestContext {
+    data_dir: PathBuf,
+    #[expect(dead_code, reason = "Guard cleans up via Drop, not explicit use")]
+    guard: TempDataDirGuard,
+    runtime: tokio::runtime::Runtime,
+}
+
+#[fixture]
+fn test_context() -> Result<TestContext, BoxError> {
+    let data_dir = make_temp_data_dir()?;
+    let guard = TempDataDirGuard::new(data_dir.clone());
+    let runtime = build_runtime()?;
+    Ok(TestContext {
+        data_dir,
+        guard,
+        runtime,
+    })
+}
+
 #[test]
 fn parse_accepts_supported_operations() {
     assert!(matches!(
@@ -177,14 +197,15 @@ fn other_error_reports_message() {
     assert!(message.contains("boom"));
 }
 
-#[test]
-fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
-    let data_dir = make_temp_data_dir()?;
-    let _guard = TempDataDirGuard::new(data_dir.clone());
-    let mut postgres = FakePostgres::new(Status::Started, data_dir.clone());
-    let runtime = build_runtime()?;
+#[rstest]
+fn ensure_postgres_started_skips_when_started(
+    test_context: Result<TestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = test_context?;
+    let mut postgres = FakePostgres::new(Status::Started, ctx.data_dir.clone());
 
-    runtime.block_on(ensure_postgres_started(&mut postgres))?;
+    ctx.runtime
+        .block_on(ensure_postgres_started(&mut postgres))?;
 
     if postgres.start_calls != 0 {
         return Err(other_error(format!(
@@ -195,14 +216,15 @@ fn ensure_postgres_started_skips_when_started() -> Result<(), BoxError> {
     Ok(())
 }
 
-#[test]
-fn ensure_postgres_started_runs_when_stopped() -> Result<(), BoxError> {
-    let data_dir = make_temp_data_dir()?;
-    let _guard = TempDataDirGuard::new(data_dir.clone());
-    let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone());
-    let runtime = build_runtime()?;
+#[rstest]
+fn ensure_postgres_started_runs_when_stopped(
+    test_context: Result<TestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = test_context?;
+    let mut postgres = FakePostgres::new(Status::Stopped, ctx.data_dir.clone());
 
-    runtime.block_on(ensure_postgres_started(&mut postgres))?;
+    ctx.runtime
+        .block_on(ensure_postgres_started(&mut postgres))?;
 
     if postgres.start_calls != 1 {
         return Err(other_error(format!(
