@@ -85,6 +85,8 @@ fn resolve_pg_port() -> Result<Option<(OsString, TcpListener)>, BoxError> {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for worker environment changes and PG port handling.
+
     use super::worker_env_changes_impl;
     use crate::test_helpers::EnvVarGuard;
     use camino::Utf8PathBuf;
@@ -109,7 +111,7 @@ mod tests {
             || None,
             |_| Ok(dummy_worker_path()),
         )
-        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+        .expect("worker env changes failed");
 
         let pg_port = OsString::from("PG_PORT");
         let has_pg_port = changes.iter().any(|(key, _)| key == &pg_port);
@@ -132,7 +134,7 @@ mod tests {
             || Some(dummy_worker_path()),
             |_| Ok(dummy_worker_path()),
         )
-        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+        .expect("worker env changes failed");
 
         let worker_key = OsString::from("PG_EMBEDDED_WORKER");
         let has_worker = changes.iter().any(|(key, _)| key == &worker_key);
@@ -156,9 +158,9 @@ mod tests {
             |_| Ok(dummy_worker_path()),
         );
 
-        let Err(error) = result.map(|(changes, _listener)| changes) else {
-            panic!("expected worker lookup failure for root execution");
-        };
+        let error = result
+            .map(|(changes, _listener)| changes)
+            .expect_err("expected worker lookup failure for root execution");
         let Some(io_err) = error.downcast_ref::<io::Error>() else {
             panic!("expected io::Error for missing pg_worker");
         };
@@ -181,14 +183,14 @@ mod tests {
             || Some(expected_path.clone()),
             |_| Ok(expected_path.clone()),
         )
-        .unwrap_or_else(|err| panic!("worker env changes failed: {err}"));
+        .expect("worker env changes failed");
 
         let worker_key = OsString::from("PG_EMBEDDED_WORKER");
         let worker_value = changes
             .iter()
             .find(|(key, _)| key == &worker_key)
             .and_then(|(_, value)| value.clone())
-            .unwrap_or_else(|| panic!("expected PG_EMBEDDED_WORKER to be set"));
+            .expect("expected PG_EMBEDDED_WORKER to be set");
 
         assert_eq!(worker_value, expected_os);
         drop(guard);

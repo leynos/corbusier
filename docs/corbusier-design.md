@@ -1472,12 +1472,12 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
-| Environment | Database                 | Connection Pool    | Backup Strategy          |
-| ----------- | ------------------------ | ------------------ | ------------------------ |
-| Development | In-memory or embedded PG | Single connection  | None (ephemeral)         |
-| Testing     | Embedded PostgreSQL      | Per-test isolation | None (ephemeral)         |
-| Staging     | PostgreSQL               | 10 connections     | Daily snapshots          |
-| Production  | PostgreSQL               | 50 connections     | Continuous WAL archiving |
+| Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
+| ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |
+| Development | SQLite (default), in-memory                                               | Single connection  | None (ephemeral)         |
+| Testing     | In-memory (unit), SQLite (file-backed), embedded PostgreSQL (integration) | Per-test isolation | None (ephemeral)         |
+| Staging     | PostgreSQL                                                                | 10 connections     | Daily snapshots          |
+| Production  | PostgreSQL                                                                | 50 connections     | Continuous WAL archiving |
 
 ##### Diesel Configuration Example
 
@@ -3561,9 +3561,12 @@ for comprehensive audit trails across all agent interactions.
 
 ##### In-memory repository for testing
 
-An in-memory repository implementation provides zero-configuration development
-environments while maintaining compatibility with the PostgreSQL production
-interface through the shared `MessageRepository` trait.
+An in-memory repository implementation supports fast local iteration and unit
+tests that do not need persistence while maintaining compatibility with the
+PostgreSQL production interface through the shared `MessageRepository` trait.
+SQLite is the default zero-configuration file-backed option for lightweight
+development and tests that require persistence, and embedded PostgreSQL is
+reserved for integration tests that need full database features.
 
 #### 5.3.4 Caching Strategy Justification
 
@@ -4237,10 +4240,10 @@ pub enum ChangeType {
 
 ##### Actix Web Integration
 
-One of the fastest web frameworks available according to the TechEmpower
-Framework Benchmark. The HTTP API layer is built using Actix Web (version to be
-pinned in Cargo.toml), providing high-performance REST endpoints and real-time
-streaming capabilities.
+Actix Web is one of the fastest web frameworks available according to the
+TechEmpower Framework Benchmark. The HTTP API layer is built using Actix Web
+(version to be pinned in Cargo.toml), providing high-performance REST endpoints
+and real-time streaming capabilities.
 
 ```mermaid
 graph TB
@@ -4430,8 +4433,9 @@ pub enum StreamEvent {
 
 The persistence layer implements a hybrid approach combining relational data
 for structured entities with JSONB storage for flexible message formats,
-utilizing PostgreSQL for production and the in-memory repository for
-development environments.
+utilizing PostgreSQL for production, SQLite as the default file-backed option
+for local development, and the in-memory repository for fast unit testing that
+does not require persistence.
 
 ```mermaid
 graph TB

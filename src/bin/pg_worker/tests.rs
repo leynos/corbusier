@@ -257,6 +257,7 @@ fn ensure_postgres_setup_skips_reset_when_valid() -> Result<(), BoxError> {
 #[test]
 fn ensure_postgres_setup_resets_invalid_data_dir() -> Result<(), BoxError> {
     let data_dir = make_temp_data_dir()?;
+    let _guard = TempDataDirGuard::new(data_dir.clone());
     let mut postgres = FakePostgres::new(Status::Stopped, data_dir.clone())
         .with_status_after_setup(Status::Stopped);
     let runtime = build_runtime()?;
