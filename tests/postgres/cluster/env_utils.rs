@@ -162,9 +162,9 @@ mod tests {
         let error = result
             .map(|(changes, _listener)| changes)
             .expect_err("expected worker lookup failure for root execution");
-        let Some(io_err) = error.downcast_ref::<io::Error>() else {
-            panic!("expected io::Error for missing pg_worker");
-        };
+        let io_err = error
+            .downcast_ref::<io::Error>()
+            .expect("expected io::Error for missing pg_worker");
 
         assert_eq!(io_err.kind(), io::ErrorKind::NotFound);
         drop(guard);

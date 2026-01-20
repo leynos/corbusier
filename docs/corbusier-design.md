@@ -4435,7 +4435,9 @@ The persistence layer implements a hybrid approach combining relational data
 for structured entities with JSONB storage for flexible message formats,
 utilizing PostgreSQL for production, SQLite as the default file-backed option
 for local development, and the in-memory repository for fast unit testing that
-does not require persistence.
+does not require persistence. Event and audit data remain memory-only outside
+production, as these are ephemeral by design and do not require cross-session
+persistence during development.
 
 ```mermaid
 graph TB
