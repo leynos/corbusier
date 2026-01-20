@@ -4455,6 +4455,7 @@ graph TB
     
     subgraph "Database Adapters"
         PG_ADAPTER[PostgreSQL Adapter]
+        SQLITE_ADAPTER[SQLite Adapter]
         MEMORY_ADAPTER[In-memory Adapter]
         CACHE_ADAPTER[Cache Adapter]
     end
@@ -4476,13 +4477,18 @@ graph TB
     REPO_MGR --> AUDIT_REPO
     
     CONV_REPO --> PG_ADAPTER
+    CONV_REPO --> SQLITE_ADAPTER
     TASK_REPO --> PG_ADAPTER
+    TASK_REPO --> SQLITE_ADAPTER
     EVENT_REPO --> MEMORY_ADAPTER
     AUDIT_REPO --> CACHE_ADAPTER
     
     PG_ADAPTER --> CONV_MODEL
     PG_ADAPTER --> MSG_MODEL
     PG_ADAPTER --> TASK_MODEL
+    SQLITE_ADAPTER --> CONV_MODEL
+    SQLITE_ADAPTER --> MSG_MODEL
+    SQLITE_ADAPTER --> TASK_MODEL
     MEMORY_ADAPTER --> EVENT_MODEL
 ```
 

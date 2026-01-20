@@ -28,8 +28,8 @@ struct CrudTestContext {
 
 /// Creates a CRUD test context with database and repository.
 ///
-/// Returns `Result` to allow `?` error propagation (fixtures aren't covered by
-/// `allow-expect-in-tests`). Tests should unwrap with `.expect()`.
+/// Returns `Result` to allow `?` error propagation. Tests should return
+/// `Result` and use `?` to consume the fixture.
 #[fixture]
 fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
     let cluster = postgres_cluster;
@@ -48,73 +48,74 @@ fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, Bo
 }
 
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn store_and_retrieve_message(
     clock: DefaultClock,
     crud_context: Result<CrudTestContext, BoxError>,
-) {
-    let ctx = crud_context.expect("fixture setup failed");
+) -> Result<(), BoxError> {
+    let ctx = crud_context?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id).expect("failed to insert conversation");
+    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
 
-    let message = create_test_message(&clock, conv_id, 1).expect("failed to create test message");
+    let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
 
-    ctx.rt
-        .block_on(ctx.repo.store(&message))
-        .expect("failed to store message");
+    ctx.rt.block_on(ctx.repo.store(&message))?;
 
     let retrieved = ctx
         .rt
-        .block_on(ctx.repo.find_by_id(msg_id))
-        .expect("failed to load message")
+        .block_on(ctx.repo.find_by_id(msg_id))?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), msg_id);
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::User);
     assert_eq!(retrieved.sequence_number().value(), 1);
+    Ok(())
 }
 
 #[rstest]
-fn find_by_id_returns_none_for_missing(crud_context: Result<CrudTestContext, BoxError>) {
-    let ctx = crud_context.expect("fixture setup failed");
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn find_by_id_returns_none_for_missing(
+    crud_context: Result<CrudTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = crud_context?;
 
-    let result = ctx
-        .rt
-        .block_on(ctx.repo.find_by_id(MessageId::new()))
-        .expect("failed to load missing message");
+    let result = ctx.rt.block_on(ctx.repo.find_by_id(MessageId::new()))?;
     assert!(result.is_none());
+    Ok(())
 }
 
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
     crud_context: Result<CrudTestContext, BoxError>,
-) {
-    let ctx = crud_context.expect("fixture setup failed");
+) -> Result<(), BoxError> {
+    let ctx = crud_context?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id).expect("failed to insert conversation");
+    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
 
-    let msg3 = create_test_message(&clock, conv_id, 3).expect("failed to create message 3");
-    let msg1 = create_test_message(&clock, conv_id, 1).expect("failed to create message 1");
-    let msg2 = create_test_message(&clock, conv_id, 2).expect("failed to create message 2");
+    let msg3 = create_test_message(&clock, conv_id, 3)?;
+    let msg1 = create_test_message(&clock, conv_id, 1)?;
+    let msg2 = create_test_message(&clock, conv_id, 2)?;
 
-    ctx.rt
-        .block_on(ctx.repo.store(&msg3))
-        .expect("failed to store message 3");
-    ctx.rt
-        .block_on(ctx.repo.store(&msg1))
-        .expect("failed to store message 1");
-    ctx.rt
-        .block_on(ctx.repo.store(&msg2))
-        .expect("failed to store message 2");
+    ctx.rt.block_on(ctx.repo.store(&msg3))?;
+    ctx.rt.block_on(ctx.repo.store(&msg1))?;
+    ctx.rt.block_on(ctx.repo.store(&msg2))?;
 
-    let messages = ctx
-        .rt
-        .block_on(ctx.repo.find_by_conversation(conv_id))
-        .expect("failed to fetch messages");
+    let messages = ctx.rt.block_on(ctx.repo.find_by_conversation(conv_id))?;
 
     assert_eq!(messages.len(), 3);
     let sequence_numbers: Vec<_> = messages
@@ -122,33 +123,31 @@ fn find_by_conversation_returns_ordered_messages(
         .map(|message| message.sequence_number().value())
         .collect();
     assert_eq!(sequence_numbers, vec![1, 2, 3]);
+    Ok(())
 }
 
 #[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
 fn exists_returns_correct_status(
     clock: DefaultClock,
     crud_context: Result<CrudTestContext, BoxError>,
-) {
-    let ctx = crud_context.expect("fixture setup failed");
+) -> Result<(), BoxError> {
+    let ctx = crud_context?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id).expect("failed to insert conversation");
+    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
 
-    let message = create_test_message(&clock, conv_id, 1).expect("failed to create message");
+    let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
 
-    let exists_before = ctx
-        .rt
-        .block_on(ctx.repo.exists(msg_id))
-        .expect("failed to check message existence");
+    let exists_before = ctx.rt.block_on(ctx.repo.exists(msg_id))?;
     assert!(!exists_before);
 
-    ctx.rt
-        .block_on(ctx.repo.store(&message))
-        .expect("failed to store message");
-    let exists_after = ctx
-        .rt
-        .block_on(ctx.repo.exists(msg_id))
-        .expect("failed to check message existence");
+    ctx.rt.block_on(ctx.repo.store(&message))?;
+    let exists_after = ctx.rt.block_on(ctx.repo.exists(msg_id))?;
     assert!(exists_after);
+    Ok(())
 }
