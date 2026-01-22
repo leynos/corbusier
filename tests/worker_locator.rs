@@ -8,9 +8,17 @@ use std::ffi::OsStr;
 pub fn locate_pg_worker_path() -> Option<Utf8PathBuf> {
     env::var_os("CARGO_BIN_EXE_pg_worker")
         .and_then(|path| utf8_path_from_os(path.as_os_str()))
+        .or_else(locate_pg_worker_in_cargo_bin)
         .or_else(locate_pg_worker_near_target)
         .or_else(locate_pg_worker_in_path)
         .or_else(locate_pg_worker_from_env)
+}
+
+fn locate_pg_worker_in_cargo_bin() -> Option<Utf8PathBuf> {
+    let home = env::var_os("HOME")?;
+    let home_path = utf8_path_from_os(home.as_os_str())?;
+    let worker_path = home_path.join(".cargo").join("bin").join("pg_worker");
+    worker_path.is_file().then_some(worker_path)
 }
 
 fn locate_pg_worker_near_target() -> Option<Utf8PathBuf> {

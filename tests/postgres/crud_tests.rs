@@ -1,9 +1,9 @@
 //! Basic CRUD operation tests for `PostgreSQL` message repository.
 
-use crate::postgres::cluster::BoxError;
+use crate::postgres::cluster::{BoxError, TemporaryDatabase};
 use crate::postgres::helpers::{
-    CleanupGuard, PostgresCluster, clock, create_test_message, ensure_template,
-    insert_conversation, postgres_cluster, setup_repository, test_runtime,
+    PostgresCluster, clock, create_test_message, ensure_template, insert_conversation,
+    postgres_cluster, setup_repository,
 };
 use corbusier::message::adapters::postgres::PostgresMessageRepository;
 use corbusier::message::{
@@ -12,18 +12,11 @@ use corbusier::message::{
 };
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
-use tokio::runtime::Runtime;
 
 struct CrudTestContext {
     cluster: PostgresCluster,
-    db_name: String,
-    #[expect(
-        dead_code,
-        reason = "CleanupGuard cleans up via Drop, not explicit use"
-    )]
-    guard: CleanupGuard<'static>,
+    temp_db: TemporaryDatabase,
     repo: PostgresMessageRepository,
-    rt: Runtime,
 }
 
 /// Creates a CRUD test context with database and repository.
@@ -31,44 +24,37 @@ struct CrudTestContext {
 /// Returns `Result` to allow `?` error propagation. Tests should return
 /// `Result` and use `?` to consume the fixture.
 #[fixture]
-fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
+async fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
     let cluster = postgres_cluster;
-    ensure_template(cluster)?;
-    let db_name = format!("test_crud_{}", uuid::Uuid::new_v4());
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name)?;
-    let rt = test_runtime()?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
     Ok(CrudTestContext {
         cluster,
-        db_name,
-        guard,
+        temp_db,
         repo,
-        rt,
     })
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn store_and_retrieve_message(
+#[tokio::test]
+async fn store_and_retrieve_message(
     clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
+    #[future] crud_context: Result<CrudTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context?;
+    let ctx = crud_context.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
 
-    ctx.rt.block_on(ctx.repo.store(&message))?;
+    ctx.repo.store(&message).await?;
 
     let retrieved = ctx
-        .rt
-        .block_on(ctx.repo.find_by_id(msg_id))?
+        .repo
+        .find_by_id(msg_id)
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), msg_id);
@@ -79,43 +65,37 @@ fn store_and_retrieve_message(
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn find_by_id_returns_none_for_missing(
-    crud_context: Result<CrudTestContext, BoxError>,
+#[tokio::test]
+async fn find_by_id_returns_none_for_missing(
+    #[future] crud_context: Result<CrudTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context?;
+    let ctx = crud_context.await?;
 
-    let result = ctx.rt.block_on(ctx.repo.find_by_id(MessageId::new()))?;
+    let result = ctx.repo.find_by_id(MessageId::new()).await?;
     assert!(result.is_none());
     Ok(())
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn find_by_conversation_returns_ordered_messages(
+#[tokio::test]
+async fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
+    #[future] crud_context: Result<CrudTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context?;
+    let ctx = crud_context.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let msg3 = create_test_message(&clock, conv_id, 3)?;
     let msg1 = create_test_message(&clock, conv_id, 1)?;
     let msg2 = create_test_message(&clock, conv_id, 2)?;
 
-    ctx.rt.block_on(ctx.repo.store(&msg3))?;
-    ctx.rt.block_on(ctx.repo.store(&msg1))?;
-    ctx.rt.block_on(ctx.repo.store(&msg2))?;
+    ctx.repo.store(&msg3).await?;
+    ctx.repo.store(&msg1).await?;
+    ctx.repo.store(&msg2).await?;
 
-    let messages = ctx.rt.block_on(ctx.repo.find_by_conversation(conv_id))?;
+    let messages = ctx.repo.find_by_conversation(conv_id).await?;
 
     assert_eq!(messages.len(), 3);
     let sequence_numbers: Vec<_> = messages
@@ -127,27 +107,24 @@ fn find_by_conversation_returns_ordered_messages(
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn exists_returns_correct_status(
+#[tokio::test]
+async fn exists_returns_correct_status(
     clock: DefaultClock,
-    crud_context: Result<CrudTestContext, BoxError>,
+    #[future] crud_context: Result<CrudTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context?;
+    let ctx = crud_context.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, &ctx.db_name, conv_id)?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
 
-    let exists_before = ctx.rt.block_on(ctx.repo.exists(msg_id))?;
+    let exists_before = ctx.repo.exists(msg_id).await?;
     assert!(!exists_before);
 
-    ctx.rt.block_on(ctx.repo.store(&message))?;
-    let exists_after = ctx.rt.block_on(ctx.repo.exists(msg_id))?;
+    ctx.repo.store(&message).await?;
+    let exists_after = ctx.repo.exists(msg_id).await?;
     assert!(exists_after);
     Ok(())
 }

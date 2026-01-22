@@ -6,7 +6,6 @@ mod worker_helpers;
 
 use self::env_utils::{env_vars_to_os, worker_env_changes};
 use self::fs_utils::{sync_password_from_file, sync_port_from_pid};
-use super::helpers::test_runtime;
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
 use pg_embedded_setup_unpriv::worker_process_test_api::{
@@ -23,6 +22,39 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 static SHARED_CLUSTER: OnceLock<ManagedCluster> = OnceLock::new();
 static TEMPLATE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// RAII guard for temporary test databases.
+///
+/// Automatically drops the database when the guard goes out of scope.
+pub struct TemporaryDatabase {
+    cluster: &'static ManagedCluster,
+    name: String,
+    url: String,
+}
+
+impl TemporaryDatabase {
+    const fn new(cluster: &'static ManagedCluster, name: String, url: String) -> Self {
+        Self { cluster, name, url }
+    }
+
+    /// Returns the database name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the database URL.
+    #[must_use]
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+}
+
+impl Drop for TemporaryDatabase {
+    fn drop(&mut self) {
+        drop(self.cluster.drop_database(&self.name));
+    }
+}
 
 /// Shared `PostgreSQL` cluster handle for integration tests.
 pub type PostgresCluster = &'static ManagedCluster;
@@ -92,7 +124,12 @@ impl ManagedCluster {
         self.execute_admin_sql(&sql)
     }
 
-    pub fn ensure_template_exists<F>(&self, template: &str, migrate: F) -> Result<(), BoxError>
+    #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
+    pub async fn ensure_template_exists<F>(
+        &self,
+        template: &str,
+        migrate: F,
+    ) -> Result<(), BoxError>
     where
         F: FnOnce(&str) -> Result<(), BoxError>,
     {
@@ -113,6 +150,21 @@ impl ManagedCluster {
         Ok(())
     }
 
+    #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
+    pub async fn temporary_database_from_template(
+        &'static self,
+        db_name: &str,
+        template: &str,
+    ) -> Result<TemporaryDatabase, BoxError> {
+        self.create_database_from_template(db_name, template)?;
+        let database_url = self.connection().database_url(db_name);
+        Ok(TemporaryDatabase::new(
+            self,
+            db_name.to_owned(),
+            database_url,
+        ))
+    }
+
     fn start(&mut self) -> Result<(), BoxError> {
         match self.bootstrap.privileges {
             ExecutionPrivileges::Root => self.start_via_worker(),
@@ -121,27 +173,56 @@ impl ManagedCluster {
     }
 
     fn start_in_process(&mut self) -> Result<(), BoxError> {
-        let runtime = test_runtime()?;
-        let env_guard = EnvVarGuard::set_many(&env_vars_to_os(&self.env_vars));
-        let mut postgres = PostgreSQL::new(self.bootstrap.settings.clone());
-        runtime.block_on(async {
-            postgres
-                .setup()
-                .await
-                .map_err(|err| Box::new(err) as BoxError)?;
-            if !matches!(postgres.status(), Status::Started) {
-                postgres
-                    .start()
-                    .await
-                    .map_err(|err| Box::new(err) as BoxError)?;
-            }
-            Ok::<(), BoxError>(())
-        })?;
-        drop(env_guard);
-        self.bootstrap.settings = postgres.settings().clone();
+        let env_vars = self.env_vars.clone();
+        let settings = self.bootstrap.settings.clone();
+
+        // Run PostgreSQL startup in a separate thread to avoid runtime nesting issues
+        let result = std::thread::scope(|s| {
+            s.spawn(|| {
+                let env_guard = EnvVarGuard::set_many(&env_vars_to_os(&env_vars));
+                let mut postgres = PostgreSQL::new(settings);
+
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|e| Box::new(e) as BoxError)?;
+
+                #[expect(
+                    clippy::excessive_nesting,
+                    reason = "Nested block required for thread-isolated async runtime"
+                )]
+                runtime.block_on(async {
+                    postgres
+                        .setup()
+                        .await
+                        .map_err(|err| Box::new(err) as BoxError)?;
+                    if !matches!(postgres.status(), Status::Started) {
+                        postgres
+                            .start()
+                            .await
+                            .map_err(|err| Box::new(err) as BoxError)?;
+                    }
+                    Ok::<(), BoxError>(())
+                })?;
+
+                let cluster_settings = postgres.settings().clone();
+                drop(env_guard);
+                Ok::<(Runtime, PostgreSQL, Settings), BoxError>((
+                    runtime,
+                    postgres,
+                    cluster_settings,
+                ))
+            })
+            .join()
+            .map_err(|_| Box::new(std::io::Error::other("thread panicked")) as BoxError)?
+        });
+
+        let (runtime, postgres, cluster_settings) = result?;
+        self.bootstrap.settings = cluster_settings;
         sync_port_from_pid(&mut self.bootstrap.settings)?;
         self.runtime = Some(runtime);
         self.postgres = Some(postgres);
+
         Ok(())
     }
 

@@ -1,6 +1,6 @@
 //! Shared test helpers for `PostgreSQL` integration tests.
 
-use super::cluster::{BoxError, ManagedCluster};
+use super::cluster::{BoxError, ManagedCluster, TemporaryDatabase};
 pub use super::cluster::{PostgresCluster, postgres_cluster};
 use corbusier::message::{
     adapters::audit_context::AuditContext,
@@ -12,7 +12,6 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::fixture;
-use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 /// SQL to create the base schema for tests.
@@ -36,47 +35,49 @@ pub fn clock() -> DefaultClock {
     DefaultClock
 }
 
-/// Creates a tokio runtime for async operations in tests.
+/// Ensures the template database exists with the schema applied.
 ///
 /// # Errors
 ///
-/// Returns an error if the runtime cannot be created.
-pub fn test_runtime() -> Result<Runtime, BoxError> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| Box::new(e) as BoxError)
+/// Returns an error if template creation or migration fails.
+pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
+    cluster
+        .ensure_template_exists(TEMPLATE_DB, |db_name| {
+            let url = cluster.connection().database_url(db_name);
+            let mut conn =
+                PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
+            conn.batch_execute(CREATE_SCHEMA_SQL)
+                .map_err(|err| Box::new(err) as BoxError)?;
+            conn.batch_execute(ADD_CONSTRAINTS_SQL)
+                .map_err(|err| Box::new(err) as BoxError)?;
+            conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
+                .map_err(|err| Box::new(err) as BoxError)?;
+            Ok(())
+        })
+        .await
 }
 
-/// Ensures the template database exists with the schema applied.
-pub fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
-    cluster.ensure_template_exists(TEMPLATE_DB, |db_name| {
-        let url = cluster.connection().database_url(db_name);
-        let mut conn = PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(CREATE_SCHEMA_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(ADD_CONSTRAINTS_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        Ok(())
-    })?;
-    Ok(())
-}
+/// Creates a test database from template and returns a repository and cleanup guard.
+///
+/// # Errors
+///
+/// Returns an error if database creation or repository setup fails.
+pub async fn setup_repository(
+    cluster: &'static ManagedCluster,
+) -> Result<(TemporaryDatabase, PostgresMessageRepository), BoxError> {
+    let temp_db = cluster
+        .temporary_database_from_template(&format!("test_{}", uuid::Uuid::new_v4()), TEMPLATE_DB)
+        .await?;
 
-/// Creates a test database from template and returns a repository.
-pub fn setup_repository(
-    cluster: &ManagedCluster,
-    db_name: &str,
-) -> Result<PostgresMessageRepository, BoxError> {
-    cluster.create_database_from_template(db_name, TEMPLATE_DB)?;
-    let url = cluster.connection().database_url(db_name);
+    let url = temp_db.url();
     let manager = ConnectionManager::<PgConnection>::new(url);
     let pool = Pool::builder()
         .max_size(1)
         .build(manager)
         .map_err(|e| Box::new(e) as BoxError)?;
-    Ok(PostgresMessageRepository::new(pool))
+
+    let repo = PostgresMessageRepository::new(pool);
+    Ok((temp_db, repo))
 }
 
 /// Creates a test message with the given conversation and sequence.
@@ -97,44 +98,6 @@ pub fn create_test_message(
         clock,
     )
     .map_err(|e| Box::new(e) as BoxError)
-}
-
-/// Cleans up a test database.
-///
-/// # Errors
-///
-/// Returns an error if database cleanup fails.
-pub fn cleanup_database(cluster: &ManagedCluster, db_name: &str) -> Result<(), BoxError> {
-    cluster.drop_database(db_name)
-}
-
-/// Guard that ensures test database cleanup runs even if test panics.
-///
-/// Call [`Self::cleanup`] to surface cleanup errors in the test body.
-pub struct CleanupGuard<'a> {
-    cluster: &'a ManagedCluster,
-    db_name: String,
-}
-
-impl<'a> CleanupGuard<'a> {
-    pub const fn new(cluster: &'a ManagedCluster, db_name: String) -> Self {
-        Self { cluster, db_name }
-    }
-
-    /// Explicitly cleanup the test database.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if database cleanup fails.
-    pub fn cleanup(&self) -> Result<(), BoxError> {
-        cleanup_database(self.cluster, &self.db_name)
-    }
-}
-
-impl Drop for CleanupGuard<'_> {
-    fn drop(&mut self) {
-        drop(cleanup_database(self.cluster, &self.db_name));
-    }
 }
 
 /// Expected audit context values for parameterized tests.
@@ -178,7 +141,7 @@ pub struct RoleResult {
 /// # Errors
 ///
 /// Returns an error if connection or insert fails.
-pub fn insert_conversation(
+pub async fn insert_conversation(
     cluster: &ManagedCluster,
     db_name: &str,
     conv_id: ConversationId,
@@ -231,7 +194,7 @@ pub struct AuditLogRow {
 /// # Errors
 ///
 /// Returns an error if connection or query fails.
-pub fn fetch_audit_log_for_message(
+pub async fn fetch_audit_log_for_message(
     cluster: &ManagedCluster,
     db_name: &str,
     message_id: uuid::Uuid,
