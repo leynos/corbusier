@@ -8,10 +8,10 @@ use std::ffi::OsStr;
 pub fn locate_pg_worker_path() -> Option<Utf8PathBuf> {
     env::var_os("CARGO_BIN_EXE_pg_worker")
         .and_then(|path| utf8_path_from_os(path.as_os_str()))
+        .or_else(locate_pg_worker_from_env)
         .or_else(locate_pg_worker_in_cargo_bin)
         .or_else(locate_pg_worker_near_target)
         .or_else(locate_pg_worker_in_path)
-        .or_else(locate_pg_worker_from_env)
 }
 
 fn locate_pg_worker_in_cargo_bin() -> Option<Utf8PathBuf> {
@@ -48,7 +48,11 @@ fn locate_pg_worker_from_env() -> Option<Utf8PathBuf> {
     let worker_path = env::var_os("PG_EMBEDDED_WORKER")?;
     let worker_path_utf8 = utf8_path_from_os(worker_path.as_os_str())?;
     let file_name = worker_path_utf8.file_name()?;
-    (file_name == "pg_worker").then_some(worker_path_utf8)
+    if file_name == "pg_worker" && worker_path_utf8.exists() && worker_path_utf8.is_file() {
+        Some(worker_path_utf8)
+    } else {
+        None
+    }
 }
 
 fn utf8_path_from_os(value: &OsStr) -> Option<Utf8PathBuf> {
