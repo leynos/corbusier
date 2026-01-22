@@ -52,7 +52,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tzdata
           if [ ! -f ~/.cargo/bin/pg_worker ]; then
-            cargo install pg-embed-setup-unpriv@0.4.0
+            cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@aebb3f5b831102e2a10ef909c83d7d50ea86c332

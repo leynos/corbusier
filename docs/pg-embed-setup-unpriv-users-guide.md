@@ -126,14 +126,14 @@ from within a runtime" because it creates its own internal Tokio runtime. Async
 contexts require enabling the `async-api` feature and using the async
 constructor and shutdown methods.
 
-Enable the feature in your `Cargo.toml`:
+Enable the feature in `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-pg-embed-setup-unpriv = { version = "0.2", features = ["async-api"] }
+pg-embed-setup-unpriv = { version = "0.4.0", features = ["async-api"] }
 ```
 
-Then use `start_async()` and `stop_async()` in your async tests:
+Then use `start_async()` and `stop_async()` in async tests:
 
 ```rust,no_run
 use pg_embedded_setup_unpriv::{TestCluster, error::BootstrapResult};
@@ -154,7 +154,7 @@ async fn test_async_database_operations() -> BootstrapResult<()> {
 
 Async clusters behave like the synchronous guard: the same accessors apply, and
 the environment overrides are restored on shutdown. `stop_async()` consumes the
-guard, so capture any required connection details before calling it.
+guard, so any required connection details must be captured before calling it.
 
 **Important:** `stop_async()` must be called explicitly before the cluster goes
 out of scope. Unlike the synchronous API where `Drop` can reliably shut down
