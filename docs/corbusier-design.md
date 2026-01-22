@@ -4240,10 +4240,10 @@ pub enum ChangeType {
 
 ##### Actix Web Integration
 
-Actix Web is one of the fastest web frameworks available according to the
-TechEmpower Framework Benchmark. The HTTP API layer is built using Actix Web
-(version to be pinned in Cargo.toml), providing high-performance REST endpoints
-and real-time streaming capabilities.
+One of the fastest web frameworks available according to the TechEmpower
+Framework Benchmark, Actix Web (version to be pinned in Cargo.toml) powers the
+HTTP API layer with high‑performance REST endpoints and real‑time streaming
+capabilities.
 
 ```mermaid
 graph TB
