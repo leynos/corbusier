@@ -50,15 +50,11 @@ use uuid::Uuid;
     "partial"
 )]
 #[tokio::test]
-#[expect(
-    clippy::used_underscore_binding,
-    reason = "Scenario parameter required for test case naming but not used in test body"
-)]
 async fn store_with_audit_captures_context(
     clock: DefaultClock,
     postgres_cluster: PostgresCluster,
     #[case] expected: ExpectedAuditContext,
-    #[case] _scenario: &str,
+    #[case] scenario: &str,
 ) {
     let cluster = postgres_cluster;
     ensure_template(cluster).await.expect("template setup");
@@ -101,7 +97,10 @@ async fn store_with_audit_captures_context(
     assert_eq!(audit_log.table_name, "messages");
     assert_eq!(audit_log.operation, "INSERT");
     assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
-    assert_eq!(audit_log.correlation_id, expected.correlation);
+    assert_eq!(
+        audit_log.correlation_id, expected.correlation,
+        "scenario: {scenario}"
+    );
     assert_eq!(audit_log.causation_id, expected.causation);
     assert_eq!(audit_log.user_id, expected.user);
     assert_eq!(audit_log.session_id, expected.session);

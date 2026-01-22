@@ -161,15 +161,11 @@ async fn insert_message_maps_duplicate_sequence_constraint(
     "partial"
 )]
 #[tokio::test]
-#[expect(
-    clippy::used_underscore_binding,
-    reason = "Scenario parameter required for test case naming but not used in test body"
-)]
 async fn set_audit_context_propagates_fields(
     postgres_cluster: PostgresCluster,
     clock: DefaultClock,
     #[case] expected: ExpectedAuditContext,
-    #[case] _scenario: &str,
+    #[case] scenario: &str,
 ) {
     let cluster = postgres_cluster;
     ensure_template(cluster).await.expect("template setup");
@@ -201,7 +197,10 @@ async fn set_audit_context_propagates_fields(
         .expect("fetch audit log")
         .expect("audit log should exist");
 
-    assert_eq!(audit_log.correlation_id, expected.correlation);
+    assert_eq!(
+        audit_log.correlation_id, expected.correlation,
+        "scenario: {scenario}"
+    );
     assert_eq!(audit_log.causation_id, expected.causation);
     assert_eq!(audit_log.user_id, expected.user);
     assert_eq!(audit_log.session_id, expected.session);
