@@ -33,7 +33,7 @@ cap-std = "3.4.5"
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
 # Embedded PostgreSQL support (test-only binaries)
-pg-embed-setup-unpriv = { version = "0.3.0", features = ["diesel-support"] }
+pg-embed-setup-unpriv = { version = "0.4.0", features = ["diesel-support"] }
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
