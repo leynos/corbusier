@@ -252,17 +252,13 @@ async fn insert_message_succeeds_for_valid_message(
 /// Tests that generic database errors (not constraint violations) are wrapped correctly.
 #[rstest]
 #[tokio::test]
-#[expect(
-    clippy::used_underscore_binding,
-    reason = "Database and repo kept alive via RAII but not explicitly used"
-)]
 async fn insert_message_wraps_generic_database_errors(
     postgres_cluster: PostgresCluster,
     clock: DefaultClock,
 ) {
     let cluster = postgres_cluster;
     ensure_template(cluster).await.expect("template setup");
-    let (_temp_db, _repo) = setup_repository(cluster).await.expect("repo");
+    let (_temp_db, repo) = setup_repository(cluster).await.expect("repo");
 
     // Don't insert the conversation - this will trigger a foreign key violation
     let conv_id = ConversationId::new();
@@ -276,7 +272,7 @@ async fn insert_message_wraps_generic_database_errors(
     )
     .expect("valid message");
 
-    let result = _repo.store(&message).await;
+    let result = repo.store(&message).await;
 
     // Should get a Database error (not DuplicateMessage or DuplicateSequence)
     match result {

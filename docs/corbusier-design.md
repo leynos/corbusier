@@ -1472,6 +1472,8 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
+Database configuration by environment:
+
 | Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
 | ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |
 | Development | SQLite (default), in-memory                                               | Single connection  | None (ephemeral)         |
