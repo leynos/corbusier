@@ -1,47 +1,23 @@
 //! Basic CRUD operation tests for `PostgreSQL` message repository.
 
-use crate::postgres::cluster::{BoxError, TemporaryDatabase};
+use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
-    PostgresCluster, clock, create_test_message, ensure_template, insert_conversation,
-    postgres_cluster, setup_repository,
+    PreparedRepo, clock, create_test_message, insert_conversation, prepared_repo,
 };
-use corbusier::message::adapters::postgres::PostgresMessageRepository;
 use corbusier::message::{
     domain::{ConversationId, MessageId, Role},
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
-use rstest::{fixture, rstest};
-
-struct CrudTestContext {
-    cluster: PostgresCluster,
-    temp_db: TemporaryDatabase,
-    repo: PostgresMessageRepository,
-}
-
-/// Creates a CRUD test context with database and repository.
-///
-/// Returns `Result` to allow `?` error propagation. Tests should return
-/// `Result` and use `?` to consume the fixture.
-#[fixture]
-async fn crud_context(postgres_cluster: PostgresCluster) -> Result<CrudTestContext, BoxError> {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
-    Ok(CrudTestContext {
-        cluster,
-        temp_db,
-        repo,
-    })
-}
+use rstest::rstest;
 
 #[rstest]
 #[tokio::test]
 async fn store_and_retrieve_message(
     clock: DefaultClock,
-    #[future] crud_context: Result<CrudTestContext, BoxError>,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context.await?;
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
     insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
@@ -67,9 +43,9 @@ async fn store_and_retrieve_message(
 #[rstest]
 #[tokio::test]
 async fn find_by_id_returns_none_for_missing(
-    #[future] crud_context: Result<CrudTestContext, BoxError>,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context.await?;
+    let ctx = prepared_repo.await?;
 
     let result = ctx.repo.find_by_id(MessageId::new()).await?;
     assert!(result.is_none());
@@ -80,9 +56,9 @@ async fn find_by_id_returns_none_for_missing(
 #[tokio::test]
 async fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
-    #[future] crud_context: Result<CrudTestContext, BoxError>,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context.await?;
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
     insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
@@ -110,9 +86,9 @@ async fn find_by_conversation_returns_ordered_messages(
 #[tokio::test]
 async fn exists_returns_correct_status(
     clock: DefaultClock,
-    #[future] crud_context: Result<CrudTestContext, BoxError>,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = crud_context.await?;
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
     insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;

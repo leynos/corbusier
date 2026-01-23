@@ -1472,7 +1472,7 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
-Database configuration by environment:
+Table 3.5.5-1: Database configuration by environment.
 
 | Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
 | ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |

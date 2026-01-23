@@ -12,9 +12,10 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use uuid::Uuid;
 
+use super::cluster::BoxError;
 use super::helpers::{
-    ExpectedAuditContext, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository,
+    ExpectedAuditContext, PreparedRepo, clock, fetch_audit_log_for_message, insert_conversation,
+    prepared_repo,
 };
 
 // ============================================================================
@@ -25,17 +26,13 @@ use super::helpers::{
 #[rstest]
 #[tokio::test]
 async fn insert_message_maps_duplicate_id_constraint(
-    postgres_cluster: PostgresCluster,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let msg_id = MessageId::new();
     let message1 = Message::new_with_id(
@@ -59,33 +56,30 @@ async fn insert_message_maps_duplicate_id_constraint(
     .expect("valid message");
 
     // Store first message
-    repo.store(&message1).await.expect("first store");
+    ctx.repo.store(&message1).await?;
 
     // Second store should fail with DuplicateMessage
-    let result = repo.store(&message2).await;
+    let result = ctx.repo.store(&message2).await;
     match result {
         Err(RepositoryError::DuplicateMessage(id)) => {
             assert_eq!(id, msg_id, "error should contain the duplicate message ID");
         }
         other => panic!("expected DuplicateMessage error, got {other:?}"),
     }
+    Ok(())
 }
 
 /// Tests that inserting a message with duplicate sequence returns `DuplicateSequence` error.
 #[rstest]
 #[tokio::test]
 async fn insert_message_maps_duplicate_sequence_constraint(
-    postgres_cluster: PostgresCluster,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message1 = Message::new(
         conv_id,
@@ -106,10 +100,10 @@ async fn insert_message_maps_duplicate_sequence_constraint(
     .expect("valid message");
 
     // Store first message
-    repo.store(&message1).await.expect("first store");
+    ctx.repo.store(&message1).await?;
 
     // Second store should fail with DuplicateSequence
-    let result = repo.store(&message2).await;
+    let result = ctx.repo.store(&message2).await;
     match result {
         Err(RepositoryError::DuplicateSequence {
             conversation_id,
@@ -120,6 +114,7 @@ async fn insert_message_maps_duplicate_sequence_constraint(
         }
         other => panic!("expected DuplicateSequence error, got {other:?}"),
     }
+    Ok(())
 }
 
 // ============================================================================
@@ -162,19 +157,15 @@ async fn insert_message_maps_duplicate_sequence_constraint(
 )]
 #[tokio::test]
 async fn set_audit_context_propagates_fields(
-    postgres_cluster: PostgresCluster,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let audit = expected.to_audit_context();
 
@@ -187,23 +178,28 @@ async fn set_audit_context_propagates_fields(
     )
     .expect("valid message");
 
-    repo.store_with_audit(&message, &audit)
-        .await
-        .expect("store with audit");
+    ctx.repo.store_with_audit(&message, &audit).await?;
 
     // Verify via audit log
-    let audit_log = fetch_audit_log_for_message(cluster, temp_db.name(), message.id().into_inner())
-        .await
-        .expect("fetch audit log")
-        .expect("audit log should exist");
+    let audit_log =
+        fetch_audit_log_for_message(ctx.cluster, ctx.temp_db.name(), message.id().into_inner())
+            .await?
+            .expect("audit log should exist");
 
     assert_eq!(
         audit_log.correlation_id, expected.correlation,
         "scenario: {scenario}"
     );
-    assert_eq!(audit_log.causation_id, expected.causation);
-    assert_eq!(audit_log.user_id, expected.user);
-    assert_eq!(audit_log.session_id, expected.session);
+    assert_eq!(
+        audit_log.causation_id, expected.causation,
+        "scenario: {scenario}"
+    );
+    assert_eq!(audit_log.user_id, expected.user, "scenario: {scenario}");
+    assert_eq!(
+        audit_log.session_id, expected.session,
+        "scenario: {scenario}"
+    );
+    Ok(())
 }
 
 // ============================================================================
@@ -214,17 +210,13 @@ async fn set_audit_context_propagates_fields(
 #[rstest]
 #[tokio::test]
 async fn insert_message_succeeds_for_valid_message(
-    postgres_cluster: PostgresCluster,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
@@ -235,30 +227,29 @@ async fn insert_message_succeeds_for_valid_message(
     )
     .expect("valid message");
 
-    repo.store(&message).await.expect("store should succeed");
+    ctx.repo.store(&message).await?;
 
     // Verify the message was stored
-    let retrieved = repo
+    let retrieved = ctx
+        .repo
         .find_by_id(message.id())
-        .await
-        .expect("find should succeed")
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), message.id());
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::Assistant);
+    Ok(())
 }
 
 /// Tests that generic database errors (not constraint violations) are wrapped correctly.
 #[rstest]
 #[tokio::test]
 async fn insert_message_wraps_generic_database_errors(
-    postgres_cluster: PostgresCluster,
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (_temp_db, repo) = setup_repository(cluster).await.expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     // Don't insert the conversation - this will trigger a foreign key violation
     let conv_id = ConversationId::new();
@@ -272,7 +263,7 @@ async fn insert_message_wraps_generic_database_errors(
     )
     .expect("valid message");
 
-    let result = repo.store(&message).await;
+    let result = ctx.repo.store(&message).await;
 
     // Should get a Database error (not DuplicateMessage or DuplicateSequence)
     match result {
@@ -281,4 +272,5 @@ async fn insert_message_wraps_generic_database_errors(
         }
         other => panic!("expected Database error for FK violation, got {other:?}"),
     }
+    Ok(())
 }

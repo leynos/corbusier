@@ -80,6 +80,39 @@ pub async fn setup_repository(
     Ok((temp_db, repo))
 }
 
+/// Prepared repository context for tests that need database access.
+///
+/// This composite struct bundles the cluster, temporary database, and repository
+/// together after performing template setup.
+pub struct PreparedRepo {
+    /// Reference to the shared cluster.
+    pub cluster: PostgresCluster,
+    /// Temporary database created from the template.
+    pub temp_db: TemporaryDatabase,
+    /// Repository for message operations.
+    pub repo: PostgresMessageRepository,
+}
+
+/// Creates a fully prepared repository context with template setup complete.
+///
+/// This fixture ensures the template database exists, creates a temporary database
+/// from it, and constructs a repository. Use this to reduce boilerplate in tests.
+///
+/// # Errors
+///
+/// Returns an error if template creation, database setup, or repository construction fails.
+#[fixture]
+pub async fn prepared_repo(postgres_cluster: PostgresCluster) -> Result<PreparedRepo, BoxError> {
+    let cluster = postgres_cluster;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
+    Ok(PreparedRepo {
+        cluster,
+        temp_db,
+        repo,
+    })
+}
+
 /// Creates a test message with the given conversation and sequence.
 ///
 /// # Errors
