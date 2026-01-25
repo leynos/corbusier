@@ -43,18 +43,24 @@ pub fn clock() -> DefaultClock {
 pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
     cluster
         .ensure_template_exists(TEMPLATE_DB, |db_name| {
-            let url = cluster.connection().database_url(db_name);
-            let mut conn =
-                PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
-            conn.batch_execute(CREATE_SCHEMA_SQL)
-                .map_err(|err| Box::new(err) as BoxError)?;
-            conn.batch_execute(ADD_CONSTRAINTS_SQL)
-                .map_err(|err| Box::new(err) as BoxError)?;
-            conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
-                .map_err(|err| Box::new(err) as BoxError)?;
-            Ok(())
+            apply_migrations(&cluster.connection().database_url(db_name))
         })
         .await
+}
+
+/// Applies all schema migrations to the database at the given URL.
+///
+/// This is a blocking operation that should be called from `spawn_blocking`
+/// or a synchronous context.
+fn apply_migrations(url: &str) -> Result<(), BoxError> {
+    let mut conn = PgConnection::establish(url).map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(CREATE_SCHEMA_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_CONSTRAINTS_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    Ok(())
 }
 
 /// Creates a test database from template and returns a repository and cleanup guard.
@@ -180,17 +186,21 @@ pub async fn insert_conversation(
     conv_id: ConversationId,
 ) -> Result<(), BoxError> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+    let conv_uuid = conv_id.into_inner();
 
-    diesel::sql_query(concat!(
-        "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
-        "VALUES ($1, '{}', 'active', NOW(), NOW())",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(conv_id.into_inner())
-    .execute(&mut conn)
-    .map_err(|e| Box::new(e) as BoxError)?;
-
-    Ok(())
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        diesel::sql_query(concat!(
+            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
+            "VALUES ($1, '{}', 'active', NOW(), NOW())",
+        ))
+        .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
+        .execute(&mut conn)
+        .map_err(|e| Box::new(e) as BoxError)?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| Box::new(e) as BoxError)?
 }
 
 /// Row from the `audit_logs` table for verification.
@@ -233,18 +243,22 @@ pub async fn fetch_audit_log_for_message(
     message_id: uuid::Uuid,
 ) -> Result<Option<AuditLogRow>, BoxError> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
 
-    match diesel::sql_query(concat!(
-        "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
-        "user_id, session_id, application_name ",
-        "FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(message_id)
-    .get_result::<AuditLogRow>(&mut conn)
-    {
-        Ok(row) => Ok(Some(row)),
-        Err(diesel::result::Error::NotFound) => Ok(None),
-        Err(e) => Err(Box::new(e) as BoxError),
-    }
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        match diesel::sql_query(concat!(
+            "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
+            "user_id, session_id, application_name ",
+            "FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
+        ))
+        .bind::<diesel::sql_types::Uuid, _>(message_id)
+        .get_result::<AuditLogRow>(&mut conn)
+        {
+            Ok(row) => Ok(Some(row)),
+            Err(diesel::result::Error::NotFound) => Ok(None),
+            Err(e) => Err(Box::new(e) as BoxError),
+        }
+    })
+    .await
+    .map_err(|e| Box::new(e) as BoxError)?
 }
