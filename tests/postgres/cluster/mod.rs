@@ -76,6 +76,7 @@ pub struct ClusterConnection {
 }
 
 impl ClusterConnection {
+    /// Builds a database URL for the provided database name.
     #[must_use]
     pub fn database_url(&self, database: &str) -> String {
         self.settings.url(database)
@@ -88,6 +89,20 @@ pub struct ManagedCluster {
     env_vars: Vec<(String, Option<String>)>,
     runtime: Option<Runtime>,
     postgres: Option<PostgreSQL>,
+}
+
+async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
+    postgres
+        .setup()
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+    if !matches!(postgres.status(), Status::Started) {
+        postgres
+            .start()
+            .await
+            .map_err(|err| Box::new(err) as BoxError)?;
+    }
+    Ok(())
 }
 
 impl ManagedCluster {
@@ -109,6 +124,7 @@ impl ManagedCluster {
         Ok(cluster)
     }
 
+    /// Returns a connection helper for generating database URLs.
     #[must_use]
     pub fn connection(&self) -> ClusterConnection {
         ClusterConnection {
@@ -116,6 +132,11 @@ impl ManagedCluster {
         }
     }
 
+    /// Creates a database using the provided template name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database cannot be created.
     pub fn create_database_from_template(
         &self,
         db_name: &str,
@@ -129,11 +150,21 @@ impl ManagedCluster {
         self.execute_admin_sql(&sql)
     }
 
+    /// Drops the named database from the cluster.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database cannot be dropped.
     pub fn drop_database(&self, db_name: &str) -> Result<(), BoxError> {
         let sql = format!("DROP DATABASE {}", quote_identifier(db_name));
         self.execute_admin_sql(&sql)
     }
 
+    /// Ensures a template database exists and has migrations applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if template creation or migration fails.
     pub async fn ensure_template_exists<F>(
         &self,
         template: &str,
@@ -158,7 +189,7 @@ impl ManagedCluster {
 
             create_database_with_url(&admin_url, &template_name)?;
             if let Err(err) = migrate(template_name) {
-                drop_database_with_url(&admin_url, &template_name_for_drop)?;
+                drop_template_after_failure(&admin_url, &template_name_for_drop);
                 return Err(err);
             }
             Ok(())
@@ -167,6 +198,11 @@ impl ManagedCluster {
         .map_err(|err| Box::new(err) as BoxError)?
     }
 
+    /// Creates a temporary database from a template for test usage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database cannot be created from the template.
     #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
     pub async fn temporary_database_from_template(
         &'static self,
@@ -204,23 +240,7 @@ impl ManagedCluster {
                     .build()
                     .map_err(|e| Box::new(e) as BoxError)?;
 
-                #[expect(
-                    clippy::excessive_nesting,
-                    reason = "Nested block required for thread-isolated async runtime"
-                )]
-                runtime.block_on(async {
-                    postgres
-                        .setup()
-                        .await
-                        .map_err(|err| Box::new(err) as BoxError)?;
-                    if !matches!(postgres.status(), Status::Started) {
-                        postgres
-                            .start()
-                            .await
-                            .map_err(|err| Box::new(err) as BoxError)?;
-                    }
-                    Ok::<(), BoxError>(())
-                })?;
+                runtime.block_on(setup_postgres(&mut postgres))?;
 
                 let cluster_settings = postgres.settings().clone();
                 drop(env_guard);
@@ -295,6 +315,22 @@ impl ManagedCluster {
 
     fn execute_admin_sql(&self, sql: &str) -> Result<(), BoxError> {
         execute_admin_sql_with_url(&self.connection().database_url("postgres"), sql)
+    }
+}
+
+fn drop_template_after_failure(admin_url: &str, template_name: &str) {
+    let drop_err = match drop_database_with_url(admin_url, template_name) {
+        Ok(()) => return,
+        Err(err) => err,
+    };
+
+    if writeln!(
+        io::stderr(),
+        "Failed to drop template database {template_name} after migration error: {drop_err}"
+    )
+    .is_err()
+    {
+        // Ignore stderr failures during cleanup reporting.
     }
 }
 
