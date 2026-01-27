@@ -14,6 +14,7 @@ use pg_embedded_setup_unpriv::worker_process_test_api::{
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, TestBootstrapSettings, bootstrap_for_tests};
 use postgresql_embedded::{PostgreSQL, Settings, Status};
 use rstest::fixture;
+use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -52,7 +53,16 @@ impl TemporaryDatabase {
 
 impl Drop for TemporaryDatabase {
     fn drop(&mut self) {
-        drop(self.cluster.drop_database(&self.name));
+        if let Err(err) = self.cluster.drop_database(&self.name)
+            && writeln!(
+                io::stderr(),
+                "Failed to drop test database {}: {err}",
+                self.name
+            )
+            .is_err()
+        {
+            // Ignore stderr failures during cleanup reporting.
+        }
     }
 }
 
@@ -324,7 +334,11 @@ fn database_exists_with_url(admin_url: &str, db_name: &str) -> Result<bool, BoxE
 
 impl Drop for ManagedCluster {
     fn drop(&mut self) {
-        drop(self.stop());
+        if let Err(err) = self.stop()
+            && writeln!(io::stderr(), "Failed to stop PostgreSQL cluster: {err}").is_err()
+        {
+            // Ignore stderr failures during cleanup reporting.
+        }
     }
 }
 
