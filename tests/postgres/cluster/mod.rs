@@ -124,30 +124,37 @@ impl ManagedCluster {
         self.execute_admin_sql(&sql)
     }
 
-    #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
     pub async fn ensure_template_exists<F>(
         &self,
         template: &str,
         migrate: F,
     ) -> Result<(), BoxError>
     where
-        F: FnOnce(&str) -> Result<(), BoxError>,
+        F: FnOnce(String) -> Result<(), BoxError> + Send + 'static,
     {
-        let lock = TEMPLATE_LOCK.get_or_init(|| Mutex::new(()));
-        let _guard = lock
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let admin_url = self.connection().database_url("postgres");
+        let template_name = template.to_owned();
+        let template_name_for_drop = template.to_owned();
 
-        if self.database_exists(template)? {
-            return Ok(());
-        }
+        tokio::task::spawn_blocking(move || {
+            let lock = TEMPLATE_LOCK.get_or_init(|| Mutex::new(()));
+            let _guard = lock
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-        self.create_database(template)?;
-        if let Err(err) = migrate(template) {
-            self.drop_database(template)?;
-            return Err(err);
-        }
-        Ok(())
+            if database_exists_with_url(&admin_url, &template_name)? {
+                return Ok(());
+            }
+
+            create_database_with_url(&admin_url, &template_name)?;
+            if let Err(err) = migrate(template_name) {
+                drop_database_with_url(&admin_url, &template_name_for_drop)?;
+                return Err(err);
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?
     }
 
     #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
@@ -276,40 +283,43 @@ impl ManagedCluster {
         Ok(())
     }
 
-    fn admin_connection(&self) -> Result<PgConnection, BoxError> {
-        let url = self.connection().database_url("postgres");
-        PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)
-    }
-
     fn execute_admin_sql(&self, sql: &str) -> Result<(), BoxError> {
-        let mut conn = self.admin_connection()?;
-        diesel::sql_query(sql)
-            .execute(&mut conn)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        Ok(())
+        execute_admin_sql_with_url(&self.connection().database_url("postgres"), sql)
     }
+}
 
-    fn create_database(&self, db_name: &str) -> Result<(), BoxError> {
-        let sql = format!("CREATE DATABASE {}", quote_identifier(db_name));
-        self.execute_admin_sql(&sql)
-    }
-
-    fn database_exists(&self, db_name: &str) -> Result<bool, BoxError> {
-        #[derive(diesel::QueryableByName)]
-        struct ExistsRow {
-            #[diesel(sql_type = diesel::sql_types::Bool)]
-            exists: bool,
-        }
-
-        let mut conn = self.admin_connection()?;
-        let row = diesel::sql_query(
-            "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1) AS exists",
-        )
-        .bind::<diesel::sql_types::Text, _>(db_name)
-        .get_result::<ExistsRow>(&mut conn)
+fn execute_admin_sql_with_url(admin_url: &str, sql: &str) -> Result<(), BoxError> {
+    let mut conn = PgConnection::establish(admin_url).map_err(|err| Box::new(err) as BoxError)?;
+    diesel::sql_query(sql)
+        .execute(&mut conn)
         .map_err(|err| Box::new(err) as BoxError)?;
-        Ok(row.exists)
+    Ok(())
+}
+
+fn create_database_with_url(admin_url: &str, db_name: &str) -> Result<(), BoxError> {
+    let sql = format!("CREATE DATABASE {}", quote_identifier(db_name));
+    execute_admin_sql_with_url(admin_url, &sql)
+}
+
+fn drop_database_with_url(admin_url: &str, db_name: &str) -> Result<(), BoxError> {
+    let sql = format!("DROP DATABASE {}", quote_identifier(db_name));
+    execute_admin_sql_with_url(admin_url, &sql)
+}
+
+fn database_exists_with_url(admin_url: &str, db_name: &str) -> Result<bool, BoxError> {
+    #[derive(diesel::QueryableByName)]
+    struct ExistsRow {
+        #[diesel(sql_type = diesel::sql_types::Bool)]
+        exists: bool,
     }
+
+    let mut conn = PgConnection::establish(admin_url).map_err(|err| Box::new(err) as BoxError)?;
+    let row =
+        diesel::sql_query("SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1) AS exists")
+            .bind::<diesel::sql_types::Text, _>(db_name)
+            .get_result::<ExistsRow>(&mut conn)
+            .map_err(|err| Box::new(err) as BoxError)?;
+    Ok(row.exists)
 }
 
 impl Drop for ManagedCluster {

@@ -41,9 +41,10 @@ pub fn clock() -> DefaultClock {
 ///
 /// Returns an error if template creation or migration fails.
 pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
+    let connection = cluster.connection();
     cluster
-        .ensure_template_exists(TEMPLATE_DB, |db_name| {
-            apply_migrations(&cluster.connection().database_url(db_name))
+        .ensure_template_exists(TEMPLATE_DB, move |db_name| {
+            apply_migrations(&connection.database_url(&db_name))
         })
         .await
 }
@@ -63,7 +64,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     Ok(())
 }
 
-/// Creates a test database from template and returns a repository and cleanup guard.
+/// Creates a test database from template and returns it alongside a repository.
 ///
 /// # Errors
 ///
