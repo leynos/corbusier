@@ -1389,11 +1389,13 @@ unit testing:
 - **Thread-safe**: Uses `Arc<std::sync::RwLock<HashMap>>` for concurrent access
 - **Schema Parity**: Implements the same `MessageRepository` trait as PostgreSQL
 
-Use the in-memory repository for quick iteration during development and for
-unit tests that do not require persistence. For integration tests requiring
-database features (constraints, triggers, transactions), use embedded
-PostgreSQL via `pg-embed-setup-unpriv`. SQLite is not used in the current
-implementation.
+Use the in-memory repository for fast local iteration and unit tests that do
+not need persistence. SQLite is the default zero-configuration local database
+for lightweight development and tests that require a file-backed database. For
+integration tests that need database features (constraints, triggers,
+transactions), use embedded PostgreSQL via `pg-embed-setup-unpriv`. SQLite
+remains a local-only option and is excluded from the production persistence
+layer implementation.
 
 #### 3.5.2 Data Persistence Strategies
 
@@ -1470,12 +1472,14 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
-| Environment | Database                 | Connection Pool    | Backup Strategy          |
-| ----------- | ------------------------ | ------------------ | ------------------------ |
-| Development | In-memory or embedded PG | Single connection  | None (ephemeral)         |
-| Testing     | Embedded PostgreSQL      | Per-test isolation | None (ephemeral)         |
-| Staging     | PostgreSQL               | 10 connections     | Daily snapshots          |
-| Production  | PostgreSQL               | 50 connections     | Continuous WAL archiving |
+Table 3.5.5-1: Database configuration by environment.
+
+| Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
+| ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |
+| Development | SQLite (default), in-memory                                               | Single connection  | None (ephemeral)         |
+| Testing     | In-memory (unit), SQLite (file-backed), embedded PostgreSQL (integration) | Per-test isolation | None (ephemeral)         |
+| Staging     | PostgreSQL                                                                | 10 connections     | Daily snapshots          |
+| Production  | PostgreSQL                                                                | 50 connections     | Continuous WAL archiving |
 
 ##### Diesel Configuration Example
 
@@ -3559,9 +3563,12 @@ for comprehensive audit trails across all agent interactions.
 
 ##### In-memory repository for testing
 
-An in-memory repository implementation provides zero-configuration development
-environments while maintaining compatibility with the PostgreSQL production
-interface through the shared `MessageRepository` trait.
+An in-memory repository implementation supports fast local iteration and unit
+tests that do not need persistence while maintaining compatibility with the
+PostgreSQL production interface through the shared `MessageRepository` trait.
+SQLite is the default zero-configuration file-backed option for lightweight
+development and tests that require persistence, and embedded PostgreSQL is
+reserved for integration tests that need full database features.
 
 #### 5.3.4 Caching Strategy Justification
 
@@ -4236,10 +4243,9 @@ pub enum ChangeType {
 ##### Actix Web Integration
 
 One of the fastest web frameworks available according to the TechEmpower
-Framework Benchmark. One of the fastest web frameworks available according to
-the TechEmpower Framework Benchmark. The HTTP API layer is built using Actix
-Web (version to be pinned in Cargo.toml), providing high-performance REST
-endpoints and real-time streaming capabilities.
+Framework Benchmark, Actix Web (version to be pinned in Cargo.toml) powers the
+HTTP API layer with high‑performance REST endpoints and real‑time streaming
+capabilities.
 
 ```mermaid
 graph TB
@@ -4429,7 +4435,12 @@ pub enum StreamEvent {
 
 The persistence layer implements a hybrid approach combining relational data
 for structured entities with JSONB storage for flexible message formats,
-utilizing PostgreSQL for production and SQLite for development environments.
+utilizing PostgreSQL for production, SQLite as the default file-backed option
+for local development, and the in-memory repository for fast unit testing that
+does not require persistence. Event data uses an in-memory adapter, whilst
+audit data uses a cache adapter (which may be memory-backed or persistent
+depending on configuration), as both are ephemeral by design and do not require
+cross-session persistence during development.
 
 ```mermaid
 graph TB
@@ -4450,6 +4461,7 @@ graph TB
     subgraph "Database Adapters"
         PG_ADAPTER[PostgreSQL Adapter]
         SQLITE_ADAPTER[SQLite Adapter]
+        MEMORY_ADAPTER[In-memory Adapter]
         CACHE_ADAPTER[Cache Adapter]
     end
     
@@ -4470,14 +4482,19 @@ graph TB
     REPO_MGR --> AUDIT_REPO
     
     CONV_REPO --> PG_ADAPTER
+    CONV_REPO --> SQLITE_ADAPTER
     TASK_REPO --> PG_ADAPTER
-    EVENT_REPO --> SQLITE_ADAPTER
+    TASK_REPO --> SQLITE_ADAPTER
+    EVENT_REPO --> MEMORY_ADAPTER
     AUDIT_REPO --> CACHE_ADAPTER
     
     PG_ADAPTER --> CONV_MODEL
     PG_ADAPTER --> MSG_MODEL
     PG_ADAPTER --> TASK_MODEL
-    SQLITE_ADAPTER --> EVENT_MODEL
+    SQLITE_ADAPTER --> CONV_MODEL
+    SQLITE_ADAPTER --> MSG_MODEL
+    SQLITE_ADAPTER --> TASK_MODEL
+    MEMORY_ADAPTER --> EVENT_MODEL
 ```
 
 ##### Schema Design

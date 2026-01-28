@@ -1,10 +1,9 @@
-//! Unit tests for internal SQL helper functions.
+//! Integration tests for internal SQL helper functions.
 //!
-//! Tests the constraint error mapping and audit context setting functions
-//! in isolation from the full repository operations.
+//! These tests require a running `PostgreSQL` instance and exercise the SQL
+//! helpers through the repository stack rather than in isolation.
 
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     domain::{ContentPart, ConversationId, Message, MessageId, Role, SequenceNumber, TextPart},
     error::RepositoryError,
     ports::repository::MessageRepository,
@@ -13,9 +12,10 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use uuid::Uuid;
 
+use super::cluster::BoxError;
 use super::helpers::{
-    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository, test_runtime,
+    ExpectedAuditContext, PreparedRepo, clock, fetch_audit_log_for_message, insert_conversation,
+    prepared_repo,
 };
 
 // ============================================================================
@@ -24,18 +24,15 @@ use super::helpers::{
 
 /// Tests that inserting a message with duplicate ID returns `DuplicateMessage` error.
 #[rstest]
-fn insert_message_maps_duplicate_id_constraint(
-    postgres_cluster: PostgresCluster,
+#[tokio::test]
+async fn insert_message_maps_duplicate_id_constraint(
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let db_name = format!("sql_helpers_dup_id_{}", Uuid::new_v4());
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let msg_id = MessageId::new();
     let message1 = Message::new_with_id(
@@ -58,39 +55,31 @@ fn insert_message_maps_duplicate_id_constraint(
     )
     .expect("valid message");
 
-    let rt = test_runtime().expect("tokio runtime");
-
     // Store first message
-    rt.block_on(repo.store(&message1)).expect("first store");
+    ctx.repo.store(&message1).await?;
 
     // Second store should fail with DuplicateMessage
-    let result = rt.block_on(repo.store(&message2));
+    let result = ctx.repo.store(&message2).await;
     match result {
         Err(RepositoryError::DuplicateMessage(id)) => {
             assert_eq!(id, msg_id, "error should contain the duplicate message ID");
         }
         other => panic!("expected DuplicateMessage error, got {other:?}"),
     }
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    Ok(())
 }
 
 /// Tests that inserting a message with duplicate sequence returns `DuplicateSequence` error.
 #[rstest]
-fn insert_message_maps_duplicate_sequence_constraint(
-    postgres_cluster: PostgresCluster,
+#[tokio::test]
+async fn insert_message_maps_duplicate_sequence_constraint(
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let db_name = format!("sql_helpers_dup_seq_{}", Uuid::new_v4());
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message1 = Message::new(
         conv_id,
@@ -110,13 +99,11 @@ fn insert_message_maps_duplicate_sequence_constraint(
     )
     .expect("valid message");
 
-    let rt = test_runtime().expect("tokio runtime");
-
     // Store first message
-    rt.block_on(repo.store(&message1)).expect("first store");
+    ctx.repo.store(&message1).await?;
 
     // Second store should fail with DuplicateSequence
-    let result = rt.block_on(repo.store(&message2));
+    let result = ctx.repo.store(&message2).await;
     match result {
         Err(RepositoryError::DuplicateSequence {
             conversation_id,
@@ -127,96 +114,58 @@ fn insert_message_maps_duplicate_sequence_constraint(
         }
         other => panic!("expected DuplicateSequence error, got {other:?}"),
     }
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    Ok(())
 }
 
 // ============================================================================
 // Audit Context Setting Tests
 // ============================================================================
 
-/// Expected audit context values for parameterized tests.
-#[expect(
-    clippy::struct_field_names,
-    reason = "Field names match AuditContext fields for clarity"
-)]
-struct ExpectedAuditContext {
-    correlation_id: Option<Uuid>,
-    causation_id: Option<Uuid>,
-    user_id: Option<Uuid>,
-    session_id: Option<Uuid>,
-}
-
-impl ExpectedAuditContext {
-    /// Creates an [`AuditContext`] from expected values.
-    const fn to_audit_context(&self) -> AuditContext {
-        let mut audit = AuditContext::empty();
-        if let Some(id) = self.correlation_id {
-            audit = audit.with_correlation_id(id);
-        }
-        if let Some(id) = self.causation_id {
-            audit = audit.with_causation_id(id);
-        }
-        if let Some(id) = self.user_id {
-            audit = audit.with_user_id(id);
-        }
-        if let Some(id) = self.session_id {
-            audit = audit.with_session_id(id);
-        }
-        audit
-    }
-}
-
 /// Tests that `set_audit_context` correctly sets `PostgreSQL` session variables.
 ///
 /// Parameterized across three scenarios:
 /// - Full context: all fields populated
 /// - Empty context: all fields `None`
-/// - Partial context: only `correlation_id` and `user_id` populated
+/// - Partial context: only `correlation` and `user` populated
 #[rstest]
 #[case::full_context(
     ExpectedAuditContext {
-        correlation_id: Some(Uuid::new_v4()),
-        causation_id: Some(Uuid::new_v4()),
-        user_id: Some(Uuid::new_v4()),
-        session_id: Some(Uuid::new_v4()),
+        correlation: Some(Uuid::new_v4()),
+        causation: Some(Uuid::new_v4()),
+        user: Some(Uuid::new_v4()),
+        session: Some(Uuid::new_v4()),
     },
     "full"
 )]
 #[case::empty_context(
     ExpectedAuditContext {
-        correlation_id: None,
-        causation_id: None,
-        user_id: None,
-        session_id: None,
+        correlation: None,
+        causation: None,
+        user: None,
+        session: None,
     },
     "empty"
 )]
 #[case::partial_context(
     ExpectedAuditContext {
-        correlation_id: Some(Uuid::new_v4()),
-        causation_id: None,
-        user_id: Some(Uuid::new_v4()),
-        session_id: None,
+        correlation: Some(Uuid::new_v4()),
+        causation: None,
+        user: Some(Uuid::new_v4()),
+        session: None,
     },
     "partial"
 )]
-fn set_audit_context_propagates_fields(
-    postgres_cluster: PostgresCluster,
+#[tokio::test]
+async fn set_audit_context_propagates_fields(
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
-) {
-    let db_name = format!("sql_helpers_audit_{scenario}_{}", Uuid::new_v4());
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let audit = expected.to_audit_context();
 
@@ -229,23 +178,28 @@ fn set_audit_context_propagates_fields(
     )
     .expect("valid message");
 
-    let rt = test_runtime().expect("tokio runtime");
-    rt.block_on(repo.store_with_audit(&message, &audit))
-        .expect("store with audit");
+    ctx.repo.store_with_audit(&message, &audit).await?;
 
     // Verify via audit log
-    let audit_log = fetch_audit_log_for_message(cluster, &db_name, message.id().into_inner())
-        .expect("fetch audit log")
-        .expect("audit log should exist");
+    let audit_log =
+        fetch_audit_log_for_message(ctx.cluster, ctx.temp_db.name(), message.id().into_inner())
+            .await?
+            .expect("audit log should exist");
 
-    assert_eq!(audit_log.correlation_id, expected.correlation_id);
-    assert_eq!(audit_log.causation_id, expected.causation_id);
-    assert_eq!(audit_log.user_id, expected.user_id);
-    assert_eq!(audit_log.session_id, expected.session_id);
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    assert_eq!(
+        audit_log.correlation_id, expected.correlation,
+        "scenario: {scenario}"
+    );
+    assert_eq!(
+        audit_log.causation_id, expected.causation,
+        "scenario: {scenario}"
+    );
+    assert_eq!(audit_log.user_id, expected.user, "scenario: {scenario}");
+    assert_eq!(
+        audit_log.session_id, expected.session,
+        "scenario: {scenario}"
+    );
+    Ok(())
 }
 
 // ============================================================================
@@ -254,18 +208,15 @@ fn set_audit_context_propagates_fields(
 
 /// Tests that `insert_message` successfully inserts a valid message.
 #[rstest]
-fn insert_message_succeeds_for_valid_message(
-    postgres_cluster: PostgresCluster,
+#[tokio::test]
+async fn insert_message_succeeds_for_valid_message(
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let db_name = format!("sql_helpers_insert_valid_{}", Uuid::new_v4());
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
@@ -276,36 +227,29 @@ fn insert_message_succeeds_for_valid_message(
     )
     .expect("valid message");
 
-    let rt = test_runtime().expect("tokio runtime");
-    rt.block_on(repo.store(&message))
-        .expect("store should succeed");
+    ctx.repo.store(&message).await?;
 
     // Verify the message was stored
-    let retrieved = rt
-        .block_on(repo.find_by_id(message.id()))
-        .expect("find should succeed")
+    let retrieved = ctx
+        .repo
+        .find_by_id(message.id())
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), message.id());
     assert_eq!(retrieved.conversation_id(), conv_id);
     assert_eq!(retrieved.role(), Role::Assistant);
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    Ok(())
 }
 
 /// Tests that generic database errors (not constraint violations) are wrapped correctly.
 #[rstest]
-fn insert_message_wraps_generic_database_errors(
-    postgres_cluster: PostgresCluster,
+#[tokio::test]
+async fn insert_message_wraps_generic_database_errors(
+    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
-) {
-    let db_name = format!("sql_helpers_insert_fk_{}", Uuid::new_v4());
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repo");
+) -> Result<(), BoxError> {
+    let ctx = prepared_repo.await?;
 
     // Don't insert the conversation - this will trigger a foreign key violation
     let conv_id = ConversationId::new();
@@ -319,8 +263,7 @@ fn insert_message_wraps_generic_database_errors(
     )
     .expect("valid message");
 
-    let rt = test_runtime().expect("tokio runtime");
-    let result = rt.block_on(repo.store(&message));
+    let result = ctx.repo.store(&message).await;
 
     // Should get a Database error (not DuplicateMessage or DuplicateSequence)
     match result {
@@ -329,8 +272,5 @@ fn insert_message_wraps_generic_database_errors(
         }
         other => panic!("expected Database error for FK violation, got {other:?}"),
     }
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    Ok(())
 }

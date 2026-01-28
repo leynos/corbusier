@@ -1,8 +1,9 @@
 //! Shared test helpers for `PostgreSQL` integration tests.
 
-use super::cluster::{BoxError, ManagedCluster};
-pub use super::cluster::{PostgresCluster, postgres_cluster};
+pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
+use super::cluster::{ManagedCluster, TemporaryDatabase};
 use corbusier::message::{
+    adapters::audit_context::AuditContext,
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
@@ -11,7 +12,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::fixture;
-use tokio::runtime::Runtime;
+use uuid::Uuid;
 
 /// SQL to create the base schema for tests.
 pub const CREATE_SCHEMA_SQL: &str =
@@ -34,47 +35,91 @@ pub fn clock() -> DefaultClock {
     DefaultClock
 }
 
-/// Creates a tokio runtime for async operations in tests.
+/// Ensures the template database exists with the schema applied.
 ///
 /// # Errors
 ///
-/// Returns an error if the runtime cannot be created.
-pub fn test_runtime() -> Result<Runtime, BoxError> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| Box::new(e) as BoxError)
+/// Returns an error if template creation or migration fails.
+pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
+    let connection = cluster.connection();
+    cluster
+        .ensure_template_exists(TEMPLATE_DB, move |db_name| {
+            apply_migrations(&connection.database_url(&db_name))
+        })
+        .await
 }
 
-/// Ensures the template database exists with the schema applied.
-pub fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
-    cluster.ensure_template_exists(TEMPLATE_DB, |db_name| {
-        let url = cluster.connection().database_url(db_name);
-        let mut conn = PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(CREATE_SCHEMA_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(ADD_CONSTRAINTS_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
-            .map_err(|err| Box::new(err) as BoxError)?;
-        Ok(())
-    })?;
+/// Applies all schema migrations to the database at the given URL.
+///
+/// This is a blocking operation that should be called from `spawn_blocking`
+/// or a synchronous context.
+fn apply_migrations(url: &str) -> Result<(), BoxError> {
+    let mut conn = PgConnection::establish(url).map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(CREATE_SCHEMA_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_CONSTRAINTS_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }
 
-/// Creates a test database from template and returns a repository.
-pub fn setup_repository(
-    cluster: &ManagedCluster,
-    db_name: &str,
-) -> Result<PostgresMessageRepository, BoxError> {
-    cluster.create_database_from_template(db_name, TEMPLATE_DB)?;
-    let url = cluster.connection().database_url(db_name);
+/// Creates a test database from template and returns it alongside a repository.
+///
+/// # Errors
+///
+/// Returns an error if database creation or repository setup fails.
+pub async fn setup_repository(
+    cluster: &'static ManagedCluster,
+) -> Result<(TemporaryDatabase, PostgresMessageRepository), BoxError> {
+    let temp_db = cluster
+        .temporary_database_from_template(&format!("test_{}", Uuid::new_v4()), TEMPLATE_DB)
+        .await?;
+
+    let url = temp_db.url();
     let manager = ConnectionManager::<PgConnection>::new(url);
     let pool = Pool::builder()
         .max_size(1)
         .build(manager)
         .map_err(|e| Box::new(e) as BoxError)?;
-    Ok(PostgresMessageRepository::new(pool))
+
+    let repo = PostgresMessageRepository::new(pool);
+    Ok((temp_db, repo))
+}
+
+/// Prepared repository context for tests that need database access.
+///
+/// This composite struct bundles the cluster, temporary database, and repository
+/// together after performing template setup.
+pub struct PreparedRepo {
+    /// Reference to the shared cluster.
+    pub cluster: PostgresCluster,
+    /// Temporary database created from the template.
+    pub temp_db: TemporaryDatabase,
+    /// Repository for message operations.
+    pub repo: PostgresMessageRepository,
+}
+
+/// Creates a fully prepared repository context with template setup complete.
+///
+/// This fixture ensures the template database exists, creates a temporary database
+/// from it, and constructs a repository. Use this to reduce boilerplate in tests.
+///
+/// # Errors
+///
+/// Returns an error if template creation, database setup, or repository construction fails.
+#[fixture]
+pub async fn prepared_repo(
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<PreparedRepo, BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
+    Ok(PreparedRepo {
+        cluster,
+        temp_db,
+        repo,
+    })
 }
 
 /// Creates a test message with the given conversation and sequence.
@@ -97,41 +142,32 @@ pub fn create_test_message(
     .map_err(|e| Box::new(e) as BoxError)
 }
 
-/// Cleans up a test database.
-///
-/// # Errors
-///
-/// Returns an error if database cleanup fails.
-pub fn cleanup_database(cluster: &ManagedCluster, db_name: &str) -> Result<(), BoxError> {
-    cluster.drop_database(db_name)
+/// Expected audit context values for parameterized tests.
+pub struct ExpectedAuditContext {
+    pub correlation: Option<Uuid>,
+    pub causation: Option<Uuid>,
+    pub user: Option<Uuid>,
+    pub session: Option<Uuid>,
 }
 
-/// Guard that ensures test database cleanup runs even if test panics.
-///
-/// Call [`Self::cleanup`] to surface cleanup errors in the test body.
-pub struct CleanupGuard<'a> {
-    cluster: &'a ManagedCluster,
-    db_name: String,
-}
-
-impl<'a> CleanupGuard<'a> {
-    pub const fn new(cluster: &'a ManagedCluster, db_name: String) -> Self {
-        Self { cluster, db_name }
-    }
-
-    /// Explicitly cleanup the test database.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if database cleanup fails.
-    pub fn cleanup(&self) -> Result<(), BoxError> {
-        cleanup_database(self.cluster, &self.db_name)
-    }
-}
-
-impl Drop for CleanupGuard<'_> {
-    fn drop(&mut self) {
-        drop(cleanup_database(self.cluster, &self.db_name));
+impl ExpectedAuditContext {
+    /// Creates an [`AuditContext`] from expected values.
+    #[must_use]
+    pub const fn to_audit_context(&self) -> AuditContext {
+        let mut audit = AuditContext::empty();
+        if let Some(id) = self.correlation {
+            audit = audit.with_correlation_id(id);
+        }
+        if let Some(id) = self.causation {
+            audit = audit.with_causation_id(id);
+        }
+        if let Some(id) = self.user {
+            audit = audit.with_user_id(id);
+        }
+        if let Some(id) = self.session {
+            audit = audit.with_session_id(id);
+        }
+        audit
     }
 }
 
@@ -147,23 +183,27 @@ pub struct RoleResult {
 /// # Errors
 ///
 /// Returns an error if connection or insert fails.
-pub fn insert_conversation(
+pub async fn insert_conversation(
     cluster: &ManagedCluster,
     db_name: &str,
     conv_id: ConversationId,
 ) -> Result<(), BoxError> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+    let conv_uuid = conv_id.into_inner();
 
-    diesel::sql_query(concat!(
-        "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
-        "VALUES ($1, '{}', 'active', NOW(), NOW())",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(conv_id.into_inner())
-    .execute(&mut conn)
-    .map_err(|e| Box::new(e) as BoxError)?;
-
-    Ok(())
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        diesel::sql_query(concat!(
+            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
+            "VALUES ($1, '{}', 'active', NOW(), NOW())",
+        ))
+        .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
+        .execute(&mut conn)
+        .map_err(|e| Box::new(e) as BoxError)?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| Box::new(e) as BoxError)?
 }
 
 /// Row from the `audit_logs` table for verification.
@@ -200,24 +240,28 @@ pub struct AuditLogRow {
 /// # Errors
 ///
 /// Returns an error if connection or query fails.
-pub fn fetch_audit_log_for_message(
+pub async fn fetch_audit_log_for_message(
     cluster: &ManagedCluster,
     db_name: &str,
     message_id: uuid::Uuid,
 ) -> Result<Option<AuditLogRow>, BoxError> {
     let url = cluster.connection().database_url(db_name);
-    let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
 
-    match diesel::sql_query(concat!(
-        "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
-        "user_id, session_id, application_name ",
-        "FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(message_id)
-    .get_result::<AuditLogRow>(&mut conn)
-    {
-        Ok(row) => Ok(Some(row)),
-        Err(diesel::result::Error::NotFound) => Ok(None),
-        Err(e) => Err(Box::new(e) as BoxError),
-    }
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        match diesel::sql_query(concat!(
+            "SELECT id, table_name, operation, row_id, correlation_id, causation_id, ",
+            "user_id, session_id, application_name ",
+            "FROM audit_logs WHERE row_id = $1 ORDER BY occurred_at DESC LIMIT 1",
+        ))
+        .bind::<diesel::sql_types::Uuid, _>(message_id)
+        .get_result::<AuditLogRow>(&mut conn)
+        {
+            Ok(row) => Ok(Some(row)),
+            Err(diesel::result::Error::NotFound) => Ok(None),
+            Err(e) => Err(Box::new(e) as BoxError),
+        }
+    })
+    .await
+    .map_err(|e| Box::new(e) as BoxError)?
 }

@@ -4,11 +4,10 @@
 //! verification via the database trigger.
 
 use crate::postgres::helpers::{
-    CleanupGuard, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository, test_runtime,
+    BoxError, ExpectedAuditContext, PostgresCluster, clock, ensure_template,
+    fetch_audit_log_for_message, insert_conversation, postgres_cluster, setup_repository,
 };
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     ports::repository::MessageRepository,
 };
@@ -16,38 +15,12 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use uuid::Uuid;
 
-/// Expected audit context values for parameterized tests.
-struct ExpectedAuditContext {
-    correlation: Option<Uuid>,
-    causation: Option<Uuid>,
-    user: Option<Uuid>,
-    session: Option<Uuid>,
-}
-
-/// Creates an `AuditContext` from expected values.
-const fn create_audit_context(expected: &ExpectedAuditContext) -> AuditContext {
-    let mut audit = AuditContext::empty();
-    if let Some(id) = expected.correlation {
-        audit = audit.with_correlation_id(id);
-    }
-    if let Some(id) = expected.causation {
-        audit = audit.with_causation_id(id);
-    }
-    if let Some(id) = expected.user {
-        audit = audit.with_user_id(id);
-    }
-    if let Some(id) = expected.session {
-        audit = audit.with_session_id(id);
-    }
-    audit
-}
-
 /// Tests `store_with_audit` correctly propagates audit context to `audit_logs` table.
 ///
 /// Parameterized across three scenarios:
 /// - Full context: all fields populated
 /// - Empty context: all fields None
-/// - Partial context: only `correlation_id` populated
+/// - Partial context: only `correlation` populated
 #[rstest]
 #[case::full_context(
     ExpectedAuditContext {
@@ -76,20 +49,19 @@ const fn create_audit_context(expected: &ExpectedAuditContext) -> AuditContext {
     },
     "partial"
 )]
-fn store_with_audit_captures_context(
+#[tokio::test]
+async fn store_with_audit_captures_context(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).expect("template setup");
-    let db_name = format!("test_audit_{scenario}_{}", Uuid::new_v4());
-    let guard = CleanupGuard::new(cluster, db_name.clone());
-    let repo = setup_repository(cluster, &db_name).expect("repository setup");
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, &db_name, conv_id).expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
@@ -97,37 +69,33 @@ fn store_with_audit_captures_context(
         vec![ContentPart::Text(TextPart::new("Audited message"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
-    let audit = create_audit_context(&expected);
+    let audit = expected.to_audit_context();
 
-    let rt = test_runtime().expect("tokio runtime");
+    repo.store_with_audit(&message, &audit).await?;
 
-    rt.block_on(repo.store_with_audit(&message, &audit))
-        .expect("store_with_audit");
-
-    let retrieved = rt
-        .block_on(repo.find_by_id(message.id()))
-        .expect("find")
+    let retrieved = repo
+        .find_by_id(message.id())
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), message.id());
 
     // Verify audit_logs entry was created with correct context
-    let audit_log = fetch_audit_log_for_message(cluster, &db_name, message.id().into_inner())
-        .expect("audit log query should succeed")
+    let audit_log = fetch_audit_log_for_message(cluster, temp_db.name(), message.id().into_inner())
+        .await?
         .expect("audit log entry should exist");
 
     assert_eq!(audit_log.table_name, "messages");
     assert_eq!(audit_log.operation, "INSERT");
     assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
-    assert_eq!(audit_log.correlation_id, expected.correlation);
+    assert_eq!(
+        audit_log.correlation_id, expected.correlation,
+        "scenario: {scenario}"
+    );
     assert_eq!(audit_log.causation_id, expected.causation);
     assert_eq!(audit_log.user_id, expected.user);
     assert_eq!(audit_log.session_id, expected.session);
-
-    drop(repo);
-
-    guard.cleanup().expect("cleanup database");
+    Ok(())
 }

@@ -16,6 +16,15 @@ tool and integrate it into automated test flows.
 - Outbound network access to crates.io and the PostgreSQL binary archive.
 - System timezone database (package usually named `tzdata`).
 
+## Platform expectations
+
+- Linux supports both privilege branches. Root executions require
+  `PG_EMBEDDED_WORKER` so the helper can drop to `nobody` for filesystem work.
+- macOS runs the unprivileged path; root executions are expected to fail fast
+  because privilege dropping is not supported on that target.
+- Windows always behaves as unprivileged, so the helper runs in-process and
+  ignores root-only scenarios.
+
 ## Quick start
 
 1. Choose directories for the staged PostgreSQL distribution and the cluster’s
@@ -109,6 +118,59 @@ The guard keeps `PGPASSFILE`, `TZ`, `TZDIR`, and the XDG directories populated
 for the duration of its lifetime, making synchronous tests usable without extra
 setup.
 
+### Async API for `#[tokio::test]` contexts
+
+Tests within an async runtime (e.g. `#[tokio::test]`) must not use the standard
+`TestCluster::new()` constructor, which panics with "Cannot start a runtime
+from within a runtime" because it creates its own internal Tokio runtime. Async
+contexts require enabling the `async-api` feature and using the async
+constructor and shutdown methods.
+
+Enable the feature in `Cargo.toml`:
+
+```toml
+[dev-dependencies]
+pg-embed-setup-unpriv = { version = "0.4.0", features = ["async-api"] }
+```
+
+Then use `start_async()` and `stop_async()` in async tests:
+
+```rust,no_run
+use pg_embedded_setup_unpriv::{TestCluster, error::BootstrapResult};
+
+#[tokio::test]
+async fn test_async_database_operations() -> BootstrapResult<()> {
+    let cluster = TestCluster::start_async().await?;
+
+    // Access connection metadata as usual.
+    let url = cluster.connection().database_url("app_db");
+    // Issue async queries using sqlx or other async clients here.
+
+    // Explicitly shut down to ensure clean resource release.
+    cluster.stop_async().await?;
+    Ok(())
+}
+```
+
+Async clusters behave like the synchronous guard: the same accessors apply, and
+the environment overrides are restored on shutdown. `stop_async()` consumes the
+guard, so any required connection details must be captured before calling it.
+
+**Important:** `stop_async()` must be called explicitly before the cluster goes
+out of scope. Unlike the synchronous API where `Drop` can reliably shut down
+PostgreSQL using its internal runtime, async-created clusters cannot guarantee
+cleanup in `Drop` because `Drop` cannot be async. When `stop_async()` is not
+called, the library will attempt best-effort cleanup and log a warning; if no
+async runtime handle is available (for example, after the runtime has shut
+down), resources may leak and the process may need to be stopped manually.
+
+The async API runs PostgreSQL lifecycle operations on the caller's runtime
+rather than creating a separate one, avoiding the nested-runtime panic whilst
+maintaining the same zero-configuration experience as the synchronous API. When
+running as `root`, the async API still delegates to the worker helper, and
+those operations are executed with `spawn_blocking` so they do not block the
+async executor.
+
 ## Observability
 
 Set `RUST_LOG=pg_embed::observability=info` to emit tracing spans that describe
@@ -135,7 +197,10 @@ normal informational lifecycle noise.
 `pg_embedded_setup_unpriv::test_support::test_cluster` exposes an `rstest`
 fixture that constructs the RAII guard on demand. Import the fixture so it is
 in scope and declare a `test_cluster: TestCluster` parameter inside an
-`#[rstest]` function; the macro injects the running cluster automatically.
+`#[rstest]` function; the macro injects the running cluster automatically. The
+`test_cluster` and `shared_test_cluster` fixtures are synchronous and
+constructed via `TestCluster::new()`, so they must not be used in async tests;
+`TestCluster::start_async()` should be used for async tests.
 
 ```rust,no_run
 use pg_embedded_setup_unpriv::{test_support::test_cluster, TestCluster};

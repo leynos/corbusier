@@ -10,6 +10,7 @@
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 
 mod test_helpers;
+mod worker_locator;
 
 mod postgres {
     pub mod cluster;

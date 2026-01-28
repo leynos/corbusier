@@ -127,6 +127,7 @@ pub fn verify_message_ordering(messages: &[Message]) {
 /// Verifies role preservation in retrieved messages.
 pub fn verify_role_preservation(messages: &[Message]) {
     let expected_roles = [Role::User, Role::Assistant, Role::Tool, Role::Assistant];
+    assert_eq!(messages.len(), expected_roles.len());
     for (message, expected) in messages.iter().zip(expected_roles.iter()) {
         assert_eq!(message.role(), *expected);
     }

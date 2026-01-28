@@ -27,23 +27,20 @@ mockable = { version = "3.0.0", default-features = false, features = ["clock"] }
 diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 
 # Capability-based filesystem access
-cap-std = "3.4.5"
+cap-std = { version = "4.0.0", features = ["fs_utf8"] }
 
 # Async runtime
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
-# Embedded PostgreSQL support (test-only binaries)
-pg-embed-setup-unpriv = { version = "0.3.0", features = ["diesel-support"] }
-postgresql_embedded = "0.20.0"
-
 [dev-dependencies]
+# Embedded PostgreSQL support (test-only)
+pg-embed-setup-unpriv = { version = "0.4.0", features = ["diesel-support", "async-api"] }
+postgresql_embedded = "0.20.0"
 rstest = "0.26.1"
 mockall = "0.14.0"
 eyre = "0.6.12"
-
-[[bin]]
-name = "pg_worker"
-path = "src/bin/pg_worker.rs"
+camino = "1.2.2"
+once_cell = "1.20.3"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
