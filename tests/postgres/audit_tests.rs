@@ -4,8 +4,8 @@
 //! verification via the database trigger.
 
 use crate::postgres::helpers::{
-    ExpectedAuditContext, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository,
+    BoxError, ExpectedAuditContext, PostgresCluster, clock, ensure_template,
+    fetch_audit_log_for_message, insert_conversation, postgres_cluster, setup_repository,
 };
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
@@ -52,18 +52,16 @@ use uuid::Uuid;
 #[tokio::test]
 async fn store_with_audit_captures_context(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
     #[case] expected: ExpectedAuditContext,
     #[case] scenario: &str,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
@@ -71,27 +69,22 @@ async fn store_with_audit_captures_context(
         vec![ContentPart::Text(TextPart::new("Audited message"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
     let audit = expected.to_audit_context();
 
-    repo.store_with_audit(&message, &audit)
-        .await
-        .expect("store_with_audit");
+    repo.store_with_audit(&message, &audit).await?;
 
     let retrieved = repo
         .find_by_id(message.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.id(), message.id());
 
     // Verify audit_logs entry was created with correct context
     let audit_log = fetch_audit_log_for_message(cluster, temp_db.name(), message.id().into_inner())
-        .await
-        .expect("audit log query should succeed")
+        .await?
         .expect("audit log entry should exist");
 
     assert_eq!(audit_log.table_name, "messages");
@@ -104,4 +97,5 @@ async fn store_with_audit_captures_context(
     assert_eq!(audit_log.causation_id, expected.causation);
     assert_eq!(audit_log.user_id, expected.user);
     assert_eq!(audit_log.session_id, expected.session);
+    Ok(())
 }

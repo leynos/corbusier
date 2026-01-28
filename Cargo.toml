@@ -40,6 +40,7 @@ rstest = "0.26.1"
 mockall = "0.14.0"
 eyre = "0.6.12"
 camino = "1.2.2"
+once_cell = "1.20.3"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

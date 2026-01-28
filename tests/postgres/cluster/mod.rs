@@ -8,6 +8,7 @@ use self::env_utils::{env_vars_to_os, worker_env_changes};
 use self::fs_utils::{sync_password_from_file, sync_port_from_pid};
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
+use once_cell::sync::OnceCell;
 use pg_embedded_setup_unpriv::worker_process_test_api::{
     WorkerOperation, WorkerRequest, WorkerRequestArgs, run as run_worker,
 };
@@ -21,7 +22,7 @@ use tokio::runtime::Runtime;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-static SHARED_CLUSTER: OnceLock<ManagedCluster> = OnceLock::new();
+static SHARED_CLUSTER: OnceCell<ManagedCluster> = OnceCell::new();
 static TEMPLATE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 /// RAII guard for temporary test databases.
@@ -380,15 +381,18 @@ impl Drop for ManagedCluster {
 
 /// Provides a `PostgreSQL` test cluster suitable for the current test runner.
 #[fixture]
-pub fn postgres_cluster() -> PostgresCluster {
+pub fn postgres_cluster() -> Result<PostgresCluster, BoxError> {
     shared_cluster()
 }
 
-fn shared_cluster() -> PostgresCluster {
-    SHARED_CLUSTER.get_or_init(|| match ManagedCluster::new() {
-        Ok(cluster) => cluster,
-        Err(err) => panic!("SKIP-TEST-CLUSTER: failed to start PostgreSQL: {err}"),
-    })
+fn shared_cluster() -> Result<PostgresCluster, BoxError> {
+    SHARED_CLUSTER
+        .get_or_try_init(ManagedCluster::new)
+        .map_err(|err| {
+            Box::new(std::io::Error::other(format!(
+                "SKIP-TEST-CLUSTER: failed to start PostgreSQL: {err}"
+            ))) as BoxError
+        })
 }
 
 fn quote_identifier(name: &str) -> String {

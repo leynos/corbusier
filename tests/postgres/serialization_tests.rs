@@ -3,8 +3,8 @@
 //! Tests role parsing, JSONB content, metadata, and UUID handling.
 
 use crate::postgres::helpers::{
-    PostgresCluster, RoleResult, clock, ensure_template, insert_conversation, postgres_cluster,
-    setup_repository,
+    BoxError, PostgresCluster, RoleResult, clock, ensure_template, insert_conversation,
+    postgres_cluster, setup_repository,
 };
 use corbusier::message::{
     domain::{
@@ -29,18 +29,16 @@ use rstest::rstest;
 #[tokio::test]
 async fn role_round_trip_through_persistence(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
     #[case] role: Role,
     #[case] expected_str: &str,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
@@ -48,17 +46,16 @@ async fn role_round_trip_through_persistence(
         vec![ContentPart::Text(TextPart::new("Role test"))],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
-    repo.store(&message).await.expect("store");
+    repo.store(&message).await?;
 
     let url = cluster.connection().database_url(temp_db.name());
-    let mut conn = PgConnection::establish(&url).expect("connection");
+    let mut conn = PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
     let stored_role: String = diesel::sql_query("SELECT role FROM messages WHERE id = $1")
         .bind::<diesel::sql_types::Uuid, _>(message.id().into_inner())
         .get_result::<RoleResult>(&mut conn)
-        .expect("query")
+        .map_err(|err| Box::new(err) as BoxError)?
         .role;
 
     assert_eq!(stored_role, expected_str);
@@ -66,11 +63,11 @@ async fn role_round_trip_through_persistence(
 
     let retrieved = repo
         .find_by_id(message.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     assert_eq!(retrieved.role(), role);
+    Ok(())
 }
 
 // ============================================================================
@@ -81,16 +78,14 @@ async fn role_round_trip_through_persistence(
 #[tokio::test]
 async fn content_jsonb_round_trip_with_multiple_parts(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let content = vec![
         ContentPart::Text(TextPart::new("Hello world")),
@@ -108,15 +103,13 @@ async fn content_jsonb_round_trip_with_multiple_parts(
         content,
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
-    repo.store(&message).await.expect("store");
+    repo.store(&message).await?;
 
     let retrieved = repo
         .find_by_id(message.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     let [first, second, third] = retrieved.content() else {
@@ -147,19 +140,21 @@ async fn content_jsonb_round_trip_with_multiple_parts(
         }
         other => panic!("Expected ToolCall, got {other:?}"),
     }
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test]
-async fn tool_result_jsonb_round_trip(clock: DefaultClock, postgres_cluster: PostgresCluster) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+async fn tool_result_jsonb_round_trip(
+    clock: DefaultClock,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let success_result =
         ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
@@ -174,15 +169,13 @@ async fn tool_result_jsonb_round_trip(clock: DefaultClock, postgres_cluster: Pos
         ],
         SequenceNumber::new(1),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
-    repo.store(&message).await.expect("store");
+    repo.store(&message).await?;
 
     let retrieved = repo
         .find_by_id(message.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     let [first, second] = retrieved.content() else {
@@ -211,40 +204,41 @@ async fn tool_result_jsonb_round_trip(clock: DefaultClock, postgres_cluster: Pos
         }
         other => panic!("Expected ToolResult, got {other:?}"),
     }
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test]
-async fn metadata_jsonb_round_trip(clock: DefaultClock, postgres_cluster: PostgresCluster) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+async fn metadata_jsonb_round_trip(
+    clock: DefaultClock,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let metadata = MessageMetadata::with_agent_backend("claude-3-opus");
 
     let message = Message::builder(conv_id, Role::Assistant, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new("Response")))
         .with_metadata(metadata)
-        .build(&clock)
-        .expect("valid message");
+        .build(&clock)?;
 
-    repo.store(&message).await.expect("store");
+    repo.store(&message).await?;
 
     let retrieved = repo
         .find_by_id(message.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     assert_eq!(
         retrieved.metadata().agent_backend,
         Some("claude-3-opus".to_owned())
     );
+    Ok(())
 }
 
 // ============================================================================
@@ -255,16 +249,14 @@ async fn metadata_jsonb_round_trip(clock: DefaultClock, postgres_cluster: Postgr
 #[tokio::test]
 async fn from_persisted_preserves_all_domain_invariants(
     clock: DefaultClock,
-    postgres_cluster: PostgresCluster,
-) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let original = Message::new(
         conv_id,
@@ -272,15 +264,13 @@ async fn from_persisted_preserves_all_domain_invariants(
         vec![ContentPart::Text(TextPart::new("Test content"))],
         SequenceNumber::new(42),
         &clock,
-    )
-    .expect("valid message");
+    )?;
 
-    repo.store(&original).await.expect("store");
+    repo.store(&original).await?;
 
     let retrieved = repo
         .find_by_id(original.id())
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     assert!(
@@ -305,6 +295,7 @@ async fn from_persisted_preserves_all_domain_invariants(
         time_diff < 100,
         "Timestamp should be preserved within 100ms, diff was {time_diff}ms"
     );
+    Ok(())
 }
 
 // ============================================================================
@@ -313,32 +304,31 @@ async fn from_persisted_preserves_all_domain_invariants(
 
 #[rstest]
 #[tokio::test]
-async fn uuid_round_trip_preserves_values(clock: DefaultClock, postgres_cluster: PostgresCluster) {
-    let cluster = postgres_cluster;
-    ensure_template(cluster).await.expect("template setup");
-    let (temp_db, repo) = setup_repository(cluster).await.expect("repository setup");
+async fn uuid_round_trip_preserves_values(
+    clock: DefaultClock,
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id)
-        .await
-        .expect("conversation insert");
+    insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
-    let specific_msg_id = MessageId::from_uuid(
-        uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("valid uuid"),
-    );
+    let specific_msg_id = MessageId::from_uuid(uuid::Uuid::parse_str(
+        "550e8400-e29b-41d4-a716-446655440000",
+    )?);
 
     let message = Message::builder(conv_id, Role::User, SequenceNumber::new(1))
         .with_id(specific_msg_id)
         .with_content(ContentPart::Text(TextPart::new("UUID test")))
-        .build(&clock)
-        .expect("valid message");
+        .build(&clock)?;
 
-    repo.store(&message).await.expect("store");
+    repo.store(&message).await?;
 
     let retrieved = repo
         .find_by_id(specific_msg_id)
-        .await
-        .expect("find")
+        .await?
         .expect("message should exist");
 
     assert_eq!(
@@ -346,4 +336,5 @@ async fn uuid_round_trip_preserves_values(clock: DefaultClock, postgres_cluster:
         "550e8400-e29b-41d4-a716-446655440000"
     );
     assert_eq!(retrieved.conversation_id(), conv_id);
+    Ok(())
 }

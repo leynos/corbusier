@@ -428,6 +428,7 @@ dependencies = [
  "eyre",
  "mockable",
  "mockall",
+ "once_cell",
  "pg-embed-setup-unpriv",
  "postgresql_embedded",
  "rstest",

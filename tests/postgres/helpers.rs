@@ -1,7 +1,7 @@
 //! Shared test helpers for `PostgreSQL` integration tests.
 
-use super::cluster::{BoxError, ManagedCluster, TemporaryDatabase};
-pub use super::cluster::{PostgresCluster, postgres_cluster};
+pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
+use super::cluster::{ManagedCluster, TemporaryDatabase};
 use corbusier::message::{
     adapters::audit_context::AuditContext,
     adapters::postgres::PostgresMessageRepository,
@@ -109,8 +109,10 @@ pub struct PreparedRepo {
 ///
 /// Returns an error if template creation, database setup, or repository construction fails.
 #[fixture]
-pub async fn prepared_repo(postgres_cluster: PostgresCluster) -> Result<PreparedRepo, BoxError> {
-    let cluster = postgres_cluster;
+pub async fn prepared_repo(
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<PreparedRepo, BoxError> {
+    let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     let (temp_db, repo) = setup_repository(cluster).await?;
     Ok(PreparedRepo {
