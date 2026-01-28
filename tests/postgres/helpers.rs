@@ -73,7 +73,7 @@ pub async fn setup_repository(
     cluster: &'static ManagedCluster,
 ) -> Result<(TemporaryDatabase, PostgresMessageRepository), BoxError> {
     let temp_db = cluster
-        .temporary_database_from_template(&format!("test_{}", uuid::Uuid::new_v4()), TEMPLATE_DB)
+        .temporary_database_from_template(&format!("test_{}", Uuid::new_v4()), TEMPLATE_DB)
         .await?;
 
     let url = temp_db.url();
