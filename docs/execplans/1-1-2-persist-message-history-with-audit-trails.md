@@ -9,8 +9,8 @@ Status: DRAFT
 
 No PLANS.md exists in this repository at the time of writing.
 
-This document must be maintained in accordance with the execplans skill
-located at `/root/.codex/skills/execplans/SKILL.md`.
+This document must be maintained in accordance with the execplans skill located
+at `/root/.codex/skills/execplans/SKILL.md`.
 
 ## Purpose / Big Picture
 
@@ -62,10 +62,9 @@ Stop and escalate if any threshold is exceeded:
 ## Risks
 
 - Risk: audit metadata fields are underspecified in the design doc, leading to
-  incompatible shapes.
-  Severity: medium; Likelihood: medium; Mitigation: derive a minimal schema
-  from corbusier-design.md §2.2.1 and §6.2.1.2, record the decision in the
-  design document, and keep metadata extensible.
+  incompatible shapes. Severity: medium; Likelihood: medium; Mitigation: derive
+  a minimal schema from corbusier-design.md §2.2.1 and §6.2.1.2, record the
+  decision in the design document, and keep metadata extensible.
 
 - Risk: race conditions when allocating sequence numbers under concurrency.
   Severity: medium; Likelihood: low; Mitigation: use repository-level
@@ -94,23 +93,22 @@ Stop and escalate if any threshold is exceeded:
 - Observation: Message persistence, audit triggers, and Postgres integration
   helpers already exist under `src/message/adapters` and `tests/postgres`.
   Evidence: `PostgresMessageRepository::store_with_audit` and migrations in
-  `migrations/2026-01-16-000000_add_audit_trigger`.
-  Impact: Implementation can extend existing ports and tests rather than adding
-  new infrastructure from scratch.
+  `migrations/2026-01-16-000000_add_audit_trigger`. Impact: Implementation can
+  extend existing ports and tests rather than adding new infrastructure from
+  scratch.
 
 ## Decision Log
 
 - Decision: Keep the feature-based layout under `src/message/` and add new
   modules there (rather than introducing a separate `application/` tree).
-  Rationale: Aligns with AGENTS.md “group by feature, not layer” guidance
-  while preserving hexagonal boundaries.
-  Date/Author: 2026-01-28, Codex.
+  Rationale: Aligns with AGENTS.md “group by feature, not layer” guidance while
+  preserving hexagonal boundaries. Date/Author: 2026-01-28, Codex.
 
 - Decision: Persist tool call and agent response audit metadata inside
   `MessageMetadata` (JSONB) with typed structs and explicit optional fields.
   Rationale: Matches corbusier-design.md §5.2.1 and §6.2.1.2, avoids new
-  tables, and keeps message retrieval self-contained.
-  Date/Author: 2026-01-28, Codex.
+  tables, and keeps message retrieval self-contained. Date/Author: 2026-01-28,
+  Codex.
 
 ## Outcomes & Retrospective
 
@@ -118,13 +116,14 @@ To be completed after implementation.
 
 ## Context and Orientation
 
-Current code already implements the canonical message schema (`src/message/
-`), in-memory and Postgres repositories, and migrations for `conversations`,
+Current code already implements the canonical message schema (`src/message/`),
+in-memory and Postgres repositories, and migrations for `conversations`,
 `messages`, `domain_events`, and `audit_logs`. Message metadata currently
 captures agent backend, turn id, and slash command expansion. Postgres adapters
-support audit context propagation via session settings and triggers. Integration
-support for embedded Postgres exists under `tests/postgres/cluster`, and
-integration tests already validate audit logs for message inserts.
+support audit context propagation via session settings and triggers.
+Integration support for embedded Postgres exists under
+`tests/postgres/cluster`, and integration tests already validate audit logs for
+message inserts.
 
 Key files and modules:
 
@@ -312,19 +311,21 @@ Expected additions (adjust if design review dictates otherwise):
 - Optional `ConversationRepository` or `ConversationHistoryPort` trait in
   `src/message/ports/` with methods such as:
 
-    async fn ensure_conversation(
-        &self,
-        id: ConversationId,
-    ) -> RepositoryResult<()>;
-    async fn append_message(&self, message: Message, audit: AuditContext)
-        -> RepositoryResult<()>
-    async fn history(&self, conversation_id: ConversationId)
-        -> RepositoryResult<Vec<Message>>;
+  ```rust
+  async fn ensure_conversation(
+      &self,
+      id: ConversationId,
+  ) -> RepositoryResult<()>;
+  async fn append_message(&self, message: Message, audit: AuditContext)
+      -> RepositoryResult<()>;
+  async fn history(&self, conversation_id: ConversationId)
+      -> RepositoryResult<Vec<Message>>;
+  ```
 
 - Dev-dependencies:
   - `rstest-bdd = "0.4.0"`
   - `rstest-bdd-macros = { version = "0.4.0", features =
     ["strict-compile-time-validation"] }`
 
-If dependency versions or feature flags differ from what is available, stop
-and escalate before proceeding.
+If dependency versions or feature flags differ from what is available, stop and
+escalate before proceeding.
