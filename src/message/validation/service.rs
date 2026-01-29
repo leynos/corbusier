@@ -109,7 +109,7 @@ impl MessageValidator for DefaultMessageValidator {
         }
 
         if let Err(e) = rules::validate_metadata(message) {
-            errors.push(e);
+            collect_errors(&mut errors, e);
         }
 
         if errors.is_empty() {

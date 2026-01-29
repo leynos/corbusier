@@ -5738,7 +5738,7 @@ schema is intentionally minimal and extensible:
 - `agent_response_audit`: agent response audit object. Required field is
   `status`. Optional fields include `response_id`, `model`, and `error`.
 
-Status values are standardised:
+Status values are standardized:
 
 - Tool call statuses: `queued`, `running`, `succeeded`, `failed`.
 - Agent response statuses: `completed`, `failed`, `cancelled`.

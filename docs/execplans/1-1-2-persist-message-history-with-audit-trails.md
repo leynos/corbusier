@@ -1,7 +1,7 @@
-# Persist Message History with Audit Trails (Roadmap 1.1.2)
+# Persist message history with audit trails (Roadmap 1.1.2)
 
 This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprizes & Discoveries`,
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
@@ -12,7 +12,7 @@ No PLANS.md exists in this repository at the time of writing.
 This document must be maintained in accordance with the execplans skill located
 at `/root/.codex/skills/execplans/SKILL.md`.
 
-## Purpose / Big Picture
+## Purpose / big picture
 
 After this change, Corbusier will persist conversation message history with
 immutable ordering and complete audit metadata for tool calls and agent
@@ -44,7 +44,7 @@ Hard invariants that must not be violated:
 - **Documentation**: new public APIs have rustdoc with examples; module files
   begin with `//!` comments; docs are en-GB-oxendict and wrapped at 80 columns.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 Stop and escalate if any threshold is exceeded:
 
@@ -77,7 +77,8 @@ Stop and escalate if any threshold is exceeded:
 
 - Risk: Postgres embedded cluster boot time increases test runtime.
   Severity: low; Likelihood: medium; Mitigation: reuse template database via
-  existing helpers in `tests/postgres/cluster` and limit BDD scenarios.
+  existing helpers in `tests/postgres/cluster` and limit behaviour-driven
+  development (BDD) scenarios.
 
 ## Progress
 
@@ -92,7 +93,7 @@ Stop and escalate if any threshold is exceeded:
 - [x] (2026-01-28 00:00Z) Stage E: documentation, design notes, roadmap update,
   and quality gates.
 
-## Surprizes & Discoveries
+## Surprises & discoveries
 
 - Observation: Message persistence, audit triggers, and Postgres integration
   helpers already exist under `src/message/adapters` and `tests/postgres`.
@@ -101,7 +102,7 @@ Stop and escalate if any threshold is exceeded:
   extend existing ports and tests rather than adding new infrastructure from
   scratch.
 
-## Decision Log
+## Decision log
 
 - Decision: Keep the feature-based layout under `src/message/` and add new
   modules there (rather than introducing a separate `application/` tree).
@@ -114,19 +115,19 @@ Stop and escalate if any threshold is exceeded:
   tables, and keeps message retrieval self-contained. Date/Author: 2026-01-28,
   Codex.
 
-- Decision: Standardise audit status values in metadata. Tool calls use
+- Decision: Standardize audit status values in metadata. Tool calls use
   `queued`, `running`, `succeeded`, `failed`; agent responses use `completed`,
   `failed`, `cancelled`. Rationale: keeps validation deterministic while
   matching common audit lifecycle stages. Date/Author: 2026-01-28, Codex.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Implementation delivered typed audit metadata for tool calls and agent
 responses, validation for required fields, and round-trip coverage through
 Postgres and in-memory repositories. Documentation now captures the schema
 decision and roadmap item 1.1.2 is complete.
 
-## Context and Orientation
+## Context and orientation
 
 Current code already implements the canonical message schema (`src/message/`),
 in-memory and Postgres repositories, and migrations for `conversations`,
@@ -150,9 +151,9 @@ responses within stored messages, plus a cohesive workflow for appending and
 retrieving ordered message history by conversation id, backed by Postgres with
 embedded test coverage.
 
-## Plan of Work
+## Plan of work
 
-### Stage A: Requirements Alignment and Metadata Schema
+### Stage A: requirements alignment and metadata schema
 
 Review corbusier-design.md §2.2.1, §5.2.1, and §6.2.3 to define the minimal
 shape for audit metadata. Decide on typed fields for tool call metadata and
@@ -160,7 +161,7 @@ agent response metadata, ensure they remain optional, and document the decision
 in `docs/corbusier-design.md` under the relevant persistence or schema section.
 If multiple interpretations remain, stop and request clarification.
 
-### Stage B: Domain Model and Ports
+### Stage B: domain model and ports
 
 Introduce typed audit metadata in the domain layer and align validation rules.
 Likely changes include:
@@ -175,7 +176,7 @@ Likely changes include:
   (new module) that orchestrates sequence allocation and message append, using
   only ports and domain types.
 
-### Stage C: Adapters and Persistence
+### Stage C: adapters and persistence
 
 Update adapters to persist and retrieve the expanded metadata, and to expose
 queryable conversation history with immutable ordering.
@@ -192,7 +193,7 @@ queryable conversation history with immutable ordering.
   any new inserts (conversation creation, domain events) also apply audit
   context when needed.
 
-### Stage D: Tests (Unit, Integration, Behavioural)
+### Stage D: tests (unit, integration, behavioural)
 
 Add comprehensive tests covering happy and unhappy paths.
 
@@ -210,7 +211,7 @@ Add comprehensive tests covering happy and unhappy paths.
   - Scenario: missing audit metadata yields validation error.
   Use `#[tokio::test]` on scenario functions to allow async repository calls.
 
-### Stage E: Documentation, Roadmap, and Quality Gates
+### Stage E: documentation, roadmap, and quality gates
 
 - Update `docs/users-guide.md` with user-visible behaviour (audit metadata now
   included in conversation history results).
@@ -218,7 +219,7 @@ Add comprehensive tests covering happy and unhappy paths.
 - Mark roadmap item 1.1.2 as done in `docs/roadmap.md`.
 - Run formatting, linting, tests, markdown lint, and Mermaid validation.
 
-## Concrete Steps
+## Concrete steps
 
 All commands run from repository root `/home/user/project`.
 
@@ -275,7 +276,7 @@ All commands run from repository root `/home/user/project`.
    - `set -o pipefail && make markdownlint 2>&1 | tee /tmp/markdownlint.log`
    - `set -o pipefail && make nixie 2>&1 | tee /tmp/nixie.log`
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Quality criteria (done means all of the following are true):
 
@@ -288,7 +289,7 @@ Quality criteria (done means all of the following are true):
 - Behavioural tests (rstest-bdd) cover at least one happy path and one unhappy
   path, and all tests pass under embedded Postgres.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 All steps are re-runnable. If a step fails:
 
@@ -297,7 +298,7 @@ All steps are re-runnable. If a step fails:
 
 No destructive actions are required. Use git to restore files if necessary.
 
-## Artifacts and Notes
+## Artifacts and notes
 
 Expected files added or modified (names may adjust to fit line limits):
 
@@ -314,7 +315,7 @@ Expected files added or modified (names may adjust to fit line limits):
 - `docs/users-guide.md`
 - `docs/roadmap.md`
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 Expected additions (adjust if design review dictates otherwise):
 

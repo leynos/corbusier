@@ -134,6 +134,8 @@ fn message_rejected_with_metadata_error(world: &HistoryWorld) {
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn persist_audit_metadata(world: HistoryWorld) {
+    // World parameter required for rstest-bdd fixture injection; step
+    // definitions handle mutation.
     let _ = world;
 }
 
@@ -143,5 +145,7 @@ async fn persist_audit_metadata(world: HistoryWorld) {
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_missing_tool_call_audit(world: HistoryWorld) {
+    // World parameter required for rstest-bdd fixture injection; step
+    // definitions handle mutation.
     let _ = world;
 }

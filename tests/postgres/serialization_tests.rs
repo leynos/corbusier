@@ -248,9 +248,11 @@ async fn metadata_jsonb_round_trip(
         Some("claude-3-opus".to_owned())
     );
     assert_eq!(retrieved.metadata().tool_call_audits.len(), 1);
-    let Some(tool_audit) = retrieved.metadata().tool_call_audits.first() else {
-        panic!("tool call audit should exist");
-    };
+    let tool_audit = retrieved
+        .metadata()
+        .tool_call_audits
+        .first()
+        .expect("tool call audit should exist");
     assert_eq!(tool_audit.status, ToolCallStatus::Succeeded);
     assert_eq!(
         retrieved
