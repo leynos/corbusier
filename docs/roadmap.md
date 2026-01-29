@@ -15,13 +15,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [x] Add versioned schema validation at ingestion boundaries. See
     corbusier-design.md §4.4.2.1.
   - [x] Success criteria: all stored messages conform to the canonical schema.
-- [ ] 1.1.2 Persist message history with audit trails. See
+- [x] 1.1.2 Persist message history with audit trails. See
   corbusier-design.md §2.2.1 and §6.2.3.
-  - [ ] Implement conversation history persistence with immutable ordering. See
+  - [x] Implement conversation history persistence with immutable ordering. See
     corbusier-design.md §6.2.3.
-  - [ ] Store audit metadata for tool calls and agent responses. See
+  - [x] Store audit metadata for tool calls and agent responses. See
     corbusier-design.md §2.1.1.
-  - [ ] Success criteria: conversation history is queryable by conversation id
+  - [x] Success criteria: conversation history is queryable by conversation id
     with complete audit metadata.
 - [ ] 1.1.3 Preserve context across agent handoffs. See
   corbusier-design.md §2.2.1 and §4.1.1.1.

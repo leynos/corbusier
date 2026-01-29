@@ -4,7 +4,9 @@
 //! timestamp preservation, and error cases for malformed data.
 
 use crate::message::{
-    adapters::models::MessageRow, adapters::postgres::row_to_message, domain::Role,
+    adapters::models::MessageRow,
+    adapters::postgres::row_to_message,
+    domain::{AgentResponseStatus, Role, ToolCallStatus},
     error::RepositoryError,
 };
 use chrono::Utc;
@@ -209,4 +211,48 @@ fn row_to_message_deserializes_metadata_with_agent_backend(message_row: MessageR
         message.metadata().agent_backend,
         Some("claude-3-opus".to_owned())
     );
+}
+
+#[rstest]
+fn row_to_message_deserializes_audit_metadata(message_row: MessageRow) {
+    let row = MessageRow {
+        metadata: json!({
+            "tool_call_audits": [
+                {
+                    "call_id": "call-1",
+                    "tool_name": "search",
+                    "status": "succeeded",
+                    "error": null
+                }
+            ],
+            "agent_response_audit": {
+                "status": "completed",
+                "response_id": "resp-1",
+                "model": "claude-3-opus"
+            }
+        }),
+        ..message_row
+    };
+
+    let result = row_to_message(row);
+
+    assert!(result.is_ok());
+    let message = result.expect("conversion should succeed");
+    assert_eq!(message.metadata().tool_call_audits.len(), 1);
+    let tool_audit = message
+        .metadata()
+        .tool_call_audits
+        .first()
+        .expect("tool call audit should exist");
+    assert_eq!(tool_audit.call_id, "call-1");
+    assert_eq!(tool_audit.tool_name, "search");
+    assert_eq!(tool_audit.status, ToolCallStatus::Succeeded);
+    let response = message
+        .metadata()
+        .agent_response_audit
+        .as_ref()
+        .expect("response audit should exist");
+    assert_eq!(response.status, AgentResponseStatus::Completed);
+    assert_eq!(response.response_id.as_deref(), Some("resp-1"));
+    assert_eq!(response.model.as_deref(), Some("claude-3-opus"));
 }

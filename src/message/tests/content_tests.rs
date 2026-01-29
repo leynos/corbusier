@@ -6,7 +6,8 @@
 )]
 
 use crate::message::domain::{
-    AttachmentPart, MessageMetadata, Role, TextPart, ToolCallPart, ToolResultPart, TurnId,
+    AgentResponseAudit, AgentResponseStatus, AttachmentPart, MessageMetadata, Role, TextPart,
+    ToolCallAudit, ToolCallPart, ToolCallStatus, ToolResultPart, TurnId,
 };
 use rstest::rstest;
 use serde_json::json;
@@ -179,11 +180,49 @@ fn message_metadata_with_agent_backend() {
 #[rstest]
 fn message_metadata_builder_chain() {
     let turn_id = TurnId::new();
+    let tool_call = ToolCallAudit::new("call-1", "search", ToolCallStatus::Succeeded);
+    let response = AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("r-1");
     let metadata = MessageMetadata::with_agent_backend("claude")
         .with_turn_id(turn_id)
+        .with_tool_call_audit(tool_call)
+        .with_agent_response_audit(response)
         .with_extension("custom", json!({"key": "value"}));
 
     assert_eq!(metadata.agent_backend, Some("claude".to_owned()));
     assert_eq!(metadata.turn_id, Some(turn_id));
+    assert_eq!(metadata.tool_call_audits.len(), 1);
+    assert!(metadata.agent_response_audit.is_some());
     assert!(metadata.extensions.contains_key("custom"));
+}
+
+// ============================================================================
+// Audit metadata tests
+// ============================================================================
+
+#[rstest]
+fn tool_call_audit_new_sets_fields() {
+    let audit = ToolCallAudit::new("call-123", "read_file", ToolCallStatus::Running);
+    assert_eq!(audit.call_id, "call-123");
+    assert_eq!(audit.tool_name, "read_file");
+    assert_eq!(audit.status, ToolCallStatus::Running);
+    assert!(audit.error.is_none());
+}
+
+#[rstest]
+fn tool_call_audit_with_error() {
+    let audit = ToolCallAudit::new("call-123", "read_file", ToolCallStatus::Failed)
+        .with_error("permission denied");
+    assert_eq!(audit.error, Some("permission denied".to_owned()));
+}
+
+#[rstest]
+fn agent_response_audit_builders() {
+    let audit = AgentResponseAudit::new(AgentResponseStatus::Completed)
+        .with_response_id("resp-1")
+        .with_model("claude-3-opus")
+        .with_error("none");
+    assert_eq!(audit.status, AgentResponseStatus::Completed);
+    assert_eq!(audit.response_id, Some("resp-1".to_owned()));
+    assert_eq!(audit.model, Some("claude-3-opus".to_owned()));
+    assert_eq!(audit.error, Some("none".to_owned()));
 }

@@ -8,8 +8,9 @@ use crate::postgres::helpers::{
 };
 use corbusier::message::{
     domain::{
-        AttachmentPart, ContentPart, ConversationId, Message, MessageId, MessageMetadata, Role,
-        SequenceNumber, TextPart, ToolCallPart, ToolResultPart,
+        AgentResponseAudit, AgentResponseStatus, AttachmentPart, ContentPart, ConversationId,
+        Message, MessageId, MessageMetadata, Role, SequenceNumber, TextPart, ToolCallAudit,
+        ToolCallPart, ToolCallStatus, ToolResultPart,
     },
     ports::repository::MessageRepository,
 };
@@ -220,7 +221,15 @@ async fn metadata_jsonb_round_trip(
     let conv_id = ConversationId::new();
     insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
-    let metadata = MessageMetadata::with_agent_backend("claude-3-opus");
+    let metadata = MessageMetadata::with_agent_backend("claude-3-opus")
+        .with_tool_call_audit(ToolCallAudit::new(
+            "call-99",
+            "read_file",
+            ToolCallStatus::Succeeded,
+        ))
+        .with_agent_response_audit(
+            AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("resp-1"),
+        );
 
     let message = Message::builder(conv_id, Role::Assistant, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new("Response")))
@@ -237,6 +246,20 @@ async fn metadata_jsonb_round_trip(
     assert_eq!(
         retrieved.metadata().agent_backend,
         Some("claude-3-opus".to_owned())
+    );
+    assert_eq!(retrieved.metadata().tool_call_audits.len(), 1);
+    let Some(tool_audit) = retrieved.metadata().tool_call_audits.first() else {
+        panic!("tool call audit should exist");
+    };
+    assert_eq!(tool_audit.status, ToolCallStatus::Succeeded);
+    assert_eq!(
+        retrieved
+            .metadata()
+            .agent_response_audit
+            .as_ref()
+            .expect("agent response audit should exist")
+            .status,
+        AgentResponseStatus::Completed
     );
     Ok(())
 }
