@@ -1,6 +1,6 @@
 //! Message metadata types capturing contextual information about messages.
 
-use super::TurnId;
+use super::{TurnId, audit::AgentResponseAudit, audit::ToolCallAudit};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -33,12 +33,21 @@ pub struct MessageMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slash_command_expansion: Option<SlashCommandExpansion>,
 
+    /// Audit metadata for tool calls associated with this message.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_call_audits: Vec<ToolCallAudit>,
+
+    /// Audit metadata for the agent response associated with this message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_response_audit: Option<AgentResponseAudit>,
+
     /// Extension data for custom metadata fields.
     ///
     /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
     /// fields during deserialisation will be captured here. This can cause
     /// unexpected behaviour if an extension key collides with a future field name.
-    /// Avoid using keys like `agent_backend`, `turn_id`, or `slash_command_expansion`.
+    /// Avoid using keys like `agent_backend`, `turn_id`, `slash_command_expansion`,
+    /// `tool_call_audits`, or `agent_response_audit`.
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub extensions: HashMap<String, Value>,
 }
@@ -77,6 +86,67 @@ impl MessageMetadata {
         self
     }
 
+    /// Appends a tool call audit record.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use corbusier::message::domain::{MessageMetadata, ToolCallAudit, ToolCallStatus};
+    ///
+    /// let metadata = MessageMetadata::empty()
+    ///     .with_tool_call_audit(ToolCallAudit::new(
+    ///         "call-123",
+    ///         "read_file",
+    ///         ToolCallStatus::Succeeded,
+    ///     ));
+    /// assert_eq!(metadata.tool_call_audits.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn with_tool_call_audit(mut self, audit: ToolCallAudit) -> Self {
+        self.tool_call_audits.push(audit);
+        self
+    }
+
+    /// Appends multiple tool call audit records.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use corbusier::message::domain::{MessageMetadata, ToolCallAudit, ToolCallStatus};
+    ///
+    /// let audits = vec![
+    ///     ToolCallAudit::new("call-1", "search", ToolCallStatus::Queued),
+    ///     ToolCallAudit::new("call-2", "read_file", ToolCallStatus::Running),
+    /// ];
+    /// let metadata = MessageMetadata::empty().with_tool_call_audits(audits);
+    /// assert_eq!(metadata.tool_call_audits.len(), 2);
+    /// ```
+    #[must_use]
+    pub fn with_tool_call_audits(
+        mut self,
+        audits: impl IntoIterator<Item = ToolCallAudit>,
+    ) -> Self {
+        self.tool_call_audits.extend(audits);
+        self
+    }
+
+    /// Sets the agent response audit metadata.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use corbusier::message::domain::{AgentResponseAudit, AgentResponseStatus, MessageMetadata};
+    ///
+    /// let response = AgentResponseAudit::new(AgentResponseStatus::Completed);
+    /// let metadata = MessageMetadata::empty().with_agent_response_audit(response);
+    /// assert!(metadata.agent_response_audit.is_some());
+    /// ```
+    #[must_use]
+    pub fn with_agent_response_audit(mut self, audit: AgentResponseAudit) -> Self {
+        self.agent_response_audit = Some(audit);
+        self
+    }
+
     /// Adds an extension field.
     #[must_use]
     pub fn with_extension(mut self, key: impl Into<String>, value: Value) -> Self {
@@ -90,6 +160,8 @@ impl MessageMetadata {
         self.agent_backend.is_none()
             && self.turn_id.is_none()
             && self.slash_command_expansion.is_none()
+            && self.tool_call_audits.is_empty()
+            && self.agent_response_audit.is_none()
             && self.extensions.is_empty()
     }
 }

@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 No PLANS.md exists in this repository at the time of writing.
 
@@ -82,11 +82,15 @@ Stop and escalate if any threshold is exceeded:
 ## Progress
 
 - [x] (2026-01-28 00:00Z) Drafted ExecPlan.
-- [ ] Stage A: requirements alignment and audit metadata schema decision.
-- [ ] Stage B: domain model and ports for conversation history + audit metadata.
-- [ ] Stage C: adapters and persistence updates (Postgres + in-memory).
-- [ ] Stage D: unit, integration, and BDD tests.
-- [ ] Stage E: documentation, design notes, roadmap update, and quality gates.
+- [x] (2026-01-28 00:00Z) Stage A: requirements alignment and audit metadata
+  schema decision.
+- [x] (2026-01-28 00:00Z) Stage B: domain model and ports for conversation
+  history + audit metadata.
+- [x] (2026-01-28 00:00Z) Stage C: adapters and persistence updates (Postgres +
+  in-memory).
+- [x] (2026-01-28 00:00Z) Stage D: unit, integration, and BDD tests.
+- [x] (2026-01-28 00:00Z) Stage E: documentation, design notes, roadmap update,
+  and quality gates.
 
 ## Surprizes & Discoveries
 
@@ -110,9 +114,17 @@ Stop and escalate if any threshold is exceeded:
   tables, and keeps message retrieval self-contained. Date/Author: 2026-01-28,
   Codex.
 
+- Decision: Standardise audit status values in metadata. Tool calls use
+  `queued`, `running`, `succeeded`, `failed`; agent responses use `completed`,
+  `failed`, `cancelled`. Rationale: keeps validation deterministic while
+  matching common audit lifecycle stages. Date/Author: 2026-01-28, Codex.
+
 ## Outcomes & Retrospective
 
-To be completed after implementation.
+Implementation delivered typed audit metadata for tool calls and agent
+responses, validation for required fields, and round-trip coverage through
+Postgres and in-memory repositories. Documentation now captures the schema
+decision and roadmap item 1.1.2 is complete.
 
 ## Context and Orientation
 
