@@ -18,5 +18,6 @@ mod validation_config_tests;
 mod validation_content_tests;
 pub(crate) mod validation_fixtures;
 mod validation_limits_tests;
+mod validation_metadata_tests;
 mod validation_structure_tests;
 mod versioning_tests;

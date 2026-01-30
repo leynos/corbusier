@@ -5683,7 +5683,19 @@ be using JSONB.
   "metadata": {
     "agent_backend": "claude_code_sdk",
     "turn_id": "uuid",
-    "slash_command_expansion": {...}
+    "slash_command_expansion": {...},
+    "tool_call_audits": [
+      {
+        "call_id": "call-123",
+        "tool_name": "weaver_edit",
+        "status": "succeeded"
+      }
+    ],
+    "agent_response_audit": {
+      "status": "completed",
+      "response_id": "resp-456",
+      "model": "claude-3-opus"
+    }
   }
 }
 
@@ -5715,6 +5727,21 @@ be using JSONB.
   }
 }
 ```
+
+###### Audit metadata schema
+
+Message metadata carries audit records for tool calls and agent responses. The
+schema is intentionally minimal and extensible:
+
+- `tool_call_audits`: array of tool call audit objects. Required fields are
+  `call_id`, `tool_name`, and `status`. Optional fields include `error`.
+- `agent_response_audit`: agent response audit object. Required field is
+  `status`. Optional fields include `response_id`, `model`, and `error`.
+
+Status values are standardized:
+
+- Tool call statuses: `queued`, `running`, `succeeded`, `failed`.
+- Agent response statuses: `completed`, `failed`, `cancelled`.
 
 ###### Canonical Message Domain Model
 
@@ -5811,11 +5838,16 @@ classDiagram
         +Option~String~ agent_backend
         +Option~TurnId~ turn_id
         +Option~SlashCommandExpansion~ expansion
+        +Vec~ToolCallAudit~ tool_call_audits
+        +Option~AgentResponseAudit~ agent_response_audit
         +HashMap~String, Value~ extensions
         +empty() MessageMetadata
         +with_agent_backend(backend) MessageMetadata
         +with_turn_id(turn_id) MessageMetadata
         +with_slash_command_expansion(exp) MessageMetadata
+        +with_tool_call_audit(audit) MessageMetadata
+        +with_tool_call_audits(audits) MessageMetadata
+        +with_agent_response_audit(audit) MessageMetadata
         +with_extension(key, value) MessageMetadata
         +is_empty() bool
     }
@@ -5826,6 +5858,41 @@ classDiagram
         +String expanded_content
         +new(command, content) SlashCommandExpansion
         +with_parameter(key, value) SlashCommandExpansion
+    }
+
+    class ToolCallAudit {
+        +String call_id
+        +String tool_name
+        +ToolCallStatus status
+        +Option~String~ error
+        +new(call_id, tool_name, status) ToolCallAudit
+        +with_error(error) ToolCallAudit
+    }
+
+    class ToolCallStatus {
+        <<enum>>
+        Queued
+        Running
+        Succeeded
+        Failed
+    }
+
+    class AgentResponseAudit {
+        +AgentResponseStatus status
+        +Option~String~ response_id
+        +Option~String~ model
+        +Option~String~ error
+        +new(status) AgentResponseAudit
+        +with_response_id(response_id) AgentResponseAudit
+        +with_model(model) AgentResponseAudit
+        +with_error(error) AgentResponseAudit
+    }
+
+    class AgentResponseStatus {
+        <<enum>>
+        Completed
+        Failed
+        Cancelled
     }
 
     class Role {
@@ -5887,6 +5954,10 @@ classDiagram
 
     MessageMetadata o-- TurnId
     MessageMetadata o-- SlashCommandExpansion
+    MessageMetadata "1" o-- "*" ToolCallAudit
+    MessageMetadata o-- AgentResponseAudit
+    ToolCallAudit o-- ToolCallStatus
+    AgentResponseAudit o-- AgentResponseStatus
 
     MessageBuilder --> Message
     MessageBuilder ..> MessageBuilderError

@@ -5,7 +5,10 @@
 //! `ValidationError` on failure.
 
 use crate::message::{
-    domain::{AttachmentPart, ContentPart, Message, TextPart, ToolCallPart, ToolResultPart},
+    domain::{
+        AgentResponseAudit, AttachmentPart, ContentPart, Message, TextPart, ToolCallAudit,
+        ToolCallPart, ToolResultPart,
+    },
     error::ValidationError,
     ports::validator::ValidationConfig,
 };
@@ -102,6 +105,53 @@ pub fn validate_content_parts(
     }
 }
 
+/// Validates message metadata audit records.
+///
+/// # Errors
+///
+/// Returns `ValidationError::InvalidMetadata` if audit metadata is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use corbusier::message::domain::{
+///     ContentPart, ConversationId, Message, MessageMetadata, Role, SequenceNumber, TextPart,
+///     ToolCallAudit, ToolCallStatus,
+/// };
+/// use corbusier::message::validation::rules::validate_metadata;
+/// use mockable::DefaultClock;
+///
+/// let clock = DefaultClock;
+/// let metadata = MessageMetadata::empty().with_tool_call_audit(
+///     ToolCallAudit::new("call-123", "search", ToolCallStatus::Succeeded),
+/// );
+/// let message = Message::builder(ConversationId::new(), Role::Assistant, SequenceNumber::new(1))
+///     .with_content(ContentPart::Text(TextPart::new("Hello")))
+///     .with_metadata(metadata)
+///     .build(&clock)
+///     .expect("valid message");
+///
+/// assert!(validate_metadata(&message).is_ok());
+/// ```
+pub fn validate_metadata(message: &Message) -> Result<(), ValidationError> {
+    let metadata = message.metadata();
+    let mut errors = Vec::new();
+
+    for (index, audit) in metadata.tool_call_audits.iter().enumerate() {
+        collect_metadata_error(&mut errors, validate_tool_call_audit(audit, index));
+    }
+
+    if let Some(audit) = metadata.agent_response_audit.as_ref() {
+        collect_metadata_error(&mut errors, validate_agent_response_audit(audit));
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(ValidationError::multiple(errors))
+    }
+}
+
 fn validate_content_part(
     part: &ContentPart,
     index: usize,
@@ -112,6 +162,64 @@ fn validate_content_part(
         ContentPart::ToolCall(tool_call) => validate_tool_call_part(tool_call, index),
         ContentPart::ToolResult(tool_result) => validate_tool_result_part(tool_result, index),
         ContentPart::Attachment(attachment) => validate_attachment_part(attachment, index),
+    }
+}
+
+fn validate_tool_call_audit(audit: &ToolCallAudit, index: usize) -> Option<ValidationError> {
+    if audit.call_id.trim().is_empty() {
+        return Some(ValidationError::InvalidMetadata(format!(
+            "tool call audit at index {index} must include a call_id"
+        )));
+    }
+
+    if audit.tool_name.trim().is_empty() {
+        return Some(ValidationError::InvalidMetadata(format!(
+            "tool call audit at index {index} must include a tool_name"
+        )));
+    }
+
+    if let Some(error) = audit.error.as_ref()
+        && error.trim().is_empty()
+    {
+        return Some(ValidationError::InvalidMetadata(format!(
+            "tool call audit at index {index} has an empty error message"
+        )));
+    }
+
+    None
+}
+
+fn validate_agent_response_audit(audit: &AgentResponseAudit) -> Option<ValidationError> {
+    if let Some(response_id) = audit.response_id.as_ref()
+        && response_id.trim().is_empty()
+    {
+        return Some(ValidationError::InvalidMetadata(
+            "agent response audit must include a non-empty response_id".to_owned(),
+        ));
+    }
+
+    if let Some(model) = audit.model.as_ref()
+        && model.trim().is_empty()
+    {
+        return Some(ValidationError::InvalidMetadata(
+            "agent response audit must include a non-empty model".to_owned(),
+        ));
+    }
+
+    if let Some(error) = audit.error.as_ref()
+        && error.trim().is_empty()
+    {
+        return Some(ValidationError::InvalidMetadata(
+            "agent response audit must include a non-empty error".to_owned(),
+        ));
+    }
+
+    None
+}
+
+fn collect_metadata_error(errors: &mut Vec<ValidationError>, maybe_error: Option<ValidationError>) {
+    if let Some(error) = maybe_error {
+        errors.push(error);
     }
 }
 
