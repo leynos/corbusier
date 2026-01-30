@@ -11,6 +11,7 @@ use corbusier::message::{
     ports::validator::MessageValidator,
     validation::service::DefaultMessageValidator,
 };
+use eyre::{WrapErr, eyre};
 use mockable::DefaultClock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -31,32 +32,20 @@ fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }
 
-fn expect_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
-    match result {
-        Ok(value) => value,
-        Err(error) => panic!("{context}: {error}"),
-    }
-}
-
-fn expect_some<T>(value: Option<T>, context: &str) -> T {
-    let Some(item) = value else {
-        panic!("{context}");
-    };
-    item
-}
-
-fn assert_metadata_error(error: &ValidationError) {
+fn assert_metadata_error(error: &ValidationError) -> Result<(), eyre::Report> {
     match error {
-        ValidationError::InvalidMetadata(_) => {}
+        ValidationError::InvalidMetadata(_) => Ok(()),
         ValidationError::Multiple(errors) => {
-            assert!(
-                errors
-                    .iter()
-                    .any(|err| matches!(err, ValidationError::InvalidMetadata(_))),
-                "expected metadata validation error"
-            );
+            if errors
+                .iter()
+                .any(|err| matches!(err, ValidationError::InvalidMetadata(_)))
+            {
+                Ok(())
+            } else {
+                Err(eyre!("expected metadata validation error"))
+            }
         }
-        _ => panic!("expected metadata validation error, got {error:?}"),
+        _ => Err(eyre!("expected metadata validation error, got {error:?}")),
     }
 }
 
@@ -66,7 +55,7 @@ fn empty_conversation_history(world: &mut HistoryWorld) {
 }
 
 #[when("a tool call and agent response are persisted")]
-fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) {
+fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) -> Result<(), eyre::Report> {
     let clock = DefaultClock;
     let metadata = MessageMetadata::empty()
         .with_tool_call_audit(ToolCallAudit::new(
@@ -77,66 +66,63 @@ fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) {
         .with_agent_response_audit(
             AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("resp-456"),
         );
-    let message = expect_ok(
-        Message::builder(
-            world.conversation_id,
-            Role::Assistant,
-            SequenceNumber::new(1),
-        )
-        .with_content(ContentPart::Text(TextPart::new("Response")))
-        .with_metadata(metadata)
-        .build(&clock),
-        "message should build",
-    );
+    let message = Message::builder(
+        world.conversation_id,
+        Role::Assistant,
+        SequenceNumber::new(1),
+    )
+    .with_content(ContentPart::Text(TextPart::new("Response")))
+    .with_metadata(metadata)
+    .build(&clock)
+    .wrap_err("message should build")?;
 
-    expect_ok(
-        run_async(world.repo.store(&message)),
-        "store should succeed",
-    );
+    run_async(world.repo.store(&message)).wrap_err("store should succeed")?;
+    Ok(())
 }
 
 #[then("the conversation history includes audit metadata")]
-fn history_includes_audit_metadata(world: &HistoryWorld) {
-    let history = expect_ok(
-        run_async(world.repo.find_by_conversation(world.conversation_id)),
-        "history fetch should succeed",
-    );
+fn history_includes_audit_metadata(world: &HistoryWorld) -> Result<(), eyre::Report> {
+    let history = run_async(world.repo.find_by_conversation(world.conversation_id))
+        .wrap_err("history fetch should succeed")?;
 
-    let message = expect_some(history.first(), "expected at least one message");
+    let message = history
+        .first()
+        .ok_or_else(|| eyre!("expected at least one message"))?;
     assert_eq!(message.metadata().tool_call_audits.len(), 1);
     assert!(message.metadata().agent_response_audit.is_some());
+    Ok(())
 }
 
 #[when("a tool call audit is missing a call id")]
-fn tool_call_audit_missing_call_id(world: &mut HistoryWorld) {
+fn tool_call_audit_missing_call_id(world: &mut HistoryWorld) -> Result<(), eyre::Report> {
     let clock = DefaultClock;
     let metadata = MessageMetadata::empty().with_tool_call_audit(ToolCallAudit::new(
         "",
         "read_file",
         ToolCallStatus::Queued,
     ));
-    let message = expect_ok(
-        Message::builder(
-            world.conversation_id,
-            Role::Assistant,
-            SequenceNumber::new(1),
-        )
-        .with_content(ContentPart::Text(TextPart::new("Response")))
-        .with_metadata(metadata)
-        .build(&clock),
-        "message should build",
-    );
+    let message = Message::builder(
+        world.conversation_id,
+        Role::Assistant,
+        SequenceNumber::new(1),
+    )
+    .with_content(ContentPart::Text(TextPart::new("Response")))
+    .with_metadata(metadata)
+    .build(&clock)
+    .wrap_err("message should build")?;
 
     let validator = DefaultMessageValidator::new();
     world.last_validation_error = validator.validate_structure(&message).err();
+    Ok(())
 }
 
 #[then("the message is rejected with a metadata error")]
-fn message_rejected_with_metadata_error(world: &HistoryWorld) {
-    let Some(error) = world.last_validation_error.as_ref() else {
-        panic!("expected a validation error");
-    };
-    assert_metadata_error(error);
+fn message_rejected_with_metadata_error(world: &HistoryWorld) -> Result<(), eyre::Report> {
+    let error = world
+        .last_validation_error
+        .as_ref()
+        .ok_or_else(|| eyre!("expected a validation error"))?;
+    assert_metadata_error(error)
 }
 
 #[scenario(
