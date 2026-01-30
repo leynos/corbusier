@@ -31,6 +31,20 @@ fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }
 
+fn expect_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => panic!("{context}: {error}"),
+    }
+}
+
+fn expect_some<T>(value: Option<T>, context: &str) -> T {
+    let Some(item) = value else {
+        panic!("{context}");
+    };
+    item
+}
+
 fn assert_metadata_error(error: &ValidationError) {
     match error {
         ValidationError::InvalidMetadata(_) => {}
@@ -63,34 +77,32 @@ fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) {
         .with_agent_response_audit(
             AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("resp-456"),
         );
-    let message = match Message::builder(
-        world.conversation_id,
-        Role::Assistant,
-        SequenceNumber::new(1),
-    )
-    .with_content(ContentPart::Text(TextPart::new("Response")))
-    .with_metadata(metadata)
-    .build(&clock)
-    {
-        Ok(message) => message,
-        Err(error) => panic!("message should build: {error}"),
-    };
+    let message = expect_ok(
+        Message::builder(
+            world.conversation_id,
+            Role::Assistant,
+            SequenceNumber::new(1),
+        )
+        .with_content(ContentPart::Text(TextPart::new("Response")))
+        .with_metadata(metadata)
+        .build(&clock),
+        "message should build",
+    );
 
-    if let Err(error) = run_async(world.repo.store(&message)) {
-        panic!("store should succeed: {error}");
-    }
+    expect_ok(
+        run_async(world.repo.store(&message)),
+        "store should succeed",
+    );
 }
 
 #[then("the conversation history includes audit metadata")]
 fn history_includes_audit_metadata(world: &HistoryWorld) {
-    let history = match run_async(world.repo.find_by_conversation(world.conversation_id)) {
-        Ok(history) => history,
-        Err(error) => panic!("history fetch should succeed: {error}"),
-    };
+    let history = expect_ok(
+        run_async(world.repo.find_by_conversation(world.conversation_id)),
+        "history fetch should succeed",
+    );
 
-    let Some(message) = history.first() else {
-        panic!("expected at least one message");
-    };
+    let message = expect_some(history.first(), "expected at least one message");
     assert_eq!(message.metadata().tool_call_audits.len(), 1);
     assert!(message.metadata().agent_response_audit.is_some());
 }
@@ -103,18 +115,17 @@ fn tool_call_audit_missing_call_id(world: &mut HistoryWorld) {
         "read_file",
         ToolCallStatus::Queued,
     ));
-    let message = match Message::builder(
-        world.conversation_id,
-        Role::Assistant,
-        SequenceNumber::new(1),
-    )
-    .with_content(ContentPart::Text(TextPart::new("Response")))
-    .with_metadata(metadata)
-    .build(&clock)
-    {
-        Ok(message) => message,
-        Err(error) => panic!("message should build: {error}"),
-    };
+    let message = expect_ok(
+        Message::builder(
+            world.conversation_id,
+            Role::Assistant,
+            SequenceNumber::new(1),
+        )
+        .with_content(ContentPart::Text(TextPart::new("Response")))
+        .with_metadata(metadata)
+        .build(&clock),
+        "message should build",
+    );
 
     let validator = DefaultMessageValidator::new();
     world.last_validation_error = validator.validate_structure(&message).err();
