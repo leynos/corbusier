@@ -19,18 +19,18 @@ use super::{AgentSessionId, HandoffId, MessageId, SequenceNumber, TurnId};
 ///
 /// ```
 /// use corbusier::message::domain::{
-///     AgentSessionId, HandoffMetadata, HandoffStatus, TurnId,
+///     AgentSessionId, HandoffMetadata, HandoffParams, HandoffStatus, TurnId,
 /// };
 /// use mockable::DefaultClock;
 ///
 /// let clock = DefaultClock;
-/// let handoff = HandoffMetadata::new(
+/// let params = HandoffParams::new(
 ///     AgentSessionId::new(),
 ///     TurnId::new(),
 ///     "claude-code",
 ///     "opus-agent",
-///     &clock,
 /// );
+/// let handoff = HandoffMetadata::new(params, &clock);
 /// assert_eq!(handoff.status, HandoffStatus::Initiated);
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -73,32 +73,49 @@ pub struct HandoffMetadata {
     pub status: HandoffStatus,
 }
 
-impl HandoffMetadata {
-    /// Creates a new handoff metadata with `Initiated` status.
-    ///
-    /// # Arguments
-    ///
-    /// * `source_session_id` - The session being handed off from
-    /// * `prior_turn_id` - The turn that triggered the handoff
-    /// * `source_agent` - The source agent backend identifier
-    /// * `target_agent` - The target agent backend identifier
-    /// * `clock` - Clock for timestamp generation
+/// Parameters for creating handoff metadata.
+#[derive(Debug, Clone)]
+pub struct HandoffParams {
+    /// The agent session being handed off from.
+    pub source_session_id: AgentSessionId,
+    /// The turn ID that triggered the handoff.
+    pub prior_turn_id: TurnId,
+    /// The source agent backend identifier.
+    pub source_agent: String,
+    /// The target agent backend identifier.
+    pub target_agent: String,
+}
+
+impl HandoffParams {
+    /// Creates new handoff parameters.
     #[must_use]
     pub fn new(
         source_session_id: AgentSessionId,
         prior_turn_id: TurnId,
         source_agent: impl Into<String>,
         target_agent: impl Into<String>,
-        clock: &impl mockable::Clock,
     ) -> Self {
         Self {
-            handoff_id: HandoffId::new(),
             source_session_id,
-            target_session_id: None,
             prior_turn_id,
-            triggering_tool_calls: Vec::new(),
             source_agent: source_agent.into(),
             target_agent: target_agent.into(),
+        }
+    }
+}
+
+impl HandoffMetadata {
+    /// Creates a new handoff metadata with `Initiated` status.
+    #[must_use]
+    pub fn new(params: HandoffParams, clock: &impl mockable::Clock) -> Self {
+        Self {
+            handoff_id: HandoffId::new(),
+            source_session_id: params.source_session_id,
+            target_session_id: None,
+            prior_turn_id: params.prior_turn_id,
+            triggering_tool_calls: Vec::new(),
+            source_agent: params.source_agent,
+            target_agent: params.target_agent,
             reason: None,
             initiated_at: clock.utc(),
             completed_at: None,
@@ -132,7 +149,7 @@ impl HandoffMetadata {
 
     /// Marks the handoff as accepted by the target agent.
     #[must_use]
-    pub fn accept(mut self) -> Self {
+    pub const fn accept(mut self) -> Self {
         self.status = HandoffStatus::Accepted;
         self
     }
@@ -152,21 +169,21 @@ impl HandoffMetadata {
 
     /// Marks the handoff as failed.
     #[must_use]
-    pub fn fail(mut self) -> Self {
+    pub const fn fail(mut self) -> Self {
         self.status = HandoffStatus::Failed;
         self
     }
 
     /// Cancels the handoff.
     #[must_use]
-    pub fn cancel(mut self) -> Self {
+    pub const fn cancel(mut self) -> Self {
         self.status = HandoffStatus::Cancelled;
         self
     }
 
     /// Returns `true` if the handoff is in a terminal state.
     #[must_use]
-    pub fn is_terminal(&self) -> bool {
+    pub const fn is_terminal(&self) -> bool {
         matches!(
             self.status,
             HandoffStatus::Completed | HandoffStatus::Failed | HandoffStatus::Cancelled
@@ -180,7 +197,7 @@ impl HandoffMetadata {
 /// tool call in the conversation history.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ToolCallReference {
-    /// The call_id of the referenced tool call.
+    /// The `call_id` of the referenced tool call.
     pub call_id: String,
 
     /// The tool name.
@@ -237,13 +254,13 @@ pub enum HandoffStatus {
 impl HandoffStatus {
     /// Returns `true` if this is a terminal status.
     #[must_use]
-    pub fn is_terminal(&self) -> bool {
+    pub const fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Returns the status as a string slice.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Initiated => "initiated",
             Self::Accepted => "accepted",
@@ -295,13 +312,13 @@ mod tests {
     #[test]
     fn handoff_metadata_new_sets_initiated_status() {
         let clock = DefaultClock;
-        let handoff = HandoffMetadata::new(
+        let params = HandoffParams::new(
             AgentSessionId::new(),
             TurnId::new(),
             "claude-code",
             "opus-agent",
-            &clock,
         );
+        let handoff = HandoffMetadata::new(params, &clock);
 
         assert_eq!(handoff.status, HandoffStatus::Initiated);
         assert!(handoff.target_session_id.is_none());
@@ -312,13 +329,13 @@ mod tests {
     #[test]
     fn handoff_metadata_complete_sets_target_and_timestamp() {
         let clock = DefaultClock;
-        let handoff = HandoffMetadata::new(
+        let params = HandoffParams::new(
             AgentSessionId::new(),
             TurnId::new(),
             "claude-code",
             "opus-agent",
-            &clock,
         );
+        let handoff = HandoffMetadata::new(params, &clock);
 
         let target_session = AgentSessionId::new();
         let completed = handoff.complete(target_session, &clock);
@@ -335,20 +352,25 @@ mod tests {
         let msg_id = MessageId::new();
         let seq = SequenceNumber::new(1);
 
-        let handoff =
-            HandoffMetadata::new(
-                AgentSessionId::new(),
-                TurnId::new(),
-                "claude-code",
-                "opus-agent",
-                &clock,
-            )
+        let params = HandoffParams::new(
+            AgentSessionId::new(),
+            TurnId::new(),
+            "claude-code",
+            "opus-agent",
+        );
+        let handoff = HandoffMetadata::new(params, &clock)
             .with_triggering_tool_call(ToolCallReference::new("call-1", "read_file", msg_id, seq))
             .with_triggering_tool_call(ToolCallReference::new("call-2", "write_file", msg_id, seq));
 
         assert_eq!(handoff.triggering_tool_calls.len(), 2);
-        assert_eq!(handoff.triggering_tool_calls[0].call_id, "call-1");
-        assert_eq!(handoff.triggering_tool_calls[1].call_id, "call-2");
+        assert_eq!(
+            handoff.triggering_tool_calls.first().map(|t| t.call_id.as_str()),
+            Some("call-1")
+        );
+        assert_eq!(
+            handoff.triggering_tool_calls.get(1).map(|t| t.call_id.as_str()),
+            Some("call-2")
+        );
     }
 
     #[test]

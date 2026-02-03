@@ -6,18 +6,25 @@
 //! - Context snapshot capture
 //! - Error handling for invalid states
 
+#![expect(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "tests commonly use expect and indexing for assertions"
+)]
+
 use corbusier::message::{
     adapters::memory::{
         InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
     },
     domain::{
-        AgentSession, AgentSessionState, ConversationId, HandoffStatus, SequenceNumber, TurnId,
+        AgentSession, AgentSessionState, ConversationId, HandoffSessionParams, HandoffStatus,
+        SequenceNumber, TurnId,
     },
     ports::{
         agent_session::AgentSessionRepository, context_snapshot::ContextSnapshotPort,
         handoff::AgentHandoffPort,
     },
-    services::HandoffService,
+    services::{HandoffService, ServiceInitiateParams},
 };
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
@@ -87,14 +94,15 @@ fn create_session_from_handoff_stores_correctly(runtime: Runtime, harness: Hando
         let conversation_id = ConversationId::new();
         let handoff_id = corbusier::message::domain::HandoffId::new();
 
+        let params = HandoffSessionParams::new(
+            conversation_id,
+            "target-agent",
+            SequenceNumber::new(10),
+            handoff_id,
+        );
         let session = harness
             .service
-            .create_target_session(
-                conversation_id,
-                "target-agent",
-                SequenceNumber::new(10),
-                handoff_id,
-            )
+            .create_target_session(params)
             .await
             .expect("should create session");
 
@@ -193,17 +201,15 @@ fn initiate_handoff_requires_active_session(runtime: Runtime, harness: HandoffTe
         let session_id = corbusier::message::domain::AgentSessionId::new();
 
         // Try to initiate handoff without an active session
-        let result = harness
-            .service
-            .initiate(
-                conversation_id,
-                session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                Some("task too complex"),
-            )
-            .await;
+        let params = ServiceInitiateParams::new(
+            conversation_id,
+            session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        )
+        .with_reason("task too complex");
+        let result = harness.service.initiate(params).await;
 
         assert!(result.is_err());
     });
@@ -229,16 +235,17 @@ fn initiate_handoff_succeeds_with_active_session(
         harness.session_repo.store(&session).await.expect("store");
 
         // Initiate handoff
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        )
+        .with_reason("task requires specialist");
         let handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                Some("task requires specialist"),
-            )
+            .initiate(initiate_params)
             .await
             .expect("should initiate");
 
@@ -288,28 +295,29 @@ fn complete_handoff_links_target_session(
             .await
             .expect("store");
 
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            source_session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
         let handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                source_session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
+            .initiate(initiate_params)
             .await
             .expect("initiate");
 
         // Create target session
+        let params = HandoffSessionParams::new(
+            conversation_id,
+            "target-agent",
+            SequenceNumber::new(6),
+            handoff.handoff_id,
+        );
         let target_session = harness
             .service
-            .create_target_session(
-                conversation_id,
-                "target-agent",
-                SequenceNumber::new(6),
-                handoff.handoff_id,
-            )
+            .create_target_session(params)
             .await
             .expect("create target");
 
@@ -357,16 +365,16 @@ fn cancel_handoff_reverts_source_session(
             .await
             .expect("store");
 
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            source_session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
         let handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                source_session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
+            .initiate(initiate_params)
             .await
             .expect("initiate");
 
@@ -417,16 +425,16 @@ fn handoff_captures_context_snapshot(
             .await
             .expect("store");
 
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            source_session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
         let _handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                source_session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
+            .initiate(initiate_params)
             .await
             .expect("initiate");
 
@@ -472,16 +480,16 @@ fn get_pending_handoff_returns_initiated(
             .await
             .expect("store");
 
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            source_session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
         let handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                source_session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
+            .initiate(initiate_params)
             .await
             .expect("initiate");
 
@@ -520,28 +528,29 @@ fn get_pending_handoff_returns_none_when_completed(
             .await
             .expect("store");
 
+        let initiate_params = ServiceInitiateParams::new(
+            conversation_id,
+            source_session.session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
         let handoff = harness
             .service
-            .initiate(
-                conversation_id,
-                source_session.session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
+            .initiate(initiate_params)
             .await
             .expect("initiate");
 
         // Create target and complete
+        let session_params = HandoffSessionParams::new(
+            conversation_id,
+            "target-agent",
+            SequenceNumber::new(6),
+            handoff.handoff_id,
+        );
         let target = harness
             .service
-            .create_target_session(
-                conversation_id,
-                "target-agent",
-                SequenceNumber::new(6),
-                handoff.handoff_id,
-            )
+            .create_target_session(session_params)
             .await
             .expect("target");
 
@@ -584,27 +593,29 @@ fn handoff_chain_tracks_all_sessions(
         harness.session_repo.store(&agent1).await.expect("store 1");
 
         // First handoff: agent-1 -> agent-2
+        let initiate1 = ServiceInitiateParams::new(
+            conversation_id,
+            agent1.session_id,
+            "agent-2",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        )
+        .with_reason("escalate to specialist");
         let handoff1 = harness
             .service
-            .initiate(
-                conversation_id,
-                agent1.session_id,
-                "agent-2",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                Some("escalate to specialist"),
-            )
+            .initiate(initiate1)
             .await
             .expect("initiate 1");
 
+        let params2 = HandoffSessionParams::new(
+            conversation_id,
+            "agent-2",
+            SequenceNumber::new(6),
+            handoff1.handoff_id,
+        );
         let agent2 = harness
             .service
-            .create_target_session(
-                conversation_id,
-                "agent-2",
-                SequenceNumber::new(6),
-                handoff1.handoff_id,
-            )
+            .create_target_session(params2)
             .await
             .expect("create agent2");
 
@@ -619,27 +630,29 @@ fn handoff_chain_tracks_all_sessions(
             .expect("complete 1");
 
         // Second handoff: agent-2 -> agent-3
+        let initiate2 = ServiceInitiateParams::new(
+            conversation_id,
+            agent2.session_id,
+            "agent-3",
+            TurnId::new(),
+            SequenceNumber::new(10),
+        )
+        .with_reason("need domain expert");
         let handoff2 = harness
             .service
-            .initiate(
-                conversation_id,
-                agent2.session_id,
-                "agent-3",
-                TurnId::new(),
-                SequenceNumber::new(10),
-                Some("need domain expert"),
-            )
+            .initiate(initiate2)
             .await
             .expect("initiate 2");
 
+        let params3 = HandoffSessionParams::new(
+            conversation_id,
+            "agent-3",
+            SequenceNumber::new(11),
+            handoff2.handoff_id,
+        );
         let agent3 = harness
             .service
-            .create_target_session(
-                conversation_id,
-                "agent-3",
-                SequenceNumber::new(11),
-                handoff2.handoff_id,
-            )
+            .create_target_session(params3)
             .await
             .expect("create agent3");
 

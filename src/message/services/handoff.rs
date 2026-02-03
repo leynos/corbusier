@@ -7,15 +7,64 @@ use std::sync::Arc;
 
 use crate::message::{
     domain::{
-        AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, SequenceNumber,
-        SnapshotType, TurnId,
+        AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata,
+        HandoffSessionParams, SequenceNumber, SnapshotType, TurnId,
     },
     ports::{
         agent_session::{AgentSessionRepository, SessionResult},
-        context_snapshot::ContextSnapshotPort,
-        handoff::{AgentHandoffPort, HandoffError, HandoffResult},
+        context_snapshot::{CaptureSnapshotParams, ContextSnapshotPort},
+        handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
     },
 };
+
+/// Parameters for initiating a handoff via the service.
+#[derive(Debug, Clone)]
+pub struct ServiceInitiateParams<'a> {
+    /// The conversation being handed off.
+    pub conversation_id: ConversationId,
+    /// The session initiating the handoff.
+    pub source_session_id: AgentSessionId,
+    /// The agent backend to hand off to.
+    pub target_agent: &'a str,
+    /// The turn that triggered the handoff.
+    pub prior_turn_id: TurnId,
+    /// Current sequence number for snapshot.
+    pub current_sequence: SequenceNumber,
+    /// Optional reason for the handoff.
+    pub reason: Option<&'a str>,
+}
+
+impl<'a> ServiceInitiateParams<'a> {
+    /// Creates new service initiate parameters.
+    #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "parameter struct constructor holds required fields"
+    )]
+    pub const fn new(
+        conversation_id: ConversationId,
+        source_session_id: AgentSessionId,
+        target_agent: &'a str,
+        prior_turn_id: TurnId,
+        current_sequence: SequenceNumber,
+    ) -> Self {
+        Self {
+            conversation_id,
+            source_session_id,
+            target_agent,
+            prior_turn_id,
+            current_sequence,
+            reason: None,
+        }
+    }
+
+    /// Sets the reason for the handoff.
+    #[must_use]
+    pub const fn with_reason(mut self, reason: &'a str) -> Self {
+        self.reason = Some(reason);
+        self
+    }
+}
 
 /// Service for coordinating agent handoffs with context preservation.
 ///
@@ -38,14 +87,14 @@ use crate::message::{
 /// );
 ///
 /// // Initiate handoff
-/// let handoff = service.initiate(
+/// let params = ServiceInitiateParams::new(
 ///     conversation_id,
 ///     source_session_id,
 ///     "target-agent",
 ///     prior_turn_id,
 ///     current_sequence,
-///     Some("task too complex"),
-/// ).await?;
+/// ).with_reason("task too complex");
+/// let handoff = service.initiate(params).await?;
 ///
 /// // Complete handoff when target agent starts
 /// let completed = service.complete(
@@ -73,7 +122,7 @@ where
     C: ContextSnapshotPort,
 {
     /// Creates a new handoff service.
-    pub fn new(session_repo: Arc<S>, handoff_adapter: Arc<H>, snapshot_adapter: Arc<C>) -> Self {
+    pub const fn new(session_repo: Arc<S>, handoff_adapter: Arc<H>, snapshot_adapter: Arc<C>) -> Self {
         Self {
             session_repo,
             handoff_adapter,
@@ -89,15 +138,6 @@ where
     /// 3. Creates the handoff record
     /// 4. Updates the source session state
     ///
-    /// # Parameters
-    ///
-    /// - `conversation_id`: The conversation being handed off
-    /// - `source_session_id`: The session initiating the handoff
-    /// - `target_agent`: The agent backend to hand off to
-    /// - `prior_turn_id`: The turn that triggered the handoff
-    /// - `current_sequence`: Current sequence number for snapshot
-    /// - `reason`: Optional reason for the handoff
-    ///
     /// # Errors
     ///
     /// Returns `HandoffError` if:
@@ -106,20 +146,15 @@ where
     /// - Handoff creation fails
     pub async fn initiate(
         &self,
-        conversation_id: ConversationId,
-        source_session_id: AgentSessionId,
-        target_agent: &str,
-        prior_turn_id: TurnId,
-        current_sequence: SequenceNumber,
-        reason: Option<&str>,
+        params: ServiceInitiateParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         // Find and validate source session
         let mut source_session = self
             .session_repo
-            .find_by_id(source_session_id)
+            .find_by_id(params.source_session_id)
             .await
-            .map_err(|_| HandoffError::SessionNotFound(source_session_id))?
-            .ok_or(HandoffError::SessionNotFound(source_session_id))?;
+            .map_err(|_| HandoffError::SessionNotFound(params.source_session_id))?
+            .ok_or(HandoffError::SessionNotFound(params.source_session_id))?;
 
         if !source_session.is_active() {
             return Err(HandoffError::InvalidStateTransition {
@@ -129,32 +164,36 @@ where
         }
 
         // Capture context snapshot before handoff
+        let snapshot_params = CaptureSnapshotParams::new(
+            params.conversation_id,
+            params.source_session_id,
+            params.current_sequence,
+            SnapshotType::HandoffInitiated,
+        );
         let _snapshot = self
             .snapshot_adapter
-            .capture_snapshot(
-                conversation_id,
-                source_session_id,
-                current_sequence,
-                SnapshotType::HandoffInitiated,
-            )
+            .capture_snapshot(snapshot_params)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
         // Initiate the handoff
+        let mut handoff_params = InitiateHandoffParams::new(
+            params.conversation_id,
+            &source_session,
+            params.target_agent,
+            params.prior_turn_id,
+        );
+        if let Some(r) = params.reason {
+            handoff_params = handoff_params.with_reason(r);
+        }
         let handoff = self
             .handoff_adapter
-            .initiate_handoff(
-                conversation_id,
-                &source_session,
-                target_agent,
-                prior_turn_id,
-                reason,
-            )
+            .initiate_handoff(handoff_params)
             .await?;
 
         // Update source session state
         let clock = mockable::DefaultClock;
-        source_session.handoff(current_sequence, handoff.handoff_id, &clock);
+        source_session.handoff(params.current_sequence, handoff.handoff_id, &clock);
 
         self.session_repo
             .update(&source_session)
@@ -205,14 +244,15 @@ where
             .ok_or(HandoffError::SessionNotFound(target_session_id))?;
 
         // Capture session start snapshot for target
+        let snapshot_params = CaptureSnapshotParams::new(
+            target_session.conversation_id,
+            target_session_id,
+            start_sequence,
+            SnapshotType::SessionStart,
+        );
         let _snapshot = self
             .snapshot_adapter
-            .capture_snapshot(
-                target_session.conversation_id,
-                target_session_id,
-                start_sequence,
-                SnapshotType::SessionStart,
-            )
+            .capture_snapshot(snapshot_params)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
@@ -252,16 +292,16 @@ where
             .session_repo
             .find_by_id(handoff.source_session_id)
             .await
+            && source_session.terminated_by_handoff == Some(handoff_id)
         {
-            if source_session.terminated_by_handoff == Some(handoff_id) {
-                // Revert to active state
-                source_session.state = crate::message::domain::AgentSessionState::Active;
-                source_session.terminated_by_handoff = None;
-                source_session.end_sequence = None;
-                source_session.ended_at = None;
+            // Revert to active state
+            source_session.state = crate::message::domain::AgentSessionState::Active;
+            source_session.terminated_by_handoff = None;
+            source_session.end_sequence = None;
+            source_session.ended_at = None;
 
-                let _ = self.session_repo.update(&source_session).await;
-            }
+            // Intentionally ignoring update result during cancellation
+            drop(self.session_repo.update(&source_session).await);
         }
 
         // Cancel the handoff
@@ -285,21 +325,15 @@ where
     /// # Returns
     ///
     /// The newly created agent session.
+    /// # Errors
+    ///
+    /// Returns `SessionError` if the session could not be stored.
     pub async fn create_target_session(
         &self,
-        conversation_id: ConversationId,
-        agent_backend: &str,
-        start_sequence: SequenceNumber,
-        handoff_id: HandoffId,
+        params: HandoffSessionParams,
     ) -> SessionResult<AgentSession> {
         let clock = mockable::DefaultClock;
-        let session = AgentSession::from_handoff(
-            conversation_id,
-            agent_backend,
-            start_sequence,
-            handoff_id,
-            &clock,
-        );
+        let session = AgentSession::from_handoff(params, &clock);
 
         self.session_repo.store(&session).await?;
 
@@ -307,6 +341,10 @@ where
     }
 
     /// Gets the current handoff for a conversation, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HandoffError` if the handoff list could not be retrieved.
     pub async fn get_pending_handoff(
         &self,
         conversation_id: ConversationId,
@@ -324,12 +362,11 @@ where
 // Conversion helper for session state to handoff status
 impl From<crate::message::domain::AgentSessionState> for crate::message::domain::HandoffStatus {
     fn from(state: crate::message::domain::AgentSessionState) -> Self {
+        use crate::message::domain::AgentSessionState;
         match state {
-            crate::message::domain::AgentSessionState::Active => Self::Initiated,
-            crate::message::domain::AgentSessionState::Paused => Self::Initiated,
-            crate::message::domain::AgentSessionState::HandedOff => Self::Completed,
-            crate::message::domain::AgentSessionState::Completed => Self::Completed,
-            crate::message::domain::AgentSessionState::Failed => Self::Failed,
+            AgentSessionState::Active | AgentSessionState::Paused => Self::Initiated,
+            AgentSessionState::HandedOff | AgentSessionState::Completed => Self::Completed,
+            AgentSessionState::Failed => Self::Failed,
         }
     }
 }
@@ -361,22 +398,18 @@ mod tests {
         let session_id = AgentSessionId::new();
 
         // No session exists, should fail
-        let result = service
-            .initiate(
-                conversation_id,
-                session_id,
-                "target-agent",
-                TurnId::new(),
-                SequenceNumber::new(5),
-                None,
-            )
-            .await;
+        let params = ServiceInitiateParams::new(
+            conversation_id,
+            session_id,
+            "target-agent",
+            TurnId::new(),
+            SequenceNumber::new(5),
+        );
+        let result = service.initiate(params).await;
 
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            HandoffError::SessionNotFound(_)
-        ));
+        let err = result.expect_err("should be error");
+        assert!(matches!(err, HandoffError::SessionNotFound(_)));
     }
 
     #[tokio::test]
@@ -385,13 +418,14 @@ mod tests {
         let conversation_id = ConversationId::new();
         let handoff_id = HandoffId::new();
 
+        let params = HandoffSessionParams::new(
+            conversation_id,
+            "target-agent",
+            SequenceNumber::new(10),
+            handoff_id,
+        );
         let session = service
-            .create_target_session(
-                conversation_id,
-                "target-agent",
-                SequenceNumber::new(10),
-                handoff_id,
-            )
+            .create_target_session(params)
             .await
             .expect("should create session");
 

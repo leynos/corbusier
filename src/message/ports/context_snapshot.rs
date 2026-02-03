@@ -14,6 +14,37 @@ use uuid::Uuid;
 /// Result type for snapshot operations.
 pub type SnapshotResult<T> = Result<T, SnapshotError>;
 
+/// Parameters for capturing a context window snapshot.
+#[derive(Debug, Clone)]
+pub struct CaptureSnapshotParams {
+    /// The conversation to snapshot.
+    pub conversation_id: ConversationId,
+    /// The agent session this snapshot belongs to.
+    pub session_id: AgentSessionId,
+    /// The last sequence number to include.
+    pub sequence_range_end: SequenceNumber,
+    /// The type of snapshot being captured.
+    pub snapshot_type: SnapshotType,
+}
+
+impl CaptureSnapshotParams {
+    /// Creates new capture snapshot parameters.
+    #[must_use]
+    pub const fn new(
+        conversation_id: ConversationId,
+        session_id: AgentSessionId,
+        sequence_range_end: SequenceNumber,
+        snapshot_type: SnapshotType,
+    ) -> Self {
+        Self {
+            conversation_id,
+            session_id,
+            sequence_range_end,
+            snapshot_type,
+        }
+    }
+}
+
 /// Port for context window snapshot operations.
 ///
 /// Implementations capture and store snapshots of the context window
@@ -25,19 +56,9 @@ pub trait ContextSnapshotPort: Send + Sync {
     /// The snapshot includes all messages from the session start up to
     /// the specified sequence number, along with message summaries and
     /// visible tool calls.
-    ///
-    /// # Parameters
-    ///
-    /// - `conversation_id`: The conversation to snapshot
-    /// - `session_id`: The agent session this snapshot belongs to
-    /// - `sequence_range_end`: The last sequence number to include
-    /// - `snapshot_type`: The type of snapshot being captured
     async fn capture_snapshot(
         &self,
-        conversation_id: ConversationId,
-        session_id: AgentSessionId,
-        sequence_range_end: SequenceNumber,
-        snapshot_type: SnapshotType,
+        params: CaptureSnapshotParams,
     ) -> SnapshotResult<ContextWindowSnapshot>;
 
     /// Stores a pre-built context snapshot.

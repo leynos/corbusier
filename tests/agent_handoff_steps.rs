@@ -9,14 +9,14 @@ use corbusier::message::{
         InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
     },
     domain::{
-        AgentSession, AgentSessionState, ConversationId, HandoffMetadata, HandoffStatus, MessageId,
-        SequenceNumber, SnapshotType, ToolCallReference, TurnId,
+        AgentSession, AgentSessionState, ConversationId, HandoffMetadata, HandoffSessionParams,
+        HandoffStatus, MessageId, SequenceNumber, SnapshotType, ToolCallReference, TurnId,
     },
     ports::{
         agent_session::AgentSessionRepository, context_snapshot::ContextSnapshotPort,
         handoff::AgentHandoffPort,
     },
-    services::HandoffService,
+    services::{HandoffService, ServiceInitiateParams},
 };
 use eyre::{WrapErr, eyre};
 use mockable::DefaultClock;
@@ -116,15 +116,15 @@ fn initiated_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("no source session"))?;
 
-    let handoff = run_async(world.service.initiate(
+    let params = ServiceInitiateParams::new(
         world.conversation_id,
         source.session_id,
         "target-agent",
         world.prior_turn_id,
         SequenceNumber::new(5),
-        Some("escalation needed"),
-    ))
-    .wrap_err("initiate handoff")?;
+    )
+    .with_reason("escalation needed");
+    let handoff = run_async(world.service.initiate(params)).wrap_err("initiate handoff")?;
 
     world.current_handoff = Some(handoff);
     Ok(())
@@ -180,24 +180,23 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
     };
 
     // Initiate handoff
-    let handoff = run_async(world.service.initiate(
+    let initiate_params = ServiceInitiateParams::new(
         world.conversation_id,
         agent_a.session_id,
         "agent-B",
         TurnId::new(),
         SequenceNumber::new(5),
-        None,
-    ))
-    .wrap_err("initiate A->B")?;
+    );
+    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate A->B")?;
 
     // Create agent B session
-    let agent_b = run_async(world.service.create_target_session(
+    let params = HandoffSessionParams::new(
         world.conversation_id,
         "agent-B",
         SequenceNumber::new(6),
         handoff.handoff_id,
-    ))
-    .wrap_err("create agent B")?;
+    );
+    let agent_b = run_async(world.service.create_target_session(params)).wrap_err("create agent B")?;
 
     // Complete handoff
     run_async(world.service.complete(
@@ -222,15 +221,15 @@ fn initiate_specialist_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Rep
         .as_ref()
         .ok_or_else(|| eyre!("no source session"))?;
 
-    let handoff = run_async(world.service.initiate(
+    let initiate_params = ServiceInitiateParams::new(
         world.conversation_id,
         source.session_id,
         "specialist-agent",
         world.prior_turn_id,
         SequenceNumber::new(5),
-        Some("task requires specialist"),
-    ))
-    .wrap_err("initiate handoff")?;
+    )
+    .with_reason("task requires specialist");
+    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
 
     world.current_handoff = Some(handoff);
     Ok(())
@@ -243,13 +242,13 @@ fn target_creates_session(world: &mut HandoffWorld) -> Result<(), eyre::Report> 
         .as_ref()
         .ok_or_else(|| eyre!("no current handoff"))?;
 
-    let target = run_async(world.service.create_target_session(
+    let params = HandoffSessionParams::new(
         world.conversation_id,
         "target-agent",
         SequenceNumber::new(10),
         handoff.handoff_id,
-    ))
-    .wrap_err("create target session")?;
+    );
+    let target = run_async(world.service.create_target_session(params)).wrap_err("create target session")?;
 
     world.target_session = Some(target);
     Ok(())
@@ -302,15 +301,16 @@ fn initiate_with_tool_calls(world: &mut HandoffWorld) -> Result<(), eyre::Report
         .as_ref()
         .ok_or_else(|| eyre!("no source session"))?;
 
-    let mut handoff = run_async(world.service.initiate(
+    let initiate_params = ServiceInitiateParams::new(
         world.conversation_id,
         source.session_id,
         "specialist-agent",
         world.prior_turn_id,
         SequenceNumber::new(5),
-        Some("tool results need review"),
-    ))
-    .wrap_err("initiate handoff")?;
+    )
+    .with_reason("tool results need review");
+    let mut handoff =
+        run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
 
     // Add tool call references
     for tcr in &world.tool_call_refs {
@@ -328,24 +328,24 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("no agent B session"))?;
 
-    let handoff = run_async(world.service.initiate(
+    let initiate_params = ServiceInitiateParams::new(
         world.conversation_id,
         agent_b.session_id,
         "agent-C",
         TurnId::new(),
         SequenceNumber::new(10),
-        Some("need domain expert"),
-    ))
-    .wrap_err("initiate B->C")?;
+    )
+    .with_reason("need domain expert");
+    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate B->C")?;
 
     // Create agent C
-    let agent_c = run_async(world.service.create_target_session(
+    let params = HandoffSessionParams::new(
         world.conversation_id,
         "agent-C",
         SequenceNumber::new(11),
         handoff.handoff_id,
-    ))
-    .wrap_err("create agent C")?;
+    );
+    let agent_c = run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
 
     // Complete handoff
     run_async(world.service.complete(

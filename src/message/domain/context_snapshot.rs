@@ -21,19 +21,19 @@ use super::{AgentSessionId, ConversationId, SequenceNumber};
 /// ```
 /// use corbusier::message::domain::{
 ///     AgentSessionId, ConversationId, ContextWindowSnapshot, MessageSummary,
-///     SequenceRange, SequenceNumber, SnapshotType,
+///     SequenceRange, SequenceNumber, SnapshotParams, SnapshotType,
 /// };
 /// use mockable::DefaultClock;
 ///
 /// let clock = DefaultClock;
-/// let snapshot = ContextWindowSnapshot::new(
+/// let params = SnapshotParams::new(
 ///     ConversationId::new(),
 ///     AgentSessionId::new(),
 ///     SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
 ///     MessageSummary::new(5, 4, 1, 0),
 ///     SnapshotType::SessionStart,
-///     &clock,
 /// );
+/// let snapshot = ContextWindowSnapshot::new(params, &clock);
 /// assert_eq!(snapshot.message_summary.total(), 10);
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,27 +68,62 @@ pub struct ContextWindowSnapshot {
     pub snapshot_type: SnapshotType,
 }
 
-impl ContextWindowSnapshot {
-    /// Creates a new context window snapshot.
+/// Parameters for creating a context window snapshot.
+#[derive(Debug, Clone, Copy)]
+pub struct SnapshotParams {
+    /// The conversation this snapshot belongs to.
+    pub conversation_id: ConversationId,
+    /// The agent session this snapshot represents.
+    pub session_id: AgentSessionId,
+    /// The sequence number range included in this context window.
+    pub sequence_range: SequenceRange,
+    /// Summary of messages included (count by role).
+    pub message_summary: MessageSummary,
+    /// Type of snapshot.
+    pub snapshot_type: SnapshotType,
+}
+
+impl SnapshotParams {
+    /// Creates new snapshot parameters.
+    ///
+    /// Note: This constructor intentionally has 5 arguments as it serves as a
+    /// parameter holder pattern to reduce argument counts in other functions.
     #[must_use]
-    pub fn new(
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "parameter struct constructor holds required fields"
+    )]
+    pub const fn new(
         conversation_id: ConversationId,
         session_id: AgentSessionId,
         sequence_range: SequenceRange,
         message_summary: MessageSummary,
         snapshot_type: SnapshotType,
-        clock: &impl mockable::Clock,
     ) -> Self {
         Self {
-            snapshot_id: Uuid::new_v4(),
             conversation_id,
             session_id,
             sequence_range,
             message_summary,
+            snapshot_type,
+        }
+    }
+}
+
+impl ContextWindowSnapshot {
+    /// Creates a new context window snapshot.
+    #[must_use]
+    pub fn new(params: SnapshotParams, clock: &impl mockable::Clock) -> Self {
+        Self {
+            snapshot_id: Uuid::new_v4(),
+            conversation_id: params.conversation_id,
+            session_id: params.session_id,
+            sequence_range: params.sequence_range,
+            message_summary: params.message_summary,
             visible_tool_calls: Vec::new(),
             token_estimate: None,
             captured_at: clock.utc(),
-            snapshot_type,
+            snapshot_type: params.snapshot_type,
         }
     }
 
@@ -111,7 +146,7 @@ impl ContextWindowSnapshot {
 
     /// Sets the token estimate.
     #[must_use]
-    pub fn with_token_estimate(mut self, estimate: u64) -> Self {
+    pub const fn with_token_estimate(mut self, estimate: u64) -> Self {
         self.token_estimate = Some(estimate);
         self
     }
@@ -136,13 +171,13 @@ impl SequenceRange {
 
     /// Returns the number of messages in this range.
     #[must_use]
-    pub fn len(&self) -> u64 {
+    pub const fn len(&self) -> u64 {
         self.end.value().saturating_sub(self.start.value()) + 1
     }
 
     /// Returns `true` if the range is empty (end < start).
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.end.value() < self.start.value()
     }
 
@@ -216,7 +251,7 @@ pub enum SnapshotType {
 impl SnapshotType {
     /// Returns the snapshot type as a string slice.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::SessionStart => "session_start",
             Self::HandoffInitiated => "handoff_initiated",
@@ -271,14 +306,8 @@ mod tests {
         let range = SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10));
         let summary = MessageSummary::new(5, 4, 1, 0);
 
-        let snapshot = ContextWindowSnapshot::new(
-            conv_id,
-            session_id,
-            range,
-            summary,
-            SnapshotType::SessionStart,
-            &clock,
-        );
+        let params = SnapshotParams::new(conv_id, session_id, range, summary, SnapshotType::SessionStart);
+        let snapshot = ContextWindowSnapshot::new(params, &clock);
 
         assert_eq!(snapshot.conversation_id, conv_id);
         assert_eq!(snapshot.session_id, session_id);

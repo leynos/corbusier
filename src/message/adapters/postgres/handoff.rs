@@ -11,10 +11,10 @@ use crate::message::{
     adapters::models::{HandoffRow, NewHandoff},
     adapters::schema::{agent_sessions, handoffs},
     domain::{
-        AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffStatus,
+        AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffParams, HandoffStatus,
         ToolCallReference, TurnId,
     },
-    ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult},
+    ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
 };
 
 use super::blocking_helpers::PgPool;
@@ -40,26 +40,22 @@ impl PostgresHandoffAdapter {
 impl AgentHandoffPort for PostgresHandoffAdapter {
     async fn initiate_handoff(
         &self,
-        _conversation_id: ConversationId,
-        source_session: &AgentSession,
-        target_agent: &str,
-        prior_turn_id: TurnId,
-        reason: Option<&str>,
+        params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         let pool = self.pool.clone();
-        let source_session_id = source_session.session_id;
-        let source_agent = source_session.agent_backend.clone();
-        let owned_target_agent = target_agent.to_owned();
-        let owned_reason = reason.map(String::from);
+        let source_session_id = params.source_session.session_id;
+        let source_agent = params.source_session.agent_backend.clone();
+        let owned_target_agent = params.target_agent.to_owned();
+        let owned_reason = params.reason.map(String::from);
         let clock = DefaultClock;
 
-        let mut handoff = HandoffMetadata::new(
+        let handoff_params = HandoffParams::new(
             source_session_id,
-            prior_turn_id,
+            params.prior_turn_id,
             &source_agent,
             &owned_target_agent,
-            &clock,
         );
+        let mut handoff = HandoffMetadata::new(handoff_params, &clock);
 
         if let Some(r) = owned_reason {
             handoff = handoff.with_reason(r);

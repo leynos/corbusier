@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use mockable::Clock;
 
 use crate::message::{
-    domain::{AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, TurnId},
-    ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult},
+    domain::{AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffParams},
+    ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
 };
 
 /// In-memory implementation of [`AgentHandoffPort`].
@@ -50,21 +50,17 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
 impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
     async fn initiate_handoff(
         &self,
-        _conversation_id: ConversationId,
-        source_session: &AgentSession,
-        target_agent: &str,
-        prior_turn_id: TurnId,
-        reason: Option<&str>,
+        params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
-        let mut handoff = HandoffMetadata::new(
-            source_session.session_id,
-            prior_turn_id,
-            &source_session.agent_backend,
-            target_agent,
-            &self.clock,
+        let handoff_params = HandoffParams::new(
+            params.source_session.session_id,
+            params.prior_turn_id,
+            &params.source_session.agent_backend,
+            params.target_agent,
         );
+        let mut handoff = HandoffMetadata::new(handoff_params, &self.clock);
 
-        if let Some(r) = reason {
+        if let Some(r) = params.reason {
             handoff = handoff.with_reason(r);
         }
 

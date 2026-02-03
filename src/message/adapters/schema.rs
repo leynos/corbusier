@@ -149,7 +149,7 @@ diesel::table! {
         started_at -> Timestamptz,
         /// When the session ended.
         ended_at -> Nullable<Timestamptz>,
-        /// Session state: active, paused, handed_off, completed, or failed.
+        /// Session state: `active`, `paused`, `handed_off`, `completed`, or `failed`.
         #[max_length = 20]
         state -> Varchar,
     }
@@ -215,7 +215,7 @@ diesel::table! {
         token_estimate -> Nullable<Int8>,
         /// When the snapshot was captured.
         captured_at -> Timestamptz,
-        /// Type of snapshot: session_start, handoff_initiated, truncation, checkpoint.
+        /// Type of snapshot: `session_start`, `handoff_initiated`, `truncation`, `checkpoint`.
         #[max_length = 30]
         snapshot_type -> Varchar,
     }

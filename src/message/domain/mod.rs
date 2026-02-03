@@ -13,13 +13,18 @@ mod message;
 mod metadata;
 mod role;
 
-pub use agent_session::{AgentSession, AgentSessionState, ParseAgentSessionStateError};
+pub use agent_session::{
+    AgentSession, AgentSessionState, HandoffSessionParams, ParseAgentSessionStateError,
+};
 pub use audit::{AgentResponseAudit, AgentResponseStatus, ToolCallAudit, ToolCallStatus};
 pub use content::{AttachmentPart, ContentPart, TextPart, ToolCallPart, ToolResultPart};
 pub use context_snapshot::{
-    ContextWindowSnapshot, MessageSummary, ParseSnapshotTypeError, SequenceRange, SnapshotType,
+    ContextWindowSnapshot, MessageSummary, ParseSnapshotTypeError, SequenceRange, SnapshotParams,
+    SnapshotType,
 };
-pub use handoff::{HandoffMetadata, HandoffStatus, ParseHandoffStatusError, ToolCallReference};
+pub use handoff::{
+    HandoffMetadata, HandoffParams, HandoffStatus, ParseHandoffStatusError, ToolCallReference,
+};
 pub use ids::{AgentSessionId, ConversationId, HandoffId, MessageId, SequenceNumber, TurnId};
 pub use message::{Message, MessageBuilder, MessageBuilderError};
 pub use metadata::{MessageMetadata, SlashCommandExpansion};

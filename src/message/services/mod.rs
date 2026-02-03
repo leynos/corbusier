@@ -5,4 +5,4 @@
 
 mod handoff;
 
-pub use handoff::HandoffService;
+pub use handoff::{HandoffService, ServiceInitiateParams};

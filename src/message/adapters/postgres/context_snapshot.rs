@@ -12,9 +12,11 @@ use crate::message::{
     adapters::schema::context_snapshots,
     domain::{
         AgentSessionId, ContextWindowSnapshot, ConversationId, MessageSummary, SequenceNumber,
-        SequenceRange, SnapshotType, ToolCallReference,
+        SequenceRange, SnapshotParams, SnapshotType, ToolCallReference,
     },
-    ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
+    ports::context_snapshot::{
+        CaptureSnapshotParams, ContextSnapshotPort, SnapshotError, SnapshotResult,
+    },
 };
 
 use super::blocking_helpers::PgPool;
@@ -40,24 +42,21 @@ impl PostgresContextSnapshotAdapter {
 impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
     async fn capture_snapshot(
         &self,
-        conversation_id: ConversationId,
-        session_id: AgentSessionId,
-        sequence_range_end: SequenceNumber,
-        snapshot_type: SnapshotType,
+        params: CaptureSnapshotParams,
     ) -> SnapshotResult<ContextWindowSnapshot> {
         // This is a simplified implementation. A full implementation would
         // query messages to calculate actual message summaries.
         let clock = DefaultClock;
 
         // Create snapshot with default summary (the service layer should compute this)
-        let snapshot = ContextWindowSnapshot::new(
-            conversation_id,
-            session_id,
-            SequenceRange::new(SequenceNumber::new(1), sequence_range_end),
+        let snapshot_params = SnapshotParams::new(
+            params.conversation_id,
+            params.session_id,
+            SequenceRange::new(SequenceNumber::new(1), params.sequence_range_end),
             MessageSummary::default(),
-            snapshot_type,
-            &clock,
+            params.snapshot_type,
         );
+        let snapshot = ContextWindowSnapshot::new(snapshot_params, &clock);
 
         // Store the snapshot
         self.store_snapshot(&snapshot).await?;

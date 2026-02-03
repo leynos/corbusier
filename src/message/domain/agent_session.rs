@@ -77,6 +77,37 @@ pub struct AgentSession {
     pub state: AgentSessionState,
 }
 
+/// Parameters for creating a session initiated by a handoff.
+#[derive(Debug, Clone)]
+pub struct HandoffSessionParams {
+    /// The conversation this session belongs to.
+    pub conversation_id: ConversationId,
+    /// The agent backend handling this session.
+    pub agent_backend: String,
+    /// Sequence number when this session started.
+    pub start_sequence: SequenceNumber,
+    /// The handoff that initiated this session.
+    pub handoff_id: HandoffId,
+}
+
+impl HandoffSessionParams {
+    /// Creates new handoff session parameters.
+    #[must_use]
+    pub fn new(
+        conversation_id: ConversationId,
+        agent_backend: impl Into<String>,
+        start_sequence: SequenceNumber,
+        handoff_id: HandoffId,
+    ) -> Self {
+        Self {
+            conversation_id,
+            agent_backend: agent_backend.into(),
+            start_sequence,
+            handoff_id,
+        }
+    }
+}
+
 impl AgentSession {
     /// Creates a new active agent session.
     #[must_use]
@@ -104,16 +135,10 @@ impl AgentSession {
 
     /// Creates a session that was initiated by a handoff.
     #[must_use]
-    pub fn from_handoff(
-        conversation_id: ConversationId,
-        agent_backend: impl Into<String>,
-        start_sequence: SequenceNumber,
-        handoff_id: HandoffId,
-        clock: &impl mockable::Clock,
-    ) -> Self {
+    pub fn from_handoff(params: HandoffSessionParams, clock: &impl mockable::Clock) -> Self {
         Self {
-            initiated_by_handoff: Some(handoff_id),
-            ..Self::new(conversation_id, agent_backend, start_sequence, clock)
+            initiated_by_handoff: Some(params.handoff_id),
+            ..Self::new(params.conversation_id, params.agent_backend, params.start_sequence, clock)
         }
     }
 
@@ -142,12 +167,12 @@ impl AgentSession {
     }
 
     /// Pauses the session.
-    pub fn pause(&mut self) {
+    pub const fn pause(&mut self) {
         self.state = AgentSessionState::Paused;
     }
 
     /// Resumes a paused session.
-    pub fn resume(&mut self) {
+    pub const fn resume(&mut self) {
         self.state = AgentSessionState::Active;
     }
 
@@ -180,19 +205,19 @@ impl AgentSession {
 
     /// Returns `true` if the session is in a terminal state.
     #[must_use]
-    pub fn is_terminal(&self) -> bool {
+    pub const fn is_terminal(&self) -> bool {
         self.state.is_terminal()
     }
 
     /// Returns `true` if the session is active.
     #[must_use]
-    pub fn is_active(&self) -> bool {
-        self.state == AgentSessionState::Active
+    pub const fn is_active(&self) -> bool {
+        matches!(self.state, AgentSessionState::Active)
     }
 
     /// Returns the number of turns executed in this session.
     #[must_use]
-    pub fn turn_count(&self) -> usize {
+    pub const fn turn_count(&self) -> usize {
         self.turn_ids.len()
     }
 }
@@ -220,13 +245,13 @@ pub enum AgentSessionState {
 impl AgentSessionState {
     /// Returns `true` if this is a terminal state.
     #[must_use]
-    pub fn is_terminal(&self) -> bool {
+    pub const fn is_terminal(&self) -> bool {
         matches!(self, Self::HandedOff | Self::Completed | Self::Failed)
     }
 
     /// Returns the state as a string slice.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "active",
             Self::Paused => "paused",
@@ -297,13 +322,13 @@ mod tests {
     fn agent_session_from_handoff() {
         let clock = DefaultClock;
         let handoff_id = HandoffId::new();
-        let session = AgentSession::from_handoff(
+        let params = HandoffSessionParams::new(
             ConversationId::new(),
             "opus-agent",
             SequenceNumber::new(10),
             handoff_id,
-            &clock,
         );
+        let session = AgentSession::from_handoff(params, &clock);
 
         assert_eq!(session.initiated_by_handoff, Some(handoff_id));
         assert_eq!(session.start_sequence, SequenceNumber::new(10));

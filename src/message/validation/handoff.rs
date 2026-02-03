@@ -48,7 +48,7 @@ pub enum HandoffValidationError {
         actual: SnapshotType,
     },
     /// Multiple validation errors occurred.
-    Multiple(Vec<HandoffValidationError>),
+    Multiple(Vec<Self>),
 }
 
 impl std::fmt::Display for HandoffValidationError {
@@ -113,11 +113,15 @@ impl HandoffValidationError {
     /// Creates a multiple error from a list of errors.
     /// If the list has exactly one error, returns that error.
     /// If the list is empty, panics (should not be called with empty list).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `errors` is empty, as this represents a programming error.
     #[must_use]
-    pub fn multiple(errors: Vec<Self>) -> Self {
+    pub fn multiple(mut errors: Vec<Self>) -> Self {
         match errors.len() {
             0 => panic!("multiple() called with empty error list"),
-            1 => errors.into_iter().next().unwrap(),
+            1 => errors.swap_remove(0),
             _ => Self::Multiple(errors),
         }
     }
@@ -222,7 +226,9 @@ pub fn validate_handoff_can_complete(handoff: &HandoffMetadata) -> HandoffValida
 /// # Errors
 ///
 /// Returns `HandoffValidationError::InvalidHandoffState` if the handoff is terminal.
-pub fn validate_handoff_can_cancel(handoff: &HandoffMetadata) -> HandoffValidationResult<()> {
+pub const fn validate_handoff_can_cancel(
+    handoff: &HandoffMetadata,
+) -> HandoffValidationResult<()> {
     if handoff.is_terminal() {
         return Err(HandoffValidationError::InvalidHandoffState {
             expected: HandoffStatus::Initiated,
@@ -309,7 +315,8 @@ pub fn validate_handoff_initiation(
 mod tests {
     use super::*;
     use crate::message::domain::{
-        AgentSessionId, ConversationId, MessageSummary, SequenceNumber, SequenceRange, TurnId,
+        AgentSessionId, ConversationId, HandoffParams, MessageSummary, SequenceNumber,
+        SequenceRange, SnapshotParams, TurnId,
     };
     use mockable::DefaultClock;
     use rstest::rstest;
@@ -326,27 +333,27 @@ mod tests {
 
     fn create_handoff(status: HandoffStatus) -> HandoffMetadata {
         let clock = DefaultClock;
-        let mut handoff = HandoffMetadata::new(
+        let params = HandoffParams::new(
             AgentSessionId::new(),
             TurnId::new(),
             "source-agent",
             "target-agent",
-            &clock,
         );
+        let mut handoff = HandoffMetadata::new(params, &clock);
         handoff.status = status;
         handoff
     }
 
     fn create_snapshot(snapshot_type: SnapshotType) -> ContextWindowSnapshot {
         let clock = DefaultClock;
-        ContextWindowSnapshot::new(
+        let params = SnapshotParams::new(
             ConversationId::new(),
             AgentSessionId::new(),
             SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
             MessageSummary::default(),
             snapshot_type,
-            &clock,
-        )
+        );
+        ContextWindowSnapshot::new(params, &clock)
     }
 
     // Session validation tests

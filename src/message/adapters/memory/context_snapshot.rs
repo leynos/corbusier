@@ -13,9 +13,11 @@ use uuid::Uuid;
 use crate::message::{
     domain::{
         AgentSessionId, ContextWindowSnapshot, ConversationId, MessageSummary, SequenceNumber,
-        SequenceRange, SnapshotType,
+        SequenceRange, SnapshotParams,
     },
-    ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
+    ports::context_snapshot::{
+        CaptureSnapshotParams, ContextSnapshotPort, SnapshotError, SnapshotResult,
+    },
 };
 
 /// In-memory implementation of [`ContextSnapshotPort`].
@@ -54,21 +56,18 @@ impl<C: Clock + Send + Sync> InMemoryContextSnapshotAdapter<C> {
 impl<C: Clock + Send + Sync> ContextSnapshotPort for InMemoryContextSnapshotAdapter<C> {
     async fn capture_snapshot(
         &self,
-        conversation_id: ConversationId,
-        session_id: AgentSessionId,
-        sequence_range_end: SequenceNumber,
-        snapshot_type: SnapshotType,
+        params: CaptureSnapshotParams,
     ) -> SnapshotResult<ContextWindowSnapshot> {
         // In a real implementation, we'd query the message repository
         // to compute the actual summary. For testing, we create a minimal snapshot.
-        let snapshot = ContextWindowSnapshot::new(
-            conversation_id,
-            session_id,
-            SequenceRange::new(SequenceNumber::new(1), sequence_range_end),
+        let snapshot_params = SnapshotParams::new(
+            params.conversation_id,
+            params.session_id,
+            SequenceRange::new(SequenceNumber::new(1), params.sequence_range_end),
             MessageSummary::default(),
-            snapshot_type,
-            &self.clock,
+            params.snapshot_type,
         );
+        let snapshot = ContextWindowSnapshot::new(snapshot_params, &self.clock);
 
         let mut guard = self
             .snapshots

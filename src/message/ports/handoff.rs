@@ -13,6 +13,47 @@ use thiserror::Error;
 /// Result type for handoff operations.
 pub type HandoffResult<T> = Result<T, HandoffError>;
 
+/// Parameters for initiating a handoff.
+#[derive(Debug, Clone)]
+pub struct InitiateHandoffParams<'a> {
+    /// The conversation being handed off.
+    pub conversation_id: ConversationId,
+    /// The current agent session.
+    pub source_session: &'a AgentSession,
+    /// The agent backend to hand off to.
+    pub target_agent: &'a str,
+    /// The turn that triggered the handoff.
+    pub prior_turn_id: TurnId,
+    /// Optional reason for the handoff.
+    pub reason: Option<&'a str>,
+}
+
+impl<'a> InitiateHandoffParams<'a> {
+    /// Creates new initiate handoff parameters.
+    #[must_use]
+    pub const fn new(
+        conversation_id: ConversationId,
+        source_session: &'a AgentSession,
+        target_agent: &'a str,
+        prior_turn_id: TurnId,
+    ) -> Self {
+        Self {
+            conversation_id,
+            source_session,
+            target_agent,
+            prior_turn_id,
+            reason: None,
+        }
+    }
+
+    /// Sets the reason for the handoff.
+    #[must_use]
+    pub const fn with_reason(mut self, reason: &'a str) -> Self {
+        self.reason = Some(reason);
+        self
+    }
+}
+
 /// Port for agent handoff operations.
 ///
 /// Implementations coordinate context transfer between agent backends
@@ -21,24 +62,12 @@ pub type HandoffResult<T> = Result<T, HandoffError>;
 pub trait AgentHandoffPort: Send + Sync {
     /// Initiates a handoff from the current agent to a target agent.
     ///
-    /// # Parameters
+    /// # Errors
     ///
-    /// - `conversation_id`: The conversation being handed off
-    /// - `source_session`: The current agent session
-    /// - `target_agent`: The agent backend to hand off to
-    /// - `prior_turn_id`: The turn that triggered the handoff
-    /// - `reason`: Optional reason for the handoff
-    ///
-    /// # Returns
-    ///
-    /// The initiated handoff metadata with `HandoffStatus::Initiated`.
+    /// Returns `HandoffError` if the handoff could not be initiated.
     async fn initiate_handoff(
         &self,
-        conversation_id: ConversationId,
-        source_session: &AgentSession,
-        target_agent: &str,
-        prior_turn_id: TurnId,
-        reason: Option<&str>,
+        params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata>;
 
     /// Completes a handoff after the target agent acknowledges.
@@ -112,7 +141,8 @@ impl HandoffError {
     }
 
     /// Creates an invalid state transition error.
-    pub fn invalid_transition(from: HandoffStatus, to: HandoffStatus) -> Self {
+    #[must_use]
+    pub const fn invalid_transition(from: HandoffStatus, to: HandoffStatus) -> Self {
         Self::InvalidStateTransition { from, to }
     }
 }
