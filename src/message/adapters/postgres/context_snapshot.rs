@@ -162,17 +162,17 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
 /// Converts a domain `ContextWindowSnapshot` to a `NewContextSnapshot` for insertion.
 fn snapshot_to_new_row(snapshot: &ContextWindowSnapshot) -> SnapshotResult<NewContextSnapshot> {
-    let message_summary = serde_json::to_value(snapshot.message_summary)
-        .map_err(SnapshotError::persistence)?;
+    let message_summary =
+        serde_json::to_value(snapshot.message_summary).map_err(SnapshotError::persistence)?;
 
-    let visible_tool_calls = serde_json::to_value(&snapshot.visible_tool_calls)
-        .map_err(SnapshotError::persistence)?;
+    let visible_tool_calls =
+        serde_json::to_value(&snapshot.visible_tool_calls).map_err(SnapshotError::persistence)?;
 
-    let sequence_start = i64::try_from(snapshot.sequence_range.start.value())
-        .map_err(SnapshotError::persistence)?;
+    let sequence_start =
+        i64::try_from(snapshot.sequence_range.start.value()).map_err(SnapshotError::persistence)?;
 
-    let sequence_end = i64::try_from(snapshot.sequence_range.end.value())
-        .map_err(SnapshotError::persistence)?;
+    let sequence_end =
+        i64::try_from(snapshot.sequence_range.end.value()).map_err(SnapshotError::persistence)?;
 
     let token_estimate = snapshot
         .token_estimate
@@ -199,8 +199,8 @@ fn row_to_snapshot(row: ContextSnapshotRow) -> SnapshotResult<ContextWindowSnaps
     let message_summary: MessageSummary =
         serde_json::from_value(row.message_summary).map_err(SnapshotError::persistence)?;
 
-    let visible_tool_calls: Vec<ToolCallReference> = serde_json::from_value(row.visible_tool_calls)
-        .map_err(SnapshotError::persistence)?;
+    let visible_tool_calls: Vec<ToolCallReference> =
+        serde_json::from_value(row.visible_tool_calls).map_err(SnapshotError::persistence)?;
 
     let start = u64::try_from(row.sequence_start).map_err(SnapshotError::persistence)?;
 
@@ -212,8 +212,8 @@ fn row_to_snapshot(row: ContextSnapshotRow) -> SnapshotResult<ContextWindowSnaps
         .transpose()
         .map_err(SnapshotError::persistence)?;
 
-    let snapshot_type = SnapshotType::try_from(row.snapshot_type.as_str())
-        .map_err(SnapshotError::persistence)?;
+    let snapshot_type =
+        SnapshotType::try_from(row.snapshot_type.as_str()).map_err(SnapshotError::persistence)?;
 
     Ok(ContextWindowSnapshot {
         snapshot_id: row.id,

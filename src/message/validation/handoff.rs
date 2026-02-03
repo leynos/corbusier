@@ -226,9 +226,7 @@ pub fn validate_handoff_can_complete(handoff: &HandoffMetadata) -> HandoffValida
 /// # Errors
 ///
 /// Returns `HandoffValidationError::InvalidHandoffState` if the handoff is terminal.
-pub const fn validate_handoff_can_cancel(
-    handoff: &HandoffMetadata,
-) -> HandoffValidationResult<()> {
+pub const fn validate_handoff_can_cancel(handoff: &HandoffMetadata) -> HandoffValidationResult<()> {
     if handoff.is_terminal() {
         return Err(HandoffValidationError::InvalidHandoffState {
             expected: HandoffStatus::Initiated,

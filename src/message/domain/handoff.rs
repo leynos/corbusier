@@ -364,11 +364,17 @@ mod tests {
 
         assert_eq!(handoff.triggering_tool_calls.len(), 2);
         assert_eq!(
-            handoff.triggering_tool_calls.first().map(|t| t.call_id.as_str()),
+            handoff
+                .triggering_tool_calls
+                .first()
+                .map(|t| t.call_id.as_str()),
             Some("call-1")
         );
         assert_eq!(
-            handoff.triggering_tool_calls.get(1).map(|t| t.call_id.as_str()),
+            handoff
+                .triggering_tool_calls
+                .get(1)
+                .map(|t| t.call_id.as_str()),
             Some("call-2")
         );
     }

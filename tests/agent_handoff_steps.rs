@@ -196,7 +196,8 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
         SequenceNumber::new(6),
         handoff.handoff_id,
     );
-    let agent_b = run_async(world.service.create_target_session(params)).wrap_err("create agent B")?;
+    let agent_b =
+        run_async(world.service.create_target_session(params)).wrap_err("create agent B")?;
 
     // Complete handoff
     run_async(world.service.complete(
@@ -229,7 +230,8 @@ fn initiate_specialist_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Rep
         SequenceNumber::new(5),
     )
     .with_reason("task requires specialist");
-    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
+    let handoff =
+        run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
 
     world.current_handoff = Some(handoff);
     Ok(())
@@ -248,7 +250,8 @@ fn target_creates_session(world: &mut HandoffWorld) -> Result<(), eyre::Report> 
         SequenceNumber::new(10),
         handoff.handoff_id,
     );
-    let target = run_async(world.service.create_target_session(params)).wrap_err("create target session")?;
+    let target =
+        run_async(world.service.create_target_session(params)).wrap_err("create target session")?;
 
     world.target_session = Some(target);
     Ok(())
@@ -345,7 +348,8 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         SequenceNumber::new(11),
         handoff.handoff_id,
     );
-    let agent_c = run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
+    let agent_c =
+        run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
 
     // Complete handoff
     run_async(world.service.complete(

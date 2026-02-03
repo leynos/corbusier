@@ -138,7 +138,12 @@ impl AgentSession {
     pub fn from_handoff(params: HandoffSessionParams, clock: &impl mockable::Clock) -> Self {
         Self {
             initiated_by_handoff: Some(params.handoff_id),
-            ..Self::new(params.conversation_id, params.agent_backend, params.start_sequence, clock)
+            ..Self::new(
+                params.conversation_id,
+                params.agent_backend,
+                params.start_sequence,
+                clock,
+            )
         }
     }
 

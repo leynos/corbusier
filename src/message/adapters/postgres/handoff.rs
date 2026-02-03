@@ -145,8 +145,8 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
                 .map_err(HandoffError::persistence)?
                 .ok_or(HandoffError::NotFound(handoff_id))?;
 
-            let status = HandoffStatus::try_from(row.status.as_str())
-                .map_err(HandoffError::persistence)?;
+            let status =
+                HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
 
             if status.is_terminal() {
                 return Err(HandoffError::invalid_transition(
@@ -214,8 +214,8 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
 /// Converts a domain `HandoffMetadata` to a `NewHandoff` for insertion.
 fn handoff_to_new_row(handoff: &HandoffMetadata) -> HandoffResult<NewHandoff> {
-    let triggering_tool_calls = serde_json::to_value(&handoff.triggering_tool_calls)
-        .map_err(HandoffError::persistence)?;
+    let triggering_tool_calls =
+        serde_json::to_value(&handoff.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
     Ok(NewHandoff {
         id: handoff.handoff_id.into_inner(),
@@ -235,11 +235,9 @@ fn handoff_to_new_row(handoff: &HandoffMetadata) -> HandoffResult<NewHandoff> {
 /// Converts a database row to a domain `HandoffMetadata`.
 fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
     let triggering_tool_calls: Vec<ToolCallReference> =
-        serde_json::from_value(row.triggering_tool_calls)
-            .map_err(HandoffError::persistence)?;
+        serde_json::from_value(row.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
-    let status =
-        HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
+    let status = HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
 
     Ok(HandoffMetadata {
         handoff_id: HandoffId::from_uuid(row.id),

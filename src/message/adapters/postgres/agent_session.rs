@@ -156,11 +156,10 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
 /// Converts a domain `AgentSession` to a `NewAgentSession` for insertion.
 fn session_to_new_row(session: &AgentSession) -> SessionResult<NewAgentSession> {
-    let turn_ids =
-        serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
+    let turn_ids = serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
 
-    let context_snapshots = serde_json::to_value(&session.context_snapshots)
-        .map_err(SessionError::persistence)?;
+    let context_snapshots =
+        serde_json::to_value(&session.context_snapshots).map_err(SessionError::persistence)?;
 
     let start_sequence =
         i64::try_from(session.start_sequence.value()).map_err(SessionError::persistence)?;
@@ -201,11 +200,10 @@ struct AgentSessionUpdate {
 
 /// Converts a domain `AgentSession` to update values.
 fn session_to_update_values(session: &AgentSession) -> SessionResult<AgentSessionUpdate> {
-    let turn_ids =
-        serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
+    let turn_ids = serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
 
-    let context_snapshots = serde_json::to_value(&session.context_snapshots)
-        .map_err(SessionError::persistence)?;
+    let context_snapshots =
+        serde_json::to_value(&session.context_snapshots).map_err(SessionError::persistence)?;
 
     let end_sequence = session
         .end_sequence
@@ -231,8 +229,7 @@ fn row_to_session(row: AgentSessionRow) -> SessionResult<AgentSession> {
     let context_snapshots: Vec<ContextWindowSnapshot> =
         serde_json::from_value(row.context_snapshots).map_err(SessionError::persistence)?;
 
-    let start_sequence =
-        u64::try_from(row.start_sequence).map_err(SessionError::persistence)?;
+    let start_sequence = u64::try_from(row.start_sequence).map_err(SessionError::persistence)?;
 
     let end_sequence = row
         .end_sequence
@@ -241,8 +238,8 @@ fn row_to_session(row: AgentSessionRow) -> SessionResult<AgentSession> {
         .map_err(SessionError::persistence)?
         .map(SequenceNumber::new);
 
-    let state = AgentSessionState::try_from(row.state.as_str())
-        .map_err(SessionError::persistence)?;
+    let state =
+        AgentSessionState::try_from(row.state.as_str()).map_err(SessionError::persistence)?;
 
     Ok(AgentSession {
         session_id: AgentSessionId::from_uuid(row.id),

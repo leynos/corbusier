@@ -306,7 +306,13 @@ mod tests {
         let range = SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10));
         let summary = MessageSummary::new(5, 4, 1, 0);
 
-        let params = SnapshotParams::new(conv_id, session_id, range, summary, SnapshotType::SessionStart);
+        let params = SnapshotParams::new(
+            conv_id,
+            session_id,
+            range,
+            summary,
+            SnapshotType::SessionStart,
+        );
         let snapshot = ContextWindowSnapshot::new(params, &clock);
 
         assert_eq!(snapshot.conversation_id, conv_id);

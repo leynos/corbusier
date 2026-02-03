@@ -122,7 +122,11 @@ where
     C: ContextSnapshotPort,
 {
     /// Creates a new handoff service.
-    pub const fn new(session_repo: Arc<S>, handoff_adapter: Arc<H>, snapshot_adapter: Arc<C>) -> Self {
+    pub const fn new(
+        session_repo: Arc<S>,
+        handoff_adapter: Arc<H>,
+        snapshot_adapter: Arc<C>,
+    ) -> Self {
         Self {
             session_repo,
             handoff_adapter,
