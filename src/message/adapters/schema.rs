@@ -119,6 +119,120 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(messages -> conversations (conversation_id));
+diesel::table! {
+    /// The `agent_sessions` table tracks contiguous periods where a single
+    /// agent backend handles turns within a conversation.
+    ///
+    /// Per corbusier-design.md §4.2.1.1, sessions enable complete context
+    /// reconstruction for handoffs and auditing.
+    agent_sessions (id) {
+        /// Unique agent session identifier.
+        id -> Uuid,
+        /// Reference to the containing conversation.
+        conversation_id -> Uuid,
+        /// Agent backend identifier (e.g., "claude-code", "opus-agent").
+        #[max_length = 100]
+        agent_backend -> Varchar,
+        /// First sequence number in this session.
+        start_sequence -> Int8,
+        /// Last sequence number (set when session ends).
+        end_sequence -> Nullable<Int8>,
+        /// Turn IDs processed in this session stored as JSONB array.
+        turn_ids -> Jsonb,
+        /// Handoff that initiated this session (if any).
+        initiated_by_handoff -> Nullable<Uuid>,
+        /// Handoff that terminated this session (if any).
+        terminated_by_handoff -> Nullable<Uuid>,
+        /// Context snapshots taken during this session stored as JSONB array.
+        context_snapshots -> Jsonb,
+        /// When the session started.
+        started_at -> Timestamptz,
+        /// When the session ended.
+        ended_at -> Nullable<Timestamptz>,
+        /// Session state: active, paused, handed_off, completed, or failed.
+        #[max_length = 20]
+        state -> Varchar,
+    }
+}
 
-diesel::allow_tables_to_appear_in_same_query!(audit_logs, conversations, domain_events, messages,);
+diesel::table! {
+    /// The `handoffs` table tracks transfers of conversation control between
+    /// agent backends.
+    ///
+    /// Preserves audit trails and context references per corbusier-design.md
+    /// §4.2.1.1 success criteria.
+    handoffs (id) {
+        /// Unique handoff identifier.
+        id -> Uuid,
+        /// Session being handed off from.
+        source_session_id -> Uuid,
+        /// Session being handed off to (set on completion).
+        target_session_id -> Nullable<Uuid>,
+        /// Turn ID that triggered the handoff.
+        prior_turn_id -> Uuid,
+        /// Tool calls that led to the handoff decision stored as JSONB array.
+        triggering_tool_calls -> Jsonb,
+        /// Source agent backend identifier.
+        #[max_length = 100]
+        source_agent -> Varchar,
+        /// Target agent backend identifier.
+        #[max_length = 100]
+        target_agent -> Varchar,
+        /// Reason for the handoff (optional).
+        reason -> Nullable<Text>,
+        /// When the handoff was initiated.
+        initiated_at -> Timestamptz,
+        /// When the handoff completed.
+        completed_at -> Nullable<Timestamptz>,
+        /// Handoff status: initiated, accepted, completed, failed, or cancelled.
+        #[max_length = 20]
+        status -> Varchar,
+    }
+}
+
+diesel::table! {
+    /// The `context_snapshots` table captures the state visible to an agent
+    /// at key moments during a session.
+    ///
+    /// Enables complete context reconstruction for auditing and handoff replay
+    /// per corbusier-design.md §2.2.1.
+    context_snapshots (id) {
+        /// Unique snapshot identifier.
+        id -> Uuid,
+        /// Reference to the containing conversation.
+        conversation_id -> Uuid,
+        /// Reference to the agent session.
+        session_id -> Uuid,
+        /// First sequence number in the context window.
+        sequence_start -> Int8,
+        /// Last sequence number in the context window.
+        sequence_end -> Int8,
+        /// Message counts by role stored as JSONB.
+        message_summary -> Jsonb,
+        /// Tool calls visible in the context window stored as JSONB array.
+        visible_tool_calls -> Jsonb,
+        /// Token count estimate for the context window.
+        token_estimate -> Nullable<Int8>,
+        /// When the snapshot was captured.
+        captured_at -> Timestamptz,
+        /// Type of snapshot: session_start, handoff_initiated, truncation, checkpoint.
+        #[max_length = 30]
+        snapshot_type -> Varchar,
+    }
+}
+
+diesel::joinable!(messages -> conversations (conversation_id));
+diesel::joinable!(agent_sessions -> conversations (conversation_id));
+diesel::joinable!(context_snapshots -> conversations (conversation_id));
+diesel::joinable!(context_snapshots -> agent_sessions (session_id));
+diesel::joinable!(handoffs -> agent_sessions (source_session_id));
+
+diesel::allow_tables_to_appear_in_same_query!(
+    agent_sessions,
+    audit_logs,
+    context_snapshots,
+    conversations,
+    domain_events,
+    handoffs,
+    messages,
+);

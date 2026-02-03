@@ -1,0 +1,118 @@
+//! Port for agent handoff operations.
+//!
+//! Defines the abstract interface for initiating and completing handoffs
+//! between agent backends while preserving context.
+
+use crate::message::domain::{
+    AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffStatus, TurnId,
+};
+use async_trait::async_trait;
+use std::sync::Arc;
+use thiserror::Error;
+
+/// Result type for handoff operations.
+pub type HandoffResult<T> = Result<T, HandoffError>;
+
+/// Port for agent handoff operations.
+///
+/// Implementations coordinate context transfer between agent backends
+/// and ensure no context is lost during transitions.
+#[async_trait]
+pub trait AgentHandoffPort: Send + Sync {
+    /// Initiates a handoff from the current agent to a target agent.
+    ///
+    /// # Parameters
+    ///
+    /// - `conversation_id`: The conversation being handed off
+    /// - `source_session`: The current agent session
+    /// - `target_agent`: The agent backend to hand off to
+    /// - `prior_turn_id`: The turn that triggered the handoff
+    /// - `reason`: Optional reason for the handoff
+    ///
+    /// # Returns
+    ///
+    /// The initiated handoff metadata with `HandoffStatus::Initiated`.
+    async fn initiate_handoff(
+        &self,
+        conversation_id: ConversationId,
+        source_session: &AgentSession,
+        target_agent: &str,
+        prior_turn_id: TurnId,
+        reason: Option<&str>,
+    ) -> HandoffResult<HandoffMetadata>;
+
+    /// Completes a handoff after the target agent acknowledges.
+    ///
+    /// Creates a new agent session for the target agent and captures
+    /// context snapshots for both sessions.
+    async fn complete_handoff(
+        &self,
+        handoff_id: HandoffId,
+        target_session_id: AgentSessionId,
+    ) -> HandoffResult<HandoffMetadata>;
+
+    /// Cancels a pending handoff.
+    async fn cancel_handoff(
+        &self,
+        handoff_id: HandoffId,
+        reason: Option<&str>,
+    ) -> HandoffResult<()>;
+
+    /// Retrieves handoff metadata by ID.
+    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>>;
+
+    /// Lists all handoffs for a conversation.
+    async fn list_handoffs_for_conversation(
+        &self,
+        conversation_id: ConversationId,
+    ) -> HandoffResult<Vec<HandoffMetadata>>;
+}
+
+/// Errors that can occur during handoff operations.
+#[derive(Debug, Clone, Error)]
+pub enum HandoffError {
+    /// Handoff not found.
+    #[error("handoff not found: {0}")]
+    NotFound(HandoffId),
+
+    /// Invalid handoff state transition.
+    #[error("invalid handoff state transition from {from} to {to}")]
+    InvalidStateTransition {
+        /// The current state.
+        from: HandoffStatus,
+        /// The attempted target state.
+        to: HandoffStatus,
+    },
+
+    /// Agent session not found.
+    #[error("agent session not found: {0}")]
+    SessionNotFound(AgentSessionId),
+
+    /// Conversation not found.
+    #[error("conversation not found: {0}")]
+    ConversationNotFound(ConversationId),
+
+    /// Prior turn not found.
+    #[error("prior turn not found: {0}")]
+    PriorTurnNotFound(TurnId),
+
+    /// Context snapshot capture failed.
+    #[error("context snapshot failed: {0}")]
+    SnapshotFailed(String),
+
+    /// Database or persistence error.
+    #[error("persistence error: {0}")]
+    Persistence(Arc<dyn std::error::Error + Send + Sync>),
+}
+
+impl HandoffError {
+    /// Creates a persistence error from any error type.
+    pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Persistence(Arc::new(err))
+    }
+
+    /// Creates an invalid state transition error.
+    pub fn invalid_transition(from: HandoffStatus, to: HandoffStatus) -> Self {
+        Self::InvalidStateTransition { from, to }
+    }
+}

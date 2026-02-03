@@ -1,0 +1,281 @@
+//! `PostgreSQL` implementation of the `AgentHandoffPort` using Diesel ORM.
+//!
+//! Provides production-grade persistence for handoff metadata with JSONB storage
+//! for tool call references.
+
+use async_trait::async_trait;
+use diesel::prelude::*;
+use mockable::{Clock, DefaultClock};
+
+use crate::message::{
+    adapters::models::{HandoffRow, NewHandoff},
+    adapters::schema::{agent_sessions, handoffs},
+    domain::{
+        AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffStatus,
+        ToolCallReference, TurnId,
+    },
+    ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult},
+};
+
+use super::blocking_helpers::PgPool;
+
+/// `PostgreSQL` implementation of [`AgentHandoffPort`].
+///
+/// Uses Diesel ORM with connection pooling via r2d2. Thread-safe for
+/// concurrent access.
+#[derive(Debug, Clone)]
+pub struct PostgresHandoffAdapter {
+    pool: PgPool,
+}
+
+impl PostgresHandoffAdapter {
+    /// Creates a new adapter with the given connection pool.
+    #[must_use]
+    pub const fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl AgentHandoffPort for PostgresHandoffAdapter {
+    async fn initiate_handoff(
+        &self,
+        _conversation_id: ConversationId,
+        source_session: &AgentSession,
+        target_agent: &str,
+        prior_turn_id: TurnId,
+        reason: Option<&str>,
+    ) -> HandoffResult<HandoffMetadata> {
+        let pool = self.pool.clone();
+        let source_session_id = source_session.session_id;
+        let source_agent = source_session.agent_backend.clone();
+        let owned_target_agent = target_agent.to_owned();
+        let owned_reason = reason.map(String::from);
+        let clock = DefaultClock;
+
+        let mut handoff = HandoffMetadata::new(
+            source_session_id,
+            prior_turn_id,
+            &source_agent,
+            &owned_target_agent,
+            &clock,
+        );
+
+        if let Some(r) = owned_reason {
+            handoff = handoff.with_reason(r);
+        }
+
+        let new_handoff = handoff_to_new_row(&handoff)?;
+
+        run_blocking(move || {
+            let mut conn = get_conn(&pool)?;
+
+            diesel::insert_into(handoffs::table)
+                .values(&new_handoff)
+                .execute(&mut conn)
+                .map_err(HandoffError::persistence)?;
+
+            Ok(handoff)
+        })
+        .await
+    }
+
+    async fn complete_handoff(
+        &self,
+        handoff_id: HandoffId,
+        target_session_id: AgentSessionId,
+    ) -> HandoffResult<HandoffMetadata> {
+        let pool = self.pool.clone();
+        let clock = DefaultClock;
+        let now = clock.utc();
+
+        run_blocking(move || {
+            let mut conn = get_conn(&pool)?;
+
+            // Find the handoff
+            let row = handoffs::table
+                .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .select(HandoffRow::as_select())
+                .first::<HandoffRow>(&mut conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .ok_or(HandoffError::NotFound(handoff_id))?;
+
+            let mut handoff = row_to_handoff(row)?;
+
+            // Check if already completed
+            if handoff.is_terminal() {
+                return Err(HandoffError::invalid_transition(
+                    handoff.status,
+                    HandoffStatus::Completed,
+                ));
+            }
+
+            // Complete the handoff
+            handoff = handoff.complete(target_session_id, &clock);
+            handoff.completed_at = Some(now);
+
+            // Update in database
+            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                .set((
+                    handoffs::target_session_id.eq(target_session_id.into_inner()),
+                    handoffs::completed_at.eq(now),
+                    handoffs::status.eq("completed"),
+                ))
+                .execute(&mut conn)
+                .map_err(HandoffError::persistence)?;
+
+            Ok(handoff)
+        })
+        .await
+    }
+
+    async fn cancel_handoff(
+        &self,
+        handoff_id: HandoffId,
+        _reason: Option<&str>,
+    ) -> HandoffResult<()> {
+        let pool = self.pool.clone();
+
+        run_blocking(move || {
+            let mut conn = get_conn(&pool)?;
+
+            // Check if handoff exists and is not terminal
+            let row = handoffs::table
+                .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .select(HandoffRow::as_select())
+                .first::<HandoffRow>(&mut conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .ok_or(HandoffError::NotFound(handoff_id))?;
+
+            let status = HandoffStatus::try_from(row.status.as_str())
+                .map_err(HandoffError::persistence)?;
+
+            if status.is_terminal() {
+                return Err(HandoffError::invalid_transition(
+                    status,
+                    HandoffStatus::Cancelled,
+                ));
+            }
+
+            // Cancel the handoff
+            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                .set(handoffs::status.eq("cancelled"))
+                .execute(&mut conn)
+                .map_err(HandoffError::persistence)?;
+
+            Ok(())
+        })
+        .await
+    }
+
+    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>> {
+        let pool = self.pool.clone();
+        let uuid = handoff_id.into_inner();
+
+        run_blocking(move || {
+            let mut conn = get_conn(&pool)?;
+
+            handoffs::table
+                .filter(handoffs::id.eq(uuid))
+                .select(HandoffRow::as_select())
+                .first::<HandoffRow>(&mut conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .map(row_to_handoff)
+                .transpose()
+        })
+        .await
+    }
+
+    async fn list_handoffs_for_conversation(
+        &self,
+        conversation_id: ConversationId,
+    ) -> HandoffResult<Vec<HandoffMetadata>> {
+        let pool = self.pool.clone();
+        let uuid = conversation_id.into_inner();
+
+        run_blocking(move || {
+            let mut conn = get_conn(&pool)?;
+
+            // Join with agent_sessions to find handoffs for this conversation
+            let rows = handoffs::table
+                .inner_join(
+                    agent_sessions::table.on(handoffs::source_session_id.eq(agent_sessions::id)),
+                )
+                .filter(agent_sessions::conversation_id.eq(uuid))
+                .select(HandoffRow::as_select())
+                .order(handoffs::initiated_at.asc())
+                .load::<HandoffRow>(&mut conn)
+                .map_err(HandoffError::persistence)?;
+
+            rows.into_iter().map(row_to_handoff).collect()
+        })
+        .await
+    }
+}
+
+/// Converts a domain `HandoffMetadata` to a `NewHandoff` for insertion.
+fn handoff_to_new_row(handoff: &HandoffMetadata) -> HandoffResult<NewHandoff> {
+    let triggering_tool_calls = serde_json::to_value(&handoff.triggering_tool_calls)
+        .map_err(HandoffError::persistence)?;
+
+    Ok(NewHandoff {
+        id: handoff.handoff_id.into_inner(),
+        source_session_id: handoff.source_session_id.into_inner(),
+        target_session_id: handoff.target_session_id.map(AgentSessionId::into_inner),
+        prior_turn_id: handoff.prior_turn_id.into_inner(),
+        triggering_tool_calls,
+        source_agent: handoff.source_agent.clone(),
+        target_agent: handoff.target_agent.clone(),
+        reason: handoff.reason.clone(),
+        initiated_at: handoff.initiated_at,
+        completed_at: handoff.completed_at,
+        status: handoff.status.as_str().to_owned(),
+    })
+}
+
+/// Converts a database row to a domain `HandoffMetadata`.
+fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
+    let triggering_tool_calls: Vec<ToolCallReference> =
+        serde_json::from_value(row.triggering_tool_calls)
+            .map_err(HandoffError::persistence)?;
+
+    let status =
+        HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
+
+    Ok(HandoffMetadata {
+        handoff_id: HandoffId::from_uuid(row.id),
+        source_session_id: AgentSessionId::from_uuid(row.source_session_id),
+        target_session_id: row.target_session_id.map(AgentSessionId::from_uuid),
+        prior_turn_id: TurnId::from_uuid(row.prior_turn_id),
+        triggering_tool_calls,
+        source_agent: row.source_agent,
+        target_agent: row.target_agent,
+        reason: row.reason,
+        initiated_at: row.initiated_at,
+        completed_at: row.completed_at,
+        status,
+    })
+}
+
+/// Wrapper to convert handoff errors to repository result.
+async fn run_blocking<F, T>(f: F) -> HandoffResult<T>
+where
+    F: FnOnce() -> HandoffResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(HandoffError::persistence)?
+}
+
+/// Obtains a connection from the pool.
+fn get_conn(
+    pool: &PgPool,
+) -> HandoffResult<
+    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
+> {
+    pool.get().map_err(HandoffError::persistence)
+}

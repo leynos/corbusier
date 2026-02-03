@@ -1,11 +1,19 @@
-//! `PostgreSQL` implementation of the `MessageRepository` port using Diesel ORM.
+//! `PostgreSQL` implementations of message subsystem ports using Diesel ORM.
 //!
-//! Provides production-grade persistence with JSONB storage for message content
-//! and metadata, following corbusier-design.md §6.2.3.
+//! Provides production-grade persistence with JSONB storage for message content,
+//! metadata, agent sessions, handoffs, and context snapshots, following
+//! corbusier-design.md §6.2.3 and §4.2.1.1.
 
-mod blocking_helpers;
+mod agent_session;
+pub(crate) mod blocking_helpers;
+mod context_snapshot;
 mod conversion_helpers;
+mod handoff;
 mod sql_helpers;
+
+pub use agent_session::PostgresAgentSessionRepository;
+pub use context_snapshot::PostgresContextSnapshotAdapter;
+pub use handoff::PostgresHandoffAdapter;
 
 use async_trait::async_trait;
 use diesel::prelude::*;

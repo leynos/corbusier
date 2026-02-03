@@ -1,6 +1,7 @@
 //! Message metadata types capturing contextual information about messages.
 
-use super::{TurnId, audit::AgentResponseAudit, audit::ToolCallAudit};
+use super::handoff::HandoffMetadata;
+use super::{AgentSessionId, TurnId, audit::AgentResponseAudit, audit::ToolCallAudit};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -40,6 +41,14 @@ pub struct MessageMetadata {
     /// Audit metadata for the agent response associated with this message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_response_audit: Option<AgentResponseAudit>,
+
+    /// Handoff metadata if this message is part of a handoff.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handoff_metadata: Option<HandoffMetadata>,
+
+    /// The agent session ID for this message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_session_id: Option<AgentSessionId>,
 
     /// Extension data for custom metadata fields.
     ///
@@ -154,6 +163,24 @@ impl MessageMetadata {
         self
     }
 
+    /// Sets the handoff metadata.
+    #[must_use]
+    pub fn with_handoff_metadata(mut self, handoff: HandoffMetadata) -> Self {
+        self.handoff_metadata = Some(handoff);
+        self
+    }
+
+    /// Sets the agent session ID.
+    #[must_use]
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Option::Some with Copy type should be const but isn't stable"
+    )]
+    pub fn with_agent_session_id(mut self, session_id: AgentSessionId) -> Self {
+        self.agent_session_id = Some(session_id);
+        self
+    }
+
     /// Returns `true` if the metadata is empty (no fields set).
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -162,6 +189,8 @@ impl MessageMetadata {
             && self.slash_command_expansion.is_none()
             && self.tool_call_audits.is_empty()
             && self.agent_response_audit.is_none()
+            && self.handoff_metadata.is_none()
+            && self.agent_session_id.is_none()
             && self.extensions.is_empty()
     }
 }
