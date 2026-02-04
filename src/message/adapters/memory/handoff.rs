@@ -19,8 +19,14 @@ use crate::message::{
 /// Thread-safe via internal [`RwLock`]. Suitable for unit tests only.
 #[derive(Debug, Clone)]
 pub struct InMemoryHandoffAdapter<C: Clock + Send + Sync> {
-    handoffs: Arc<RwLock<HashMap<HandoffId, HandoffMetadata>>>,
+    store: Arc<RwLock<HandoffStore>>,
     clock: C,
+}
+
+#[derive(Debug, Default)]
+struct HandoffStore {
+    handoffs: HashMap<HandoffId, HandoffMetadata>,
+    conversations: HashMap<HandoffId, ConversationId>,
 }
 
 impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
@@ -28,7 +34,7 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
     #[must_use]
     pub fn new(clock: C) -> Self {
         Self {
-            handoffs: Arc::new(RwLock::new(HashMap::new())),
+            store: Arc::new(RwLock::new(HandoffStore::default())),
             clock,
         }
     }
@@ -36,7 +42,10 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
     /// Returns the number of stored handoffs.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.handoffs.read().map(|guard| guard.len()).unwrap_or(0)
+        self.store
+            .read()
+            .map(|guard| guard.handoffs.len())
+            .unwrap_or(0)
     }
 
     /// Returns `true` if no handoffs are stored.
@@ -65,11 +74,14 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         }
 
         let mut guard = self
-            .handoffs
+            .store
             .write()
             .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
 
-        guard.insert(handoff.handoff_id, handoff.clone());
+        guard.handoffs.insert(handoff.handoff_id, handoff.clone());
+        guard
+            .conversations
+            .insert(handoff.handoff_id, params.conversation_id);
 
         Ok(handoff)
     }
@@ -80,16 +92,24 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
         let mut guard = self
-            .handoffs
+            .store
             .write()
             .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
 
         let handoff = guard
+            .handoffs
             .get(&handoff_id)
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
+        if handoff.is_terminal() {
+            return Err(HandoffError::invalid_transition(
+                handoff.status,
+                crate::message::domain::HandoffStatus::Completed,
+            ));
+        }
+
         let completed = handoff.clone().complete(target_session_id, &self.clock);
-        guard.insert(handoff_id, completed.clone());
+        guard.handoffs.insert(handoff_id, completed.clone());
 
         Ok(completed)
     }
@@ -97,30 +117,38 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
     async fn cancel_handoff(
         &self,
         handoff_id: HandoffId,
-        _reason: Option<&str>,
+        reason: Option<&str>,
     ) -> HandoffResult<()> {
         let mut guard = self
-            .handoffs
+            .store
             .write()
             .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
 
         let handoff = guard
+            .handoffs
             .get(&handoff_id)
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
-        let cancelled = handoff.clone().cancel();
-        guard.insert(handoff_id, cancelled);
+        if handoff.is_terminal() {
+            return Err(HandoffError::invalid_transition(
+                handoff.status,
+                crate::message::domain::HandoffStatus::Cancelled,
+            ));
+        }
+
+        let cancelled = handoff.clone().cancel(reason);
+        guard.handoffs.insert(handoff_id, cancelled);
 
         Ok(())
     }
 
     async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>> {
         let guard = self
-            .handoffs
+            .store
             .read()
             .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
 
-        Ok(guard.get(&handoff_id).cloned())
+        Ok(guard.handoffs.get(&handoff_id).cloned())
     }
 
     async fn list_handoffs_for_conversation(
@@ -128,19 +156,18 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>> {
         let guard = self
-            .handoffs
+            .store
             .read()
             .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
 
-        // Note: We don't have conversation_id in HandoffMetadata directly,
-        // but we could filter by source_session's conversation.
-        // For now, we return all handoffs (would need session lookup in real impl)
-        let mut handoffs: Vec<HandoffMetadata> = guard.values().cloned().collect();
-
-        // In a real implementation, we'd filter by conversation_id.
-        // For testing, we store conversation_id association separately or
-        // trust the caller to only query relevant conversations.
-        let _ = conversation_id;
+        let mut handoffs: Vec<HandoffMetadata> = Vec::new();
+        for (handoff_id, conv_id) in &guard.conversations {
+            if *conv_id == conversation_id
+                && let Some(handoff) = guard.handoffs.get(handoff_id)
+            {
+                handoffs.push(handoff.clone());
+            }
+        }
 
         handoffs.sort_by_key(|h| h.initiated_at);
         Ok(handoffs)

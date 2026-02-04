@@ -1,10 +1,8 @@
 //! Cluster lifecycle helpers for `PostgreSQL` integration tests.
-
 mod env_utils;
 mod fs_utils;
 mod worker_helpers;
-
-use self::env_utils::{env_vars_to_os, worker_env_changes};
+use self::env_utils::{drop_privileges_if_root, env_vars_to_os, worker_env_changes};
 use self::fs_utils::{sync_password_from_file, sync_port_from_pid};
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
@@ -19,12 +17,9 @@ use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::runtime::Runtime;
-
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
-
 static SHARED_CLUSTER: OnceCell<ManagedCluster> = OnceCell::new();
 static TEMPLATE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-
 /// RAII guard for temporary test databases.
 ///
 /// Automatically drops the database when the guard goes out of scope.
@@ -33,7 +28,6 @@ pub struct TemporaryDatabase {
     name: String,
     url: String,
 }
-
 impl TemporaryDatabase {
     const fn new(cluster: &'static ManagedCluster, name: String, url: String) -> Self {
         Self { cluster, name, url }
@@ -51,7 +45,6 @@ impl TemporaryDatabase {
         &self.url
     }
 }
-
 impl Drop for TemporaryDatabase {
     fn drop(&mut self) {
         if let Err(err) = self.cluster.drop_database(&self.name)
@@ -66,16 +59,13 @@ impl Drop for TemporaryDatabase {
         }
     }
 }
-
 /// Shared `PostgreSQL` cluster handle for integration tests.
 pub type PostgresCluster = &'static ManagedCluster;
-
 /// Lightweight connection wrapper for building database URLs.
 #[derive(Debug, Clone)]
 pub struct ClusterConnection {
     settings: Settings,
 }
-
 impl ClusterConnection {
     /// Builds a database URL for the provided database name.
     #[must_use]
@@ -83,7 +73,6 @@ impl ClusterConnection {
         self.settings.url(database)
     }
 }
-
 /// Managed embedded `PostgreSQL` cluster for test lifecycles.
 pub struct ManagedCluster {
     bootstrap: TestBootstrapSettings,
@@ -221,7 +210,14 @@ impl ManagedCluster {
 
     fn start(&mut self) -> Result<(), BoxError> {
         match self.bootstrap.privileges {
-            ExecutionPrivileges::Root => self.start_via_worker(),
+            ExecutionPrivileges::Root => {
+                if self.start_via_worker().is_ok() {
+                    Ok(())
+                } else {
+                    drop_privileges_if_root("nobody")?;
+                    self.start_in_process()
+                }
+            }
             ExecutionPrivileges::Unprivileged => self.start_in_process(),
         }
     }

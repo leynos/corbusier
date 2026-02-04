@@ -10,6 +10,7 @@ use cap_std::fs::PermissionsExt;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::sync::{Mutex, OnceLock};
 
 static WORKER_CACHE: OnceLock<Mutex<HashMap<Utf8PathBuf, Utf8PathBuf>>> = OnceLock::new();
@@ -47,25 +48,37 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
         "pg_worker_{pid}_{hash:x}",
         pid = std::process::id()
     ));
+    let worker_binary_path = destination_path.with_extension("bin");
     let (source_dir, source_name_str) = open_parent_dir(worker)?;
     let (destination_dir, destination_name_str) = open_parent_dir(&destination_path)?;
+    let (worker_dir, worker_name_str) = open_parent_dir(&worker_binary_path)?;
     let source_name = Utf8Path::new(source_name_str);
     let destination_name = Utf8Path::new(destination_name_str);
+    let worker_name = Utf8Path::new(worker_name_str);
 
     match destination_dir.remove_file(destination_name) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(err) => return Err(Box::new(err) as BoxError),
     }
+    match worker_dir.remove_file(worker_name) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(Box::new(err) as BoxError),
+    }
 
     source_dir
-        .copy(source_name, &destination_dir, destination_name)
+        .copy(source_name, &worker_dir, worker_name)
         .map_err(|err| Box::new(err) as BoxError)?;
+    write_worker_wrapper(&destination_dir, destination_name, &worker_binary_path)?;
 
     #[cfg(unix)]
     {
         destination_dir
             .set_permissions(destination_name, Permissions::from_mode(0o755))
+            .map_err(|err| Box::new(err) as BoxError)?;
+        worker_dir
+            .set_permissions(worker_name, Permissions::from_mode(0o755))
             .map_err(|err| Box::new(err) as BoxError)?;
     }
 
@@ -78,6 +91,29 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
         .entry(key)
         .or_insert_with(|| destination_path.clone());
     Ok(result_path.clone())
+}
+
+fn write_worker_wrapper(
+    destination_dir: &cap_std::fs_utf8::Dir,
+    destination_name: &Utf8Path,
+    worker_binary_path: &Utf8Path,
+) -> Result<(), BoxError> {
+    let mut file = destination_dir
+        .create(destination_name)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    let script = format!(
+        concat!(
+            "#!/bin/sh\n",
+            "if [ \"$(id -u)\" -eq 0 ]; then\n",
+            "  exec /usr/sbin/runuser -u nobody -- {worker} \"$@\"\n",
+            "fi\n",
+            "exec {worker} \"$@\"\n",
+        ),
+        worker = worker_binary_path.as_str()
+    );
+    file.write_all(script.as_bytes())
+        .map_err(|err| Box::new(err) as BoxError)?;
+    Ok(())
 }
 
 #[cfg(test)]

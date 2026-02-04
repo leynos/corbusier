@@ -11,12 +11,10 @@ use mockable::Clock;
 use uuid::Uuid;
 
 use crate::message::{
-    domain::{
-        AgentSessionId, ContextWindowSnapshot, ConversationId, MessageSummary, SequenceNumber,
-        SequenceRange, SnapshotParams,
-    },
+    domain::{AgentSessionId, ContextWindowSnapshot, ConversationId},
     ports::context_snapshot::{
         CaptureSnapshotParams, ContextSnapshotPort, SnapshotError, SnapshotResult,
+        build_default_snapshot,
     },
 };
 
@@ -60,14 +58,7 @@ impl<C: Clock + Send + Sync> ContextSnapshotPort for InMemoryContextSnapshotAdap
     ) -> SnapshotResult<ContextWindowSnapshot> {
         // In a real implementation, we'd query the message repository
         // to compute the actual summary. For testing, we create a minimal snapshot.
-        let snapshot_params = SnapshotParams::new(
-            params.conversation_id,
-            params.session_id,
-            SequenceRange::new(SequenceNumber::new(1), params.sequence_range_end),
-            MessageSummary::default(),
-            params.snapshot_type,
-        );
-        let snapshot = ContextWindowSnapshot::new(snapshot_params, &self.clock);
+        let snapshot = build_default_snapshot(&params, &self.clock);
 
         let mut guard = self
             .snapshots

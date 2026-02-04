@@ -148,6 +148,7 @@ where
     /// - Source session not found
     /// - Source session is not active
     /// - Handoff creation fails
+    /// - Source session update fails
     pub async fn initiate(
         &self,
         params: ServiceInitiateParams<'_>,
@@ -171,6 +172,7 @@ where
         let snapshot_params = CaptureSnapshotParams::new(
             params.conversation_id,
             params.source_session_id,
+            source_session.start_sequence,
             params.current_sequence,
             SnapshotType::HandoffInitiated,
         );
@@ -202,7 +204,7 @@ where
         self.session_repo
             .update(&source_session)
             .await
-            .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
+            .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
 
         Ok(handoff)
     }
@@ -252,6 +254,7 @@ where
             target_session.conversation_id,
             target_session_id,
             start_sequence,
+            start_sequence,
             SnapshotType::SessionStart,
         );
         let _snapshot = self
@@ -283,6 +286,7 @@ where
     /// Returns `HandoffError` if:
     /// - Handoff not found
     /// - Handoff is already in a terminal state
+    /// - Source session update fails
     pub async fn cancel(&self, handoff_id: HandoffId, reason: Option<&str>) -> HandoffResult<()> {
         // Find the handoff
         let handoff = self
@@ -292,10 +296,11 @@ where
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
         // Revert source session if needed
-        if let Ok(Some(mut source_session)) = self
+        if let Some(mut source_session) = self
             .session_repo
             .find_by_id(handoff.source_session_id)
             .await
+            .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?
             && source_session.terminated_by_handoff == Some(handoff_id)
         {
             // Revert to active state
@@ -304,8 +309,10 @@ where
             source_session.end_sequence = None;
             source_session.ended_at = None;
 
-            // Intentionally ignoring update result during cancellation
-            drop(self.session_repo.update(&source_session).await);
+            self.session_repo
+                .update(&source_session)
+                .await
+                .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
         }
 
         // Cancel the handoff
@@ -372,79 +379,5 @@ impl From<crate::message::domain::AgentSessionState> for crate::message::domain:
             AgentSessionState::HandedOff | AgentSessionState::Completed => Self::Completed,
             AgentSessionState::Failed => Self::Failed,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::message::adapters::memory::{
-        InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
-    };
-    use mockable::DefaultClock;
-
-    fn create_service() -> HandoffService<
-        InMemoryAgentSessionRepository,
-        InMemoryHandoffAdapter<DefaultClock>,
-        InMemoryContextSnapshotAdapter<DefaultClock>,
-    > {
-        HandoffService::new(
-            Arc::new(InMemoryAgentSessionRepository::new()),
-            Arc::new(InMemoryHandoffAdapter::new(DefaultClock)),
-            Arc::new(InMemoryContextSnapshotAdapter::new(DefaultClock)),
-        )
-    }
-
-    #[tokio::test]
-    async fn initiate_handoff_requires_active_session() {
-        let service = create_service();
-        let conversation_id = ConversationId::new();
-        let session_id = AgentSessionId::new();
-
-        // No session exists, should fail
-        let params = ServiceInitiateParams::new(
-            conversation_id,
-            session_id,
-            "target-agent",
-            TurnId::new(),
-            SequenceNumber::new(5),
-        );
-        let result = service.initiate(params).await;
-
-        assert!(result.is_err());
-        let err = result.expect_err("should be error");
-        assert!(matches!(err, HandoffError::SessionNotFound(_)));
-    }
-
-    #[tokio::test]
-    async fn create_target_session_stores_session() {
-        let service = create_service();
-        let conversation_id = ConversationId::new();
-        let handoff_id = HandoffId::new();
-
-        let params = HandoffSessionParams::new(
-            conversation_id,
-            "target-agent",
-            SequenceNumber::new(10),
-            handoff_id,
-        );
-        let session = service
-            .create_target_session(params)
-            .await
-            .expect("should create session");
-
-        assert_eq!(session.conversation_id, conversation_id);
-        assert_eq!(session.initiated_by_handoff, Some(handoff_id));
-        assert_eq!(session.agent_backend, "target-agent");
-
-        // Verify it was stored
-        let found = service
-            .session_repo
-            .find_by_id(session.session_id)
-            .await
-            .expect("should find")
-            .expect("session should exist");
-
-        assert_eq!(found.session_id, session.session_id);
     }
 }

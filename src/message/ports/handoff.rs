@@ -74,6 +74,10 @@ pub trait AgentHandoffPort: Send + Sync {
     ///
     /// Creates a new agent session for the target agent and captures
     /// context snapshots for both sessions.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HandoffError` if the handoff cannot be completed or persisted.
     async fn complete_handoff(
         &self,
         handoff_id: HandoffId,
@@ -81,6 +85,10 @@ pub trait AgentHandoffPort: Send + Sync {
     ) -> HandoffResult<HandoffMetadata>;
 
     /// Cancels a pending handoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HandoffError` if the handoff cannot be cancelled or persisted.
     async fn cancel_handoff(
         &self,
         handoff_id: HandoffId,
@@ -88,9 +96,17 @@ pub trait AgentHandoffPort: Send + Sync {
     ) -> HandoffResult<()>;
 
     /// Retrieves handoff metadata by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HandoffError` if lookup fails.
     async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>>;
 
     /// Lists all handoffs for a conversation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `HandoffError` if the list cannot be retrieved.
     async fn list_handoffs_for_conversation(
         &self,
         conversation_id: ConversationId,
@@ -128,6 +144,10 @@ pub enum HandoffError {
     /// Context snapshot capture failed.
     #[error("context snapshot failed: {0}")]
     SnapshotFailed(String),
+
+    /// Agent session update failed.
+    #[error("session update failed: {0}")]
+    SessionUpdateFailed(String),
 
     /// Database or persistence error.
     #[error("persistence error: {0}")]

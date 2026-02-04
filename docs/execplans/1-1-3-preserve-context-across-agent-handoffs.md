@@ -16,13 +16,13 @@ Implement roadmap item 1.1.3 from `docs/roadmap.md`:
   `docs/pg-embed-setup-unpriv-users-guide.md`
 - Architecture: Hexagonal (domain/ports/adapters separation)
 
----
+______________________________________________________________________
 
 ## Phase 1: Domain Types (src/message/domain/)
 
 ### 1.1 Add new identifier types to `ids.rs`
 
-Add following existing `TurnId` pattern (~30 lines each):
+Add the following, using the existing `TurnId` pattern (~30 lines each):
 
 ```rust
 pub struct HandoffId(Uuid);       // Unique handoff event identifier
@@ -118,7 +118,7 @@ Add builders: `with_handoff_metadata()`, `with_agent_session_id()`.
 
 Export new modules and types.
 
----
+______________________________________________________________________
 
 ## Phase 2: Port Definitions (src/message/ports/)
 
@@ -165,7 +165,7 @@ pub trait AgentSessionRepository: Send + Sync {
 
 Export new port modules.
 
----
+______________________________________________________________________
 
 ## Phase 3: In-Memory Adapters (src/message/adapters/memory/)
 
@@ -184,10 +184,10 @@ existing `memory.rs`.
 
 ### 3.4 Restructure memory adapters
 
-Move existing `memory.rs` content to `memory/message.rs`, create `memory/mod.rs`
-exporting all in-memory adapters.
+Move existing `memory.rs` content to `memory/message.rs`, create
+`memory/mod.rs` exporting all in-memory adapters.
 
----
+______________________________________________________________________
 
 ## Phase 4: Database Schema (migrations/)
 
@@ -253,10 +253,10 @@ Run `diesel print-schema` to regenerate table definitions.
 
 ### 4.3 Create `adapters/models/session_models.rs` (~150 lines)
 
-Diesel models: `AgentSessionRow`, `NewAgentSession`, `HandoffRow`, `NewHandoff`,
-`ContextSnapshotRow`, `NewContextSnapshot`.
+Diesel models: `AgentSessionRow`, `NewAgentSession`, `HandoffRow`,
+`NewHandoff`, `ContextSnapshotRow`, `NewContextSnapshot`.
 
----
+______________________________________________________________________
 
 ## Phase 5: PostgreSQL Adapters (src/message/adapters/postgres/)
 
@@ -278,7 +278,7 @@ support.
 
 Export new adapters.
 
----
+______________________________________________________________________
 
 ## Phase 6: Service Layer (src/message/services/)
 
@@ -299,7 +299,7 @@ impl HandoffService {
 Orchestrates: find active session -> capture snapshot -> collect tool refs ->
 create handoff -> update session state.
 
----
+______________________________________________________________________
 
 ## Phase 7: Validation (src/message/validation/)
 
@@ -314,27 +314,27 @@ create handoff -> update session state.
 
 Add `HandoffValidationError` enum.
 
----
+______________________________________________________________________
 
 ## Phase 8: Testing
 
 ### 8.1 Unit tests (`src/message/tests/`)
 
-| File                          | Coverage                                    |
-| ----------------------------- | ------------------------------------------- |
+| File                          | Coverage                                       |
+| ----------------------------- | ---------------------------------------------- |
 | `handoff_tests.rs`            | `HandoffMetadata` construction, builder, serde |
-| `agent_session_tests.rs`      | `AgentSession` lifecycle, state transitions |
-| `context_snapshot_tests.rs`   | Snapshot construction, `MessageSummary`     |
-| `handoff_validation_tests.rs` | Validation rules happy/unhappy paths        |
+| `agent_session_tests.rs`      | `AgentSession` lifecycle, state transitions    |
+| `context_snapshot_tests.rs`   | Snapshot construction, `MessageSummary`        |
+| `handoff_validation_tests.rs` | Validation rules happy/unhappy paths           |
 
 ### 8.2 Integration tests (`tests/`)
 
-| File                          | Coverage                                    |
-| ----------------------------- | ------------------------------------------- |
-| `in_memory/handoff_tests.rs`  | Full handoff flow with in-memory adapters   |
-| `postgres/handoff_tests.rs`   | Persistence, audit trail, transactions      |
+| File                         | Coverage                                  |
+| ---------------------------- | ----------------------------------------- |
+| `in_memory/handoff_tests.rs` | Full handoff flow with in-memory adapters |
+| `postgres/handoff_tests.rs`  | Persistence, audit trail, transactions    |
 
-### 8.3 BDD tests
+### 8.3 Behaviour-Driven Development (BDD) tests
 
 **`tests/features/agent_handoff.feature`:**
 
@@ -360,7 +360,7 @@ Feature: Agent handoff context preservation
 
 **`tests/agent_handoff_steps.rs`:** Step definitions using `rstest_bdd_macros`.
 
----
+______________________________________________________________________
 
 ## Phase 9: Documentation
 
@@ -385,36 +385,36 @@ Document design decisions:
 
 Mark item 1.1.3 and sub-items as `[x]` complete.
 
----
+______________________________________________________________________
 
 ## Implementation Order
 
-| Step | Task                       | Files                                          | Est. Lines |
-| ---- | -------------------------- | ---------------------------------------------- | ---------- |
-| 1    | Domain identifiers         | `domain/ids.rs`                                | +60        |
-| 2    | Handoff types              | `domain/handoff.rs` (new)                      | +150       |
-| 3    | Context snapshot types     | `domain/context_snapshot.rs` (new)             | +120       |
-| 4    | Agent session types        | `domain/agent_session.rs` (new)                | +130       |
-| 5    | Extend MessageMetadata     | `domain/metadata.rs`                           | +30        |
-| 6    | Domain module exports      | `domain/mod.rs`                                | +10        |
-| 7    | Unit tests for domain      | `tests/*.rs`                                   | +300       |
-| 8    | Port definitions           | `ports/*.rs` (3 new files)                     | +200       |
-| 9    | In-memory adapters         | `adapters/memory/*.rs`                         | +300       |
-| 10   | In-memory integration tests | `tests/in_memory/*.rs`                        | +200       |
-| 11   | Database migration         | `migrations/*/up.sql`                          | +50        |
-| 12   | Diesel schema + models     | `adapters/schema.rs`, `models/*.rs`            | +200       |
-| 13   | PostgreSQL adapters        | `adapters/postgres/*.rs`                       | +450       |
-| 14   | PostgreSQL integration tests | `tests/postgres/*.rs`                        | +250       |
-| 15   | Validation rules           | `validation/handoff_rules.rs`                  | +100       |
-| 16   | Service layer              | `services/handoff_service.rs`                  | +200       |
-| 17   | BDD feature + steps        | `tests/features/*.feature`, `tests/*_steps.rs` | +150       |
-| 18   | Documentation updates      | `docs/*.md`                                    | +100       |
-| 19   | Run quality gates          | `make check-fmt && make lint && make test`     | -          |
-| 20   | Mark roadmap complete      | `docs/roadmap.md`                              | +3         |
+| Step | Task                         | Files                                          | Est. Lines |
+| ---- | ---------------------------- | ---------------------------------------------- | ---------- |
+| 1    | Domain identifiers           | `domain/ids.rs`                                | +60        |
+| 2    | Handoff types                | `domain/handoff.rs` (new)                      | +150       |
+| 3    | Context snapshot types       | `domain/context_snapshot.rs` (new)             | +120       |
+| 4    | Agent session types          | `domain/agent_session.rs` (new)                | +130       |
+| 5    | Extend MessageMetadata       | `domain/metadata.rs`                           | +30        |
+| 6    | Domain module exports        | `domain/mod.rs`                                | +10        |
+| 7    | Unit tests for domain        | `tests/*.rs`                                   | +300       |
+| 8    | Port definitions             | `ports/*.rs` (3 new files)                     | +200       |
+| 9    | In-memory adapters           | `adapters/memory/*.rs`                         | +300       |
+| 10   | In-memory integration tests  | `tests/in_memory/*.rs`                         | +200       |
+| 11   | Database migration           | `migrations/*/up.sql`                          | +50        |
+| 12   | Diesel schema + models       | `adapters/schema.rs`, `models/*.rs`            | +200       |
+| 13   | PostgreSQL adapters          | `adapters/postgres/*.rs`                       | +450       |
+| 14   | PostgreSQL integration tests | `tests/postgres/*.rs`                          | +250       |
+| 15   | Validation rules             | `validation/handoff_rules.rs`                  | +100       |
+| 16   | Service layer                | `services/handoff_service.rs`                  | +200       |
+| 17   | BDD feature + steps          | `tests/features/*.feature`, `tests/*_steps.rs` | +150       |
+| 18   | Documentation updates        | `docs/*.md`                                    | +100       |
+| 19   | Run quality gates            | `make check-fmt && make lint && make test`     | -          |
+| 20   | Mark roadmap complete        | `docs/roadmap.md`                              | +3         |
 
 **Total estimated**: ~3000 lines across ~25 files
 
----
+______________________________________________________________________
 
 ## Critical File Paths
 
@@ -466,7 +466,7 @@ Mark item 1.1.3 and sub-items as `[x]` complete.
 - `/home/user/project/docs/corbusier-design.md`
 - `/home/user/project/docs/roadmap.md`
 
----
+______________________________________________________________________
 
 ## Quality Gates (before commit)
 
@@ -476,18 +476,18 @@ make check-fmt && make lint && make test
 
 All must pass before marking roadmap item complete.
 
----
+______________________________________________________________________
 
 ## Risks and Mitigations
 
-| Risk                           | Mitigation                                        |
-| ------------------------------ | ------------------------------------------------- |
-| Schema complexity              | Use JSONB for nested structures to minimise table count |
-| Performance (snapshot capture) | Make snapshot async, use token estimates          |
-| State machine complexity       | Explicit enums with validation functions          |
-| File size limits (400 lines)   | Split large modules into submodules               |
+| Risk                           | Mitigation                                              |
+| ------------------------------ | ------------------------------------------------------- |
+| Schema complexity              | Use JSONB for nested structures to minimize table count |
+| Performance (snapshot capture) | Make snapshot async, use token estimates                |
+| State machine complexity       | Explicit enums with validation functions                |
+| File size limits (400 lines)   | Split large modules into submodules                     |
 
----
+______________________________________________________________________
 
 ## Design Decisions to Record
 

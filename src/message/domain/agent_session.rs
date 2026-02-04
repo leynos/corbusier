@@ -171,14 +171,26 @@ impl AgentSession {
         self.context_snapshots.push(snapshot);
     }
 
-    /// Pauses the session.
-    pub const fn pause(&mut self) {
-        self.state = AgentSessionState::Paused;
+    /// Pauses the session when currently active.
+    ///
+    /// Returns `true` if the transition succeeds.
+    pub fn pause(&mut self) -> bool {
+        if self.state == AgentSessionState::Active {
+            self.state = AgentSessionState::Paused;
+            return true;
+        }
+        false
     }
 
-    /// Resumes a paused session.
-    pub const fn resume(&mut self) {
-        self.state = AgentSessionState::Active;
+    /// Resumes the session when currently paused.
+    ///
+    /// Returns `true` if the transition succeeds.
+    pub fn resume(&mut self) -> bool {
+        if self.state == AgentSessionState::Paused {
+            self.state = AgentSessionState::Active;
+            return true;
+        }
+        false
     }
 
     /// Ends the session via handoff to another agent.
@@ -297,93 +309,5 @@ impl TryFrom<&str> for AgentSessionState {
             "failed" => Ok(Self::Failed),
             _ => Err(ParseAgentSessionStateError(s.to_owned())),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockable::DefaultClock;
-
-    #[test]
-    fn agent_session_new_is_active() {
-        let clock = DefaultClock;
-        let session = AgentSession::new(
-            ConversationId::new(),
-            "claude-code",
-            SequenceNumber::new(1),
-            &clock,
-        );
-
-        assert_eq!(session.state, AgentSessionState::Active);
-        assert!(session.is_active());
-        assert!(!session.is_terminal());
-        assert!(session.end_sequence.is_none());
-        assert!(session.ended_at.is_none());
-        assert!(session.initiated_by_handoff.is_none());
-    }
-
-    #[test]
-    fn agent_session_from_handoff() {
-        let clock = DefaultClock;
-        let handoff_id = HandoffId::new();
-        let params = HandoffSessionParams::new(
-            ConversationId::new(),
-            "opus-agent",
-            SequenceNumber::new(10),
-            handoff_id,
-        );
-        let session = AgentSession::from_handoff(params, &clock);
-
-        assert_eq!(session.initiated_by_handoff, Some(handoff_id));
-        assert_eq!(session.start_sequence, SequenceNumber::new(10));
-    }
-
-    #[test]
-    fn agent_session_handoff_terminates() {
-        let clock = DefaultClock;
-        let mut session = AgentSession::new(
-            ConversationId::new(),
-            "claude-code",
-            SequenceNumber::new(1),
-            &clock,
-        );
-
-        let handoff_id = HandoffId::new();
-        session.handoff(SequenceNumber::new(5), handoff_id, &clock);
-
-        assert_eq!(session.state, AgentSessionState::HandedOff);
-        assert!(session.is_terminal());
-        assert_eq!(session.end_sequence, Some(SequenceNumber::new(5)));
-        assert_eq!(session.terminated_by_handoff, Some(handoff_id));
-        assert!(session.ended_at.is_some());
-    }
-
-    #[test]
-    fn agent_session_record_turns() {
-        let clock = DefaultClock;
-        let mut session = AgentSession::new(
-            ConversationId::new(),
-            "claude-code",
-            SequenceNumber::new(1),
-            &clock,
-        );
-
-        session.record_turn(TurnId::new());
-        session.record_turn(TurnId::new());
-
-        assert_eq!(session.turn_count(), 2);
-    }
-
-    #[test]
-    fn agent_session_state_serialisation() {
-        assert_eq!(
-            serde_json::to_string(&AgentSessionState::Active).expect("serialisation"),
-            "\"active\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AgentSessionState::HandedOff).expect("serialisation"),
-            "\"handed_off\""
-        );
     }
 }

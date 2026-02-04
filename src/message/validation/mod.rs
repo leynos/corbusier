@@ -7,6 +7,9 @@ pub mod handoff;
 pub mod rules;
 pub mod service;
 
+#[cfg(test)]
+mod handoff_tests;
+
 pub use handoff::{
     HandoffValidationError, HandoffValidationResult, validate_handoff_can_cancel,
     validate_handoff_can_complete, validate_handoff_initiation,

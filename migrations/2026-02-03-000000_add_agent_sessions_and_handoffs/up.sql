@@ -100,7 +100,8 @@ CREATE INDEX idx_context_snapshots_conversation_type ON context_snapshots(conver
 CREATE OR REPLACE FUNCTION update_agent_session_ended_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.state IN ('handed_off', 'completed', 'failed') AND OLD.state = 'active' THEN
+    IF NEW.state IN ('handed_off', 'completed', 'failed')
+        AND OLD.state IN ('active', 'paused') THEN
         NEW.ended_at := NOW();
     END IF;
     RETURN NEW;

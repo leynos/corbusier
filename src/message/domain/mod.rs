@@ -13,6 +13,11 @@ mod message;
 mod metadata;
 mod role;
 
+#[cfg(test)]
+mod agent_session_tests;
+#[cfg(test)]
+mod handoff_tests;
+
 pub use agent_session::{
     AgentSession, AgentSessionState, HandoffSessionParams, ParseAgentSessionStateError,
 };

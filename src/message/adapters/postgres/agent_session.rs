@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use diesel::prelude::*;
 
-use super::blocking_helpers::PgPool;
+use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 use crate::message::{
     adapters::models::{AgentSessionRow, NewAgentSession},
     adapters::schema::agent_sessions,
@@ -41,27 +41,30 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let new_session = session_to_new_row(session)?;
         let session_id = session.session_id;
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-            // Check for duplicate
-            let exists: i64 = agent_sessions::table
-                .filter(agent_sessions::id.eq(session_id.into_inner()))
-                .count()
-                .get_result(&mut conn)
-                .map_err(SessionError::persistence)?;
+                // Check for duplicate
+                let exists: i64 = agent_sessions::table
+                    .filter(agent_sessions::id.eq(session_id.into_inner()))
+                    .count()
+                    .get_result(&mut conn)
+                    .map_err(SessionError::persistence)?;
 
-            if exists > 0 {
-                return Err(SessionError::Duplicate(session_id));
-            }
+                if exists > 0 {
+                    return Err(SessionError::Duplicate(session_id));
+                }
 
-            diesel::insert_into(agent_sessions::table)
-                .values(&new_session)
-                .execute(&mut conn)
-                .map_err(SessionError::persistence)?;
+                diesel::insert_into(agent_sessions::table)
+                    .values(&new_session)
+                    .execute(&mut conn)
+                    .map_err(SessionError::persistence)?;
 
-            Ok(())
-        })
+                Ok(())
+            },
+            SessionError::persistence,
+        )
         .await
     }
 
@@ -70,22 +73,25 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let session_id = session.session_id;
         let updated = session_to_update_values(session)?;
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-            let updated_rows = diesel::update(
-                agent_sessions::table.filter(agent_sessions::id.eq(session_id.into_inner())),
-            )
-            .set(&updated)
-            .execute(&mut conn)
-            .map_err(SessionError::persistence)?;
+                let updated_rows = diesel::update(
+                    agent_sessions::table.filter(agent_sessions::id.eq(session_id.into_inner())),
+                )
+                .set(&updated)
+                .execute(&mut conn)
+                .map_err(SessionError::persistence)?;
 
-            if updated_rows == 0 {
-                return Err(SessionError::NotFound(session_id));
-            }
+                if updated_rows == 0 {
+                    return Err(SessionError::NotFound(session_id));
+                }
 
-            Ok(())
-        })
+                Ok(())
+            },
+            SessionError::persistence,
+        )
         .await
     }
 
@@ -93,18 +99,21 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let pool = self.pool.clone();
         let uuid = id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-            agent_sessions::table
-                .filter(agent_sessions::id.eq(uuid))
-                .select(AgentSessionRow::as_select())
-                .first::<AgentSessionRow>(&mut conn)
-                .optional()
-                .map_err(SessionError::persistence)?
-                .map(row_to_session)
-                .transpose()
-        })
+                agent_sessions::table
+                    .filter(agent_sessions::id.eq(uuid))
+                    .select(AgentSessionRow::as_select())
+                    .first::<AgentSessionRow>(&mut conn)
+                    .optional()
+                    .map_err(SessionError::persistence)?
+                    .map(row_to_session)
+                    .transpose()
+            },
+            SessionError::persistence,
+        )
         .await
     }
 
@@ -115,19 +124,22 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-            agent_sessions::table
-                .filter(agent_sessions::conversation_id.eq(uuid))
-                .filter(agent_sessions::state.eq("active"))
-                .select(AgentSessionRow::as_select())
-                .first::<AgentSessionRow>(&mut conn)
-                .optional()
-                .map_err(SessionError::persistence)?
-                .map(row_to_session)
-                .transpose()
-        })
+                agent_sessions::table
+                    .filter(agent_sessions::conversation_id.eq(uuid))
+                    .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
+                    .select(AgentSessionRow::as_select())
+                    .first::<AgentSessionRow>(&mut conn)
+                    .optional()
+                    .map_err(SessionError::persistence)?
+                    .map(row_to_session)
+                    .transpose()
+            },
+            SessionError::persistence,
+        )
         .await
     }
 
@@ -138,18 +150,21 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-            let rows = agent_sessions::table
-                .filter(agent_sessions::conversation_id.eq(uuid))
-                .order(agent_sessions::started_at.asc())
-                .select(AgentSessionRow::as_select())
-                .load::<AgentSessionRow>(&mut conn)
-                .map_err(SessionError::persistence)?;
+                let rows = agent_sessions::table
+                    .filter(agent_sessions::conversation_id.eq(uuid))
+                    .order(agent_sessions::started_at.asc())
+                    .select(AgentSessionRow::as_select())
+                    .load::<AgentSessionRow>(&mut conn)
+                    .map_err(SessionError::persistence)?;
 
-            rows.into_iter().map(row_to_session).collect()
-        })
+                rows.into_iter().map(row_to_session).collect()
+            },
+            SessionError::persistence,
+        )
         .await
     }
 }
@@ -255,24 +270,4 @@ fn row_to_session(row: AgentSessionRow) -> SessionResult<AgentSession> {
         ended_at: row.ended_at,
         state,
     })
-}
-
-/// Wrapper to convert session errors to repository result.
-async fn run_blocking<F, T>(f: F) -> SessionResult<T>
-where
-    F: FnOnce() -> SessionResult<T> + Send + 'static,
-    T: Send + 'static,
-{
-    tokio::task::spawn_blocking(f)
-        .await
-        .map_err(SessionError::persistence)?
-}
-
-/// Obtains a connection from the pool.
-fn get_conn(
-    pool: &PgPool,
-) -> SessionResult<
-    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
-> {
-    pool.get().map_err(SessionError::persistence)
 }

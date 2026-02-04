@@ -3,8 +3,9 @@
 use super::BoxError;
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
 use camino::{Utf8Path, Utf8PathBuf};
+use nix::unistd::{Uid, User, initgroups, setgid, setuid};
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
-use std::ffi::OsString;
+use std::ffi::{CString, OsString};
 use std::net::TcpListener;
 
 type WorkerEnvChanges = (Vec<(OsString, Option<OsString>)>, Option<TcpListener>);
@@ -24,6 +25,40 @@ pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
         locate_pg_worker_path,
         prepare_pg_worker,
     )
+}
+
+pub(super) fn drop_privileges_if_root(username: &str) -> Result<(), BoxError> {
+    if !Uid::effective().is_root() {
+        return Ok(());
+    }
+
+    let user = User::from_name(username)
+        .map_err(|err| Box::new(err) as BoxError)?
+        .ok_or_else(|| {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("user '{username}' not found"),
+            )) as BoxError
+        })?;
+
+    let user_cstr = CString::new(user.name.clone()).map_err(|err| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid user name for initgroups: {err}"),
+        )) as BoxError
+    })?;
+    initgroups(&user_cstr, user.gid).map_err(|err| Box::new(err) as BoxError)?;
+    setgid(user.gid).map_err(|err| Box::new(err) as BoxError)?;
+    setuid(user.uid).map_err(|err| Box::new(err) as BoxError)?;
+
+    // SAFETY: tests execute single-threaded when mutating env vars.
+    unsafe {
+        std::env::set_var("HOME", user.dir);
+        std::env::set_var("USER", user.name.clone());
+        std::env::set_var("LOGNAME", user.name);
+    }
+
+    Ok(())
 }
 
 fn worker_env_changes_impl<D, L, P>(

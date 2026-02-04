@@ -5,4 +5,7 @@
 
 mod handoff;
 
+#[cfg(test)]
+mod handoff_tests;
+
 pub use handoff::{HandoffService, ServiceInitiateParams};

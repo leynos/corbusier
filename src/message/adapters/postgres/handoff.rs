@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use diesel::prelude::*;
-use mockable::{Clock, DefaultClock};
+use mockable::DefaultClock;
 
 use crate::message::{
     adapters::models::{HandoffRow, NewHandoff},
@@ -17,7 +17,7 @@ use crate::message::{
     ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
 };
 
-use super::blocking_helpers::PgPool;
+use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 
 /// `PostgreSQL` implementation of [`AgentHandoffPort`].
 ///
@@ -63,16 +63,19 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
         let new_handoff = handoff_to_new_row(&handoff)?;
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-            diesel::insert_into(handoffs::table)
-                .values(&new_handoff)
-                .execute(&mut conn)
-                .map_err(HandoffError::persistence)?;
+                diesel::insert_into(handoffs::table)
+                    .values(&new_handoff)
+                    .execute(&mut conn)
+                    .map_err(HandoffError::persistence)?;
 
-            Ok(handoff)
-        })
+                Ok(handoff)
+            },
+            HandoffError::persistence,
+        )
         .await
     }
 
@@ -83,86 +86,95 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
     ) -> HandoffResult<HandoffMetadata> {
         let pool = self.pool.clone();
         let clock = DefaultClock;
-        let now = clock.utc();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-            // Find the handoff
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .first::<HandoffRow>(&mut conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+                // Find the handoff
+                let row = handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .select(HandoffRow::as_select())
+                    .first::<HandoffRow>(&mut conn)
+                    .optional()
+                    .map_err(HandoffError::persistence)?
+                    .ok_or(HandoffError::NotFound(handoff_id))?;
 
-            let mut handoff = row_to_handoff(row)?;
+                let mut handoff = row_to_handoff(row)?;
 
-            // Check if already completed
-            if handoff.is_terminal() {
-                return Err(HandoffError::invalid_transition(
-                    handoff.status,
-                    HandoffStatus::Completed,
-                ));
-            }
+                // Check if already completed
+                if handoff.is_terminal() {
+                    return Err(HandoffError::invalid_transition(
+                        handoff.status,
+                        HandoffStatus::Completed,
+                    ));
+                }
 
-            // Complete the handoff
-            handoff = handoff.complete(target_session_id, &clock);
-            handoff.completed_at = Some(now);
+                // Complete the handoff
+                handoff = handoff.complete(target_session_id, &clock);
+                let completed_at = handoff.completed_at;
 
-            // Update in database
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set((
-                    handoffs::target_session_id.eq(target_session_id.into_inner()),
-                    handoffs::completed_at.eq(now),
-                    handoffs::status.eq("completed"),
-                ))
-                .execute(&mut conn)
-                .map_err(HandoffError::persistence)?;
+                // Update in database
+                diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                    .set((
+                        handoffs::target_session_id.eq(target_session_id.into_inner()),
+                        handoffs::completed_at.eq(completed_at),
+                        handoffs::status.eq(HandoffStatus::Completed.as_str()),
+                    ))
+                    .execute(&mut conn)
+                    .map_err(HandoffError::persistence)?;
 
-            Ok(handoff)
-        })
+                Ok(handoff)
+            },
+            HandoffError::persistence,
+        )
         .await
     }
 
     async fn cancel_handoff(
         &self,
         handoff_id: HandoffId,
-        _reason: Option<&str>,
+        reason: Option<&str>,
     ) -> HandoffResult<()> {
         let pool = self.pool.clone();
+        let owned_reason = reason.map(str::to_owned);
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-            // Check if handoff exists and is not terminal
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .first::<HandoffRow>(&mut conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+                // Check if handoff exists and is not terminal
+                let row = handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .select(HandoffRow::as_select())
+                    .first::<HandoffRow>(&mut conn)
+                    .optional()
+                    .map_err(HandoffError::persistence)?
+                    .ok_or(HandoffError::NotFound(handoff_id))?;
 
-            let status =
-                HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
+                let status = HandoffStatus::try_from(row.status.as_str())
+                    .map_err(HandoffError::persistence)?;
 
-            if status.is_terminal() {
-                return Err(HandoffError::invalid_transition(
-                    status,
-                    HandoffStatus::Cancelled,
-                ));
-            }
+                if status.is_terminal() {
+                    return Err(HandoffError::invalid_transition(
+                        status,
+                        HandoffStatus::Cancelled,
+                    ));
+                }
 
-            // Cancel the handoff
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set(handoffs::status.eq("cancelled"))
-                .execute(&mut conn)
-                .map_err(HandoffError::persistence)?;
+                // Cancel the handoff
+                diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                    .set((
+                        handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
+                        handoffs::reason.eq(owned_reason),
+                    ))
+                    .execute(&mut conn)
+                    .map_err(HandoffError::persistence)?;
 
-            Ok(())
-        })
+                Ok(())
+            },
+            HandoffError::persistence,
+        )
         .await
     }
 
@@ -170,18 +182,21 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let pool = self.pool.clone();
         let uuid = handoff_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-            handoffs::table
-                .filter(handoffs::id.eq(uuid))
-                .select(HandoffRow::as_select())
-                .first::<HandoffRow>(&mut conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .map(row_to_handoff)
-                .transpose()
-        })
+                handoffs::table
+                    .filter(handoffs::id.eq(uuid))
+                    .select(HandoffRow::as_select())
+                    .first::<HandoffRow>(&mut conn)
+                    .optional()
+                    .map_err(HandoffError::persistence)?
+                    .map(row_to_handoff)
+                    .transpose()
+            },
+            HandoffError::persistence,
+        )
         .await
     }
 
@@ -192,22 +207,26 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-            // Join with agent_sessions to find handoffs for this conversation
-            let rows = handoffs::table
-                .inner_join(
-                    agent_sessions::table.on(handoffs::source_session_id.eq(agent_sessions::id)),
-                )
-                .filter(agent_sessions::conversation_id.eq(uuid))
-                .select(HandoffRow::as_select())
-                .order(handoffs::initiated_at.asc())
-                .load::<HandoffRow>(&mut conn)
-                .map_err(HandoffError::persistence)?;
+                // Join with agent_sessions to find handoffs for this conversation
+                let rows = handoffs::table
+                    .inner_join(
+                        agent_sessions::table
+                            .on(handoffs::source_session_id.eq(agent_sessions::id)),
+                    )
+                    .filter(agent_sessions::conversation_id.eq(uuid))
+                    .select(HandoffRow::as_select())
+                    .order(handoffs::initiated_at.asc())
+                    .load::<HandoffRow>(&mut conn)
+                    .map_err(HandoffError::persistence)?;
 
-            rows.into_iter().map(row_to_handoff).collect()
-        })
+                rows.into_iter().map(row_to_handoff).collect()
+            },
+            HandoffError::persistence,
+        )
         .await
     }
 }
@@ -252,24 +271,4 @@ fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
         completed_at: row.completed_at,
         status,
     })
-}
-
-/// Wrapper to convert handoff errors to repository result.
-async fn run_blocking<F, T>(f: F) -> HandoffResult<T>
-where
-    F: FnOnce() -> HandoffResult<T> + Send + 'static,
-    T: Send + 'static,
-{
-    tokio::task::spawn_blocking(f)
-        .await
-        .map_err(HandoffError::persistence)?
-}
-
-/// Obtains a connection from the pool.
-fn get_conn(
-    pool: &PgPool,
-) -> HandoffResult<
-    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
-> {
-    pool.get().map_err(HandoffError::persistence)
 }

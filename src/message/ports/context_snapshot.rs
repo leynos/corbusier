@@ -4,15 +4,33 @@
 //! snapshots, enabling audit and reconstruction of agent session state.
 
 use crate::message::domain::{
-    AgentSessionId, ContextWindowSnapshot, ConversationId, SequenceNumber, SnapshotType,
+    AgentSessionId, ContextWindowSnapshot, ConversationId, MessageSummary, SequenceNumber,
+    SequenceRange, SnapshotParams, SnapshotType,
 };
 use async_trait::async_trait;
+use mockable::Clock;
 use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
 /// Result type for snapshot operations.
 pub type SnapshotResult<T> = Result<T, SnapshotError>;
+
+/// Builds a default snapshot for the specified capture parameters.
+#[must_use]
+pub fn build_default_snapshot(
+    params: &CaptureSnapshotParams,
+    clock: &impl Clock,
+) -> ContextWindowSnapshot {
+    let snapshot_params = SnapshotParams::new(
+        params.conversation_id,
+        params.session_id,
+        SequenceRange::new(params.sequence_range_start, params.sequence_range_end),
+        MessageSummary::default(),
+        params.snapshot_type,
+    );
+    ContextWindowSnapshot::new(snapshot_params, clock)
+}
 
 /// Parameters for capturing a context window snapshot.
 #[derive(Debug, Clone)]
@@ -21,6 +39,8 @@ pub struct CaptureSnapshotParams {
     pub conversation_id: ConversationId,
     /// The agent session this snapshot belongs to.
     pub session_id: AgentSessionId,
+    /// The first sequence number to include.
+    pub sequence_range_start: SequenceNumber,
     /// The last sequence number to include.
     pub sequence_range_end: SequenceNumber,
     /// The type of snapshot being captured.
@@ -30,15 +50,21 @@ pub struct CaptureSnapshotParams {
 impl CaptureSnapshotParams {
     /// Creates new capture snapshot parameters.
     #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "parameter struct constructor holds required fields"
+    )]
     pub const fn new(
         conversation_id: ConversationId,
         session_id: AgentSessionId,
+        sequence_range_start: SequenceNumber,
         sequence_range_end: SequenceNumber,
         snapshot_type: SnapshotType,
     ) -> Self {
         Self {
             conversation_id,
             session_id,
+            sequence_range_start,
             sequence_range_end,
             snapshot_type,
         }
@@ -53,8 +79,8 @@ impl CaptureSnapshotParams {
 pub trait ContextSnapshotPort: Send + Sync {
     /// Captures a context window snapshot for an agent session.
     ///
-    /// The snapshot includes all messages from the session start up to
-    /// the specified sequence number, along with message summaries and
+    /// The snapshot includes all messages from the specified start sequence
+    /// up to the specified end sequence, along with message summaries and
     /// visible tool calls.
     async fn capture_snapshot(
         &self,

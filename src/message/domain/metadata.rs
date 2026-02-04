@@ -53,7 +53,7 @@ pub struct MessageMetadata {
     /// Extension data for custom metadata fields.
     ///
     /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
-    /// fields during deserialisation will be captured here. This can cause
+    /// fields during deserialization will be captured here. This can cause
     /// unexpected behaviour if an extension key collides with a future field name.
     /// Avoid using keys like `agent_backend`, `turn_id`, `slash_command_expansion`,
     /// `tool_call_audits`, or `agent_response_audit`.

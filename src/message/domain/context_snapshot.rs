@@ -219,7 +219,10 @@ impl MessageSummary {
     /// Returns the total number of messages.
     #[must_use]
     pub const fn total(&self) -> u32 {
-        self.user_count + self.assistant_count + self.tool_count + self.system_count
+        self.user_count
+            .saturating_add(self.assistant_count)
+            .saturating_add(self.tool_count)
+            .saturating_add(self.system_count)
     }
 
     /// Returns `true` if there are no messages.
@@ -356,13 +359,13 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_type_serialisation() {
+    fn snapshot_type_serialization() {
         assert_eq!(
-            serde_json::to_string(&SnapshotType::SessionStart).expect("serialisation"),
+            serde_json::to_string(&SnapshotType::SessionStart).expect("serialization"),
             "\"session_start\""
         );
         assert_eq!(
-            serde_json::to_string(&SnapshotType::HandoffInitiated).expect("serialisation"),
+            serde_json::to_string(&SnapshotType::HandoffInitiated).expect("serialization"),
             "\"handoff_initiated\""
         );
     }

@@ -174,9 +174,12 @@ impl HandoffMetadata {
         self
     }
 
-    /// Cancels the handoff.
+    /// Cancels the handoff, optionally recording a reason.
     #[must_use]
-    pub const fn cancel(mut self) -> Self {
+    pub fn cancel(mut self, reason: Option<&str>) -> Self {
+        if let Some(reason_text) = reason {
+            self.reason = Some(reason_text.to_owned());
+        }
         self.status = HandoffStatus::Cancelled;
         self
     }
@@ -184,10 +187,7 @@ impl HandoffMetadata {
     /// Returns `true` if the handoff is in a terminal state.
     #[must_use]
     pub const fn is_terminal(&self) -> bool {
-        matches!(
-            self.status,
-            HandoffStatus::Completed | HandoffStatus::Failed | HandoffStatus::Cancelled
-        )
+        self.status.is_terminal()
     }
 }
 
@@ -301,105 +301,5 @@ impl TryFrom<&str> for HandoffStatus {
             "cancelled" => Ok(Self::Cancelled),
             _ => Err(ParseHandoffStatusError(s.to_owned())),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockable::DefaultClock;
-
-    #[test]
-    fn handoff_metadata_new_sets_initiated_status() {
-        let clock = DefaultClock;
-        let params = HandoffParams::new(
-            AgentSessionId::new(),
-            TurnId::new(),
-            "claude-code",
-            "opus-agent",
-        );
-        let handoff = HandoffMetadata::new(params, &clock);
-
-        assert_eq!(handoff.status, HandoffStatus::Initiated);
-        assert!(handoff.target_session_id.is_none());
-        assert!(handoff.completed_at.is_none());
-        assert!(handoff.triggering_tool_calls.is_empty());
-    }
-
-    #[test]
-    fn handoff_metadata_complete_sets_target_and_timestamp() {
-        let clock = DefaultClock;
-        let params = HandoffParams::new(
-            AgentSessionId::new(),
-            TurnId::new(),
-            "claude-code",
-            "opus-agent",
-        );
-        let handoff = HandoffMetadata::new(params, &clock);
-
-        let target_session = AgentSessionId::new();
-        let completed = handoff.complete(target_session, &clock);
-
-        assert_eq!(completed.status, HandoffStatus::Completed);
-        assert_eq!(completed.target_session_id, Some(target_session));
-        assert!(completed.completed_at.is_some());
-        assert!(completed.is_terminal());
-    }
-
-    #[test]
-    fn handoff_metadata_with_tool_calls_accumulates() {
-        let clock = DefaultClock;
-        let msg_id = MessageId::new();
-        let seq = SequenceNumber::new(1);
-
-        let params = HandoffParams::new(
-            AgentSessionId::new(),
-            TurnId::new(),
-            "claude-code",
-            "opus-agent",
-        );
-        let handoff = HandoffMetadata::new(params, &clock)
-            .with_triggering_tool_call(ToolCallReference::new("call-1", "read_file", msg_id, seq))
-            .with_triggering_tool_call(ToolCallReference::new("call-2", "write_file", msg_id, seq));
-
-        assert_eq!(handoff.triggering_tool_calls.len(), 2);
-        assert_eq!(
-            handoff
-                .triggering_tool_calls
-                .first()
-                .map(|t| t.call_id.as_str()),
-            Some("call-1")
-        );
-        assert_eq!(
-            handoff
-                .triggering_tool_calls
-                .get(1)
-                .map(|t| t.call_id.as_str()),
-            Some("call-2")
-        );
-    }
-
-    #[test]
-    fn handoff_status_serialisation_uses_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&HandoffStatus::Initiated).expect("serialisation"),
-            "\"initiated\""
-        );
-        assert_eq!(
-            serde_json::to_string(&HandoffStatus::Completed).expect("serialisation"),
-            "\"completed\""
-        );
-    }
-
-    #[test]
-    fn tool_call_reference_construction() {
-        let msg_id = MessageId::new();
-        let seq = SequenceNumber::new(42);
-        let reference = ToolCallReference::new("call-123", "search", msg_id, seq);
-
-        assert_eq!(reference.call_id, "call-123");
-        assert_eq!(reference.tool_name, "search");
-        assert_eq!(reference.message_id, msg_id);
-        assert_eq!(reference.sequence_number, seq);
     }
 }
