@@ -289,6 +289,8 @@ pub struct HandoffRow {
     pub id: Uuid,
     /// Session being handed off from.
     pub source_session_id: Uuid,
+    /// Conversation containing the handoff.
+    pub conversation_id: Uuid,
     /// Session being handed off to.
     pub target_session_id: Option<Uuid>,
     /// Turn ID that triggered the handoff.
@@ -317,6 +319,8 @@ pub struct NewHandoff {
     pub id: Uuid,
     /// Session being handed off from.
     pub source_session_id: Uuid,
+    /// Conversation containing the handoff.
+    pub conversation_id: Uuid,
     /// Session being handed off to.
     pub target_session_id: Option<Uuid>,
     /// Turn ID that triggered the handoff.

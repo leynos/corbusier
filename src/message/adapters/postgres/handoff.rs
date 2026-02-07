@@ -9,7 +9,7 @@ use mockable::DefaultClock;
 
 use crate::message::{
     adapters::models::{HandoffRow, NewHandoff},
-    adapters::schema::{agent_sessions, handoffs},
+    adapters::schema::handoffs,
     domain::{
         AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffParams, HandoffStatus,
         ToolCallReference, TurnId,
@@ -61,7 +61,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             handoff = handoff.with_reason(r);
         }
 
-        let new_handoff = handoff_to_new_row(&handoff)?;
+        let new_handoff = handoff_to_new_row(&handoff, params.conversation_id)?;
 
         run_blocking_with(
             move || {
@@ -211,13 +211,8 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
 
-                // Join with agent_sessions to find handoffs for this conversation
                 let rows = handoffs::table
-                    .inner_join(
-                        agent_sessions::table
-                            .on(handoffs::source_session_id.eq(agent_sessions::id)),
-                    )
-                    .filter(agent_sessions::conversation_id.eq(uuid))
+                    .filter(handoffs::conversation_id.eq(uuid))
                     .select(HandoffRow::as_select())
                     .order(handoffs::initiated_at.asc())
                     .load::<HandoffRow>(&mut conn)
@@ -232,13 +227,17 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 }
 
 /// Converts a domain `HandoffMetadata` to a `NewHandoff` for insertion.
-fn handoff_to_new_row(handoff: &HandoffMetadata) -> HandoffResult<NewHandoff> {
+fn handoff_to_new_row(
+    handoff: &HandoffMetadata,
+    conversation_id: ConversationId,
+) -> HandoffResult<NewHandoff> {
     let triggering_tool_calls =
         serde_json::to_value(&handoff.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
     Ok(NewHandoff {
         id: handoff.handoff_id.into_inner(),
         source_session_id: handoff.source_session_id.into_inner(),
+        conversation_id: conversation_id.into_inner(),
         target_session_id: handoff.target_session_id.map(AgentSessionId::into_inner),
         prior_turn_id: handoff.prior_turn_id.into_inner(),
         triggering_tool_calls,

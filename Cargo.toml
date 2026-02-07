@@ -29,7 +29,6 @@ diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_j
 # Capability-based filesystem access
 cap-std = { version = "4.0.0", features = ["fs_utf8"] }
 camino = "1.2.2"
-nix = { version = "0.30.1", features = ["user"] }
 
 # Async runtime
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
@@ -45,6 +44,9 @@ rstest-bdd-macros = { version = "0.4.0", features = ["strict-compile-time-valida
 mockall = "0.14.0"
 eyre = "0.6.12"
 once_cell = "1.20.3"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.30.1", features = ["user"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

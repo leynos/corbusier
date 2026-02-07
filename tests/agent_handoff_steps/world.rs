@@ -22,14 +22,15 @@ use rstest::fixture;
 pub type TestHandoffService = HandoffService<
     InMemoryAgentSessionRepository,
     InMemoryHandoffAdapter<DefaultClock>,
-    InMemoryContextSnapshotAdapter<DefaultClock>,
+    InMemoryContextSnapshotAdapter,
+    DefaultClock,
 >;
 
 /// World state for handoff BDD tests.
 pub struct HandoffWorld {
     pub session_repo: Arc<InMemoryAgentSessionRepository>,
     pub handoff_adapter: Arc<InMemoryHandoffAdapter<DefaultClock>>,
-    pub snapshot_adapter: Arc<InMemoryContextSnapshotAdapter<DefaultClock>>,
+    pub snapshot_adapter: Arc<InMemoryContextSnapshotAdapter>,
     pub service: TestHandoffService,
     pub conversation_id: ConversationId,
     pub source_session: Option<AgentSession>,
@@ -42,14 +43,16 @@ pub struct HandoffWorld {
 
 impl Default for HandoffWorld {
     fn default() -> Self {
+        let service_clock = Arc::new(DefaultClock);
         let session_repo = Arc::new(InMemoryAgentSessionRepository::new());
         let handoff_adapter = Arc::new(InMemoryHandoffAdapter::new(DefaultClock));
-        let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new(DefaultClock));
+        let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new());
 
         let service = HandoffService::new(
             Arc::clone(&session_repo),
             Arc::clone(&handoff_adapter),
             Arc::clone(&snapshot_adapter),
+            service_clock,
         );
 
         Self {

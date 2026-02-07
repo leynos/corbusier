@@ -3,10 +3,6 @@
 //! Provides production-grade persistence for context window snapshots with JSONB
 //! storage for message summaries and tool call references.
 
-use async_trait::async_trait;
-use diesel::prelude::*;
-use mockable::DefaultClock;
-
 use crate::message::{
     adapters::models::{ContextSnapshotRow, NewContextSnapshot},
     adapters::schema::context_snapshots,
@@ -14,11 +10,10 @@ use crate::message::{
         AgentSessionId, ContextWindowSnapshot, ConversationId, MessageSummary, SequenceNumber,
         SequenceRange, SnapshotType, ToolCallReference,
     },
-    ports::context_snapshot::{
-        CaptureSnapshotParams, ContextSnapshotPort, SnapshotError, SnapshotResult,
-        build_default_snapshot,
-    },
+    ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
 };
+use async_trait::async_trait;
+use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 
@@ -41,22 +36,6 @@ impl PostgresContextSnapshotAdapter {
 
 #[async_trait]
 impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
-    async fn capture_snapshot(
-        &self,
-        params: CaptureSnapshotParams,
-    ) -> SnapshotResult<ContextWindowSnapshot> {
-        // This is a simplified implementation. A full implementation would
-        // query messages to calculate actual message summaries.
-        let clock = DefaultClock;
-
-        let snapshot = build_default_snapshot(&params, &clock);
-
-        // Store the snapshot
-        self.store_snapshot(&snapshot).await?;
-
-        Ok(snapshot)
-    }
-
     async fn store_snapshot(&self, snapshot: &ContextWindowSnapshot) -> SnapshotResult<()> {
         let pool = self.pool.clone();
         let new_snapshot = snapshot_to_new_row(snapshot)?;

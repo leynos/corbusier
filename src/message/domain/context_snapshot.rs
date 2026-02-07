@@ -26,13 +26,13 @@ use super::{AgentSessionId, ConversationId, SequenceNumber};
 /// use mockable::DefaultClock;
 ///
 /// let clock = DefaultClock;
-/// let params = SnapshotParams::new(
-///     ConversationId::new(),
-///     AgentSessionId::new(),
-///     SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
-///     MessageSummary::new(5, 4, 1, 0),
-///     SnapshotType::SessionStart,
-/// );
+/// let params = SnapshotParams {
+///     conversation_id: ConversationId::new(),
+///     session_id: AgentSessionId::new(),
+///     sequence_range: SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
+///     message_summary: MessageSummary::new(5, 4, 1, 0),
+///     snapshot_type: SnapshotType::SessionStart,
+/// };
 /// let snapshot = ContextWindowSnapshot::new(params, &clock);
 /// assert_eq!(snapshot.message_summary.total(), 10);
 /// ```
@@ -81,33 +81,6 @@ pub struct SnapshotParams {
     pub message_summary: MessageSummary,
     /// Type of snapshot.
     pub snapshot_type: SnapshotType,
-}
-
-impl SnapshotParams {
-    /// Creates new snapshot parameters.
-    ///
-    /// Note: This constructor intentionally has 5 arguments as it serves as a
-    /// parameter holder pattern to reduce argument counts in other functions.
-    #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "parameter struct constructor holds required fields"
-    )]
-    pub const fn new(
-        conversation_id: ConversationId,
-        session_id: AgentSessionId,
-        sequence_range: SequenceRange,
-        message_summary: MessageSummary,
-        snapshot_type: SnapshotType,
-    ) -> Self {
-        Self {
-            conversation_id,
-            session_id,
-            sequence_range,
-            message_summary,
-            snapshot_type,
-        }
-    }
 }
 
 impl ContextWindowSnapshot {
@@ -172,7 +145,14 @@ impl SequenceRange {
     /// Returns the number of messages in this range.
     #[must_use]
     pub const fn len(&self) -> u64 {
-        self.end.value().saturating_sub(self.start.value()) + 1
+        if self.end.value() < self.start.value() {
+            0
+        } else {
+            self.end
+                .value()
+                .saturating_sub(self.start.value())
+                .saturating_add(1)
+        }
     }
 
     /// Returns `true` if the range is empty (end < start).
@@ -309,13 +289,13 @@ mod tests {
         let range = SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10));
         let summary = MessageSummary::new(5, 4, 1, 0);
 
-        let params = SnapshotParams::new(
-            conv_id,
+        let params = SnapshotParams {
+            conversation_id: conv_id,
             session_id,
-            range,
-            summary,
-            SnapshotType::SessionStart,
-        );
+            sequence_range: range,
+            message_summary: summary,
+            snapshot_type: SnapshotType::SessionStart,
+        };
         let snapshot = ContextWindowSnapshot::new(params, &clock);
 
         assert_eq!(snapshot.conversation_id, conv_id);
@@ -334,6 +314,10 @@ mod tests {
 
         let single = SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(1));
         assert_eq!(single.len(), 1);
+
+        let empty = SequenceRange::new(SequenceNumber::new(10), SequenceNumber::new(5));
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
     }
 
     #[test]

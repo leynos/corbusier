@@ -2,6 +2,7 @@
 
 use super::BoxError;
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
+use crate::test_helpers::EnvVarGuard;
 use camino::{Utf8Path, Utf8PathBuf};
 use nix::unistd::{Uid, User, initgroups, setgid, setuid};
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
@@ -27,9 +28,12 @@ pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
     )
 }
 
-pub(super) fn drop_privileges_if_root(username: &str) -> Result<(), BoxError> {
+pub(super) fn drop_privileges_if_root(
+    username: &str,
+    env_vars: &[(OsString, Option<OsString>)],
+) -> Result<Option<EnvVarGuard>, BoxError> {
     if !Uid::effective().is_root() {
-        return Ok(());
+        return Ok(None);
     }
 
     let user = User::from_name(username)
@@ -41,6 +45,22 @@ pub(super) fn drop_privileges_if_root(username: &str) -> Result<(), BoxError> {
             )) as BoxError
         })?;
 
+    let account_name = user.name.clone();
+    let user_home = user.dir.clone().into_os_string();
+    let mut changes = Vec::with_capacity(env_vars.len() + 3);
+    changes.extend(env_vars.iter().cloned());
+    changes.push((OsString::from("HOME"), Some(user_home)));
+    changes.push((
+        OsString::from("USER"),
+        Some(OsString::from(account_name.clone())),
+    ));
+    changes.push((
+        OsString::from("LOGNAME"),
+        Some(OsString::from(account_name.clone())),
+    ));
+
+    let env_guard = EnvVarGuard::set_many(&changes);
+
     let user_cstr = CString::new(user.name.clone()).map_err(|err| {
         Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -51,14 +71,7 @@ pub(super) fn drop_privileges_if_root(username: &str) -> Result<(), BoxError> {
     setgid(user.gid).map_err(|err| Box::new(err) as BoxError)?;
     setuid(user.uid).map_err(|err| Box::new(err) as BoxError)?;
 
-    // SAFETY: tests execute single-threaded when mutating env vars.
-    unsafe {
-        std::env::set_var("HOME", user.dir);
-        std::env::set_var("USER", user.name.clone());
-        std::env::set_var("LOGNAME", user.name);
-    }
-
-    Ok(())
+    Ok(Some(env_guard))
 }
 
 fn worker_env_changes_impl<D, L, P>(

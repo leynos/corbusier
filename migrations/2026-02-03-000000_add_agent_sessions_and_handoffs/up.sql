@@ -26,6 +26,7 @@ CREATE TABLE agent_sessions (
 CREATE TABLE handoffs (
     id UUID PRIMARY KEY,
     source_session_id UUID NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     target_session_id UUID REFERENCES agent_sessions(id) ON DELETE SET NULL,
     prior_turn_id UUID NOT NULL,
     triggering_tool_calls JSONB NOT NULL DEFAULT '[]',
@@ -81,6 +82,9 @@ CREATE INDEX idx_agent_sessions_agent_backend ON agent_sessions(agent_backend);
 
 -- Find handoffs by source session
 CREATE INDEX idx_handoffs_source_session_id ON handoffs(source_session_id);
+
+-- Find handoffs by conversation
+CREATE INDEX idx_handoffs_conversation_id ON handoffs(conversation_id);
 
 -- Find handoffs by target session
 CREATE INDEX idx_handoffs_target_session_id ON handoffs(target_session_id)

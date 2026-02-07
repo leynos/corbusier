@@ -5,14 +5,17 @@
 
 use std::sync::Arc;
 
+use mockable::Clock;
+
 use crate::message::{
     domain::{
-        AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata,
-        HandoffSessionParams, SequenceNumber, SnapshotType, TurnId,
+        AgentSession, AgentSessionId, ContextWindowSnapshot, ConversationId, HandoffId,
+        HandoffMetadata, HandoffSessionParams, MessageSummary, SequenceNumber, SequenceRange,
+        SnapshotParams, SnapshotType, TurnId,
     },
     ports::{
         agent_session::{AgentSessionRepository, SessionResult},
-        context_snapshot::{CaptureSnapshotParams, ContextSnapshotPort},
+        context_snapshot::ContextSnapshotPort,
         handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
     },
 };
@@ -84,6 +87,7 @@ impl<'a> ServiceInitiateParams<'a> {
 ///     session_repo,
 ///     handoff_adapter,
 ///     snapshot_adapter,
+///     clock,
 /// );
 ///
 /// // Initiate handoff
@@ -103,34 +107,39 @@ impl<'a> ServiceInitiateParams<'a> {
 ///     start_sequence,
 /// ).await?;
 /// ```
-#[derive(Debug, Clone)]
-pub struct HandoffService<S, H, C>
+#[derive(Clone)]
+pub struct HandoffService<S, H, C, K>
 where
     S: AgentSessionRepository,
     H: AgentHandoffPort,
     C: ContextSnapshotPort,
+    K: Clock + Send + Sync,
 {
     session_repo: Arc<S>,
     handoff_adapter: Arc<H>,
     snapshot_adapter: Arc<C>,
+    clock: Arc<K>,
 }
 
-impl<S, H, C> HandoffService<S, H, C>
+impl<S, H, C, K> HandoffService<S, H, C, K>
 where
     S: AgentSessionRepository,
     H: AgentHandoffPort,
     C: ContextSnapshotPort,
+    K: Clock + Send + Sync,
 {
     /// Creates a new handoff service.
     pub const fn new(
         session_repo: Arc<S>,
         handoff_adapter: Arc<H>,
         snapshot_adapter: Arc<C>,
+        clock: Arc<K>,
     ) -> Self {
         Self {
             session_repo,
             handoff_adapter,
             snapshot_adapter,
+            clock,
         }
     }
 
@@ -169,16 +178,18 @@ where
         }
 
         // Capture context snapshot before handoff
-        let snapshot_params = CaptureSnapshotParams::new(
-            params.conversation_id,
-            params.source_session_id,
-            source_session.start_sequence,
-            params.current_sequence,
-            SnapshotType::HandoffInitiated,
-        );
-        let _snapshot = self
-            .snapshot_adapter
-            .capture_snapshot(snapshot_params)
+        let snapshot = self.build_snapshot(SnapshotParams {
+            conversation_id: params.conversation_id,
+            session_id: params.source_session_id,
+            sequence_range: SequenceRange::new(
+                source_session.start_sequence,
+                params.current_sequence,
+            ),
+            message_summary: MessageSummary::default(),
+            snapshot_type: SnapshotType::HandoffInitiated,
+        });
+        self.snapshot_adapter
+            .store_snapshot(&snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
@@ -198,8 +209,11 @@ where
             .await?;
 
         // Update source session state
-        let clock = mockable::DefaultClock;
-        source_session.handoff(params.current_sequence, handoff.handoff_id, &clock);
+        source_session.handoff(
+            params.current_sequence,
+            handoff.handoff_id,
+            self.clock.as_ref(),
+        );
 
         self.session_repo
             .update(&source_session)
@@ -250,16 +264,15 @@ where
             .ok_or(HandoffError::SessionNotFound(target_session_id))?;
 
         // Capture session start snapshot for target
-        let snapshot_params = CaptureSnapshotParams::new(
-            target_session.conversation_id,
-            target_session_id,
-            start_sequence,
-            start_sequence,
-            SnapshotType::SessionStart,
-        );
-        let _snapshot = self
-            .snapshot_adapter
-            .capture_snapshot(snapshot_params)
+        let snapshot = self.build_snapshot(SnapshotParams {
+            conversation_id: target_session.conversation_id,
+            session_id: target_session_id,
+            sequence_range: SequenceRange::new(start_sequence, start_sequence),
+            message_summary: MessageSummary::default(),
+            snapshot_type: SnapshotType::SessionStart,
+        });
+        self.snapshot_adapter
+            .store_snapshot(&snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
@@ -343,8 +356,7 @@ where
         &self,
         params: HandoffSessionParams,
     ) -> SessionResult<AgentSession> {
-        let clock = mockable::DefaultClock;
-        let session = AgentSession::from_handoff(params, &clock);
+        let session = AgentSession::from_handoff(params, self.clock.as_ref());
 
         self.session_repo.store(&session).await?;
 
@@ -367,6 +379,10 @@ where
 
         // Find a non-terminal handoff
         Ok(handoffs.into_iter().find(|h| !h.is_terminal()))
+    }
+
+    fn build_snapshot(&self, params: SnapshotParams) -> ContextWindowSnapshot {
+        ContextWindowSnapshot::new(params, self.clock.as_ref())
     }
 }
 

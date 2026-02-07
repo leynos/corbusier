@@ -166,6 +166,8 @@ diesel::table! {
         id -> Uuid,
         /// Session being handed off from.
         source_session_id -> Uuid,
+        /// Conversation containing the handoff.
+        conversation_id -> Uuid,
         /// Session being handed off to (set on completion).
         target_session_id -> Nullable<Uuid>,
         /// Turn ID that triggered the handoff.
@@ -226,6 +228,7 @@ diesel::joinable!(agent_sessions -> conversations (conversation_id));
 diesel::joinable!(context_snapshots -> conversations (conversation_id));
 diesel::joinable!(context_snapshots -> agent_sessions (session_id));
 diesel::joinable!(handoffs -> agent_sessions (source_session_id));
+diesel::joinable!(handoffs -> conversations (conversation_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     agent_sessions,

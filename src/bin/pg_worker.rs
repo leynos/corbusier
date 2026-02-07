@@ -47,9 +47,13 @@ use std::env;
 #[cfg(unix)]
 use std::ffi::{CString, OsStr, OsString};
 #[cfg(unix)]
+use std::io;
+#[cfg(unix)]
 use std::io::Read;
 #[cfg(unix)]
 use std::path::PathBuf;
+#[cfg(unix)]
+use std::process::Command;
 #[cfg(unix)]
 use thiserror::Error;
 
@@ -64,7 +68,6 @@ use tokio::runtime::Builder;
 const WORKER_REEXEC_ENV: &str = "PG_WORKER_REEXEC";
 
 /// Boxed error type for the main result.
-#[cfg(unix)]
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Errors that can occur during worker operations.
@@ -162,17 +165,61 @@ fn maybe_reexec_as_nobody(args: &[OsString]) -> Result<(), WorkerError> {
     }
 
     let exe = env::current_exe().map_err(WorkerError::RuntimeInit)?;
-    let status = std::process::Command::new("/usr/sbin/runuser")
+    let status = match Command::new("runuser")
         .arg("-u")
         .arg("nobody")
         .arg("--")
-        .arg(exe)
+        .arg(&exe)
         .args(args.iter().skip(1))
         .env(WORKER_REEXEC_ENV, "1")
         .status()
-        .map_err(|err| WorkerError::PrivilegeDrop(err.to_string()))?;
+    {
+        Ok(status) => status,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => run_via_su(&exe, args)?,
+        Err(err) => return Err(WorkerError::PrivilegeDrop(err.to_string())),
+    };
 
     std::process::exit(status.code().unwrap_or(1));
+}
+
+#[cfg(unix)]
+fn run_via_su(
+    exe: &std::path::Path,
+    args: &[OsString],
+) -> Result<std::process::ExitStatus, WorkerError> {
+    let mut command = format!(
+        "{WORKER_REEXEC_ENV}=1 exec {}",
+        shell_escape(exe.as_os_str())
+    );
+    for arg in args.iter().skip(1) {
+        command.push(' ');
+        command.push_str(&shell_escape(arg));
+    }
+
+    Command::new("su")
+        .arg("-s")
+        .arg("/bin/sh")
+        .arg("nobody")
+        .arg("-c")
+        .arg(command)
+        .status()
+        .map_err(|err| WorkerError::PrivilegeDrop(err.to_string()))
+}
+
+#[cfg(unix)]
+fn shell_escape(value: &OsStr) -> String {
+    let input = value.to_string_lossy();
+    let mut escaped = String::with_capacity(input.len() + 2);
+    escaped.push('\'');
+    for ch in input.chars() {
+        if ch == '\'' {
+            escaped.push_str("'\\''");
+        } else {
+            escaped.push(ch);
+        }
+    }
+    escaped.push('\'');
+    escaped
 }
 
 #[cfg(unix)]

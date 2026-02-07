@@ -7,33 +7,33 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use mockable::Clock;
 use uuid::Uuid;
 
 use crate::message::{
     domain::{AgentSessionId, ContextWindowSnapshot, ConversationId},
-    ports::context_snapshot::{
-        CaptureSnapshotParams, ContextSnapshotPort, SnapshotError, SnapshotResult,
-        build_default_snapshot,
-    },
+    ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
 };
 
 /// In-memory implementation of [`ContextSnapshotPort`].
 ///
 /// Thread-safe via internal [`RwLock`]. Suitable for unit tests only.
 #[derive(Debug, Clone)]
-pub struct InMemoryContextSnapshotAdapter<C: Clock + Send + Sync> {
+pub struct InMemoryContextSnapshotAdapter {
     snapshots: Arc<RwLock<HashMap<Uuid, ContextWindowSnapshot>>>,
-    clock: C,
 }
 
-impl<C: Clock + Send + Sync> InMemoryContextSnapshotAdapter<C> {
-    /// Creates a new adapter with the given clock.
+impl Default for InMemoryContextSnapshotAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InMemoryContextSnapshotAdapter {
+    /// Creates a new adapter.
     #[must_use]
-    pub fn new(clock: C) -> Self {
+    pub fn new() -> Self {
         Self {
             snapshots: Arc::new(RwLock::new(HashMap::new())),
-            clock,
         }
     }
 
@@ -51,25 +51,7 @@ impl<C: Clock + Send + Sync> InMemoryContextSnapshotAdapter<C> {
 }
 
 #[async_trait]
-impl<C: Clock + Send + Sync> ContextSnapshotPort for InMemoryContextSnapshotAdapter<C> {
-    async fn capture_snapshot(
-        &self,
-        params: CaptureSnapshotParams,
-    ) -> SnapshotResult<ContextWindowSnapshot> {
-        // In a real implementation, we'd query the message repository
-        // to compute the actual summary. For testing, we create a minimal snapshot.
-        let snapshot = build_default_snapshot(&params, &self.clock);
-
-        let mut guard = self
-            .snapshots
-            .write()
-            .map_err(|e| SnapshotError::persistence(std::io::Error::other(e.to_string())))?;
-
-        guard.insert(snapshot.snapshot_id, snapshot.clone());
-
-        Ok(snapshot)
-    }
-
+impl ContextSnapshotPort for InMemoryContextSnapshotAdapter {
     async fn store_snapshot(&self, snapshot: &ContextWindowSnapshot) -> SnapshotResult<()> {
         let mut guard = self
             .snapshots

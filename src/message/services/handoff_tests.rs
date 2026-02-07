@@ -17,17 +17,24 @@ struct ServiceHarness {
     service: HandoffService<
         InMemoryAgentSessionRepository,
         InMemoryHandoffAdapter<mockable::DefaultClock>,
-        InMemoryContextSnapshotAdapter<mockable::DefaultClock>,
+        InMemoryContextSnapshotAdapter,
+        mockable::DefaultClock,
     >,
     session_repo: Arc<InMemoryAgentSessionRepository>,
 }
 
 fn create_service() -> ServiceHarness {
     let session_repo = Arc::new(InMemoryAgentSessionRepository::new());
+    let clock = Arc::new(mockable::DefaultClock);
     let handoff_adapter = Arc::new(InMemoryHandoffAdapter::new(mockable::DefaultClock));
-    let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new(mockable::DefaultClock));
+    let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new());
 
-    let service = HandoffService::new(Arc::clone(&session_repo), handoff_adapter, snapshot_adapter);
+    let service = HandoffService::new(
+        Arc::clone(&session_repo),
+        handoff_adapter,
+        snapshot_adapter,
+        clock,
+    );
 
     ServiceHarness {
         service,

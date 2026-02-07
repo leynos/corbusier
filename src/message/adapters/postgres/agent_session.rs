@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use diesel::prelude::*;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 use crate::message::{
@@ -45,21 +46,15 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-                // Check for duplicate
-                let exists: i64 = agent_sessions::table
-                    .filter(agent_sessions::id.eq(session_id.into_inner()))
-                    .count()
-                    .get_result(&mut conn)
-                    .map_err(SessionError::persistence)?;
-
-                if exists > 0 {
-                    return Err(SessionError::Duplicate(session_id));
-                }
-
                 diesel::insert_into(agent_sessions::table)
                     .values(&new_session)
                     .execute(&mut conn)
-                    .map_err(SessionError::persistence)?;
+                    .map_err(|err| match err {
+                        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
+                            SessionError::Duplicate(session_id)
+                        }
+                        _ => SessionError::persistence(err),
+                    })?;
 
                 Ok(())
             },

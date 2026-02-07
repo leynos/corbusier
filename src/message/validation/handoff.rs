@@ -20,8 +20,8 @@ pub enum HandoffValidationError {
     },
     /// The handoff is not in a valid state for the requested operation.
     InvalidHandoffState {
-        /// The expected handoff status.
-        expected: HandoffStatus,
+        /// The expected handoff statuses.
+        expected: Vec<HandoffStatus>,
         /// The actual handoff status.
         actual: HandoffStatus,
     },
@@ -47,6 +47,8 @@ pub enum HandoffValidationError {
         /// The actual snapshot type.
         actual: SnapshotType,
     },
+    /// Internal validation error indicating a logic issue.
+    InternalError(String),
     /// Multiple validation errors occurred.
     Multiple(Vec<Self>),
 }
@@ -60,12 +62,24 @@ impl std::fmt::Display for HandoffValidationError {
                     "source session must be in {expected:?} state, but is {actual:?}"
                 )
             }
-            Self::InvalidHandoffState { expected, actual } => {
-                write!(
+            Self::InvalidHandoffState { expected, actual } => match expected.as_slice() {
+                [] => write!(f, "handoff must be in a valid state, but is {actual:?}"),
+                [expected_state] => write!(
                     f,
-                    "handoff must be in {expected:?} state, but is {actual:?}"
-                )
-            }
+                    "handoff must be in {expected_state:?} state, but is {actual:?}"
+                ),
+                _ => {
+                    let expected_states = expected
+                        .iter()
+                        .map(|status| format!("{status:?}"))
+                        .collect::<Vec<_>>()
+                        .join(" or ");
+                    write!(
+                        f,
+                        "handoff must be in {expected_states} state, but is {actual:?}"
+                    )
+                }
+            },
             Self::InvalidTargetAgent(reason) => {
                 write!(f, "invalid target agent: {reason}")
             }
@@ -88,6 +102,9 @@ impl std::fmt::Display for HandoffValidationError {
                 write!(f, "expected snapshot type {expected:?}, but got {actual:?}")
             }
             Self::Multiple(errors) => write_multiple_errors(f, errors),
+            Self::InternalError(message) => {
+                write!(f, "internal validation error: {message}")
+            }
         }
     }
 }
@@ -121,18 +138,17 @@ fn write_multiple_errors(
 impl HandoffValidationError {
     /// Creates a multiple error from a list of errors.
     /// If the list has exactly one error, returns that error.
-    /// If the list is empty, this triggers a debug assertion in development
-    /// builds as a guard against programming errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an internal error variant if called with an empty list, as this
+    /// indicates a logic error in the caller.
     #[must_use]
     pub fn multiple(mut errors: Vec<Self>) -> Self {
-        debug_assert!(
-            !errors.is_empty(),
-            "multiple() called with empty error list"
-        );
-        if errors.len() == 1 {
-            errors.swap_remove(0)
-        } else {
-            Self::Multiple(errors)
+        match errors.len() {
+            0 => Self::InternalError("no validation errors provided".to_owned()),
+            1 => errors.swap_remove(0),
+            _ => Self::Multiple(errors),
         }
     }
 }
@@ -208,7 +224,7 @@ pub fn validate_handoff_can_complete(handoff: &HandoffMetadata) -> HandoffValida
     let errors: Vec<_> = [
         (handoff.status != HandoffStatus::Initiated && handoff.status != HandoffStatus::Accepted)
             .then_some(HandoffValidationError::InvalidHandoffState {
-                expected: HandoffStatus::Initiated,
+                expected: vec![HandoffStatus::Initiated, HandoffStatus::Accepted],
                 actual: handoff.status,
             }),
         handoff
@@ -232,10 +248,10 @@ pub fn validate_handoff_can_complete(handoff: &HandoffMetadata) -> HandoffValida
 /// # Errors
 ///
 /// Returns `HandoffValidationError::InvalidHandoffState` if the handoff is terminal.
-pub const fn validate_handoff_can_cancel(handoff: &HandoffMetadata) -> HandoffValidationResult<()> {
+pub fn validate_handoff_can_cancel(handoff: &HandoffMetadata) -> HandoffValidationResult<()> {
     if handoff.is_terminal() {
         return Err(HandoffValidationError::InvalidHandoffState {
-            expected: HandoffStatus::Initiated,
+            expected: vec![HandoffStatus::Initiated, HandoffStatus::Accepted],
             actual: handoff.status,
         });
     }

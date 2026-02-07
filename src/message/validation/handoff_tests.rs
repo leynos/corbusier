@@ -38,13 +38,13 @@ fn create_handoff(status: HandoffStatus) -> HandoffMetadata {
 
 fn create_snapshot(snapshot_type: SnapshotType) -> ContextWindowSnapshot {
     let clock = DefaultClock;
-    let params = SnapshotParams::new(
-        ConversationId::new(),
-        AgentSessionId::new(),
-        SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
-        MessageSummary::default(),
+    let params = SnapshotParams {
+        conversation_id: ConversationId::new(),
+        session_id: AgentSessionId::new(),
+        sequence_range: SequenceRange::new(SequenceNumber::new(1), SequenceNumber::new(10)),
+        message_summary: MessageSummary::default(),
         snapshot_type,
-    );
+    };
     ContextWindowSnapshot::new(params, &clock)
 }
 
@@ -246,6 +246,17 @@ fn error_display_same_source_and_target() {
 }
 
 #[rstest]
+fn error_display_invalid_handoff_state_includes_expected_states() {
+    let error = HandoffValidationError::InvalidHandoffState {
+        expected: vec![HandoffStatus::Initiated, HandoffStatus::Accepted],
+        actual: HandoffStatus::Completed,
+    };
+    let display = format!("{error}");
+    assert!(display.contains("Initiated"));
+    assert!(display.contains("Accepted"));
+}
+
+#[rstest]
 fn error_display_multiple() {
     let errors = vec![
         HandoffValidationError::InvalidTargetAgent("empty".to_owned()),
@@ -254,4 +265,12 @@ fn error_display_multiple() {
     let error = HandoffValidationError::multiple(errors);
     let display = format!("{error}");
     assert!(display.contains("multiple"));
+}
+
+#[rstest]
+fn error_display_empty_multiple_falls_back() {
+    let error = HandoffValidationError::multiple(Vec::new());
+    let display = format!("{error}");
+    assert!(matches!(error, HandoffValidationError::InternalError(_)));
+    assert!(display.contains("internal"));
 }

@@ -32,24 +32,35 @@ pub fn clock() -> DefaultClock {
 pub struct HandoffTestHarness {
     pub session_repo: Arc<InMemoryAgentSessionRepository>,
     pub handoff_adapter: Arc<InMemoryHandoffAdapter<DefaultClock>>,
-    pub snapshot_adapter: Arc<InMemoryContextSnapshotAdapter<DefaultClock>>,
+    pub snapshot_adapter: Arc<InMemoryContextSnapshotAdapter>,
     pub service: HandoffService<
         InMemoryAgentSessionRepository,
         InMemoryHandoffAdapter<DefaultClock>,
-        InMemoryContextSnapshotAdapter<DefaultClock>,
+        InMemoryContextSnapshotAdapter,
+        DefaultClock,
     >,
 }
 
 impl HandoffTestHarness {
+    /// Creates a test harness with in-memory adapters and a default clock.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let harness = HandoffTestHarness::new();
+    /// assert!(harness.session_repo.is_empty());
+    /// ```
     pub fn new() -> Self {
+        let clock = Arc::new(DefaultClock);
         let session_repo = Arc::new(InMemoryAgentSessionRepository::new());
         let handoff_adapter = Arc::new(InMemoryHandoffAdapter::new(DefaultClock));
-        let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new(DefaultClock));
+        let snapshot_adapter = Arc::new(InMemoryContextSnapshotAdapter::new());
 
         let service = HandoffService::new(
             Arc::clone(&session_repo),
             Arc::clone(&handoff_adapter),
             Arc::clone(&snapshot_adapter),
+            clock,
         );
 
         Self {

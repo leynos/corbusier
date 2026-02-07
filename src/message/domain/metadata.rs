@@ -53,10 +53,11 @@ pub struct MessageMetadata {
     /// Extension data for custom metadata fields.
     ///
     /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
-    /// fields during deserialization will be captured here. This can cause
+    /// fields during deserialisation will be captured here. This can cause
     /// unexpected behaviour if an extension key collides with a future field name.
     /// Avoid using keys like `agent_backend`, `turn_id`, `slash_command_expansion`,
-    /// `tool_call_audits`, or `agent_response_audit`.
+    /// `tool_call_audits`, `agent_response_audit`, `handoff_metadata`, or
+    /// `agent_session_id`.
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub extensions: HashMap<String, Value>,
 }
@@ -79,11 +80,7 @@ impl MessageMetadata {
 
     /// Sets the turn identifier.
     #[must_use]
-    #[expect(
-        clippy::missing_const_for_fn,
-        reason = "Option::Some with Copy type should be const but isn't stable"
-    )]
-    pub fn with_turn_id(mut self, turn_id: TurnId) -> Self {
+    pub const fn with_turn_id(mut self, turn_id: TurnId) -> Self {
         self.turn_id = Some(turn_id);
         self
     }
@@ -172,11 +169,7 @@ impl MessageMetadata {
 
     /// Sets the agent session ID.
     #[must_use]
-    #[expect(
-        clippy::missing_const_for_fn,
-        reason = "Option::Some with Copy type should be const but isn't stable"
-    )]
-    pub fn with_agent_session_id(mut self, session_id: AgentSessionId) -> Self {
+    pub const fn with_agent_session_id(mut self, session_id: AgentSessionId) -> Self {
         self.agent_session_id = Some(session_id);
         self
     }

@@ -105,7 +105,10 @@ fn write_worker_wrapper(
         concat!(
             "#!/bin/sh\n",
             "if [ \"$(id -u)\" -eq 0 ]; then\n",
-            "  exec /usr/sbin/runuser -u nobody -- {worker} \"$@\"\n",
+            "  if command -v runuser >/dev/null 2>&1; then\n",
+            "    exec runuser -u nobody -- {worker} \"$@\"\n",
+            "  fi\n",
+            "  exec su -s /bin/sh nobody -c \"exec {worker} \\\"$@\\\"\"\n",
             "fi\n",
             "exec {worker} \"$@\"\n",
         ),

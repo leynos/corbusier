@@ -1,7 +1,7 @@
 //! Integration tests for PostgreSQL handoff persistence.
 
 use crate::postgres::cluster::BoxError;
-use crate::postgres::helpers::{PreparedRepo, clock as _, insert_conversation, prepared_repo};
+use crate::postgres::helpers::{PreparedRepo, insert_conversation, prepared_repo};
 use corbusier::message::{
     adapters::postgres::{PostgresAgentSessionRepository, PostgresHandoffAdapter},
     domain::{AgentSession, ConversationId, SequenceNumber, TurnId},
