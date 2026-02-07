@@ -34,7 +34,6 @@ fn cancel_handoff_reverts_source_session(
             .expect("store");
 
         let initiate_params = ServiceInitiateParams::new(
-            conversation_id,
             source_session.session_id,
             "target-agent",
             TurnId::new(),

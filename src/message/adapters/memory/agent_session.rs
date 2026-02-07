@@ -39,36 +39,45 @@ impl InMemoryAgentSessionRepository {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    fn upsert_with_check<F>(&self, session: &AgentSession, validate: F) -> SessionResult<()>
+    where
+        F: FnOnce(&HashMap<AgentSessionId, AgentSession>) -> SessionResult<()>,
+    {
+        let mut guard = self
+            .sessions
+            .write()
+            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
+
+        validate(&guard)?;
+
+        guard.insert(session.session_id, session.clone());
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl AgentSessionRepository for InMemoryAgentSessionRepository {
     async fn store(&self, session: &AgentSession) -> SessionResult<()> {
-        let mut guard = self
-            .sessions
-            .write()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
+        let session_id = session.session_id;
+        self.upsert_with_check(session, |sessions| {
+            if sessions.contains_key(&session_id) {
+                return Err(SessionError::Duplicate(session_id));
+            }
 
-        if guard.contains_key(&session.session_id) {
-            return Err(SessionError::Duplicate(session.session_id));
-        }
-
-        guard.insert(session.session_id, session.clone());
-        Ok(())
+            Ok(())
+        })
     }
 
     async fn update(&self, session: &AgentSession) -> SessionResult<()> {
-        let mut guard = self
-            .sessions
-            .write()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
+        let session_id = session.session_id;
+        self.upsert_with_check(session, |sessions| {
+            if !sessions.contains_key(&session_id) {
+                return Err(SessionError::NotFound(session_id));
+            }
 
-        if !guard.contains_key(&session.session_id) {
-            return Err(SessionError::NotFound(session.session_id));
-        }
-
-        guard.insert(session.session_id, session.clone());
-        Ok(())
+            Ok(())
+        })
     }
 
     async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {

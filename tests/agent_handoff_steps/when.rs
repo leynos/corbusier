@@ -18,7 +18,6 @@ fn initiate_specialist_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Rep
         .ok_or_else(|| eyre!("no source session"))?;
 
     let initiate_params = ServiceInitiateParams::new(
-        world.conversation_id,
         source.session_id,
         "specialist-agent",
         world.prior_turn_id,
@@ -100,7 +99,6 @@ fn initiate_with_tool_calls(world: &mut HandoffWorld) -> Result<(), eyre::Report
         .ok_or_else(|| eyre!("no source session"))?;
 
     let initiate_params = ServiceInitiateParams::new(
-        world.conversation_id,
         source.session_id,
         "specialist-agent",
         world.prior_turn_id,
@@ -126,7 +124,6 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         .ok_or_else(|| eyre!("no agent B session"))?;
 
     let initiate_params = ServiceInitiateParams::new(
-        world.conversation_id,
         agent_b.session_id,
         "agent-C",
         TurnId::new(),

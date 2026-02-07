@@ -34,7 +34,6 @@ fn get_pending_handoff_returns_initiated(
             .expect("store");
 
         let initiate_params = ServiceInitiateParams::new(
-            conversation_id,
             source_session.session_id,
             "target-agent",
             TurnId::new(),
@@ -81,7 +80,6 @@ fn get_pending_handoff_returns_none_when_completed(
             .expect("store");
 
         let initiate_params = ServiceInitiateParams::new(
-            conversation_id,
             source_session.session_id,
             "target-agent",
             TurnId::new(),

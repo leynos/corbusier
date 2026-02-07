@@ -45,11 +45,9 @@ fn create_service() -> ServiceHarness {
 #[tokio::test]
 async fn initiate_handoff_requires_active_session() {
     let service = create_service().service;
-    let conversation_id = ConversationId::new();
     let session_id = AgentSessionId::new();
 
     let params = ServiceInitiateParams::new(
-        conversation_id,
         session_id,
         "target-agent",
         TurnId::new(),

@@ -53,6 +53,42 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Helper method to update a handoff with terminal state validation.
+    ///
+    /// Acquires a write lock, fetches the handoff, validates it's not terminal,
+    /// applies the transformation, and persists the result.
+    fn update_handoff<F>(
+        &self,
+        handoff_id: HandoffId,
+        target_status: crate::message::domain::HandoffStatus,
+        transform: F,
+    ) -> HandoffResult<HandoffMetadata>
+    where
+        F: FnOnce(HandoffMetadata) -> HandoffMetadata,
+    {
+        let mut guard = self
+            .store
+            .write()
+            .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
+
+        let handoff = guard
+            .handoffs
+            .get(&handoff_id)
+            .ok_or(HandoffError::NotFound(handoff_id))?;
+
+        if handoff.is_terminal() {
+            return Err(HandoffError::invalid_transition(
+                handoff.status,
+                target_status,
+            ));
+        }
+
+        let updated = transform(handoff.clone());
+        guard.handoffs.insert(handoff_id, updated.clone());
+
+        Ok(updated)
+    }
 }
 
 #[async_trait]
@@ -91,27 +127,12 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
-        let mut guard = self
-            .store
-            .write()
-            .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
-
-        let handoff = guard
-            .handoffs
-            .get(&handoff_id)
-            .ok_or(HandoffError::NotFound(handoff_id))?;
-
-        if handoff.is_terminal() {
-            return Err(HandoffError::invalid_transition(
-                handoff.status,
-                crate::message::domain::HandoffStatus::Completed,
-            ));
-        }
-
-        let completed = handoff.clone().complete(target_session_id, &self.clock);
-        guard.handoffs.insert(handoff_id, completed.clone());
-
-        Ok(completed)
+        let clock = &self.clock;
+        self.update_handoff(
+            handoff_id,
+            crate::message::domain::HandoffStatus::Completed,
+            |handoff| handoff.complete(target_session_id, clock),
+        )
     }
 
     async fn cancel_handoff(
@@ -119,26 +140,11 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()> {
-        let mut guard = self
-            .store
-            .write()
-            .map_err(|e| HandoffError::persistence(std::io::Error::other(e.to_string())))?;
-
-        let handoff = guard
-            .handoffs
-            .get(&handoff_id)
-            .ok_or(HandoffError::NotFound(handoff_id))?;
-
-        if handoff.is_terminal() {
-            return Err(HandoffError::invalid_transition(
-                handoff.status,
-                crate::message::domain::HandoffStatus::Cancelled,
-            ));
-        }
-
-        let cancelled = handoff.clone().cancel(reason);
-        guard.handoffs.insert(handoff_id, cancelled);
-
+        self.update_handoff(
+            handoff_id,
+            crate::message::domain::HandoffStatus::Cancelled,
+            |handoff| handoff.cancel(reason),
+        )?;
         Ok(())
     }
 

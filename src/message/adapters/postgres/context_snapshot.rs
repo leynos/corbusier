@@ -13,6 +13,7 @@ use crate::message::{
     ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
 };
 use async_trait::async_trait;
+use diesel::pg::Pg;
 use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
@@ -31,6 +32,55 @@ impl PostgresContextSnapshotAdapter {
     #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    async fn find_one<F>(&self, build_query: F) -> SnapshotResult<Option<ContextWindowSnapshot>>
+    where
+        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
+            + Send
+            + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
+
+                build_query(context_snapshots::table)
+                    .select(ContextSnapshotRow::as_select())
+                    .first::<ContextSnapshotRow>(&mut conn)
+                    .optional()
+                    .map_err(SnapshotError::persistence)?
+                    .map(row_to_snapshot)
+                    .transpose()
+            },
+            SnapshotError::persistence,
+        )
+        .await
+    }
+
+    async fn find_many<F>(&self, build_query: F) -> SnapshotResult<Vec<ContextWindowSnapshot>>
+    where
+        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
+            + Send
+            + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
+
+                let rows = build_query(context_snapshots::table)
+                    .select(ContextSnapshotRow::as_select())
+                    .load::<ContextSnapshotRow>(&mut conn)
+                    .map_err(SnapshotError::persistence)?;
+
+                rows.into_iter().map(row_to_snapshot).collect()
+            },
+            SnapshotError::persistence,
+        )
+        .await
     }
 }
 
@@ -67,23 +117,11 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         &self,
         snapshot_id: uuid::Uuid,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-
-                context_snapshots::table
-                    .filter(context_snapshots::id.eq(snapshot_id))
-                    .select(ContextSnapshotRow::as_select())
-                    .first::<ContextSnapshotRow>(&mut conn)
-                    .optional()
-                    .map_err(SnapshotError::persistence)?
-                    .map(row_to_snapshot)
-                    .transpose()
-            },
-            SnapshotError::persistence,
-        )
+        self.find_one(move |table| {
+            table
+                .filter(context_snapshots::id.eq(snapshot_id))
+                .into_boxed()
+        })
         .await
     }
 
@@ -91,24 +129,14 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         &self,
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>> {
-        let pool = self.pool.clone();
         let uuid = session_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-
-                let rows = context_snapshots::table
-                    .filter(context_snapshots::session_id.eq(uuid))
-                    .order(context_snapshots::captured_at.asc())
-                    .select(ContextSnapshotRow::as_select())
-                    .load::<ContextSnapshotRow>(&mut conn)
-                    .map_err(SnapshotError::persistence)?;
-
-                rows.into_iter().map(row_to_snapshot).collect()
-            },
-            SnapshotError::persistence,
-        )
+        self.find_many(move |table| {
+            table
+                .filter(context_snapshots::session_id.eq(uuid))
+                .order(context_snapshots::captured_at.asc())
+                .into_boxed()
+        })
         .await
     }
 
@@ -116,25 +144,14 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         &self,
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
-        let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-
-                context_snapshots::table
-                    .filter(context_snapshots::conversation_id.eq(uuid))
-                    .order(context_snapshots::captured_at.desc())
-                    .select(ContextSnapshotRow::as_select())
-                    .first::<ContextSnapshotRow>(&mut conn)
-                    .optional()
-                    .map_err(SnapshotError::persistence)?
-                    .map(row_to_snapshot)
-                    .transpose()
-            },
-            SnapshotError::persistence,
-        )
+        self.find_one(move |table| {
+            table
+                .filter(context_snapshots::conversation_id.eq(uuid))
+                .order(context_snapshots::captured_at.desc())
+                .into_boxed()
+        })
         .await
     }
 }

@@ -17,11 +17,9 @@ fn initiate_handoff_requires_active_session(
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
-        let conversation_id = ConversationId::new();
         let session_id = corbusier::message::domain::AgentSessionId::new();
 
         let params = ServiceInitiateParams::new(
-            conversation_id,
             session_id,
             "target-agent",
             TurnId::new(),
@@ -54,7 +52,6 @@ fn initiate_handoff_succeeds_with_active_session(
         harness.session_repo.store(&session).await.expect("store");
 
         let initiate_params = ServiceInitiateParams::new(
-            conversation_id,
             session.session_id,
             "target-agent",
             TurnId::new(),

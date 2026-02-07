@@ -23,8 +23,6 @@ use crate::message::{
 /// Parameters for initiating a handoff via the service.
 #[derive(Debug, Clone)]
 pub struct ServiceInitiateParams<'a> {
-    /// The conversation being handed off.
-    pub conversation_id: ConversationId,
     /// The session initiating the handoff.
     pub source_session_id: AgentSessionId,
     /// The agent backend to hand off to.
@@ -40,19 +38,13 @@ pub struct ServiceInitiateParams<'a> {
 impl<'a> ServiceInitiateParams<'a> {
     /// Creates new service initiate parameters.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "parameter struct constructor holds required fields"
-    )]
     pub const fn new(
-        conversation_id: ConversationId,
         source_session_id: AgentSessionId,
         target_agent: &'a str,
         prior_turn_id: TurnId,
         current_sequence: SequenceNumber,
     ) -> Self {
         Self {
-            conversation_id,
             source_session_id,
             target_agent,
             prior_turn_id,
@@ -92,7 +84,6 @@ impl<'a> ServiceInitiateParams<'a> {
 ///
 /// // Initiate handoff
 /// let params = ServiceInitiateParams::new(
-///     conversation_id,
 ///     source_session_id,
 ///     "target-agent",
 ///     prior_turn_id,
@@ -179,7 +170,7 @@ where
 
         // Capture context snapshot before handoff
         let snapshot = self.build_snapshot(SnapshotParams {
-            conversation_id: params.conversation_id,
+            conversation_id: source_session.conversation_id,
             session_id: params.source_session_id,
             sequence_range: SequenceRange::new(
                 source_session.start_sequence,
@@ -195,7 +186,7 @@ where
 
         // Initiate the handoff
         let mut handoff_params = InitiateHandoffParams::new(
-            params.conversation_id,
+            source_session.conversation_id,
             &source_session,
             params.target_agent,
             params.prior_turn_id,

@@ -4,6 +4,7 @@
 //! for tool call references.
 
 use async_trait::async_trait;
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use mockable::DefaultClock;
 
@@ -33,6 +34,24 @@ impl PostgresHandoffAdapter {
     #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// Executes a query with standard error handling.
+    async fn execute_query<F, T>(&self, query_fn: F) -> HandoffResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
+                query_fn(&mut conn)
+            },
+            HandoffError::persistence,
+        )
+        .await
     }
 }
 
@@ -179,24 +198,18 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
     }
 
     async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>> {
-        let pool = self.pool.clone();
         let uuid = handoff_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-
-                handoffs::table
-                    .filter(handoffs::id.eq(uuid))
-                    .select(HandoffRow::as_select())
-                    .first::<HandoffRow>(&mut conn)
-                    .optional()
-                    .map_err(HandoffError::persistence)?
-                    .map(row_to_handoff)
-                    .transpose()
-            },
-            HandoffError::persistence,
-        )
+        self.execute_query(move |conn| {
+            handoffs::table
+                .filter(handoffs::id.eq(uuid))
+                .select(HandoffRow::as_select())
+                .first::<HandoffRow>(conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .map(row_to_handoff)
+                .transpose()
+        })
         .await
     }
 
@@ -204,24 +217,18 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         &self,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>> {
-        let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
+        self.execute_query(move |conn| {
+            let rows = handoffs::table
+                .filter(handoffs::conversation_id.eq(uuid))
+                .select(HandoffRow::as_select())
+                .order(handoffs::initiated_at.asc())
+                .load::<HandoffRow>(conn)
+                .map_err(HandoffError::persistence)?;
 
-                let rows = handoffs::table
-                    .filter(handoffs::conversation_id.eq(uuid))
-                    .select(HandoffRow::as_select())
-                    .order(handoffs::initiated_at.asc())
-                    .load::<HandoffRow>(&mut conn)
-                    .map_err(HandoffError::persistence)?;
-
-                rows.into_iter().map(row_to_handoff).collect()
-            },
-            HandoffError::persistence,
-        )
+            rows.into_iter().map(row_to_handoff).collect()
+        })
         .await
     }
 }

@@ -10,6 +10,59 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
 
+/// Helper to initiate, create target session, and complete a handoff.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Test helper mirrors the full handoff flow inputs"
+)]
+async fn complete_handoff_to_agent(
+    harness: &HandoffTestHarness,
+    conversation_id: ConversationId,
+    source_session: &AgentSession,
+    target_agent: &str,
+    start_sequence: SequenceNumber,
+    reason: &str,
+) -> (corbusier::message::domain::HandoffMetadata, AgentSession) {
+    let initiate_params = ServiceInitiateParams::new(
+        source_session.session_id,
+        target_agent,
+        TurnId::new(),
+        start_sequence,
+    )
+    .with_reason(reason);
+
+    let handoff = harness
+        .service
+        .initiate(initiate_params)
+        .await
+        .unwrap_or_else(|_err| panic!("initiate handoff"));
+
+    let session_params = HandoffSessionParams::new(
+        conversation_id,
+        target_agent,
+        start_sequence,
+        handoff.handoff_id,
+    );
+
+    let target_session = harness
+        .service
+        .create_target_session(session_params)
+        .await
+        .unwrap_or_else(|_err| panic!("create target session"));
+
+    let completed = harness
+        .service
+        .complete(
+            handoff.handoff_id,
+            target_session.session_id,
+            start_sequence,
+        )
+        .await
+        .unwrap_or_else(|_err| panic!("complete handoff"));
+
+    (completed, target_session)
+}
+
 #[rstest]
 fn handoff_chain_tracks_all_sessions(
     runtime: TestResult<Runtime>,
@@ -23,77 +76,24 @@ fn handoff_chain_tracks_all_sessions(
         let agent1 = AgentSession::new(conversation_id, "agent-1", SequenceNumber::new(1), &clock);
         harness.session_repo.store(&agent1).await.expect("store 1");
 
-        let initiate1 = ServiceInitiateParams::new(
+        let (_handoff1, agent2) = complete_handoff_to_agent(
+            &harness,
             conversation_id,
-            agent1.session_id,
-            "agent-2",
-            TurnId::new(),
-            SequenceNumber::new(5),
-        )
-        .with_reason("escalate to specialist");
-        let handoff1 = harness
-            .service
-            .initiate(initiate1)
-            .await
-            .expect("initiate 1");
-
-        let params2 = HandoffSessionParams::new(
-            conversation_id,
+            &agent1,
             "agent-2",
             SequenceNumber::new(6),
-            handoff1.handoff_id,
-        );
-        let agent2 = harness
-            .service
-            .create_target_session(params2)
-            .await
-            .expect("create agent2");
-
-        harness
-            .service
-            .complete(
-                handoff1.handoff_id,
-                agent2.session_id,
-                SequenceNumber::new(6),
-            )
-            .await
-            .expect("complete 1");
-
-        let initiate2 = ServiceInitiateParams::new(
-            conversation_id,
-            agent2.session_id,
-            "agent-3",
-            TurnId::new(),
-            SequenceNumber::new(10),
+            "escalate to specialist",
         )
-        .with_reason("need domain expert");
-        let handoff2 = harness
-            .service
-            .initiate(initiate2)
-            .await
-            .expect("initiate 2");
-
-        let params3 = HandoffSessionParams::new(
+        .await;
+        let (_handoff2, _agent3) = complete_handoff_to_agent(
+            &harness,
             conversation_id,
+            &agent2,
             "agent-3",
             SequenceNumber::new(11),
-            handoff2.handoff_id,
-        );
-        let agent3 = harness
-            .service
-            .create_target_session(params3)
-            .await
-            .expect("create agent3");
-
-        harness
-            .service
-            .complete(
-                handoff2.handoff_id,
-                agent3.session_id,
-                SequenceNumber::new(11),
-            )
-            .await
-            .expect("complete 2");
+            "need domain expert",
+        )
+        .await;
 
         let sessions = harness
             .session_repo

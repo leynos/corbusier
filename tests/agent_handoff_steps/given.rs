@@ -34,7 +34,6 @@ fn initiated_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         .ok_or_else(|| eyre!("no source session"))?;
 
     let params = ServiceInitiateParams::new(
-        world.conversation_id,
         source.session_id,
         "target-agent",
         world.prior_turn_id,
@@ -61,7 +60,6 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
     let agent_a = create_and_store_session(world, "agent-A", SequenceNumber::new(1))?;
 
     let initiate_params = ServiceInitiateParams::new(
-        world.conversation_id,
         agent_a.session_id,
         "agent-B",
         TurnId::new(),

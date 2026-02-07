@@ -4,6 +4,7 @@
 //! for turn IDs and context snapshots.
 
 use async_trait::async_trait;
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 
@@ -32,6 +33,24 @@ impl PostgresAgentSessionRepository {
     #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// Helper to execute a database query with standard error handling.
+    async fn query_with<F, T>(&self, query_fn: F) -> SessionResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+                query_fn(&mut conn)
+            },
+            SessionError::persistence,
+        )
+        .await
     }
 }
 
@@ -91,24 +110,18 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     }
 
     async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {
-        let pool = self.pool.clone();
         let uuid = id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
-
-                agent_sessions::table
-                    .filter(agent_sessions::id.eq(uuid))
-                    .select(AgentSessionRow::as_select())
-                    .first::<AgentSessionRow>(&mut conn)
-                    .optional()
-                    .map_err(SessionError::persistence)?
-                    .map(row_to_session)
-                    .transpose()
-            },
-            SessionError::persistence,
-        )
+        self.query_with(move |conn| {
+            agent_sessions::table
+                .filter(agent_sessions::id.eq(uuid))
+                .select(AgentSessionRow::as_select())
+                .first::<AgentSessionRow>(conn)
+                .optional()
+                .map_err(SessionError::persistence)?
+                .map(row_to_session)
+                .transpose()
+        })
         .await
     }
 
@@ -116,25 +129,19 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         &self,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
-        let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
-
-                agent_sessions::table
-                    .filter(agent_sessions::conversation_id.eq(uuid))
-                    .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
-                    .select(AgentSessionRow::as_select())
-                    .first::<AgentSessionRow>(&mut conn)
-                    .optional()
-                    .map_err(SessionError::persistence)?
-                    .map(row_to_session)
-                    .transpose()
-            },
-            SessionError::persistence,
-        )
+        self.query_with(move |conn| {
+            agent_sessions::table
+                .filter(agent_sessions::conversation_id.eq(uuid))
+                .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
+                .select(AgentSessionRow::as_select())
+                .first::<AgentSessionRow>(conn)
+                .optional()
+                .map_err(SessionError::persistence)?
+                .map(row_to_session)
+                .transpose()
+        })
         .await
     }
 
@@ -142,24 +149,18 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         &self,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
-        let pool = self.pool.clone();
         let uuid = conversation_id.into_inner();
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+        self.query_with(move |conn| {
+            let rows = agent_sessions::table
+                .filter(agent_sessions::conversation_id.eq(uuid))
+                .order(agent_sessions::started_at.asc())
+                .select(AgentSessionRow::as_select())
+                .load::<AgentSessionRow>(conn)
+                .map_err(SessionError::persistence)?;
 
-                let rows = agent_sessions::table
-                    .filter(agent_sessions::conversation_id.eq(uuid))
-                    .order(agent_sessions::started_at.asc())
-                    .select(AgentSessionRow::as_select())
-                    .load::<AgentSessionRow>(&mut conn)
-                    .map_err(SessionError::persistence)?;
-
-                rows.into_iter().map(row_to_session).collect()
-            },
-            SessionError::persistence,
-        )
+            rows.into_iter().map(row_to_session).collect()
+        })
         .await
     }
 }
