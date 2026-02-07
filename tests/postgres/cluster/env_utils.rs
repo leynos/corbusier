@@ -2,9 +2,11 @@
 
 use super::BoxError;
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
+use crate::test_helpers::EnvVarGuard;
 use camino::{Utf8Path, Utf8PathBuf};
+use nix::unistd::{Uid, User, initgroups, setgid, setuid};
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
-use std::ffi::OsString;
+use std::ffi::{CString, OsString};
 use std::net::TcpListener;
 
 type WorkerEnvChanges = (Vec<(OsString, Option<OsString>)>, Option<TcpListener>);
@@ -24,6 +26,52 @@ pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
         locate_pg_worker_path,
         prepare_pg_worker,
     )
+}
+
+pub(super) fn drop_privileges_if_root(
+    username: &str,
+    env_vars: &[(OsString, Option<OsString>)],
+) -> Result<Option<EnvVarGuard>, BoxError> {
+    if !Uid::effective().is_root() {
+        return Ok(None);
+    }
+
+    let user = User::from_name(username)
+        .map_err(|err| Box::new(err) as BoxError)?
+        .ok_or_else(|| {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("user '{username}' not found"),
+            )) as BoxError
+        })?;
+
+    let account_name = user.name.clone();
+    let user_home = user.dir.clone().into_os_string();
+    let mut changes = Vec::with_capacity(env_vars.len() + 3);
+    changes.extend(env_vars.iter().cloned());
+    changes.push((OsString::from("HOME"), Some(user_home)));
+    changes.push((
+        OsString::from("USER"),
+        Some(OsString::from(account_name.clone())),
+    ));
+    changes.push((
+        OsString::from("LOGNAME"),
+        Some(OsString::from(account_name.clone())),
+    ));
+
+    let env_guard = EnvVarGuard::set_many(&changes);
+
+    let user_cstr = CString::new(user.name.clone()).map_err(|err| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid user name for initgroups: {err}"),
+        )) as BoxError
+    })?;
+    initgroups(&user_cstr, user.gid).map_err(|err| Box::new(err) as BoxError)?;
+    setgid(user.gid).map_err(|err| Box::new(err) as BoxError)?;
+    setuid(user.uid).map_err(|err| Box::new(err) as BoxError)?;
+
+    Ok(Some(env_guard))
 }
 
 fn worker_env_changes_impl<D, L, P>(

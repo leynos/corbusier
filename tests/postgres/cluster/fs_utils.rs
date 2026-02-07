@@ -60,3 +60,34 @@ pub(super) fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError
     settings.port = port;
     Ok(())
 }
+
+pub(super) fn cleanup_stale_postmaster_pid(settings: &Settings) -> Result<(), BoxError> {
+    let data_dir_string = settings.data_dir.to_string_lossy();
+    let data_dir_path = Utf8Path::new(data_dir_string.as_ref());
+    let data_dir_handle = open_ambient_dir(data_dir_path)?;
+    let pid_contents = match data_dir_handle.read_to_string(Utf8Path::new("postmaster.pid")) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(Box::new(err) as BoxError),
+    };
+    let pid_line = pid_contents
+        .lines()
+        .next()
+        .ok_or_else(|| Box::new(std::io::Error::other("postmaster.pid missing pid")) as BoxError)?;
+    let pid = pid_line.parse::<i32>().map_err(|err| {
+        Box::new(std::io::Error::other(format!(
+            "failed to parse postmaster.pid pid: {err}"
+        ))) as BoxError
+    })?;
+
+    if cfg!(target_os = "linux") {
+        let proc_entry = std::path::Path::new("/proc").join(pid.to_string());
+        if !proc_entry.exists() {
+            data_dir_handle
+                .remove_file(Utf8Path::new("postmaster.pid"))
+                .map_err(|err| Box::new(err) as BoxError)?;
+        }
+    }
+
+    Ok(())
+}

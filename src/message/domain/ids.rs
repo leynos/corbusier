@@ -1,4 +1,5 @@
-//! Domain identifier newtypes providing type safety for message and conversation IDs.
+//! Domain identifier newtypes providing type safety for message, conversation, and
+//! session identifiers.
 //!
 //! These types wrap UUIDs to prevent accidental mixing of different identifier types
 //! and to provide domain-specific validation.
@@ -218,6 +219,117 @@ impl From<u64> for SequenceNumber {
 }
 
 impl fmt::Display for SequenceNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unique identifier for an agent handoff event.
+///
+/// A handoff represents a transfer of conversation control from one agent
+/// backend to another, preserving context and audit trail.
+///
+/// # Examples
+///
+/// ```
+/// use corbusier::message::domain::HandoffId;
+///
+/// let id = HandoffId::new();
+/// assert!(!id.as_ref().is_nil());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct HandoffId(Uuid);
+
+impl HandoffId {
+    /// Creates a new random handoff identifier.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Creates a handoff identifier from an existing UUID.
+    #[must_use]
+    pub const fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Returns the inner UUID value.
+    #[must_use]
+    pub const fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for HandoffId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AsRef<Uuid> for HandoffId {
+    fn as_ref(&self) -> &Uuid {
+        &self.0
+    }
+}
+
+impl fmt::Display for HandoffId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unique identifier for an agent session within a conversation.
+///
+/// An agent session represents a contiguous period where a single agent backend
+/// handles turns within a conversation. Sessions are created when an agent
+/// begins processing and end via handoff or completion.
+///
+/// # Examples
+///
+/// ```
+/// use corbusier::message::domain::AgentSessionId;
+///
+/// let id = AgentSessionId::new();
+/// assert!(!id.as_ref().is_nil());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AgentSessionId(Uuid);
+
+impl AgentSessionId {
+    /// Creates a new random agent session identifier.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Creates an agent session identifier from an existing UUID.
+    #[must_use]
+    pub const fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Returns the inner UUID value.
+    #[must_use]
+    pub const fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for AgentSessionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AsRef<Uuid> for AgentSessionId {
+    fn as_ref(&self) -> &Uuid {
+        &self.0
+    }
+}
+
+impl fmt::Display for AgentSessionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }

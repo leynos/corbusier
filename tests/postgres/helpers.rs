@@ -26,6 +26,10 @@ pub const ADD_CONSTRAINTS_SQL: &str =
 pub const ADD_AUDIT_TRIGGER_SQL: &str =
     include_str!("../../migrations/2026-01-16-000000_add_audit_trigger/up.sql");
 
+/// SQL to add agent sessions, handoffs, and context snapshots.
+pub const ADD_HANDOFF_SCHEMA_SQL: &str =
+    include_str!("../../migrations/2026-02-03-000000_add_agent_sessions_and_handoffs/up.sql");
+
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
 
@@ -60,6 +64,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     conn.batch_execute(ADD_CONSTRAINTS_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }
