@@ -93,6 +93,20 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
     Ok(result_path.clone())
 }
 
+fn shell_escape(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len() + 2);
+    escaped.push('\'');
+    for ch in value.chars() {
+        if ch == '\'' {
+            escaped.push_str("'\"'\"'");
+        } else {
+            escaped.push(ch);
+        }
+    }
+    escaped.push('\'');
+    escaped
+}
+
 fn write_worker_wrapper(
     destination_dir: &cap_std::fs_utf8::Dir,
     destination_name: &Utf8Path,
@@ -101,6 +115,7 @@ fn write_worker_wrapper(
     let mut file = destination_dir
         .create(destination_name)
         .map_err(|err| Box::new(err) as BoxError)?;
+    let worker_path = shell_escape(worker_binary_path.as_str());
     let script = format!(
         concat!(
             "#!/bin/sh\n",
@@ -108,11 +123,11 @@ fn write_worker_wrapper(
             "  if command -v runuser >/dev/null 2>&1; then\n",
             "    exec runuser -u nobody -- {worker} \"$@\"\n",
             "  fi\n",
-            "  exec su -s /bin/sh nobody -c \"exec {worker} \\\"$@\\\"\"\n",
+            "  exec su -s /bin/sh nobody -c 'exec \"$0\" \"$@\"' {worker} \"$@\"\n",
             "fi\n",
             "exec {worker} \"$@\"\n",
         ),
-        worker = worker_binary_path.as_str()
+        worker = worker_path
     );
     file.write_all(script.as_bytes())
         .map_err(|err| Box::new(err) as BoxError)?;

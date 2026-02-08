@@ -81,8 +81,9 @@ pub(super) fn cleanup_stale_postmaster_pid(settings: &Settings) -> Result<(), Bo
     })?;
 
     if cfg!(target_os = "linux") {
-        let proc_entry = std::path::Path::new("/proc").join(pid.to_string());
-        if !proc_entry.exists() {
+        let proc_dir = open_ambient_dir(Utf8Path::new("/proc"))?;
+        let pid_string = pid.to_string();
+        if proc_dir.metadata(Utf8Path::new(&pid_string)).is_err() {
             data_dir_handle
                 .remove_file(Utf8Path::new("postmaster.pid"))
                 .map_err(|err| Box::new(err) as BoxError)?;

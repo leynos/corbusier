@@ -10,37 +10,47 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
 
+/// Parameters for completing a handoff to a target agent in tests.
+struct HandoffParams<'a> {
+    target_agent: &'a str,
+    start_sequence: SequenceNumber,
+    reason: &'a str,
+}
+
+impl<'a> HandoffParams<'a> {
+    const fn new(target_agent: &'a str, start_sequence: SequenceNumber, reason: &'a str) -> Self {
+        Self {
+            target_agent,
+            start_sequence,
+            reason,
+        }
+    }
+}
+
 /// Helper to initiate, create target session, and complete a handoff.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Test helper mirrors the full handoff flow inputs"
-)]
 async fn complete_handoff_to_agent(
     harness: &HandoffTestHarness,
-    conversation_id: ConversationId,
     source_session: &AgentSession,
-    target_agent: &str,
-    start_sequence: SequenceNumber,
-    reason: &str,
+    params: HandoffParams<'_>,
 ) -> (corbusier::message::domain::HandoffMetadata, AgentSession) {
     let initiate_params = ServiceInitiateParams::new(
         source_session.session_id,
-        target_agent,
+        params.target_agent,
         TurnId::new(),
-        start_sequence,
+        params.start_sequence,
     )
-    .with_reason(reason);
+    .with_reason(params.reason);
 
     let handoff = harness
         .service
         .initiate(initiate_params)
         .await
-        .unwrap_or_else(|_err| panic!("initiate handoff"));
+        .expect("initiate handoff");
 
     let session_params = HandoffSessionParams::new(
-        conversation_id,
-        target_agent,
-        start_sequence,
+        source_session.conversation_id,
+        params.target_agent,
+        params.start_sequence,
         handoff.handoff_id,
     );
 
@@ -48,17 +58,17 @@ async fn complete_handoff_to_agent(
         .service
         .create_target_session(session_params)
         .await
-        .unwrap_or_else(|_err| panic!("create target session"));
+        .expect("create target session");
 
     let completed = harness
         .service
         .complete(
             handoff.handoff_id,
             target_session.session_id,
-            start_sequence,
+            params.start_sequence,
         )
         .await
-        .unwrap_or_else(|_err| panic!("complete handoff"));
+        .expect("complete handoff");
 
     (completed, target_session)
 }
@@ -78,20 +88,22 @@ fn handoff_chain_tracks_all_sessions(
 
         let (_handoff1, agent2) = complete_handoff_to_agent(
             &harness,
-            conversation_id,
             &agent1,
-            "agent-2",
-            SequenceNumber::new(6),
-            "escalate to specialist",
+            HandoffParams::new(
+                "agent-2",
+                SequenceNumber::new(6),
+                "escalate to specialist",
+            ),
         )
         .await;
         let (_handoff2, _agent3) = complete_handoff_to_agent(
             &harness,
-            conversation_id,
             &agent2,
-            "agent-3",
-            SequenceNumber::new(11),
-            "need domain expert",
+            HandoffParams::new(
+                "agent-3",
+                SequenceNumber::new(11),
+                "need domain expert",
+            ),
         )
         .await;
 

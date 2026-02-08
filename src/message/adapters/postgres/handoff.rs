@@ -32,9 +32,8 @@ pub struct PostgresHandoffAdapter {
 impl PostgresHandoffAdapter {
     /// Creates a new adapter with the given connection pool.
     #[must_use]
-    pub const fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
+    #[rustfmt::skip]
+    pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
     /// Executes a query with standard error handling.
     async fn execute_query<F, T>(&self, query_fn: F) -> HandoffResult<T>

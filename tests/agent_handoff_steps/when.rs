@@ -141,7 +141,7 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
     let agent_c =
         run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
 
-    run_async(world.service.complete(
+    let completed = run_async(world.service.complete(
         handoff.handoff_id,
         agent_c.session_id,
         SequenceNumber::new(11),
@@ -149,6 +149,6 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
     .wrap_err("complete B->C")?;
 
     world.target_session = Some(agent_c);
-    world.current_handoff = Some(handoff);
+    world.current_handoff = Some(completed);
     Ok(())
 }

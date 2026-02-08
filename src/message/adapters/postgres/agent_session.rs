@@ -31,9 +31,8 @@ pub struct PostgresAgentSessionRepository {
 impl PostgresAgentSessionRepository {
     /// Creates a new repository with the given connection pool.
     #[must_use]
-    pub const fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
+    #[rustfmt::skip]
+    pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
     /// Helper to execute a database query with standard error handling.
     async fn query_with<F, T>(&self, query_fn: F) -> SessionResult<T>
@@ -51,6 +50,15 @@ impl PostgresAgentSessionRepository {
             SessionError::persistence,
         )
         .await
+    }
+
+    /// Helper to start a query filtered by conversation ID.
+    fn conversation_query(
+        uuid: uuid::Uuid,
+    ) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg> {
+        agent_sessions::table
+            .filter(agent_sessions::conversation_id.eq(uuid))
+            .into_boxed()
     }
 }
 
@@ -132,8 +140,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let uuid = conversation_id.into_inner();
 
         self.query_with(move |conn| {
-            agent_sessions::table
-                .filter(agent_sessions::conversation_id.eq(uuid))
+            Self::conversation_query(uuid)
                 .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
                 .select(AgentSessionRow::as_select())
                 .first::<AgentSessionRow>(conn)
@@ -152,8 +159,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let uuid = conversation_id.into_inner();
 
         self.query_with(move |conn| {
-            let rows = agent_sessions::table
-                .filter(agent_sessions::conversation_id.eq(uuid))
+            let rows = Self::conversation_query(uuid)
                 .order(agent_sessions::started_at.asc())
                 .select(AgentSessionRow::as_select())
                 .load::<AgentSessionRow>(conn)

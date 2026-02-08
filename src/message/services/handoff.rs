@@ -382,9 +382,9 @@ impl From<crate::message::domain::AgentSessionState> for crate::message::domain:
     fn from(state: crate::message::domain::AgentSessionState) -> Self {
         use crate::message::domain::AgentSessionState;
         match state {
-            AgentSessionState::Active | AgentSessionState::Paused => Self::Initiated,
+            AgentSessionState::Active => Self::Initiated,
             AgentSessionState::HandedOff | AgentSessionState::Completed => Self::Completed,
-            AgentSessionState::Failed => Self::Failed,
+            AgentSessionState::Failed | AgentSessionState::Paused => Self::Failed,
         }
     }
 }

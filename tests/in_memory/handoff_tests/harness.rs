@@ -11,6 +11,7 @@ use rstest::fixture;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
+/// Result type for in-memory handoff tests.
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 /// Provides a tokio runtime for async operations in tests.

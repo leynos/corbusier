@@ -34,28 +34,39 @@ impl PostgresContextSnapshotAdapter {
         Self { pool }
     }
 
-    async fn find_one<F>(&self, build_query: F) -> SnapshotResult<Option<ContextWindowSnapshot>>
+    /// Generic helper to execute a database query with standard error handling.
+    async fn execute_query<F, T>(&self, query_fn: F) -> SnapshotResult<T>
     where
-        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
-            + Send
-            + 'static,
+        F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
+        T: Send + 'static,
     {
         let pool = self.pool.clone();
 
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-
-                build_query(context_snapshots::table)
-                    .select(ContextSnapshotRow::as_select())
-                    .first::<ContextSnapshotRow>(&mut conn)
-                    .optional()
-                    .map_err(SnapshotError::persistence)?
-                    .map(row_to_snapshot)
-                    .transpose()
+                query_fn(&mut conn)
             },
             SnapshotError::persistence,
         )
+        .await
+    }
+
+    async fn find_one<F>(&self, build_query: F) -> SnapshotResult<Option<ContextWindowSnapshot>>
+    where
+        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
+            + Send
+            + 'static,
+    {
+        self.execute_query(move |conn| {
+            build_query(context_snapshots::table)
+                .select(ContextSnapshotRow::as_select())
+                .first::<ContextSnapshotRow>(conn)
+                .optional()
+                .map_err(SnapshotError::persistence)?
+                .map(row_to_snapshot)
+                .transpose()
+        })
         .await
     }
 
@@ -65,21 +76,14 @@ impl PostgresContextSnapshotAdapter {
             + Send
             + 'static,
     {
-        let pool = self.pool.clone();
+        self.execute_query(move |conn| {
+            let rows = build_query(context_snapshots::table)
+                .select(ContextSnapshotRow::as_select())
+                .load::<ContextSnapshotRow>(conn)
+                .map_err(SnapshotError::persistence)?;
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-
-                let rows = build_query(context_snapshots::table)
-                    .select(ContextSnapshotRow::as_select())
-                    .load::<ContextSnapshotRow>(&mut conn)
-                    .map_err(SnapshotError::persistence)?;
-
-                rows.into_iter().map(row_to_snapshot).collect()
-            },
-            SnapshotError::persistence,
-        )
+            rows.into_iter().map(row_to_snapshot).collect()
+        })
         .await
     }
 }
