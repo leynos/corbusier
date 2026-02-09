@@ -5,26 +5,24 @@ use corbusier::task::{domain::IssueRef, services::CreateTaskFromIssueRequest};
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
 
-#[given(
-    r#"an external issue "{provider}" "{repository}" #{issue_number:u64} with title "{title}""#
-)]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Step definition captures multiple issue fields from a single step"
-)]
-fn external_issue_with_title(
-    world: &mut TaskWorld,
-    provider: String,
-    repository: String,
-    issue_number: u64,
-    title: String,
-) {
+#[given(r#"an external issue "{provider}" "{repository}" #{issue_number:u64}"#)]
+fn external_issue(world: &mut TaskWorld, provider: String, repository: String, issue_number: u64) {
+    world.pending_issue_ref = Some((provider, repository, issue_number));
+}
+
+#[given(r#"the issue has title "{title}""#)]
+fn issue_has_title(world: &mut TaskWorld, title: String) -> Result<(), eyre::Report> {
+    let (provider, repository, issue_number) = world
+        .pending_issue_ref
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing pending issue reference in scenario world"))?;
     world.pending_request = Some(CreateTaskFromIssueRequest::new(
         provider,
         repository,
         issue_number,
         title,
     ));
+    Ok(())
 }
 
 #[given("a task has already been created from that issue")]

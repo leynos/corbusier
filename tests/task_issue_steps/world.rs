@@ -16,6 +16,7 @@ pub type TestTaskService = TaskLifecycleService<InMemoryTaskRepository, DefaultC
 /// Scenario world for task lifecycle behaviour tests.
 pub struct TaskWorld {
     pub service: TestTaskService,
+    pub pending_issue_ref: Option<(String, String, u64)>,
     pub pending_request: Option<CreateTaskFromIssueRequest>,
     pub pending_lookup: Option<IssueRef>,
     pub last_created_task: Option<Task>,
@@ -23,20 +24,29 @@ pub struct TaskWorld {
     pub last_lookup_result: Option<Result<Option<Task>, TaskLifecycleError>>,
 }
 
-impl Default for TaskWorld {
-    fn default() -> Self {
+impl TaskWorld {
+    /// Creates a world with empty pending scenario state.
+    #[must_use]
+    pub fn new() -> Self {
         let service = TaskLifecycleService::new(
             Arc::new(InMemoryTaskRepository::new()),
             Arc::new(DefaultClock),
         );
         Self {
             service,
+            pending_issue_ref: None,
             pending_request: None,
             pending_lookup: None,
             last_created_task: None,
             last_create_result: None,
             last_lookup_result: None,
         }
+    }
+}
+
+impl Default for TaskWorld {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

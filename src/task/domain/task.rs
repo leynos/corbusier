@@ -88,6 +88,45 @@ pub struct Task {
     updated_at: DateTime<Utc>,
 }
 
+/// Parameter object for reconstructing a persisted task aggregate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistedTaskData {
+    /// Persisted task identifier.
+    pub id: TaskId,
+    /// Persisted origin metadata.
+    pub origin: TaskOrigin,
+    /// Persisted lifecycle state.
+    pub state: TaskState,
+    /// Persisted creation timestamp.
+    pub created_at: DateTime<Utc>,
+    /// Persisted latest lifecycle timestamp.
+    pub updated_at: DateTime<Utc>,
+}
+
+impl PersistedTaskData {
+    /// Creates a new persisted task parameter object.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Persisted task construction intentionally mirrors stored fields"
+    )]
+    #[must_use]
+    pub const fn new(
+        id: TaskId,
+        origin: TaskOrigin,
+        state: TaskState,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            origin,
+            state,
+            created_at,
+            updated_at,
+        }
+    }
+}
+
 impl Task {
     /// Creates a new task from external issue data.
     #[must_use]
@@ -108,18 +147,15 @@ impl Task {
     }
 
     /// Reconstructs a task from persisted storage.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Persisted reconstruction requires all stored aggregate fields"
-    )]
     #[must_use]
-    pub const fn from_persisted(
-        id: TaskId,
-        origin: TaskOrigin,
-        state: TaskState,
-        created_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
-    ) -> Self {
+    pub fn from_persisted(data: PersistedTaskData) -> Self {
+        let PersistedTaskData {
+            id,
+            origin,
+            state,
+            created_at,
+            updated_at,
+        } = data;
         Self {
             id,
             origin,

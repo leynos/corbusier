@@ -11,4 +11,4 @@ mod task;
 pub use error::{ParseTaskStateError, TaskDomainError};
 pub use ids::{IssueNumber, RepositoryFullName, TaskId};
 pub use issue::{ExternalIssue, ExternalIssueMetadata, IssueProvider, IssueRef, IssueSnapshot};
-pub use task::{Task, TaskOrigin, TaskState};
+pub use task::{PersistedTaskData, Task, TaskOrigin, TaskState};
