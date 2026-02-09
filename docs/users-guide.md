@@ -58,3 +58,43 @@ let metadata = MessageMetadata::empty()
 assert_eq!(metadata.tool_call_audits.len(), 1);
 assert!(metadata.agent_response_audit.is_some());
 ```
+
+## Issue-to-task creation
+
+Corbusier can create an internal task directly from external issue metadata and
+retrieve it by the external issue reference. Issue-origin tasks start in the
+`draft` state and record lifecycle timestamps (`created_at`, `updated_at`) at
+creation time.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::task::{
+    adapters::memory::InMemoryTaskRepository,
+    domain::IssueRef,
+    services::{CreateTaskFromIssueRequest, TaskLifecycleService},
+};
+use mockable::DefaultClock;
+
+async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
+    let service = TaskLifecycleService::new(
+        Arc::new(InMemoryTaskRepository::new()),
+        Arc::new(DefaultClock),
+    );
+
+    let request = CreateTaskFromIssueRequest::new(
+        "github",
+        "corbusier/core",
+        120,
+        "Track issue metadata",
+    )
+    .with_labels(vec!["feature".to_owned(), "roadmap-1.2.1".to_owned()]);
+
+    let created = service.create_from_issue(request).await?;
+    let issue_ref = IssueRef::from_parts("github", "corbusier/core", 120)?;
+    let fetched = service.find_by_issue_ref(&issue_ref).await?;
+
+    assert_eq!(fetched, Some(created));
+    Ok(())
+}
+```

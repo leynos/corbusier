@@ -5,6 +5,7 @@
 //! - `sequence_tests`: Sequence number management
 //! - `constraint_tests`: Duplicate detection, exists checks
 //! - `handoff_tests`: Agent handoff workflow
+//! - `task_lifecycle_tests`: Issue-to-task creation and tracking
 
 mod in_memory {
     pub mod helpers;
@@ -13,4 +14,5 @@ mod in_memory {
     mod conversation_flow_tests;
     mod handoff_tests;
     mod sequence_tests;
+    mod task_lifecycle_tests;
 }

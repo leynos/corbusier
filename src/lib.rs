@@ -15,6 +15,8 @@
 //! # Modules
 //!
 //! - [`message`]: Canonical message format and validation
+//! - [`task`]: Issue-to-task creation and lifecycle tracking
 
 pub mod message;
+pub mod task;
 pub mod worker;
