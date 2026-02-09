@@ -103,30 +103,6 @@ pub struct PersistedTaskData {
     pub updated_at: DateTime<Utc>,
 }
 
-impl PersistedTaskData {
-    /// Creates a new persisted task parameter object.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Persisted task construction intentionally mirrors stored fields"
-    )]
-    #[must_use]
-    pub const fn new(
-        id: TaskId,
-        origin: TaskOrigin,
-        state: TaskState,
-        created_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
-    ) -> Self {
-        Self {
-            id,
-            origin,
-            state,
-            created_at,
-            updated_at,
-        }
-    }
-}
-
 impl Task {
     /// Creates a new task from external issue data.
     #[must_use]

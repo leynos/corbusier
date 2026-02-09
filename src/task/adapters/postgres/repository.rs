@@ -118,13 +118,13 @@ fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
     let state = TaskState::try_from(row.state.as_str())
         .map_err(|err: ParseTaskStateError| TaskRepositoryError::persistence(err))?;
 
-    let data = PersistedTaskData::new(
-        TaskId::from_uuid(row.id),
+    let data = PersistedTaskData {
+        id: TaskId::from_uuid(row.id),
         origin,
         state,
-        row.created_at,
-        row.updated_at,
-    );
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    };
     Ok(Task::from_persisted(data))
 }
 
