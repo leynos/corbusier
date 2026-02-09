@@ -39,6 +39,8 @@
 #[cfg(unix)]
 use camino::{Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
+use corbusier::worker::shell_escape;
+#[cfg(unix)]
 use nix::unistd::{Uid, User, initgroups, setgid, setuid};
 #[cfg(unix)]
 use pg_embedded_setup_unpriv::worker::{PlainSecret, WorkerPayload};
@@ -189,11 +191,11 @@ fn run_via_su(
 ) -> Result<std::process::ExitStatus, WorkerError> {
     let mut command = format!(
         "{WORKER_REEXEC_ENV}=1 exec {}",
-        shell_escape(exe.as_os_str())
+        shell_escape(exe.to_string_lossy().as_ref())
     );
     for arg in args.iter().skip(1) {
         command.push(' ');
-        command.push_str(&shell_escape(arg));
+        command.push_str(&shell_escape(arg.to_string_lossy().as_ref()));
     }
 
     Command::new("su")
@@ -204,22 +206,6 @@ fn run_via_su(
         .arg(command)
         .status()
         .map_err(|err| WorkerError::PrivilegeDrop(err.to_string()))
-}
-
-#[cfg(unix)]
-fn shell_escape(value: &OsStr) -> String {
-    let input = value.to_string_lossy();
-    let mut escaped = String::with_capacity(input.len() + 2);
-    escaped.push('\'');
-    for ch in input.chars() {
-        if ch == '\'' {
-            escaped.push_str("'\\''");
-        } else {
-            escaped.push(ch);
-        }
-    }
-    escaped.push('\'');
-    escaped
 }
 
 #[cfg(unix)]

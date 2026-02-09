@@ -61,6 +61,9 @@ pub(super) fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError
     Ok(())
 }
 
+/// Remove a stale `postmaster.pid` if the PID no longer exists on Linux.
+///
+/// On non-Linux platforms, the PID is parsed but no `/proc` check is attempted.
 pub(super) fn cleanup_stale_postmaster_pid(settings: &Settings) -> Result<(), BoxError> {
     let data_dir_string = settings.data_dir.to_string_lossy();
     let data_dir_path = Utf8Path::new(data_dir_string.as_ref());

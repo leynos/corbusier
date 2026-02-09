@@ -17,3 +17,4 @@
 //! - [`message`]: Canonical message format and validation
 
 pub mod message;
+pub mod worker;

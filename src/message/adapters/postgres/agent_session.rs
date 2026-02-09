@@ -59,16 +59,8 @@ impl PostgresAgentSessionRepository {
             + Send
             + 'static,
     {
-        self.query_with(move |conn| {
-            build_query(agent_sessions::table)
-                .select(AgentSessionRow::as_select())
-                .first::<AgentSessionRow>(conn)
-                .optional()
-                .map_err(SessionError::persistence)?
-                .map(row_to_session)
-                .transpose()
-        })
-        .await
+        let sessions = self.find_many(build_query).await?;
+        Ok(sessions.into_iter().next())
     }
 
     /// Execute a query that returns multiple sessions.
@@ -88,7 +80,6 @@ impl PostgresAgentSessionRepository {
         })
         .await
     }
-
 }
 
 #[async_trait]

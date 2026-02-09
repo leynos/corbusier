@@ -7,6 +7,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs::Permissions;
 #[cfg(unix)]
 use cap_std::fs::PermissionsExt;
+use corbusier::worker::shell_escape;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -91,20 +92,6 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
         .entry(key)
         .or_insert_with(|| destination_path.clone());
     Ok(result_path.clone())
-}
-
-fn shell_escape(value: &str) -> String {
-    let mut escaped = String::with_capacity(value.len() + 2);
-    escaped.push('\'');
-    for ch in value.chars() {
-        if ch == '\'' {
-            escaped.push_str("'\"'\"'");
-        } else {
-            escaped.push(ch);
-        }
-    }
-    escaped.push('\'');
-    escaped
 }
 
 fn write_worker_wrapper(

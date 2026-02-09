@@ -32,7 +32,7 @@ async fn complete_handoff_to_agent(
     harness: &HandoffTestHarness,
     source_session: &AgentSession,
     params: HandoffParams<'_>,
-) -> (corbusier::message::domain::HandoffMetadata, AgentSession) {
+) -> TestResult<(corbusier::message::domain::HandoffMetadata, AgentSession)> {
     let initiate_params = ServiceInitiateParams::new(
         source_session.session_id,
         params.target_agent,
@@ -45,7 +45,7 @@ async fn complete_handoff_to_agent(
         .service
         .initiate(initiate_params)
         .await
-        .expect("initiate handoff");
+        .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
     let session_params = HandoffSessionParams::new(
         source_session.conversation_id,
@@ -58,7 +58,7 @@ async fn complete_handoff_to_agent(
         .service
         .create_target_session(session_params)
         .await
-        .expect("create target session");
+        .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
     let completed = harness
         .service
@@ -68,9 +68,9 @@ async fn complete_handoff_to_agent(
             params.start_sequence,
         )
         .await
-        .expect("complete handoff");
+        .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
-    (completed, target_session)
+    Ok((completed, target_session))
 }
 
 #[rstest]
@@ -89,23 +89,17 @@ fn handoff_chain_tracks_all_sessions(
         let (_handoff1, agent2) = complete_handoff_to_agent(
             &harness,
             &agent1,
-            HandoffParams::new(
-                "agent-2",
-                SequenceNumber::new(6),
-                "escalate to specialist",
-            ),
+            HandoffParams::new("agent-2", SequenceNumber::new(6), "escalate to specialist"),
         )
-        .await;
+        .await
+        .expect("handoff 1");
         let (_handoff2, _agent3) = complete_handoff_to_agent(
             &harness,
             &agent2,
-            HandoffParams::new(
-                "agent-3",
-                SequenceNumber::new(11),
-                "need domain expert",
-            ),
+            HandoffParams::new("agent-3", SequenceNumber::new(11), "need domain expert"),
         )
-        .await;
+        .await
+        .expect("handoff 2");
 
         let sessions = harness
             .session_repo
