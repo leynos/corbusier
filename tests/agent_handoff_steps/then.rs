@@ -1,7 +1,9 @@
 //! Then steps for handoff BDD scenarios.
 
 use super::world::{HandoffWorld, run_async};
-use corbusier::message::domain::{AgentSessionState, HandoffStatus, SnapshotType};
+use corbusier::message::domain::{
+    AgentSession, AgentSessionId, AgentSessionState, HandoffMetadata, HandoffStatus, SnapshotType,
+};
 use corbusier::message::ports::{
     agent_session::AgentSessionRepository, context_snapshot::ContextSnapshotPort,
     handoff::AgentHandoffPort,
@@ -10,20 +12,55 @@ use eyre::{WrapErr, eyre};
 use rstest_bdd_macros::then;
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Extract the current handoff from world, returning an error if not present.
+fn get_current_handoff(world: &HandoffWorld) -> Result<&HandoffMetadata, eyre::Report> {
+    world
+        .current_handoff
+        .as_ref()
+        .ok_or_else(|| eyre!("no handoff"))
+}
+
+/// Extract the source session from world, returning an error if not present.
+fn get_source_session(world: &HandoffWorld) -> Result<&AgentSession, eyre::Report> {
+    world
+        .source_session
+        .as_ref()
+        .ok_or_else(|| eyre!("no source session"))
+}
+
+/// Fetch the latest version of a session from the repository.
+fn fetch_session(
+    world: &HandoffWorld,
+    session_id: AgentSessionId,
+) -> Result<AgentSession, eyre::Report> {
+    run_async(world.session_repo.find_by_id(session_id))
+        .wrap_err("find source")?
+        .ok_or_else(|| eyre!("source session not found"))
+}
+
+/// Assert a condition, returning an error with the given message if false.
+fn assert_that(condition: bool, message: impl Into<String>) -> Result<(), eyre::Report> {
+    if condition {
+        Ok(())
+    } else {
+        Err(eyre!(message.into()))
+    }
+}
+
+// ============================================================================
 // Then Steps
 // ============================================================================
 
 #[then("a handoff record is created with initiated status")]
 fn handoff_initiated_status(world: &HandoffWorld) -> Result<(), eyre::Report> {
-    let handoff = world
-        .current_handoff
-        .as_ref()
-        .ok_or_else(|| eyre!("no handoff"))?;
-
-    if handoff.status != HandoffStatus::Initiated {
-        return Err(eyre!("expected Initiated status, got {:?}", handoff.status));
-    }
-    Ok(())
+    let handoff = get_current_handoff(world)?;
+    assert_that(
+        handoff.status == HandoffStatus::Initiated,
+        format!("expected Initiated status, got {:?}", handoff.status),
+    )
 }
 
 #[then("a context snapshot is captured for the source session")]
@@ -57,21 +94,12 @@ fn snapshot_captured(world: &HandoffWorld) -> Result<(), eyre::Report> {
 
 #[then("the source session is marked as handed off")]
 fn source_handed_off(world: &HandoffWorld) -> Result<(), eyre::Report> {
-    let source = world
-        .source_session
-        .as_ref()
-        .ok_or_else(|| eyre!("no source session"))?;
-
-    let updated =
-        run_async(world.session_repo.find_by_id(source.session_id)).wrap_err("find source")?;
-
-    let session = updated.ok_or_else(|| eyre!("source session not found"))?;
-
-    if session.state != AgentSessionState::HandedOff {
-        return Err(eyre!("expected HandedOff state, got {:?}", session.state));
-    }
-
-    Ok(())
+    let source = get_source_session(world)?;
+    let session = fetch_session(world, source.session_id)?;
+    assert_that(
+        session.state == AgentSessionState::HandedOff,
+        format!("expected HandedOff state, got {:?}", session.state),
+    )
 }
 
 #[then("the handoff record links source and target sessions")]
@@ -113,25 +141,16 @@ fn handoff_completed(world: &HandoffWorld) -> Result<(), eyre::Report> {
 
 #[then("the source session is reverted to active state")]
 fn source_reverted(world: &HandoffWorld) -> Result<(), eyre::Report> {
-    let source = world
-        .source_session
-        .as_ref()
-        .ok_or_else(|| eyre!("no source session"))?;
-
-    let updated =
-        run_async(world.session_repo.find_by_id(source.session_id)).wrap_err("find source")?;
-
-    let session = updated.ok_or_else(|| eyre!("source session not found"))?;
-
-    if session.state != AgentSessionState::Active {
-        return Err(eyre!("expected Active state, got {:?}", session.state));
-    }
-
-    if session.terminated_by_handoff.is_some() {
-        return Err(eyre!("terminated_by_handoff should be None"));
-    }
-
-    Ok(())
+    let source = get_source_session(world)?;
+    let session = fetch_session(world, source.session_id)?;
+    assert_that(
+        session.state == AgentSessionState::Active,
+        format!("expected Active state, got {:?}", session.state),
+    )?;
+    assert_that(
+        session.terminated_by_handoff.is_none(),
+        "terminated_by_handoff should be None",
+    )
 }
 
 #[then("no target session is created")]
@@ -144,16 +163,11 @@ fn no_target_session(world: &HandoffWorld) -> Result<(), eyre::Report> {
 
 #[then("the handoff metadata includes the prior turn id")]
 fn handoff_includes_turn(world: &HandoffWorld) -> Result<(), eyre::Report> {
-    let handoff = world
-        .current_handoff
-        .as_ref()
-        .ok_or_else(|| eyre!("no handoff"))?;
-
-    if handoff.prior_turn_id != world.prior_turn_id {
-        return Err(eyre!("prior_turn_id does not match"));
-    }
-
-    Ok(())
+    let handoff = get_current_handoff(world)?;
+    assert_that(
+        handoff.prior_turn_id == world.prior_turn_id,
+        "prior_turn_id does not match",
+    )
 }
 
 #[then("the handoff metadata includes the triggering tool calls")]

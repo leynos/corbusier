@@ -52,14 +52,43 @@ impl PostgresAgentSessionRepository {
         .await
     }
 
-    /// Helper to start a query filtered by conversation ID.
-    fn conversation_query(
-        uuid: uuid::Uuid,
-    ) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg> {
-        agent_sessions::table
-            .filter(agent_sessions::conversation_id.eq(uuid))
-            .into_boxed()
+    /// Execute a query that returns a single optional session.
+    async fn find_one<F>(&self, build_query: F) -> SessionResult<Option<AgentSession>>
+    where
+        F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
+            + Send
+            + 'static,
+    {
+        self.query_with(move |conn| {
+            build_query(agent_sessions::table)
+                .select(AgentSessionRow::as_select())
+                .first::<AgentSessionRow>(conn)
+                .optional()
+                .map_err(SessionError::persistence)?
+                .map(row_to_session)
+                .transpose()
+        })
+        .await
     }
+
+    /// Execute a query that returns multiple sessions.
+    async fn find_many<F>(&self, build_query: F) -> SessionResult<Vec<AgentSession>>
+    where
+        F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
+            + Send
+            + 'static,
+    {
+        self.query_with(move |conn| {
+            let rows = build_query(agent_sessions::table)
+                .select(AgentSessionRow::as_select())
+                .load::<AgentSessionRow>(conn)
+                .map_err(SessionError::persistence)?;
+
+            rows.into_iter().map(row_to_session).collect()
+        })
+        .await
+    }
+
 }
 
 #[async_trait]
@@ -120,17 +149,8 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {
         let uuid = id.into_inner();
 
-        self.query_with(move |conn| {
-            agent_sessions::table
-                .filter(agent_sessions::id.eq(uuid))
-                .select(AgentSessionRow::as_select())
-                .first::<AgentSessionRow>(conn)
-                .optional()
-                .map_err(SessionError::persistence)?
-                .map(row_to_session)
-                .transpose()
-        })
-        .await
+        self.find_one(move |table| table.filter(agent_sessions::id.eq(uuid)).into_boxed())
+            .await
     }
 
     async fn find_active_for_conversation(
@@ -139,15 +159,11 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     ) -> SessionResult<Option<AgentSession>> {
         let uuid = conversation_id.into_inner();
 
-        self.query_with(move |conn| {
-            Self::conversation_query(uuid)
+        self.find_one(move |table| {
+            table
+                .filter(agent_sessions::conversation_id.eq(uuid))
                 .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
-                .select(AgentSessionRow::as_select())
-                .first::<AgentSessionRow>(conn)
-                .optional()
-                .map_err(SessionError::persistence)?
-                .map(row_to_session)
-                .transpose()
+                .into_boxed()
         })
         .await
     }
@@ -158,14 +174,11 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     ) -> SessionResult<Vec<AgentSession>> {
         let uuid = conversation_id.into_inner();
 
-        self.query_with(move |conn| {
-            let rows = Self::conversation_query(uuid)
+        self.find_many(move |table| {
+            table
+                .filter(agent_sessions::conversation_id.eq(uuid))
                 .order(agent_sessions::started_at.asc())
-                .select(AgentSessionRow::as_select())
-                .load::<AgentSessionRow>(conn)
-                .map_err(SessionError::persistence)?;
-
-            rows.into_iter().map(row_to_session).collect()
+                .into_boxed()
         })
         .await
     }
