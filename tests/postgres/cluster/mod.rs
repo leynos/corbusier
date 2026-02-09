@@ -1,11 +1,9 @@
 //! Cluster lifecycle helpers for `PostgreSQL` integration tests.
-
 mod env_utils;
 mod fs_utils;
 mod worker_helpers;
-
-use self::env_utils::{env_vars_to_os, worker_env_changes};
-use self::fs_utils::{sync_password_from_file, sync_port_from_pid};
+use self::env_utils::{drop_privileges_if_root, env_vars_to_os, worker_env_changes};
+use self::fs_utils::{cleanup_stale_postmaster_pid, sync_password_from_file, sync_port_from_pid};
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
 use once_cell::sync::OnceCell;
@@ -19,12 +17,9 @@ use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::runtime::Runtime;
-
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
-
 static SHARED_CLUSTER: OnceCell<ManagedCluster> = OnceCell::new();
 static TEMPLATE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-
 /// RAII guard for temporary test databases.
 ///
 /// Automatically drops the database when the guard goes out of scope.
@@ -33,25 +28,21 @@ pub struct TemporaryDatabase {
     name: String,
     url: String,
 }
-
 impl TemporaryDatabase {
     const fn new(cluster: &'static ManagedCluster, name: String, url: String) -> Self {
         Self { cluster, name, url }
     }
-
     /// Returns the database name.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
-
     /// Returns the database URL.
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
 }
-
 impl Drop for TemporaryDatabase {
     fn drop(&mut self) {
         if let Err(err) = self.cluster.drop_database(&self.name)
@@ -66,16 +57,13 @@ impl Drop for TemporaryDatabase {
         }
     }
 }
-
 /// Shared `PostgreSQL` cluster handle for integration tests.
 pub type PostgresCluster = &'static ManagedCluster;
-
 /// Lightweight connection wrapper for building database URLs.
 #[derive(Debug, Clone)]
 pub struct ClusterConnection {
     settings: Settings,
 }
-
 impl ClusterConnection {
     /// Builds a database URL for the provided database name.
     #[must_use]
@@ -83,7 +71,6 @@ impl ClusterConnection {
         self.settings.url(database)
     }
 }
-
 /// Managed embedded `PostgreSQL` cluster for test lifecycles.
 pub struct ManagedCluster {
     bootstrap: TestBootstrapSettings,
@@ -91,7 +78,6 @@ pub struct ManagedCluster {
     runtime: Option<Runtime>,
     postgres: Option<PostgreSQL>,
 }
-
 async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
     postgres
         .setup()
@@ -105,7 +91,6 @@ async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
     }
     Ok(())
 }
-
 impl ManagedCluster {
     fn new() -> Result<Self, BoxError> {
         let (worker_env, port_guard) = worker_env_changes()?;
@@ -124,7 +109,6 @@ impl ManagedCluster {
         cluster.start()?;
         Ok(cluster)
     }
-
     /// Returns a connection helper for generating database URLs.
     #[must_use]
     pub fn connection(&self) -> ClusterConnection {
@@ -132,7 +116,6 @@ impl ManagedCluster {
             settings: self.bootstrap.settings.clone(),
         }
     }
-
     /// Creates a database using the provided template name.
     ///
     /// # Errors
@@ -220,20 +203,38 @@ impl ManagedCluster {
     }
 
     fn start(&mut self) -> Result<(), BoxError> {
+        let env_vars = env_vars_to_os(&self.env_vars);
+        cleanup_stale_postmaster_pid(&self.bootstrap.settings)?;
         match self.bootstrap.privileges {
-            ExecutionPrivileges::Root => self.start_via_worker(),
-            ExecutionPrivileges::Unprivileged => self.start_in_process(),
+            ExecutionPrivileges::Root => {
+                let started = self.start_via_worker().is_ok()
+                    && database_exists_with_url(
+                        &self.connection().database_url("postgres"),
+                        "postgres",
+                    )
+                    .is_ok();
+                if started {
+                    Ok(())
+                } else {
+                    let env_guard = drop_privileges_if_root("nobody", &env_vars)?;
+                    self.start_in_process(&env_vars, env_guard)
+                }
+            }
+            ExecutionPrivileges::Unprivileged => self.start_in_process(&env_vars, None),
         }
     }
 
-    fn start_in_process(&mut self) -> Result<(), BoxError> {
-        let env_vars = self.env_vars.clone();
+    fn start_in_process(
+        &mut self,
+        env_vars: &[(std::ffi::OsString, Option<std::ffi::OsString>)],
+        env_guard: Option<EnvVarGuard>,
+    ) -> Result<(), BoxError> {
         let settings = self.bootstrap.settings.clone();
+        let _env_guard = env_guard.unwrap_or_else(|| EnvVarGuard::set_many(env_vars));
 
         // Run PostgreSQL startup in a separate thread to avoid runtime nesting issues
         let result = std::thread::scope(|s| {
             s.spawn(|| {
-                let env_guard = EnvVarGuard::set_many(&env_vars_to_os(&env_vars));
                 let mut postgres = PostgreSQL::new(settings);
 
                 let runtime = tokio::runtime::Builder::new_current_thread()
@@ -244,7 +245,6 @@ impl ManagedCluster {
                 runtime.block_on(setup_postgres(&mut postgres))?;
 
                 let cluster_settings = postgres.settings().clone();
-                drop(env_guard);
                 Ok::<(Runtime, PostgreSQL, Settings), BoxError>((
                     runtime,
                     postgres,

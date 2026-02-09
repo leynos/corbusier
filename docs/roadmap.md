@@ -23,13 +23,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §2.1.1.
   - [x] Success criteria: conversation history is queryable by conversation id
     with complete audit metadata.
-- [ ] 1.1.3 Preserve context across agent handoffs. See
+- [x] 1.1.3 Preserve context across agent handoffs. See
   corbusier-design.md §2.2.1 and §4.1.1.1.
-  - [ ] Persist handoff metadata between agent turns. See
+  - [x] Persist handoff metadata between agent turns. See
     corbusier-design.md §4.2.1.1.
-  - [ ] Maintain context window snapshots per agent session. See
+  - [x] Maintain context window snapshots per agent session. See
     corbusier-design.md §2.2.1.
-  - [ ] Success criteria: every handoff references the prior turn and tool
+  - [x] Success criteria: every handoff references the prior turn and tool
     calls used to reach the handoff.
 
 ### 1.2. Task lifecycle management
