@@ -78,8 +78,8 @@ fn handoff_chain_tracks_all_sessions(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
     clock: DefaultClock,
-) {
-    let runtime_handle = runtime.expect("runtime");
+) -> TestResult<()> {
+    let runtime_handle = runtime?;
     runtime_handle.block_on(async {
         let conversation_id = ConversationId::new();
 
@@ -107,7 +107,13 @@ fn handoff_chain_tracks_all_sessions(
             .await
             .expect("list");
 
-        assert_eq!(sessions.len(), 3);
+        if sessions.len() != 3 {
+            let err = Box::new(std::io::Error::other(format!(
+                "expected 3 sessions, got {}",
+                sessions.len()
+            ))) as Box<dyn std::error::Error + Send + Sync>;
+            return Err(err);
+        }
 
         let handoffs = harness
             .handoff_adapter
@@ -115,11 +121,25 @@ fn handoff_chain_tracks_all_sessions(
             .await
             .expect("list handoffs");
 
-        assert_eq!(handoffs.len(), 2);
-        assert!(
-            handoffs
-                .iter()
-                .all(|h| h.status == HandoffStatus::Completed)
-        );
-    });
+        if handoffs.len() != 2 {
+            let err = Box::new(std::io::Error::other(format!(
+                "expected 2 handoffs, got {}",
+                handoffs.len()
+            ))) as Box<dyn std::error::Error + Send + Sync>;
+            return Err(err);
+        }
+
+        if !handoffs
+            .iter()
+            .all(|h| h.status == HandoffStatus::Completed)
+        {
+            let err = Box::new(std::io::Error::other(
+                "expected all handoffs to be completed",
+            )) as Box<dyn std::error::Error + Send + Sync>;
+            return Err(err);
+        }
+
+        Ok(())
+    })?;
+    Ok(())
 }

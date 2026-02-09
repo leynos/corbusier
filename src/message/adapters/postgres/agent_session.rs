@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
+use serde::Serialize;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 use crate::message::{
@@ -177,19 +178,14 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
 /// Converts a domain `AgentSession` to a `NewAgentSession` for insertion.
 fn session_to_new_row(session: &AgentSession) -> SessionResult<NewAgentSession> {
-    let turn_ids = serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
+    let turn_ids = serialize_json(&session.turn_ids)?;
 
-    let context_snapshots =
-        serde_json::to_value(&session.context_snapshots).map_err(SessionError::persistence)?;
+    let context_snapshots = serialize_json(&session.context_snapshots)?;
 
     let start_sequence =
         i64::try_from(session.start_sequence.value()).map_err(SessionError::persistence)?;
 
-    let end_sequence = session
-        .end_sequence
-        .map(|s| i64::try_from(s.value()))
-        .transpose()
-        .map_err(SessionError::persistence)?;
+    let end_sequence = session_end_sequence(session)?;
 
     Ok(NewAgentSession {
         id: session.session_id.into_inner(),
@@ -221,16 +217,11 @@ struct AgentSessionUpdate {
 
 /// Converts a domain `AgentSession` to update values.
 fn session_to_update_values(session: &AgentSession) -> SessionResult<AgentSessionUpdate> {
-    let turn_ids = serde_json::to_value(&session.turn_ids).map_err(SessionError::persistence)?;
+    let turn_ids = serialize_json(&session.turn_ids)?;
 
-    let context_snapshots =
-        serde_json::to_value(&session.context_snapshots).map_err(SessionError::persistence)?;
+    let context_snapshots = serialize_json(&session.context_snapshots)?;
 
-    let end_sequence = session
-        .end_sequence
-        .map(|s| i64::try_from(s.value()))
-        .transpose()
-        .map_err(SessionError::persistence)?;
+    let end_sequence = session_end_sequence(session)?;
 
     Ok(AgentSessionUpdate {
         end_sequence,
@@ -240,6 +231,18 @@ fn session_to_update_values(session: &AgentSession) -> SessionResult<AgentSessio
         ended_at: session.ended_at,
         state: session.state.as_str().to_owned(),
     })
+}
+
+fn serialize_json<T: Serialize>(value: &T) -> SessionResult<serde_json::Value> {
+    serde_json::to_value(value).map_err(SessionError::persistence)
+}
+
+fn session_end_sequence(session: &AgentSession) -> SessionResult<Option<i64>> {
+    session
+        .end_sequence
+        .map(|s| i64::try_from(s.value()))
+        .transpose()
+        .map_err(SessionError::persistence)
 }
 
 /// Converts a database row to a domain `AgentSession`.

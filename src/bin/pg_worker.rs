@@ -47,13 +47,11 @@ use pg_embedded_setup_unpriv::worker::{PlainSecret, WorkerPayload};
 #[cfg(unix)]
 use std::env;
 #[cfg(unix)]
-use std::ffi::{CString, OsStr, OsString};
+use std::ffi::CString;
 #[cfg(unix)]
 use std::io;
 #[cfg(unix)]
 use std::io::Read;
-#[cfg(unix)]
-use std::path::PathBuf;
 #[cfg(unix)]
 use std::process::Command;
 #[cfg(unix)]
@@ -68,6 +66,8 @@ use tokio::runtime::Builder;
 
 #[cfg(unix)]
 const WORKER_REEXEC_ENV: &str = "PG_WORKER_REEXEC";
+#[cfg(unix)]
+const TRUSTED_PATH: &str = "/usr/sbin:/usr/bin:/sbin:/bin";
 
 /// Boxed error type for the main result.
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -102,8 +102,8 @@ enum Operation {
 
 #[cfg(unix)]
 impl Operation {
-    fn parse(arg: &OsStr) -> Result<Self, WorkerError> {
-        match arg.to_string_lossy().as_ref() {
+    fn parse(arg: &Utf8Path) -> Result<Self, WorkerError> {
+        match arg.as_str() {
             "setup" => Ok(Self::Setup),
             "start" => Ok(Self::Start),
             "stop" => Ok(Self::Stop),
@@ -116,13 +116,25 @@ impl Operation {
 
 #[cfg(unix)]
 fn main() -> Result<(), BoxError> {
-    let args: Vec<OsString> = env::args_os().collect();
+    let args = collect_args()?;
     maybe_reexec_as_nobody(&args)?;
     run_worker(args.into_iter()).map_err(Into::into)
 }
 
 #[cfg(unix)]
-fn run_worker(args: impl Iterator<Item = OsString>) -> Result<(), WorkerError> {
+fn collect_args() -> Result<Vec<Utf8PathBuf>, WorkerError> {
+    env::args_os()
+        .map(|arg_os| {
+            let arg = arg_os
+                .into_string()
+                .map_err(|_| WorkerError::InvalidArgs("argument is not valid UTF-8".into()))?;
+            Ok(Utf8PathBuf::from(arg))
+        })
+        .collect()
+}
+
+#[cfg(unix)]
+fn run_worker(args: impl Iterator<Item = Utf8PathBuf>) -> Result<(), WorkerError> {
     let (operation, config_path) = parse_args(args)?;
     let payload = load_payload(&config_path)?;
     drop_privileges_if_root("nobody")?;
@@ -161,19 +173,27 @@ fn run_worker(args: impl Iterator<Item = OsString>) -> Result<(), WorkerError> {
 }
 
 #[cfg(unix)]
-fn maybe_reexec_as_nobody(args: &[OsString]) -> Result<(), WorkerError> {
+fn maybe_reexec_as_nobody(args: &[Utf8PathBuf]) -> Result<(), WorkerError> {
     if !Uid::effective().is_root() || env::var_os(WORKER_REEXEC_ENV).is_some() {
         return Ok(());
     }
 
-    let exe = env::current_exe().map_err(WorkerError::RuntimeInit)?;
+    let exe_path = env::current_exe().map_err(WorkerError::RuntimeInit)?;
+    let exe = exe_path
+        .into_os_string()
+        .into_string()
+        .map(Utf8PathBuf::from)
+        .map_err(|_| {
+            WorkerError::RuntimeInit(std::io::Error::other("executable path is not valid UTF-8"))
+        })?;
     let status = match Command::new("runuser")
         .arg("-u")
         .arg("nobody")
         .arg("--")
-        .arg(&exe)
-        .args(args.iter().skip(1))
+        .arg(exe.as_std_path())
+        .args(args.iter().skip(1).map(|arg| arg.as_std_path()))
         .env(WORKER_REEXEC_ENV, "1")
+        .env("PATH", TRUSTED_PATH)
         .status()
     {
         Ok(status) => status,
@@ -186,46 +206,40 @@ fn maybe_reexec_as_nobody(args: &[OsString]) -> Result<(), WorkerError> {
 
 #[cfg(unix)]
 fn run_via_su(
-    exe: &std::path::Path,
-    args: &[OsString],
+    exe: &Utf8Path,
+    args: &[Utf8PathBuf],
 ) -> Result<std::process::ExitStatus, WorkerError> {
-    let mut command = format!(
-        "{WORKER_REEXEC_ENV}=1 exec {}",
-        shell_escape(exe.to_string_lossy().as_ref())
-    );
+    let mut command = format!("{WORKER_REEXEC_ENV}=1 exec {}", shell_escape(exe.as_str()));
     for arg in args.iter().skip(1) {
         command.push(' ');
-        command.push_str(&shell_escape(arg.to_string_lossy().as_ref()));
+        command.push_str(&shell_escape(arg.as_str()));
     }
 
-    Command::new("su")
+    Command::new("/bin/su")
         .arg("-s")
         .arg("/bin/sh")
         .arg("nobody")
         .arg("-c")
         .arg(command)
+        .env("PATH", TRUSTED_PATH)
         .status()
         .map_err(|err| WorkerError::PrivilegeDrop(err.to_string()))
 }
 
 #[cfg(unix)]
 fn parse_args(
-    mut args: impl Iterator<Item = OsString>,
+    mut args: impl Iterator<Item = Utf8PathBuf>,
 ) -> Result<(Operation, Utf8PathBuf), WorkerError> {
     let _program = args.next();
     let operation = args
         .next()
         .ok_or_else(|| WorkerError::InvalidArgs("missing operation argument".into()))
         .and_then(|arg| Operation::parse(&arg))?;
-    let config_path_buf = args
+    let config_path = args
         .next()
-        .map(PathBuf::from)
         .ok_or_else(|| WorkerError::InvalidArgs("missing config path argument".into()))?;
-    let config_path = Utf8PathBuf::from_path_buf(config_path_buf).map_err(|p| {
-        WorkerError::InvalidArgs(format!("config path is not valid UTF-8: {}", p.display()))
-    })?;
     if let Some(extra) = args.next() {
-        let extra_arg = extra.to_string_lossy();
+        let extra_arg = extra.as_str();
         return Err(WorkerError::InvalidArgs(format!(
             "unexpected extra argument: {extra_arg}"
         )));
@@ -288,13 +302,17 @@ fn apply_worker_environment(environment: &[(String, Option<PlainSecret>)]) {
     for (key, value) in environment {
         match value {
             Some(plain) => {
-                // SAFETY: tests control the worker lifecycle and no other threads mutate vars.
+                // SAFETY: the worker runs single-threaded and owns its lifecycle, so no other
+                // threads or processes mutate the environment while
+                // env::set_var(key, plain.expose()) executes.
                 unsafe {
                     env::set_var(key, plain.expose());
                 }
             }
             None => {
-                // SAFETY: tests control the worker lifecycle and no other threads mutate vars.
+                // SAFETY: the worker runs single-threaded and owns its lifecycle, so no other
+                // threads or processes mutate the environment while
+                // env::remove_var(key) executes.
                 unsafe {
                     env::remove_var(key);
                 }
