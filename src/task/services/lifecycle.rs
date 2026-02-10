@@ -101,6 +101,22 @@ where
     R: TaskRepository,
     C: Clock + Send + Sync,
 {
+    fn apply_optional_metadata(
+        metadata: ExternalIssueMetadata,
+        description: Option<String>,
+        milestone: Option<String>,
+    ) -> ExternalIssueMetadata {
+        let metadata_with_description = match description {
+            Some(value) => metadata.with_description(value),
+            None => metadata,
+        };
+
+        match milestone {
+            Some(value) => metadata_with_description.with_milestone(value),
+            None => metadata_with_description,
+        }
+    }
+
     /// Creates a new task lifecycle service.
     #[must_use]
     pub const fn new(repository: Arc<R>, clock: Arc<C>) -> Self {
@@ -117,19 +133,22 @@ where
         &self,
         request: CreateTaskFromIssueRequest,
     ) -> TaskLifecycleResult<Task> {
-        let issue_ref =
-            IssueRef::from_parts(&request.provider, &request.repository, request.issue_number)?;
+        let CreateTaskFromIssueRequest {
+            provider,
+            repository,
+            issue_number,
+            title,
+            description,
+            labels,
+            assignees,
+            milestone,
+        } = request;
 
-        let mut metadata = ExternalIssueMetadata::new(request.title)?;
-        if let Some(description) = request.description {
-            metadata = metadata.with_description(description);
-        }
-        metadata = metadata
-            .with_labels(request.labels)
-            .with_assignees(request.assignees);
-        if let Some(milestone) = request.milestone {
-            metadata = metadata.with_milestone(milestone);
-        }
+        let issue_ref = IssueRef::from_parts(&provider, &repository, issue_number)?;
+        let base_metadata = ExternalIssueMetadata::new(title)?
+            .with_labels(labels)
+            .with_assignees(assignees);
+        let metadata = Self::apply_optional_metadata(base_metadata, description, milestone);
 
         let external_issue = ExternalIssue::new(issue_ref, metadata);
         let task = Task::new_from_issue(&external_issue, &*self.clock);

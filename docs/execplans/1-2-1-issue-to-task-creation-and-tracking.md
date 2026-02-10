@@ -11,7 +11,7 @@ the controlling execution document for this feature.
 
 ## Purpose / big picture
 
-Implement roadmap item 1.2.1 so Corbusier can create an internal task record
+Implement roadmap item 1.2.1, so Corbusier can create an internal task record
 from external issue metadata, assign internal task identity and lifecycle
 timestamps, and retrieve the task by external issue reference.
 
@@ -62,7 +62,8 @@ unhappy paths.
 ## Risks
 
 - Risk: Existing migrations do not currently create a `tasks` table, while
-  schema/design references assume one. Severity: high Likelihood: high
+  schema and design references for task lifecycle assume one. Severity: high
+  Likelihood: high
   Mitigation: add a dedicated migration for task lifecycle foundations and
   verify Diesel schema regeneration plus migration ordering.
 
@@ -111,16 +112,16 @@ unhappy paths.
   (`src/task/`) instead of extending `src/message/`. Rationale: task lifecycle
   is a separate aggregate with separate ports and adapters; this keeps domain
   boundaries explicit and avoids cross-feature coupling. Date/Author:
-  2026-02-09 / Codex
+  2026-02-09 / Codex.
 
 - Decision: store canonical issue origin in domain value objects and persist as
   JSONB `origin`, with typed extraction helpers in adapters. Rationale: aligns
   with `docs/corbusier-design.md` task-origin schema while keeping provider
-  metadata extensible. Date/Author: 2026-02-09 / Codex
+  metadata extensible. Date/Author: 2026-02-09 / Codex.
 
 - Decision: include roadmap completion (`[x]`) only at end of implementation,
   not during planning. Rationale: roadmap should represent delivered behaviour,
-  not planned work. Date/Author: 2026-02-09 / Codex
+  not planned work. Date/Author: 2026-02-09 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -288,7 +289,7 @@ All commands run from repository root: `/home/user/project`.
 Behavioural acceptance criteria:
 
 - Creating a task from valid external issue metadata succeeds and returns a
-  task with:
+  task that includes all of the following:
   - generated internal task ID,
   - initial lifecycle state,
   - populated created/updated timestamps.
