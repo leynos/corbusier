@@ -57,7 +57,7 @@ unhappy paths.
 - Timebox: if any single stage exceeds 4 hours of active work, stop and report
   remaining unknowns.
 - Ambiguity: if issue reference parsing rules are materially unclear (URL
-  normalisation, provider inference), stop and request a decision.
+  normalization, provider inference), stop and request a decision.
 
 ## Risks
 
@@ -93,11 +93,11 @@ unhappy paths.
 
 ## Surprises & Discoveries
 
-- Observation: MCP resources for the Qdrant memory protocol were unavailable in
-  this session (`list_mcp_resources` returned empty results). Evidence: tool
-  discovery returned no configured resources/templates. Impact: implementation
-  proceeds without historical project notes; capture new discoveries explicitly
-  in repository docs.
+- Observation: Model Context Protocol (MCP) resources for the Qdrant memory
+  protocol were unavailable in this session (`list_mcp_resources` returned
+  empty results). Evidence: tool discovery returned no configured
+  resources/templates. Impact: implementation proceeds without historical
+  project notes; capture new discoveries explicitly in repository docs.
 
 - Observation: current schema tracks `conversations.task_id`, but migrations do
   not define a `tasks` table yet. Evidence:

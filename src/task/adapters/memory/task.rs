@@ -12,8 +12,13 @@ use crate::task::{
 /// Thread-safe in-memory task repository.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryTaskRepository {
-    tasks: Arc<RwLock<HashMap<TaskId, Task>>>,
-    issue_index: Arc<RwLock<HashMap<IssueRef, TaskId>>>,
+    state: Arc<RwLock<InMemoryTaskState>>,
+}
+
+#[derive(Debug, Default)]
+struct InMemoryTaskState {
+    tasks: HashMap<TaskId, Task>,
+    issue_index: HashMap<IssueRef, TaskId>,
 }
 
 impl InMemoryTaskRepository {
@@ -27,46 +32,39 @@ impl InMemoryTaskRepository {
 #[async_trait]
 impl TaskRepository for InMemoryTaskRepository {
     async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
-        let mut tasks = self.tasks.write().map_err(|err| {
+        let mut state = self.state.write().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        if tasks.contains_key(&task.id()) {
+        if state.tasks.contains_key(&task.id()) {
             return Err(TaskRepositoryError::DuplicateTask(task.id()));
         }
 
-        let mut issue_index = self.issue_index.write().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
         let issue_ref = task.origin().issue_ref().clone();
-        if issue_index.contains_key(&issue_ref) {
+        if state.issue_index.contains_key(&issue_ref) {
             return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref));
         }
 
-        issue_index.insert(issue_ref, task.id());
-        tasks.insert(task.id(), task.clone());
+        state.issue_index.insert(issue_ref, task.id());
+        state.tasks.insert(task.id(), task.clone());
         Ok(())
     }
 
     async fn find_by_id(&self, id: TaskId) -> TaskRepositoryResult<Option<Task>> {
-        let tasks = self.tasks.read().map_err(|err| {
+        let state = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        Ok(tasks.get(&id).cloned())
+        Ok(state.tasks.get(&id).cloned())
     }
 
     async fn find_by_issue_ref(&self, issue_ref: &IssueRef) -> TaskRepositoryResult<Option<Task>> {
-        let maybe_task_id = self
+        let state = self.state.read().map_err(|err| {
+            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
+        })?;
+        let task = state
             .issue_index
-            .read()
-            .map_err(|err| {
-                TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-            })?
             .get(issue_ref)
-            .copied();
-        let Some(task_id) = maybe_task_id else {
-            return Ok(None);
-        };
-
-        self.find_by_id(task_id).await
+            .and_then(|task_id| state.tasks.get(task_id))
+            .cloned();
+        Ok(task)
     }
 }

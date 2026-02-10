@@ -36,6 +36,16 @@ fn issue_ref_from_parts_rejects_zero_issue_number() {
 }
 
 #[rstest]
+fn issue_ref_from_parts_rejects_issue_number_beyond_postgres_range() {
+    let too_large_issue_number = (i64::MAX as u64) + 1;
+    let result = IssueRef::from_parts("github", "owner/repo", too_large_issue_number);
+    assert_eq!(
+        result,
+        Err(TaskDomainError::InvalidIssueNumber(too_large_issue_number))
+    );
+}
+
+#[rstest]
 fn issue_metadata_rejects_empty_title() {
     let result = ExternalIssueMetadata::new("    ");
     assert_eq!(result, Err(TaskDomainError::EmptyIssueTitle));

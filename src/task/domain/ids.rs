@@ -54,13 +54,17 @@ impl fmt::Display for TaskId {
 pub struct IssueNumber(u64);
 
 impl IssueNumber {
+    /// Largest issue number representable in the current `PostgreSQL` schema.
+    const MAX_PERSISTED_VALUE: u64 = i64::MAX as u64;
+
     /// Creates a validated issue number.
     ///
     /// # Errors
     ///
-    /// Returns [`TaskDomainError::InvalidIssueNumber`] when the value is zero.
+    /// Returns [`TaskDomainError::InvalidIssueNumber`] when the value is zero
+    /// or exceeds the schema-backed maximum (`i64::MAX`).
     pub const fn new(value: u64) -> Result<Self, TaskDomainError> {
-        if value == 0 {
+        if value == 0 || value > Self::MAX_PERSISTED_VALUE {
             return Err(TaskDomainError::InvalidIssueNumber(value));
         }
         Ok(Self(value))

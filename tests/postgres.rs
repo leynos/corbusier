@@ -1,4 +1,4 @@
-//! `PostgreSQL` integration tests for the message repository.
+//! `PostgreSQL` integration tests for the message and task repositories.
 //!
 //! Tests are organized into modules by functionality:
 //! - `cluster`: Embedded `PostgreSQL` cluster lifecycle helpers

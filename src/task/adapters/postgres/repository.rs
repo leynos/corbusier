@@ -5,17 +5,14 @@ use super::{
     schema::tasks,
 };
 use crate::task::{
-    domain::{
-        IssueRef, ParseTaskStateError, PersistedTaskData, Task, TaskId, TaskOrigin, TaskState,
-    },
+    domain::{IssueRef, PersistedTaskData, Task, TaskId, TaskOrigin, TaskState},
     ports::{TaskRepository, TaskRepositoryError, TaskRepositoryResult},
 };
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use serde_json::Value;
+use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 
 /// `PostgreSQL` connection pool type used by task adapters.
 pub type TaskPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -56,16 +53,23 @@ impl TaskRepository for PostgresTaskRepository {
         let new_row = to_new_row(task)?;
 
         self.run_blocking(move |connection| {
-            // Pre-check issue reference to provide stable semantic errors.
+            // This pre-check improves semantic error reporting but is not relied
+            // on for correctness: the unique index still enforces integrity in
+            // the TOCTOU window between check and insert.
             let duplicate_issue = find_task_by_issue_ref(connection, &issue_ref)?;
             if duplicate_issue.is_some() {
-                return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref));
+                return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref.clone()));
             }
 
             diesel::insert_into(tasks::table)
                 .values(&new_row)
                 .execute(connection)
                 .map_err(|err| match err {
+                    DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info)
+                        if is_issue_origin_unique_violation(info.as_ref()) =>
+                    {
+                        TaskRepositoryError::DuplicateIssueOrigin(issue_ref.clone())
+                    }
                     DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
                         TaskRepositoryError::DuplicateTask(task_id)
                     }
@@ -106,40 +110,52 @@ fn to_new_row(task: &Task) -> TaskRepositoryResult<NewTaskRow> {
     Ok(NewTaskRow {
         id: task.id().into_inner(),
         origin,
+        branch_ref: None,
+        pull_request_ref: None,
         state: task.state().as_str().to_owned(),
+        workspace_id: None,
         created_at: task.created_at(),
         updated_at: task.updated_at(),
     })
 }
 
 fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
-    let origin = serde_json::from_value::<TaskOrigin>(row.origin)
+    let TaskRow {
+        id,
+        origin: persisted_origin,
+        branch_ref,
+        pull_request_ref,
+        state: persisted_state,
+        workspace_id,
+        created_at,
+        updated_at,
+    } = row;
+
+    let has_deferred_links =
+        branch_ref.is_some() || pull_request_ref.is_some() || workspace_id.is_some();
+    debug_assert!(
+        !has_deferred_links,
+        "deferred task link/workspace columns should remain unset until roadmap items 1.2.2 and 1.2.3"
+    );
+
+    let origin = serde_json::from_value::<TaskOrigin>(persisted_origin)
         .map_err(TaskRepositoryError::persistence)?;
-    let state = TaskState::try_from(row.state.as_str())
-        .map_err(|err: ParseTaskStateError| TaskRepositoryError::persistence(err))?;
+    let state =
+        TaskState::try_from(persisted_state.as_str()).map_err(TaskRepositoryError::persistence)?;
 
     let data = PersistedTaskData {
-        id: TaskId::from_uuid(row.id),
+        id: TaskId::from_uuid(id),
         origin,
         state,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+        created_at,
+        updated_at,
     };
     Ok(Task::from_persisted(data))
 }
 
-#[derive(Debug, QueryableByName)]
-struct LookupTaskRow {
-    #[diesel(sql_type = diesel::sql_types::Uuid)]
-    id: uuid::Uuid,
-    #[diesel(sql_type = diesel::sql_types::Jsonb)]
-    origin: Value,
-    #[diesel(sql_type = diesel::sql_types::Varchar)]
-    state: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    created_at: chrono::DateTime<chrono::Utc>,
-    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    updated_at: chrono::DateTime<chrono::Utc>,
+fn is_issue_origin_unique_violation(info: &dyn DatabaseErrorInformation) -> bool {
+    info.constraint_name()
+        .is_some_and(|name| name == "idx_tasks_issue_origin_unique")
 }
 
 fn find_task_by_issue_ref(
@@ -149,7 +165,8 @@ fn find_task_by_issue_ref(
     let issue_number = i64::try_from(issue_ref.issue_number().value())
         .map_err(TaskRepositoryError::persistence)?;
     let query = diesel::sql_query(concat!(
-        "SELECT id, origin, state, created_at, updated_at FROM tasks ",
+        "SELECT id, origin, branch_ref, pull_request_ref, state, workspace_id, created_at, ",
+        "updated_at FROM tasks ",
         "WHERE origin->>'type' = 'issue' ",
         "AND origin->'issue_ref'->>'provider' = $1 ",
         "AND origin->'issue_ref'->>'repository' = $2 ",
@@ -160,16 +177,8 @@ fn find_task_by_issue_ref(
     .bind::<diesel::sql_types::Text, _>(issue_ref.repository().as_str())
     .bind::<diesel::sql_types::BigInt, _>(issue_number);
 
-    let row = query
-        .get_result::<LookupTaskRow>(connection)
+    query
+        .get_result::<TaskRow>(connection)
         .optional()
-        .map_err(TaskRepositoryError::persistence)?;
-
-    Ok(row.map(|lookup| TaskRow {
-        id: lookup.id,
-        origin: lookup.origin,
-        state: lookup.state,
-        created_at: lookup.created_at,
-        updated_at: lookup.updated_at,
-    }))
+        .map_err(TaskRepositoryError::persistence)
 }

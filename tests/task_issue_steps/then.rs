@@ -1,7 +1,9 @@
 //! Then steps for task lifecycle BDD scenarios.
 
 use super::world::{TaskWorld, run_async};
-use corbusier::task::{ports::TaskRepositoryError, services::TaskLifecycleError};
+use corbusier::task::{
+    domain::TaskOrigin, ports::TaskRepositoryError, services::TaskLifecycleError,
+};
 use rstest_bdd_macros::then;
 
 #[then("the task is created with draft state and lifecycle timestamps")]
@@ -25,6 +27,49 @@ fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Repor
             "expected created_at and updated_at timestamps to match at creation"
         ));
     }
+
+    let (expected_provider, expected_repository, expected_issue_number) = world
+        .pending_issue_ref
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing expected issue reference in scenario world"))?;
+    let expected_title = world
+        .pending_issue_title
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing expected issue title in scenario world"))?;
+    let TaskOrigin::Issue {
+        issue_ref,
+        metadata,
+        ..
+    } = task.origin();
+    if issue_ref.provider().as_str() != expected_provider {
+        return Err(eyre::eyre!(
+            "expected issue provider {}, found {}",
+            expected_provider,
+            issue_ref.provider().as_str()
+        ));
+    }
+    if issue_ref.repository().as_str() != expected_repository {
+        return Err(eyre::eyre!(
+            "expected issue repository {}, found {}",
+            expected_repository,
+            issue_ref.repository().as_str()
+        ));
+    }
+    if issue_ref.issue_number().value() != expected_issue_number {
+        return Err(eyre::eyre!(
+            "expected issue number {}, found {}",
+            expected_issue_number,
+            issue_ref.issue_number().value()
+        ));
+    }
+    if metadata.title != expected_title {
+        return Err(eyre::eyre!(
+            "expected issue title {}, found {}",
+            expected_title,
+            metadata.title
+        ));
+    }
+
     Ok(())
 }
 

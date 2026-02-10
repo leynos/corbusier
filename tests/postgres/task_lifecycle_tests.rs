@@ -2,14 +2,14 @@
 
 use corbusier::task::{
     adapters::postgres::{PostgresTaskRepository, TaskPgPool},
-    domain::IssueRef,
-    ports::TaskRepositoryError,
+    domain::{IssueRef, TaskDomainError},
+    ports::{TaskRepository, TaskRepositoryError},
     services::{CreateTaskFromIssueRequest, TaskLifecycleError, TaskLifecycleService},
 };
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -19,6 +19,7 @@ use crate::postgres::helpers::{
 };
 
 struct TaskTestContext {
+    repository: Arc<PostgresTaskRepository>,
     service: TaskLifecycleService<PostgresTaskRepository, DefaultClock>,
     _temp_db: TemporaryDatabase,
 }
@@ -35,26 +36,30 @@ async fn setup_task_context(cluster: PostgresCluster) -> Result<TaskTestContext,
         .build(manager)
         .map_err(|err| Box::new(err) as BoxError)?;
     let repository = Arc::new(PostgresTaskRepository::new(pool));
-    let service = TaskLifecycleService::new(repository, Arc::new(DefaultClock));
+    let service = TaskLifecycleService::new(repository.clone(), Arc::new(DefaultClock));
     Ok(TaskTestContext {
+        repository,
         service,
         _temp_db: db,
     })
 }
 
+#[fixture]
+async fn context(
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+) -> Result<TaskTestContext, BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    setup_task_context(cluster).await
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_create_and_lookup_by_issue_reference(
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-) {
-    let cluster = postgres_cluster.expect("postgres cluster should start");
-    ensure_template(cluster)
-        .await
-        .expect("template database should be prepared");
-    let context = setup_task_context(cluster)
-        .await
-        .expect("task test context should be created");
-    let service = &context.service;
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
 
     let request = CreateTaskFromIssueRequest::new(
         "github",
@@ -87,21 +92,16 @@ async fn postgres_create_and_lookup_by_issue_reference(
         fetched.updated_at().timestamp_micros(),
         created.updated_at().timestamp_micros()
     );
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_duplicate_issue_reference_is_rejected(
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-) {
-    let cluster = postgres_cluster.expect("postgres cluster should start");
-    ensure_template(cluster)
-        .await
-        .expect("template database should be prepared");
-    let context = setup_task_context(cluster)
-        .await
-        .expect("task test context should be created");
-    let service = &context.service;
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
 
     service
         .create_from_issue(CreateTaskFromIssueRequest::new(
@@ -128,21 +128,16 @@ async fn postgres_duplicate_issue_reference_is_rejected(
             TaskRepositoryError::DuplicateIssueOrigin(_)
         ))
     ));
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_lookup_returns_none_for_missing_issue_reference(
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-) {
-    let cluster = postgres_cluster.expect("postgres cluster should start");
-    ensure_template(cluster)
-        .await
-        .expect("template database should be prepared");
-    let context = setup_task_context(cluster)
-        .await
-        .expect("task test context should be created");
-    let service = &context.service;
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
 
     let issue_ref =
         IssueRef::from_parts("github", "corbusier/core", 10001).expect("valid issue reference");
@@ -152,4 +147,65 @@ async fn postgres_lookup_returns_none_for_missing_issue_reference(
         .expect("lookup should succeed");
 
     assert!(found.is_none());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_create_rejects_issue_number_beyond_supported_range(
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
+    let too_large_issue_number = (i64::MAX as u64) + 1;
+
+    let result = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            too_large_issue_number,
+            "Out-of-range issue number",
+        ))
+        .await;
+
+    assert!(
+        matches!(
+            result,
+            Err(TaskLifecycleError::Domain(TaskDomainError::InvalidIssueNumber(issue_number)))
+                if issue_number == too_large_issue_number
+        ),
+        "expected InvalidIssueNumber domain error"
+    );
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_repository_find_by_id_round_trips_created_task(
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
+    let repository = &task_context.repository;
+
+    let created = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            42,
+            "find_by_id round trip",
+        ))
+        .await
+        .expect("task creation should succeed");
+
+    let fetched = repository
+        .find_by_id(created.id())
+        .await
+        .expect("repository lookup should succeed")
+        .expect("task should exist in repository");
+
+    assert_eq!(fetched.id(), created.id());
+    assert_eq!(fetched.origin(), created.origin());
+    assert_eq!(fetched.state(), created.state());
+    Ok(())
 }

@@ -104,6 +104,16 @@ impl IssueRef {
     }
 }
 
+impl fmt::Display for IssueRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}/{}/#{}",
+            self.provider, self.repository, self.issue_number
+        )
+    }
+}
+
 /// External issue metadata as received from VCS providers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalIssueMetadata {
@@ -140,7 +150,8 @@ impl ExternalIssueMetadata {
     #[must_use]
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         let value = description.into();
-        self.description = (!value.trim().is_empty()).then_some(value);
+        let normalized = value.trim();
+        self.description = (!normalized.is_empty()).then_some(normalized.to_owned());
         self
     }
 
@@ -170,7 +181,8 @@ impl ExternalIssueMetadata {
     #[must_use]
     pub fn with_milestone(mut self, milestone: impl Into<String>) -> Self {
         let value = milestone.into();
-        self.milestone = (!value.trim().is_empty()).then_some(value);
+        let normalized = value.trim();
+        self.milestone = (!normalized.is_empty()).then_some(normalized.to_owned());
         self
     }
 

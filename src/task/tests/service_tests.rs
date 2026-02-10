@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use crate::task::{
     adapters::memory::InMemoryTaskRepository,
-    domain::IssueRef,
+    domain::{IssueRef, TaskDomainError},
     ports::TaskRepositoryError,
-    services::{CreateTaskFromIssueRequest, TaskLifecycleService},
+    services::{CreateTaskFromIssueRequest, TaskLifecycleError, TaskLifecycleService},
 };
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
@@ -61,22 +61,66 @@ async fn create_from_issue_rejects_duplicate_issue_reference(service: TestServic
     let duplicate = CreateTaskFromIssueRequest::new("gitlab", "team/repo", 77, "Duplicate");
     let result = service.create_from_issue(duplicate).await;
 
-    assert!(matches!(
-        result,
-        Err(crate::task::services::TaskLifecycleError::Repository(
-            TaskRepositoryError::DuplicateIssueOrigin(_)
-        ))
-    ));
-    let Err(crate::task::services::TaskLifecycleError::Repository(
-        TaskRepositoryError::DuplicateIssueOrigin(issue_ref),
-    )) = result
+    let Err(TaskLifecycleError::Repository(TaskRepositoryError::DuplicateIssueOrigin(issue_ref))) =
+        result
     else {
-        return;
+        panic!("expected duplicate issue origin error");
     };
 
     assert_eq!(issue_ref.provider().as_str(), "gitlab");
     assert_eq!(issue_ref.repository().as_str(), "team/repo");
     assert_eq!(issue_ref.issue_number().value(), 77);
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn create_from_issue_rejects_invalid_provider(service: TestService) {
+    let request =
+        CreateTaskFromIssueRequest::new("unknown-provider", "owner/repo", 10, "Invalid provider");
+
+    let result = service.create_from_issue(request).await;
+
+    assert!(
+        matches!(
+            result,
+            Err(TaskLifecycleError::Domain(TaskDomainError::InvalidIssueProvider(provider)))
+                if provider == "unknown-provider"
+        ),
+        "expected InvalidIssueProvider domain error"
+    );
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn create_from_issue_rejects_invalid_repository(service: TestService) {
+    let request = CreateTaskFromIssueRequest::new("github", "owner-only", 10, "Invalid repository");
+
+    let result = service.create_from_issue(request).await;
+
+    assert!(
+        matches!(
+            result,
+            Err(TaskLifecycleError::Domain(TaskDomainError::InvalidRepository(repository)))
+                if repository == "owner-only"
+        ),
+        "expected InvalidRepository domain error"
+    );
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn create_from_issue_rejects_empty_title(service: TestService) {
+    let request = CreateTaskFromIssueRequest::new("github", "owner/repo", 10, "   ");
+
+    let result = service.create_from_issue(request).await;
+
+    assert!(
+        matches!(
+            result,
+            Err(TaskLifecycleError::Domain(TaskDomainError::EmptyIssueTitle))
+        ),
+        "expected EmptyIssueTitle domain error"
+    );
 }
 
 #[rstest]

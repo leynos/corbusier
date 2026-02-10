@@ -821,6 +821,9 @@ Corbusier implements this through:
 - Enforce one-task-per-issue with a partial unique index over
   `origin.issue_ref.provider`, `origin.issue_ref.repository`, and
   `origin.issue_ref.issue_number` when `origin.type = issue`.
+- Constrain issue numbers to positive values representable by PostgreSQL
+  `BIGINT` (`<= i64::MAX`) so issue-reference lookups cannot fail from lossy
+  downcasts at persistence time.
 - Generate internal task identifiers as UUIDs and set `created_at` and
   `updated_at` to the same timestamp when a task is created from an issue.
 - Keep branch, pull request, and workspace references nullable in 1.2.1 so

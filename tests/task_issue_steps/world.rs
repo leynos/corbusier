@@ -17,6 +17,7 @@ pub type TestTaskService = TaskLifecycleService<InMemoryTaskRepository, DefaultC
 pub struct TaskWorld {
     pub service: TestTaskService,
     pub pending_issue_ref: Option<(String, String, u64)>,
+    pub pending_issue_title: Option<String>,
     pub pending_request: Option<CreateTaskFromIssueRequest>,
     pub pending_lookup: Option<IssueRef>,
     pub last_created_task: Option<Task>,
@@ -35,6 +36,7 @@ impl TaskWorld {
         Self {
             service,
             pending_issue_ref: None,
+            pending_issue_title: None,
             pending_request: None,
             pending_lookup: None,
             last_created_task: None,

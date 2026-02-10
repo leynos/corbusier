@@ -2,7 +2,7 @@
 
 use crate::task::{
     domain::{ExternalIssue, ExternalIssueMetadata, IssueRef, Task, TaskDomainError},
-    ports::{TaskRepository, TaskRepositoryError, TaskRepositoryResult},
+    ports::{TaskRepository, TaskRepositoryError},
 };
 use mockable::Clock;
 use std::sync::Arc;
@@ -149,8 +149,6 @@ where
         &self,
         issue_ref: &IssueRef,
     ) -> TaskLifecycleResult<Option<Task>> {
-        let result: TaskRepositoryResult<Option<Task>> =
-            self.repository.find_by_issue_ref(issue_ref).await;
-        Ok(result?)
+        Ok(self.repository.find_by_issue_ref(issue_ref).await?)
     }
 }

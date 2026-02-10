@@ -16,6 +16,7 @@ fn issue_has_title(world: &mut TaskWorld, title: String) -> Result<(), eyre::Rep
         .pending_issue_ref
         .clone()
         .ok_or_else(|| eyre::eyre!("missing pending issue reference in scenario world"))?;
+    world.pending_issue_title = Some(title.clone());
     world.pending_request = Some(CreateTaskFromIssueRequest::new(
         provider,
         repository,

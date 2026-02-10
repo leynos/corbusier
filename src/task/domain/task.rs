@@ -125,19 +125,12 @@ impl Task {
     /// Reconstructs a task from persisted storage.
     #[must_use]
     pub fn from_persisted(data: PersistedTaskData) -> Self {
-        let PersistedTaskData {
-            id,
-            origin,
-            state,
-            created_at,
-            updated_at,
-        } = data;
         Self {
-            id,
-            origin,
-            state,
-            created_at,
-            updated_at,
+            id: data.id,
+            origin: data.origin,
+            state: data.state,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
         }
     }
 

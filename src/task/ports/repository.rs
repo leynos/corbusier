@@ -39,7 +39,7 @@ pub enum TaskRepositoryError {
     DuplicateTask(TaskId),
 
     /// A task for the issue reference already exists.
-    #[error("duplicate issue origin: {0:?}")]
+    #[error("duplicate issue origin: {0}")]
     DuplicateIssueOrigin(IssueRef),
 
     /// The task was not found.
