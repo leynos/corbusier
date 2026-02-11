@@ -62,7 +62,8 @@ unhappy paths.
 ## Risks
 
 - Risk: Existing migrations do not currently create a `tasks` table, while
-  schema and design references for task lifecycle assume one. Severity: high
+  schema and design references for task lifecycle assume one exists. Severity:
+  high
   Likelihood: high
   Mitigation: add a dedicated migration for task lifecycle foundations and
   verify Diesel schema regeneration plus migration ordering.
@@ -350,7 +351,7 @@ Expected implementation touchpoints:
   - `src/message/adapters/schema.rs` (or task schema file if split)
   - `src/message/adapters/models.rs` (or task models file if split)
 - Tests:
-  - `src/task/tests/*.rs` and/or `tests/in_memory/*`
+  - `src/task/tests/*.rs` and `tests/in_memory/*` (as applicable)
   - `tests/postgres/*task*`
   - `tests/features/task_issue_creation.feature`
   - `tests/task_issue_creation_steps.rs` (or folder module)

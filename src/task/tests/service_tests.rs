@@ -21,34 +21,12 @@ fn service() -> TestService {
     )
 }
 
-struct CreateFromIssueTestParams<'a, F>
-where
-    F: FnOnce(&TaskDomainError) -> bool,
-{
-    provider: &'a str,
-    repository: &'a str,
-    issue_number: u64,
-    title: &'a str,
-    error_matcher: F,
-    error_description: &'a str,
-}
-
-async fn assert_create_from_issue_fails_with_domain_error<F>(
+async fn assert_create_from_issue_fails_with_domain_error(
     service: &TestService,
-    params: CreateFromIssueTestParams<'_, F>,
-) where
-    F: FnOnce(&TaskDomainError) -> bool,
-{
-    let CreateFromIssueTestParams {
-        provider,
-        repository,
-        issue_number,
-        title,
-        error_matcher,
-        error_description,
-    } = params;
-
-    let request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
+    request: CreateTaskFromIssueRequest,
+    error_matcher: impl FnOnce(&TaskDomainError) -> bool,
+    error_description: &str,
+) {
     let result = service.create_from_issue(request).await;
 
     match result {
@@ -109,47 +87,28 @@ async fn create_from_issue_rejects_duplicate_issue_reference(service: TestServic
 }
 
 #[rstest]
+#[case(
+    CreateTaskFromIssueRequest::new("unknown-provider", "owner/repo", 10, "Invalid provider"),
+    TaskDomainError::InvalidIssueProvider("unknown-provider".to_owned()),
+    "InvalidIssueProvider domain error"
+)]
+#[case(
+    CreateTaskFromIssueRequest::new("github", "owner-only", 10, "Invalid repository"),
+    TaskDomainError::InvalidRepository("owner-only".to_owned()),
+    "InvalidRepository domain error"
+)]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_from_issue_rejects_invalid_provider(service: TestService) {
+async fn create_from_issue_rejects_invalid_issue_metadata(
+    service: TestService,
+    #[case] request: CreateTaskFromIssueRequest,
+    #[case] expected_error: TaskDomainError,
+    #[case] error_description: &str,
+) {
     assert_create_from_issue_fails_with_domain_error(
         &service,
-        CreateFromIssueTestParams {
-            provider: "unknown-provider",
-            repository: "owner/repo",
-            issue_number: 10,
-            title: "Invalid provider",
-            error_matcher: |error| {
-                matches!(
-                    error,
-                    TaskDomainError::InvalidIssueProvider(provider)
-                        if provider == "unknown-provider"
-                )
-            },
-            error_description: "InvalidIssueProvider domain error",
-        },
-    )
-    .await;
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn create_from_issue_rejects_invalid_repository(service: TestService) {
-    assert_create_from_issue_fails_with_domain_error(
-        &service,
-        CreateFromIssueTestParams {
-            provider: "github",
-            repository: "owner-only",
-            issue_number: 10,
-            title: "Invalid repository",
-            error_matcher: |error| {
-                matches!(
-                    error,
-                    TaskDomainError::InvalidRepository(repository)
-                        if repository == "owner-only"
-                )
-            },
-            error_description: "InvalidRepository domain error",
-        },
+        request,
+        |error| error == &expected_error,
+        error_description,
     )
     .await;
 }
@@ -157,16 +116,13 @@ async fn create_from_issue_rejects_invalid_repository(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_rejects_empty_title(service: TestService) {
+    let request = CreateTaskFromIssueRequest::new("github", "owner/repo", 10, "   ");
+
     assert_create_from_issue_fails_with_domain_error(
         &service,
-        CreateFromIssueTestParams {
-            provider: "github",
-            repository: "owner/repo",
-            issue_number: 10,
-            title: "   ",
-            error_matcher: |error| matches!(error, TaskDomainError::EmptyIssueTitle),
-            error_description: "EmptyIssueTitle domain error",
-        },
+        request,
+        |error| matches!(error, TaskDomainError::EmptyIssueTitle),
+        "EmptyIssueTitle domain error",
     )
     .await;
 }
