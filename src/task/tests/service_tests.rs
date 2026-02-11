@@ -21,6 +21,28 @@ fn service() -> TestService {
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Signature is explicitly required by the refactoring task"
+)]
+async fn assert_create_from_issue_fails_with_domain_error(
+    service: &TestService,
+    provider: &str,
+    repository: &str,
+    issue_number: u64,
+    title: &str,
+    error_matcher: impl FnOnce(&TaskDomainError) -> bool,
+    error_description: &str,
+) {
+    let request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
+    let result = service.create_from_issue(request).await;
+
+    match result {
+        Err(TaskLifecycleError::Domain(ref error)) if error_matcher(error) => {}
+        other => panic!("expected {error_description}, got {other:?}"),
+    }
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_persists_and_is_retrievable(service: TestService) {
@@ -75,52 +97,51 @@ async fn create_from_issue_rejects_duplicate_issue_reference(service: TestServic
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_rejects_invalid_provider(service: TestService) {
-    let request =
-        CreateTaskFromIssueRequest::new("unknown-provider", "owner/repo", 10, "Invalid provider");
-
-    let result = service.create_from_issue(request).await;
-
-    assert!(
-        matches!(
-            result,
-            Err(TaskLifecycleError::Domain(TaskDomainError::InvalidIssueProvider(provider)))
-                if provider == "unknown-provider"
-        ),
-        "expected InvalidIssueProvider domain error"
-    );
+    assert_create_from_issue_fails_with_domain_error(
+        &service,
+        "unknown-provider",
+        "owner/repo",
+        10,
+        "Invalid provider",
+        |error| {
+            matches!(
+                error,
+                TaskDomainError::InvalidIssueProvider(provider) if provider == "unknown-provider"
+            )
+        },
+        "InvalidIssueProvider domain error",
+    )
+    .await;
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_rejects_invalid_repository(service: TestService) {
-    let request = CreateTaskFromIssueRequest::new("github", "owner-only", 10, "Invalid repository");
-
-    let result = service.create_from_issue(request).await;
-
-    assert!(
-        matches!(
-            result,
-            Err(TaskLifecycleError::Domain(TaskDomainError::InvalidRepository(repository)))
-                if repository == "owner-only"
-        ),
-        "expected InvalidRepository domain error"
-    );
+    assert_create_from_issue_fails_with_domain_error(
+        &service,
+        "github",
+        "owner-only",
+        10,
+        "Invalid repository",
+        |error| matches!(error, TaskDomainError::InvalidRepository(repository) if repository == "owner-only"),
+        "InvalidRepository domain error",
+    )
+    .await;
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_rejects_empty_title(service: TestService) {
-    let request = CreateTaskFromIssueRequest::new("github", "owner/repo", 10, "   ");
-
-    let result = service.create_from_issue(request).await;
-
-    assert!(
-        matches!(
-            result,
-            Err(TaskLifecycleError::Domain(TaskDomainError::EmptyIssueTitle))
-        ),
-        "expected EmptyIssueTitle domain error"
-    );
+    assert_create_from_issue_fails_with_domain_error(
+        &service,
+        "github",
+        "owner/repo",
+        10,
+        "   ",
+        |error| matches!(error, TaskDomainError::EmptyIssueTitle),
+        "EmptyIssueTitle domain error",
+    )
+    .await;
 }
 
 #[rstest]

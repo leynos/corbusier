@@ -2,20 +2,13 @@
 
 use super::world::{TaskWorld, run_async};
 use corbusier::task::{
-    domain::TaskOrigin, ports::TaskRepositoryError, services::TaskLifecycleError,
+    domain::{IssueRef, IssueSnapshot, Task, TaskOrigin},
+    ports::TaskRepositoryError,
+    services::TaskLifecycleError,
 };
 use rstest_bdd_macros::then;
 
-#[then("the task is created with draft state and lifecycle timestamps")]
-fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Report> {
-    let create_result = world
-        .last_create_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing create result in scenario world"))?;
-    let task = create_result
-        .as_ref()
-        .map_err(|err| eyre::eyre!("unexpected task creation failure: {err}"))?;
-
+fn assert_lifecycle_data(task: &Task) -> Result<(), eyre::Report> {
     if task.state().as_str() != "draft" {
         return Err(eyre::eyre!(
             "expected draft state, found {}",
@@ -27,20 +20,15 @@ fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Repor
             "expected created_at and updated_at timestamps to match at creation"
         ));
     }
+    Ok(())
+}
 
-    let (expected_provider, expected_repository, expected_issue_number) = world
-        .pending_issue_ref
-        .clone()
-        .ok_or_else(|| eyre::eyre!("missing expected issue reference in scenario world"))?;
-    let expected_title = world
-        .pending_issue_title
-        .clone()
-        .ok_or_else(|| eyre::eyre!("missing expected issue title in scenario world"))?;
-    let TaskOrigin::Issue {
-        issue_ref,
-        metadata,
-        ..
-    } = task.origin();
+fn assert_issue_reference(
+    issue_ref: &IssueRef,
+    expected_provider: &str,
+    expected_repository: &str,
+    expected_issue_number: u64,
+) -> Result<(), eyre::Report> {
     if issue_ref.provider().as_str() != expected_provider {
         return Err(eyre::eyre!(
             "expected issue provider {}, found {}",
@@ -62,6 +50,11 @@ fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Repor
             issue_ref.issue_number().value()
         ));
     }
+
+    Ok(())
+}
+
+fn assert_issue_title(metadata: &IssueSnapshot, expected_title: &str) -> Result<(), eyre::Report> {
     if metadata.title != expected_title {
         return Err(eyre::eyre!(
             "expected issue title {}, found {}",
@@ -69,6 +62,42 @@ fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Repor
             metadata.title
         ));
     }
+
+    Ok(())
+}
+
+#[then("the task is created with draft state and lifecycle timestamps")]
+fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Report> {
+    let create_result = world
+        .last_create_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("missing create result in scenario world"))?;
+    let task = create_result
+        .as_ref()
+        .map_err(|err| eyre::eyre!("unexpected task creation failure: {err}"))?;
+
+    assert_lifecycle_data(task)?;
+
+    let (expected_provider, expected_repository, expected_issue_number) = world
+        .pending_issue_ref
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing expected issue reference in scenario world"))?;
+    let expected_title = world
+        .pending_issue_title
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing expected issue title in scenario world"))?;
+    let TaskOrigin::Issue {
+        issue_ref,
+        metadata,
+        ..
+    } = task.origin();
+    assert_issue_reference(
+        issue_ref,
+        &expected_provider,
+        &expected_repository,
+        expected_issue_number,
+    )?;
+    assert_issue_title(metadata, &expected_title)?;
 
     Ok(())
 }
