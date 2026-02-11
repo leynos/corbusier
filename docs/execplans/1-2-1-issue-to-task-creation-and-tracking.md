@@ -126,7 +126,7 @@ unhappy paths.
 ## Outcomes & Retrospective
 
 Initial planning outcome: requirements and architecture constraints are now
-captured in an executable implementation sequence. Final outcomes, deviations,
+captured in an executable implementation sequence. Outcomes, deviations,
 and lessons learned will be filled in after execution.
 
 ## Context and orientation

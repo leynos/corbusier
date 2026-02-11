@@ -244,6 +244,12 @@ impl IssueSnapshot {
             milestone: metadata.milestone,
         }
     }
+
+    /// Returns the persisted issue title.
+    #[must_use]
+    pub fn title(&self) -> &str {
+        &self.title
+    }
 }
 
 /// External issue payload used to create a task.

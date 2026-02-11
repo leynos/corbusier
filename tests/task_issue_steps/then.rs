@@ -2,14 +2,14 @@
 
 use super::world::{TaskWorld, run_async};
 use corbusier::task::{
-    domain::{IssueRef, IssueSnapshot, Task, TaskOrigin},
+    domain::{IssueRef, IssueSnapshot, Task, TaskOrigin, TaskState},
     ports::TaskRepositoryError,
     services::TaskLifecycleError,
 };
 use rstest_bdd_macros::then;
 
 fn assert_lifecycle_data(task: &Task) -> Result<(), eyre::Report> {
-    if task.state().as_str() != "draft" {
+    if task.state() != TaskState::Draft {
         return Err(eyre::eyre!(
             "expected draft state, found {}",
             task.state().as_str()
@@ -55,11 +55,11 @@ fn assert_issue_reference(
 }
 
 fn assert_issue_title(metadata: &IssueSnapshot, expected_title: &str) -> Result<(), eyre::Report> {
-    if metadata.title != expected_title {
+    if metadata.title() != expected_title {
         return Err(eyre::eyre!(
             "expected issue title {}, found {}",
             expected_title,
-            metadata.title
+            metadata.title()
         ));
     }
 
@@ -108,8 +108,18 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         .pending_lookup
         .clone()
         .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
-    let found = run_async(world.service.find_by_issue_ref(&issue_ref))
-        .map_err(|err| eyre::eyre!("lookup failed: {err}"))?;
+    let lookup_result = run_async(world.service.find_by_issue_ref(&issue_ref));
+    let found = match lookup_result {
+        Ok(found) => {
+            world.last_lookup_result = Some(Ok(found.clone()));
+            found
+        }
+        Err(err) => {
+            let message = format!("lookup failed: {err}");
+            world.last_lookup_result = Some(Err(err));
+            return Err(eyre::eyre!(message));
+        }
+    };
 
     if found.is_none() {
         return Err(eyre::eyre!(

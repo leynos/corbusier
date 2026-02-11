@@ -21,19 +21,33 @@ fn service() -> TestService {
     )
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Signature is explicitly required by the refactoring task"
-)]
-async fn assert_create_from_issue_fails_with_domain_error(
-    service: &TestService,
-    provider: &str,
-    repository: &str,
+struct CreateFromIssueTestParams<'a, F>
+where
+    F: FnOnce(&TaskDomainError) -> bool,
+{
+    provider: &'a str,
+    repository: &'a str,
     issue_number: u64,
-    title: &str,
-    error_matcher: impl FnOnce(&TaskDomainError) -> bool,
-    error_description: &str,
-) {
+    title: &'a str,
+    error_matcher: F,
+    error_description: &'a str,
+}
+
+async fn assert_create_from_issue_fails_with_domain_error<F>(
+    service: &TestService,
+    params: CreateFromIssueTestParams<'_, F>,
+) where
+    F: FnOnce(&TaskDomainError) -> bool,
+{
+    let CreateFromIssueTestParams {
+        provider,
+        repository,
+        issue_number,
+        title,
+        error_matcher,
+        error_description,
+    } = params;
+
     let request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
     let result = service.create_from_issue(request).await;
 
@@ -99,17 +113,20 @@ async fn create_from_issue_rejects_duplicate_issue_reference(service: TestServic
 async fn create_from_issue_rejects_invalid_provider(service: TestService) {
     assert_create_from_issue_fails_with_domain_error(
         &service,
-        "unknown-provider",
-        "owner/repo",
-        10,
-        "Invalid provider",
-        |error| {
-            matches!(
-                error,
-                TaskDomainError::InvalidIssueProvider(provider) if provider == "unknown-provider"
-            )
+        CreateFromIssueTestParams {
+            provider: "unknown-provider",
+            repository: "owner/repo",
+            issue_number: 10,
+            title: "Invalid provider",
+            error_matcher: |error| {
+                matches!(
+                    error,
+                    TaskDomainError::InvalidIssueProvider(provider)
+                        if provider == "unknown-provider"
+                )
+            },
+            error_description: "InvalidIssueProvider domain error",
         },
-        "InvalidIssueProvider domain error",
     )
     .await;
 }
@@ -119,12 +136,20 @@ async fn create_from_issue_rejects_invalid_provider(service: TestService) {
 async fn create_from_issue_rejects_invalid_repository(service: TestService) {
     assert_create_from_issue_fails_with_domain_error(
         &service,
-        "github",
-        "owner-only",
-        10,
-        "Invalid repository",
-        |error| matches!(error, TaskDomainError::InvalidRepository(repository) if repository == "owner-only"),
-        "InvalidRepository domain error",
+        CreateFromIssueTestParams {
+            provider: "github",
+            repository: "owner-only",
+            issue_number: 10,
+            title: "Invalid repository",
+            error_matcher: |error| {
+                matches!(
+                    error,
+                    TaskDomainError::InvalidRepository(repository)
+                        if repository == "owner-only"
+                )
+            },
+            error_description: "InvalidRepository domain error",
+        },
     )
     .await;
 }
@@ -134,12 +159,14 @@ async fn create_from_issue_rejects_invalid_repository(service: TestService) {
 async fn create_from_issue_rejects_empty_title(service: TestService) {
     assert_create_from_issue_fails_with_domain_error(
         &service,
-        "github",
-        "owner/repo",
-        10,
-        "   ",
-        |error| matches!(error, TaskDomainError::EmptyIssueTitle),
-        "EmptyIssueTitle domain error",
+        CreateFromIssueTestParams {
+            provider: "github",
+            repository: "owner/repo",
+            issue_number: 10,
+            title: "   ",
+            error_matcher: |error| matches!(error, TaskDomainError::EmptyIssueTitle),
+            error_description: "EmptyIssueTitle domain error",
+        },
     )
     .await;
 }
