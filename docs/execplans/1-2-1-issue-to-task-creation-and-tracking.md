@@ -78,8 +78,8 @@ unhappy paths.
   Mitigation: keep `Then` assertions focused on task creation/retrieval
   outcomes and error surfaces.
 
-- Risk: Version upgrade friction moving `rstest-bdd` and
-  `pg-embed-setup-unpriv` to v0.5.0. Severity: medium Likelihood: medium
+- Risk: Version upgrade friction when moving `rstest-bdd` and
+  `pg-embed-setup-unpriv` to v0.5.0. Severity: medium. Likelihood: medium.
   Mitigation: update dependency versions first and confirm compile/test
   baseline before feature logic.
 
@@ -290,7 +290,7 @@ All commands run from repository root: `/home/user/project`.
 Behavioural acceptance criteria:
 
 - Creating a task from valid external issue metadata succeeds and returns a
-  task that includes all of the following:
+  task that includes all the following:
   - generated internal task ID,
   - initial lifecycle state,
   - populated created/updated timestamps.
