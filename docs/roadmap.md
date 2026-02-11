@@ -34,13 +34,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.2. Task lifecycle management
 
-- [ ] 1.2.1 Implement issue-to-task creation and tracking. See
+- [x] 1.2.1 Implement issue-to-task creation and tracking. See
   corbusier-design.md §2.2.2.
-  - [ ] Map external issue metadata into internal task records. See
+  - [x] Map external issue metadata into internal task records. See
     corbusier-design.md §2.2.2.
-  - [ ] Generate task identifiers and lifecycle timestamps. See
+  - [x] Generate task identifiers and lifecycle timestamps. See
     corbusier-design.md §4.3.1.2.
-  - [ ] Success criteria: tasks can be created from issues and retrieved by
+  - [x] Success criteria: tasks can be created from issues and retrieved by
     external issue reference.
 - [ ] 1.2.2 Associate branches and pull requests with tasks. Requires 1.2.1. See
   corbusier-design.md §2.2.2.
