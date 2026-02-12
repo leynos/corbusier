@@ -79,6 +79,28 @@ async fn assert_create_from_issue_fails_with_domain_error(
     }
 }
 
+/// Helper to test that duplicate associations are rejected.
+async fn assert_duplicate_association_rejected<F1, F2, Fut1, Fut2, E>(
+    task_id: TaskId,
+    first_association: F1,
+    duplicate_association: F2,
+    assert_error: E,
+) where
+    F1: FnOnce(TaskId) -> Fut1,
+    F2: FnOnce(TaskId) -> Fut2,
+    Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
+    Fut2: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
+    E: FnOnce(Result<Task, TaskLifecycleError>),
+{
+    first_association(task_id)
+        .await
+        .expect("first association should succeed");
+
+    let result = duplicate_association(task_id).await;
+
+    assert_error(result);
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_persists_and_is_retrievable(service: TestService) {
@@ -216,26 +238,28 @@ async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
     let task = create_test_task(&service, 501, "Task")
         .await
         .expect("task creation should succeed");
-    service
-        .associate_branch(AssociateBranchRequest::new(
-            task.id(),
-            "github",
-            "owner/repo",
-            "branch-1",
-        ))
-        .await
-        .expect("first branch association should succeed");
 
-    let result = service
-        .associate_branch(AssociateBranchRequest::new(
-            task.id(),
-            "github",
-            "owner/repo",
-            "branch-2",
-        ))
-        .await;
-
-    assert_branch_already_associated_error(result);
+    assert_duplicate_association_rejected(
+        task.id(),
+        |task_id| {
+            service.associate_branch(AssociateBranchRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                "branch-1",
+            ))
+        },
+        |task_id| {
+            service.associate_branch(AssociateBranchRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                "branch-2",
+            ))
+        },
+        assert_branch_already_associated_error,
+    )
+    .await;
 }
 
 #[rstest]
@@ -305,26 +329,28 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(service: TestServ
     let task = create_test_task(&service, 601, "Task")
         .await
         .expect("task creation should succeed");
-    service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task.id(),
-            "github",
-            "owner/repo",
-            10,
-        ))
-        .await
-        .expect("first PR association should succeed");
 
-    let result = service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task.id(),
-            "github",
-            "owner/repo",
-            20,
-        ))
-        .await;
-
-    assert_pr_already_associated_error(result);
+    assert_duplicate_association_rejected(
+        task.id(),
+        |task_id| {
+            service.associate_pull_request(AssociatePullRequestRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                10,
+            ))
+        },
+        |task_id| {
+            service.associate_pull_request(AssociatePullRequestRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                20,
+            ))
+        },
+        assert_pr_already_associated_error,
+    )
+    .await;
 }
 
 #[rstest]

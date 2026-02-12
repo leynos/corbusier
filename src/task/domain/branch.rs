@@ -37,15 +37,20 @@ impl BranchName {
         let raw = value.into();
         let normalized = raw.trim();
 
-        let is_empty = normalized.is_empty();
-        let contains_forbidden_char = normalized.contains(':');
-        let exceeds_length_limit = normalized.len() > MAX_BRANCH_NAME_LENGTH;
-
-        if is_empty || contains_forbidden_char || exceeds_length_limit {
+        if Self::is_invalid_branch_name(normalized) {
             return Err(TaskDomainError::InvalidBranchName(raw));
         }
 
         Ok(Self(normalized.to_owned()))
+    }
+
+    /// Validates branch name constraints.
+    fn is_invalid_branch_name(name: &str) -> bool {
+        let is_empty = name.is_empty();
+        let contains_forbidden_char = name.contains(':');
+        let exceeds_length_limit = name.len() > MAX_BRANCH_NAME_LENGTH;
+
+        is_empty || contains_forbidden_char || exceeds_length_limit
     }
 
     /// Returns the branch name as a string slice.
