@@ -37,10 +37,11 @@ impl BranchName {
         let raw = value.into();
         let normalized = raw.trim();
 
-        if normalized.is_empty()
-            || normalized.contains(':')
-            || normalized.len() > MAX_BRANCH_NAME_LENGTH
-        {
+        let is_empty = normalized.is_empty();
+        let contains_forbidden_char = normalized.contains(':');
+        let exceeds_length_limit = normalized.len() > MAX_BRANCH_NAME_LENGTH;
+
+        if is_empty || contains_forbidden_char || exceeds_length_limit {
             return Err(TaskDomainError::InvalidBranchName(raw));
         }
 

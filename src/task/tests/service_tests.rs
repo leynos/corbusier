@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::task::{
     adapters::memory::InMemoryTaskRepository,
-    domain::{BranchRef, IssueRef, PullRequestRef, TaskDomainError, TaskState},
+    domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskDomainError, TaskId, TaskState},
     ports::TaskRepositoryError,
     services::{
         AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
@@ -22,6 +22,47 @@ fn service() -> TestService {
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
     )
+}
+
+async fn create_test_task(
+    service: &TestService,
+    issue_number: u32,
+    title: &str,
+) -> Result<Task, TaskLifecycleError> {
+    let request =
+        CreateTaskFromIssueRequest::new("github", "owner/repo", u64::from(issue_number), title);
+    service.create_from_issue(request).await
+}
+
+fn assert_not_found_error<T: std::fmt::Debug>(result: Result<T, TaskLifecycleError>) {
+    match result {
+        Err(TaskLifecycleError::Repository(TaskRepositoryError::NotFound(_))) => {}
+        other => panic!("expected NotFound repository error, got {other:?}"),
+    }
+}
+
+fn assert_branch_already_associated_error<T: std::fmt::Debug>(
+    result: Result<T, TaskLifecycleError>,
+) {
+    match result {
+        Err(TaskLifecycleError::Domain(TaskDomainError::BranchAlreadyAssociated(_))) => {}
+        other => panic!("expected BranchAlreadyAssociated domain error, got {other:?}"),
+    }
+}
+
+fn assert_pr_already_associated_error<T: std::fmt::Debug>(result: Result<T, TaskLifecycleError>) {
+    match result {
+        Err(TaskLifecycleError::Domain(TaskDomainError::PullRequestAlreadyAssociated(_))) => {}
+        other => panic!("expected PullRequestAlreadyAssociated domain error, got {other:?}"),
+    }
+}
+
+fn assert_single_task_found(found: &[Task], expected_id: TaskId) {
+    assert_eq!(found.len(), 1);
+    match found.first() {
+        Some(task) => assert_eq!(task.id(), expected_id),
+        None => panic!("expected at least one task"),
+    }
 }
 
 async fn assert_create_from_issue_fails_with_domain_error(
@@ -147,13 +188,7 @@ async fn find_by_issue_ref_returns_none_when_missing(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_branch_persists_and_is_retrievable(service: TestService) {
-    let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            500,
-            "Task for branch test",
-        ))
+    let task = create_test_task(&service, 500, "Task for branch test")
         .await
         .expect("task creation should succeed");
     let request =
@@ -172,20 +207,13 @@ async fn associate_branch_persists_and_is_retrievable(service: TestService) {
         .find_by_branch_ref(&branch_ref)
         .await
         .expect("lookup should succeed");
-    assert_eq!(found.len(), 1);
-    assert_eq!(found.first().expect("at least one task").id(), task.id());
+    assert_single_task_found(&found, task.id());
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
-    let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            501,
-            "Task",
-        ))
+    let task = create_test_task(&service, 501, "Task")
         .await
         .expect("task creation should succeed");
     service
@@ -207,28 +235,18 @@ async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
         ))
         .await;
 
-    assert!(matches!(
-        result,
-        Err(TaskLifecycleError::Domain(
-            TaskDomainError::BranchAlreadyAssociated(_)
-        ))
-    ));
+    assert_branch_already_associated_error(result);
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_branch_returns_not_found_for_unknown_task(service: TestService) {
-    let unknown_id = crate::task::domain::TaskId::new();
+    let unknown_id = TaskId::new();
     let request = AssociateBranchRequest::new(unknown_id, "github", "owner/repo", "main");
 
     let result = service.associate_branch(request).await;
 
-    assert!(matches!(
-        result,
-        Err(TaskLifecycleError::Repository(
-            TaskRepositoryError::NotFound(_)
-        ))
-    ));
+    assert_not_found_error(result);
 }
 
 #[rstest]
@@ -260,13 +278,7 @@ async fn associate_branch_rejects_invalid_branch_name(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_pull_request_persists_and_transitions_to_in_review(service: TestService) {
-    let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            600,
-            "Task",
-        ))
+    let task = create_test_task(&service, 600, "Task")
         .await
         .expect("task creation should succeed");
     let request = AssociatePullRequestRequest::new(task.id(), "github", "owner/repo", 42);
@@ -284,20 +296,13 @@ async fn associate_pull_request_persists_and_transitions_to_in_review(service: T
         .find_by_pull_request_ref(&pr_ref)
         .await
         .expect("lookup should succeed");
-    assert_eq!(found.len(), 1);
-    assert_eq!(found.first().expect("at least one task").id(), task.id());
+    assert_single_task_found(&found, task.id());
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_pull_request_rejects_duplicate_on_same_task(service: TestService) {
-    let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            601,
-            "Task",
-        ))
+    let task = create_test_task(&service, 601, "Task")
         .await
         .expect("task creation should succeed");
     service
@@ -319,28 +324,18 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(service: TestServ
         ))
         .await;
 
-    assert!(matches!(
-        result,
-        Err(TaskLifecycleError::Domain(
-            TaskDomainError::PullRequestAlreadyAssociated(_)
-        ))
-    ));
+    assert_pr_already_associated_error(result);
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_pull_request_returns_not_found_for_unknown_task(service: TestService) {
-    let unknown_id = crate::task::domain::TaskId::new();
+    let unknown_id = TaskId::new();
     let request = AssociatePullRequestRequest::new(unknown_id, "github", "owner/repo", 1);
 
     let result = service.associate_pull_request(request).await;
 
-    assert!(matches!(
-        result,
-        Err(TaskLifecycleError::Repository(
-            TaskRepositoryError::NotFound(_)
-        ))
-    ));
+    assert_not_found_error(result);
 }
 
 // ── Many-to-many branch sharing ─────────────────────────────────────
@@ -348,22 +343,10 @@ async fn associate_pull_request_returns_not_found_for_unknown_task(service: Test
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
-    let task1 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            700,
-            "Task 1",
-        ))
+    let task1 = create_test_task(&service, 700, "Task 1")
         .await
         .expect("first task creation should succeed");
-    let task2 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            701,
-            "Task 2",
-        ))
+    let task2 = create_test_task(&service, 701, "Task 2")
         .await
         .expect("second task creation should succeed");
 
@@ -395,7 +378,7 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
         .expect("lookup should succeed");
 
     assert_eq!(found.len(), 2);
-    let ids: Vec<_> = found.iter().map(crate::task::domain::Task::id).collect();
+    let ids: Vec<_> = found.iter().map(Task::id).collect();
     assert!(ids.contains(&task1.id()));
     assert!(ids.contains(&task2.id()));
 }

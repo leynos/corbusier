@@ -183,6 +183,13 @@ where
         Self { repository, clock }
     }
 
+    async fn find_task_by_id_or_error(&self, task_id: TaskId) -> TaskLifecycleResult<Task> {
+        self.repository
+            .find_by_id(task_id)
+            .await?
+            .ok_or_else(|| TaskRepositoryError::NotFound(task_id).into())
+    }
+
     /// Creates a new task from external issue metadata.
     ///
     /// # Errors
@@ -250,13 +257,7 @@ where
         } = request;
 
         let branch_ref = BranchRef::from_parts(&provider, &repository, &branch_name)?;
-
-        let mut task = self
-            .repository
-            .find_by_id(task_id)
-            .await?
-            .ok_or(TaskRepositoryError::NotFound(task_id))?;
-
+        let mut task = self.find_task_by_id_or_error(task_id).await?;
         task.associate_branch(branch_ref, &*self.clock)?;
         self.repository.update(&task).await?;
         Ok(task)
@@ -282,13 +283,7 @@ where
         } = request;
 
         let pr_ref = PullRequestRef::from_parts(&provider, &repository, pull_request_number)?;
-
-        let mut task = self
-            .repository
-            .find_by_id(task_id)
-            .await?
-            .ok_or(TaskRepositoryError::NotFound(task_id))?;
-
+        let mut task = self.find_task_by_id_or_error(task_id).await?;
         task.associate_pull_request(pr_ref, &*self.clock)?;
         self.repository.update(&task).await?;
         Ok(task)

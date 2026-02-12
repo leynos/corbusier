@@ -47,6 +47,24 @@ impl PostgresTaskRepository {
     }
 }
 
+/// Generates a `find_by_*_ref` body that filters `tasks` by a nullable
+/// `VARCHAR` column and maps the resulting rows to domain `Task` values.
+macro_rules! find_tasks_by_ref_column {
+    ($self:expr, $ref_str:expr, $column:expr) => {{
+        let value = $ref_str;
+        $self
+            .run_blocking(move |connection| {
+                let rows = tasks::table
+                    .filter($column.eq(&value))
+                    .select(TaskRow::as_select())
+                    .load::<TaskRow>(connection)
+                    .map_err(TaskRepositoryError::persistence)?;
+                rows.into_iter().map(row_to_task).collect()
+            })
+            .await
+    }};
+}
+
 #[async_trait]
 impl TaskRepository for PostgresTaskRepository {
     async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
@@ -131,32 +149,16 @@ impl TaskRepository for PostgresTaskRepository {
     }
 
     async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>> {
-        let branch_str = branch_ref.to_string();
-        self.run_blocking(move |connection| {
-            let rows = tasks::table
-                .filter(tasks::branch_ref.eq(&branch_str))
-                .select(TaskRow::as_select())
-                .load::<TaskRow>(connection)
-                .map_err(TaskRepositoryError::persistence)?;
-            rows.into_iter().map(row_to_task).collect()
-        })
-        .await
+        let ref_str = branch_ref.to_string();
+        find_tasks_by_ref_column!(self, ref_str, tasks::branch_ref)
     }
 
     async fn find_by_pull_request_ref(
         &self,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
-        let pr_str = pr_ref.to_string();
-        self.run_blocking(move |connection| {
-            let rows = tasks::table
-                .filter(tasks::pull_request_ref.eq(&pr_str))
-                .select(TaskRow::as_select())
-                .load::<TaskRow>(connection)
-                .map_err(TaskRepositoryError::persistence)?;
-            rows.into_iter().map(row_to_task).collect()
-        })
-        .await
+        let ref_str = pr_ref.to_string();
+        find_tasks_by_ref_column!(self, ref_str, tasks::pull_request_ref)
     }
 }
 

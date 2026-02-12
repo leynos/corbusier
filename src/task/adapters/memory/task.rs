@@ -67,6 +67,22 @@ fn remove_pr_index(state: &mut InMemoryTaskState, task_id: TaskId, key: &str) {
     }
 }
 
+/// Helper to look up tasks by index key.
+fn find_by_index(
+    state: &InMemoryTaskState,
+    index: &HashMap<String, Vec<TaskId>>,
+    key: &str,
+) -> Vec<Task> {
+    index
+        .get(key)
+        .map(|ids| {
+            ids.iter()
+                .filter_map(|id| state.tasks.get(id).cloned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[async_trait]
 impl TaskRepository for InMemoryTaskRepository {
     async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
@@ -138,16 +154,7 @@ impl TaskRepository for InMemoryTaskRepository {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
         let key = branch_ref.to_string();
-        let tasks = state
-            .branch_index
-            .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| state.tasks.get(id).cloned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(tasks)
+        Ok(find_by_index(&state, &state.branch_index, &key))
     }
 
     async fn find_by_pull_request_ref(
@@ -158,15 +165,6 @@ impl TaskRepository for InMemoryTaskRepository {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
         let key = pr_ref.to_string();
-        let tasks = state
-            .pull_request_index
-            .get(&key)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| state.tasks.get(id).cloned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(tasks)
+        Ok(find_by_index(&state, &state.pull_request_index, &key))
     }
 }

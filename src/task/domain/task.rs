@@ -200,12 +200,7 @@ impl Task {
         branch_ref: BranchRef,
         clock: &impl Clock,
     ) -> Result<(), TaskDomainError> {
-        if self.branch_ref.is_some() {
-            return Err(TaskDomainError::BranchAlreadyAssociated(self.id));
-        }
-        self.branch_ref = Some(branch_ref);
-        self.updated_at = clock.utc();
-        Ok(())
+        self.associate_ref(branch_ref, clock)
     }
 
     /// Associates a pull request with this task.
@@ -223,12 +218,54 @@ impl Task {
         pr_ref: PullRequestRef,
         clock: &impl Clock,
     ) -> Result<(), TaskDomainError> {
-        if self.pull_request_ref.is_some() {
-            return Err(TaskDomainError::PullRequestAlreadyAssociated(self.id));
+        self.associate_ref(pr_ref, clock)
+    }
+
+    fn associate_ref<T: AssociationRef>(
+        &mut self,
+        value: T,
+        clock: &impl Clock,
+    ) -> Result<(), TaskDomainError> {
+        if value.is_already_set(self) {
+            return Err(T::already_associated_error(self.id));
         }
-        self.pull_request_ref = Some(pr_ref);
-        self.state = TaskState::InReview;
+        value.apply(self);
         self.updated_at = clock.utc();
         Ok(())
+    }
+}
+
+trait AssociationRef {
+    fn is_already_set(&self, task: &Task) -> bool;
+    fn apply(self, task: &mut Task);
+    fn already_associated_error(task_id: TaskId) -> TaskDomainError;
+}
+
+impl AssociationRef for BranchRef {
+    fn is_already_set(&self, task: &Task) -> bool {
+        task.branch_ref.is_some()
+    }
+
+    fn apply(self, task: &mut Task) {
+        task.branch_ref = Some(self);
+    }
+
+    fn already_associated_error(task_id: TaskId) -> TaskDomainError {
+        TaskDomainError::BranchAlreadyAssociated(task_id)
+    }
+}
+
+impl AssociationRef for PullRequestRef {
+    fn is_already_set(&self, task: &Task) -> bool {
+        task.pull_request_ref.is_some()
+    }
+
+    fn apply(self, task: &mut Task) {
+        task.pull_request_ref = Some(self);
+        task.state = TaskState::InReview;
+    }
+
+    fn already_associated_error(task_id: TaskId) -> TaskDomainError {
+        TaskDomainError::PullRequestAlreadyAssociated(task_id)
     }
 }
