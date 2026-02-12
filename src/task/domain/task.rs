@@ -1,6 +1,9 @@
 //! Task aggregate root and related task lifecycle types.
 
-use super::{ExternalIssue, IssueRef, IssueSnapshot, ParseTaskStateError, TaskId};
+use super::{
+    BranchRef, ExternalIssue, IssueRef, IssueSnapshot, ParseTaskStateError, PullRequestRef,
+    TaskDomainError, TaskId,
+};
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
@@ -83,6 +86,8 @@ impl TaskOrigin {
 pub struct Task {
     id: TaskId,
     origin: TaskOrigin,
+    branch_ref: Option<BranchRef>,
+    pull_request_ref: Option<PullRequestRef>,
     state: TaskState,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -95,6 +100,10 @@ pub struct PersistedTaskData {
     pub id: TaskId,
     /// Persisted origin metadata.
     pub origin: TaskOrigin,
+    /// Persisted branch reference, if any.
+    pub branch_ref: Option<BranchRef>,
+    /// Persisted pull request reference, if any.
+    pub pull_request_ref: Option<PullRequestRef>,
     /// Persisted lifecycle state.
     pub state: TaskState,
     /// Persisted creation timestamp.
@@ -116,6 +125,8 @@ impl Task {
         Self {
             id: TaskId::new(),
             origin,
+            branch_ref: None,
+            pull_request_ref: None,
             state: TaskState::Draft,
             created_at: timestamp,
             updated_at: timestamp,
@@ -128,6 +139,8 @@ impl Task {
         Self {
             id: data.id,
             origin: data.origin,
+            branch_ref: data.branch_ref,
+            pull_request_ref: data.pull_request_ref,
             state: data.state,
             created_at: data.created_at,
             updated_at: data.updated_at,
@@ -146,6 +159,18 @@ impl Task {
         &self.origin
     }
 
+    /// Returns the associated branch reference, if any.
+    #[must_use]
+    pub const fn branch_ref(&self) -> Option<&BranchRef> {
+        self.branch_ref.as_ref()
+    }
+
+    /// Returns the associated pull request reference, if any.
+    #[must_use]
+    pub const fn pull_request_ref(&self) -> Option<&PullRequestRef> {
+        self.pull_request_ref.as_ref()
+    }
+
     /// Returns the task lifecycle state.
     #[must_use]
     pub const fn state(&self) -> TaskState {
@@ -162,5 +187,48 @@ impl Task {
     #[must_use]
     pub const fn updated_at(&self) -> DateTime<Utc> {
         self.updated_at
+    }
+
+    /// Associates a branch with this task.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskDomainError::BranchAlreadyAssociated`] if a branch is
+    /// already set.
+    pub fn associate_branch(
+        &mut self,
+        branch_ref: BranchRef,
+        clock: &impl Clock,
+    ) -> Result<(), TaskDomainError> {
+        if self.branch_ref.is_some() {
+            return Err(TaskDomainError::BranchAlreadyAssociated(self.id));
+        }
+        self.branch_ref = Some(branch_ref);
+        self.updated_at = clock.utc();
+        Ok(())
+    }
+
+    /// Associates a pull request with this task.
+    ///
+    /// Transitions the task state to [`TaskState::InReview`] as a side
+    /// effect. State transition validation (guard logic) is deferred to
+    /// roadmap item 1.2.3.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskDomainError::PullRequestAlreadyAssociated`] if a pull
+    /// request is already set.
+    pub fn associate_pull_request(
+        &mut self,
+        pr_ref: PullRequestRef,
+        clock: &impl Clock,
+    ) -> Result<(), TaskDomainError> {
+        if self.pull_request_ref.is_some() {
+            return Err(TaskDomainError::PullRequestAlreadyAssociated(self.id));
+        }
+        self.pull_request_ref = Some(pr_ref);
+        self.state = TaskState::InReview;
+        self.updated_at = clock.utc();
+        Ok(())
     }
 }

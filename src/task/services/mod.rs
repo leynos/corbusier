@@ -2,4 +2,7 @@
 
 mod lifecycle;
 
-pub use lifecycle::{CreateTaskFromIssueRequest, TaskLifecycleError, TaskLifecycleService};
+pub use lifecycle::{
+    AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
+    TaskLifecycleError, TaskLifecycleService,
+};

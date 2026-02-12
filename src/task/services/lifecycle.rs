@@ -1,7 +1,13 @@
-//! Service layer for issue-to-task creation and retrieval.
+//! Service layer for task lifecycle orchestration.
+//!
+//! Provides [`TaskLifecycleService`] which coordinates issue-to-task creation,
+//! branch and pull request association, and lookup operations.
 
 use crate::task::{
-    domain::{ExternalIssue, ExternalIssueMetadata, IssueRef, Task, TaskDomainError},
+    domain::{
+        BranchRef, ExternalIssue, ExternalIssueMetadata, IssueRef, PullRequestRef, Task,
+        TaskDomainError, TaskId,
+    },
     ports::{TaskRepository, TaskRepositoryError},
 };
 use mockable::Clock;
@@ -68,6 +74,60 @@ impl CreateTaskFromIssueRequest {
     pub fn with_milestone(mut self, milestone: impl Into<String>) -> Self {
         self.milestone = Some(milestone.into());
         self
+    }
+}
+
+/// Request payload for associating a branch with an existing task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssociateBranchRequest {
+    task_id: TaskId,
+    provider: String,
+    repository: String,
+    branch_name: String,
+}
+
+impl AssociateBranchRequest {
+    /// Creates a branch association request.
+    #[must_use]
+    pub fn new(
+        task_id: TaskId,
+        provider: impl Into<String>,
+        repository: impl Into<String>,
+        branch_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            task_id,
+            provider: provider.into(),
+            repository: repository.into(),
+            branch_name: branch_name.into(),
+        }
+    }
+}
+
+/// Request payload for associating a pull request with an existing task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssociatePullRequestRequest {
+    task_id: TaskId,
+    provider: String,
+    repository: String,
+    pull_request_number: u64,
+}
+
+impl AssociatePullRequestRequest {
+    /// Creates a pull request association request.
+    #[must_use]
+    pub fn new(
+        task_id: TaskId,
+        provider: impl Into<String>,
+        repository: impl Into<String>,
+        pull_request_number: u64,
+    ) -> Self {
+        Self {
+            task_id,
+            provider: provider.into(),
+            repository: repository.into(),
+            pull_request_number,
+        }
     }
 }
 
@@ -169,5 +229,98 @@ where
         issue_ref: &IssueRef,
     ) -> TaskLifecycleResult<Option<Task>> {
         Ok(self.repository.find_by_issue_ref(issue_ref).await?)
+    }
+
+    /// Associates a branch with an existing task.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::Domain`] when input validation or the
+    /// association invariant fails, or [`TaskLifecycleError::Repository`]
+    /// when the task is not found or persistence fails.
+    pub async fn associate_branch(
+        &self,
+        request: AssociateBranchRequest,
+    ) -> TaskLifecycleResult<Task> {
+        let AssociateBranchRequest {
+            task_id,
+            provider,
+            repository,
+            branch_name,
+        } = request;
+
+        let branch_ref = BranchRef::from_parts(&provider, &repository, &branch_name)?;
+
+        let mut task = self
+            .repository
+            .find_by_id(task_id)
+            .await?
+            .ok_or(TaskRepositoryError::NotFound(task_id))?;
+
+        task.associate_branch(branch_ref, &*self.clock)?;
+        self.repository.update(&task).await?;
+        Ok(task)
+    }
+
+    /// Associates a pull request with an existing task and transitions the
+    /// task state to `InReview`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::Domain`] when input validation or the
+    /// association invariant fails, or [`TaskLifecycleError::Repository`]
+    /// when the task is not found or persistence fails.
+    pub async fn associate_pull_request(
+        &self,
+        request: AssociatePullRequestRequest,
+    ) -> TaskLifecycleResult<Task> {
+        let AssociatePullRequestRequest {
+            task_id,
+            provider,
+            repository,
+            pull_request_number,
+        } = request;
+
+        let pr_ref = PullRequestRef::from_parts(&provider, &repository, pull_request_number)?;
+
+        let mut task = self
+            .repository
+            .find_by_id(task_id)
+            .await?
+            .ok_or(TaskRepositoryError::NotFound(task_id))?;
+
+        task.associate_pull_request(pr_ref, &*self.clock)?;
+        self.repository.update(&task).await?;
+        Ok(task)
+    }
+
+    /// Retrieves all tasks linked to a branch reference.
+    ///
+    /// Multiple tasks may share a branch (many-to-many relationship).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::Repository`] when persistence lookup
+    /// fails.
+    pub async fn find_by_branch_ref(
+        &self,
+        branch_ref: &BranchRef,
+    ) -> TaskLifecycleResult<Vec<Task>> {
+        Ok(self.repository.find_by_branch_ref(branch_ref).await?)
+    }
+
+    /// Retrieves all tasks linked to a pull request reference.
+    ///
+    /// Multiple tasks may share a pull request (many-to-many relationship).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::Repository`] when persistence lookup
+    /// fails.
+    pub async fn find_by_pull_request_ref(
+        &self,
+        pr_ref: &PullRequestRef,
+    ) -> TaskLifecycleResult<Vec<Task>> {
+        Ok(self.repository.find_by_pull_request_ref(pr_ref).await?)
     }
 }

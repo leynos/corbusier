@@ -98,3 +98,77 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Branch and pull request association
+
+Once a task has been created from an issue, a branch reference can be
+associated with it. Multiple tasks may share the same branch. Each individual
+task has at most one active branch and at most one open pull request.
+
+Associating a pull request with a task automatically transitions the task state
+to `in_review`.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::task::{
+    adapters::memory::InMemoryTaskRepository,
+    domain::{BranchRef, PullRequestRef, TaskState},
+    services::{
+        AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
+        TaskLifecycleService,
+    },
+};
+use mockable::DefaultClock;
+
+async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
+    let service = TaskLifecycleService::new(
+        Arc::new(InMemoryTaskRepository::new()),
+        Arc::new(DefaultClock),
+    );
+
+    // Create a task from an issue.
+    let task = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            200,
+            "Implement branch tracking",
+        ))
+        .await?;
+
+    // Associate a branch with the task.
+    let updated = service
+        .associate_branch(AssociateBranchRequest::new(
+            task.id(),
+            "github",
+            "corbusier/core",
+            "feature/branch-tracking",
+        ))
+        .await?;
+    assert!(updated.branch_ref().is_some());
+
+    // Retrieve the task by branch reference.
+    let branch_ref = BranchRef::from_parts("github", "corbusier/core", "feature/branch-tracking")?;
+    let found = service.find_by_branch_ref(&branch_ref).await?;
+    assert_eq!(found.len(), 1);
+
+    // Associate a pull request — this transitions the task to in_review.
+    let reviewed = service
+        .associate_pull_request(AssociatePullRequestRequest::new(
+            task.id(),
+            "github",
+            "corbusier/core",
+            42,
+        ))
+        .await?;
+    assert_eq!(reviewed.state(), TaskState::InReview);
+
+    // Retrieve the task by pull request reference.
+    let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 42)?;
+    let found = service.find_by_pull_request_ref(&pr_ref).await?;
+    assert_eq!(found.len(), 1);
+
+    Ok(())
+}
+```

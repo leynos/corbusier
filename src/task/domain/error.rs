@@ -20,6 +20,31 @@ pub enum TaskDomainError {
     /// The issue title is empty after trimming.
     #[error("issue title must not be empty")]
     EmptyIssueTitle,
+
+    /// The branch name is invalid (empty, contains colons, or exceeds the
+    /// length limit).
+    #[error("invalid branch name: {0}")]
+    InvalidBranchName(String),
+
+    /// The pull request number is invalid.
+    #[error("invalid pull request number {0}, expected a positive integer")]
+    InvalidPullRequestNumber(u64),
+
+    /// A branch is already associated with this task.
+    #[error("task {0} already has an associated branch")]
+    BranchAlreadyAssociated(super::TaskId),
+
+    /// A pull request is already associated with this task.
+    #[error("task {0} already has an associated pull request")]
+    PullRequestAlreadyAssociated(super::TaskId),
+
+    /// The canonical branch reference string could not be parsed.
+    #[error("invalid branch reference format: {0}")]
+    InvalidBranchRefFormat(String),
+
+    /// The canonical pull request reference string could not be parsed.
+    #[error("invalid pull request reference format: {0}")]
+    InvalidPullRequestRefFormat(String),
 }
 
 /// Error returned while parsing task states from persistence.

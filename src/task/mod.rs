@@ -1,8 +1,10 @@
 //! Task lifecycle management for Corbusier.
 //!
-//! This module implements roadmap item 1.2.1: creating internal task records
-//! from external issue metadata and retrieving tasks by external issue
-//! reference. The module follows hexagonal architecture:
+//! This module implements roadmap items 1.2.1 and 1.2.2: creating internal task
+//! records from external issue metadata, retrieving tasks by external issue
+//! reference, and associating branch and pull request references with tasks.
+//! Associating a pull request transitions the task state to `InReview`. The
+//! module follows hexagonal architecture:
 //!
 //! - Domain types in [`domain`]
 //! - Port contracts in [`ports`]

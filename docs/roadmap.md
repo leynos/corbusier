@@ -42,13 +42,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §4.3.1.2.
   - [x] Success criteria: tasks can be created from issues and retrieved by
     external issue reference.
-- [ ] 1.2.2 Associate branches and pull requests with tasks. Requires 1.2.1. See
+- [x] 1.2.2 Associate branches and pull requests with tasks. Requires 1.2.1. See
   corbusier-design.md §2.2.2.
-  - [ ] Persist branch identifiers alongside task records. See
+  - [x] Persist branch identifiers alongside task records. See
     corbusier-design.md §2.2.2.
-  - [ ] Map pull request identifiers to task state updates. See
+  - [x] Map pull request identifiers to task state updates. See
     corbusier-design.md §2.2.2 and §4.1.1.2.
-  - [ ] Success criteria: task records include branch and pull request
+  - [x] Success criteria: task records include branch and pull request
     references for all linked work items.
 - [ ] 1.2.3 Enforce task state transitions with validation. Requires 1.2.1. See
   corbusier-design.md §4.3.1.2 and §4.4.1.1.

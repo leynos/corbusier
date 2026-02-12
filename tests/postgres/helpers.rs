@@ -33,6 +33,10 @@ pub const ADD_HANDOFF_SCHEMA_SQL: &str =
 pub const ADD_TASKS_SCHEMA_SQL: &str =
     include_str!("../../migrations/2026-02-09-000000_add_tasks_table/up.sql");
 
+/// SQL to add branch and pull request lookup indexes for roadmap 1.2.2.
+pub const ADD_BRANCH_PR_INDEXES_SQL: &str =
+    include_str!("../../migrations/2026-02-11-000000_add_branch_pr_lookup_indexes/up.sql");
+
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
 
@@ -71,6 +75,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     conn.batch_execute(ADD_TASKS_SCHEMA_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }

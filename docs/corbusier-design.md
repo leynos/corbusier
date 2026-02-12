@@ -830,6 +830,22 @@ Corbusier implements this through:
   roadmap items 1.2.2 and 1.2.3 can extend the lifecycle without re-shaping
   issue-origin records.
 
+###### Implementation Decisions (2026-02-11) — Roadmap 1.2.2
+
+- Branch and pull request references are stored as canonical string
+  representations (`provider:owner/repo:identifier`) in the existing
+  `branch_ref` and `pull_request_ref` `VARCHAR(255)` columns.
+- Multiple tasks may share the same branch reference (many-to-many).
+  Each individual task has at most one active branch and at most one
+  open pull request.
+- Non-unique partial indexes on `branch_ref` and `pull_request_ref`
+  accelerate lookup queries.
+- Associating a pull request transitions the task state to `InReview`.
+  State transition validation (guard logic) is deferred to 1.2.3.
+- Domain types `BranchRef` and `PullRequestRef` follow the same
+  pattern as `IssueRef` with provider, repository, and identifier
+  components.
+
 ##### F-002-RQ-002: Branch Association
 
 - **Technical Specifications:**
