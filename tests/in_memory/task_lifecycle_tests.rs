@@ -24,6 +24,18 @@ fn service() -> TestService {
     )
 }
 
+/// Helper to assert exactly one task is found with the expected ID.
+fn assert_single_task_found(
+    found: &[corbusier::task::domain::Task],
+    expected_id: corbusier::task::domain::TaskId,
+) {
+    assert_eq!(found.len(), 1, "expected exactly one task");
+    match found.first() {
+        Some(task) => assert_eq!(task.id(), expected_id, "task ID should match"),
+        None => panic!("expected at least one task"),
+    }
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_and_lookup_by_external_issue_reference(service: TestService) {
@@ -122,8 +134,7 @@ async fn associate_branch_and_retrieve_by_ref(service: TestService) {
         .find_by_branch_ref(&branch_ref)
         .await
         .expect("lookup should succeed");
-    assert_eq!(found.len(), 1);
-    assert_eq!(found.first().expect("at least one task").id(), task.id());
+    assert_single_task_found(&found, task.id());
 }
 
 #[rstest]
@@ -155,8 +166,7 @@ async fn associate_pr_and_verify_state_transition(service: TestService) {
         .find_by_pull_request_ref(&pr_ref)
         .await
         .expect("lookup should succeed");
-    assert_eq!(found.len(), 1);
-    assert_eq!(found.first().expect("at least one task").id(), task.id());
+    assert_single_task_found(&found, task.id());
 }
 
 #[rstest]
