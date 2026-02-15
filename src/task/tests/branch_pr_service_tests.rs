@@ -270,7 +270,10 @@ async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
     assert_eq!(found.len(), 2, "expected exactly two tasks");
     let ids: Vec<_> = found.iter().map(Task::id).collect();
     assert!(ids.contains(&first.id()), "first task should be in results");
-    assert!(ids.contains(&second.id()), "second task should be in results");
+    assert!(
+        ids.contains(&second.id()),
+        "second task should be in results"
+    );
 }
 
 // ── Many-to-many branch sharing ─────────────────────────────────────

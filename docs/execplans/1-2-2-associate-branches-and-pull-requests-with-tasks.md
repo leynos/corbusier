@@ -123,7 +123,7 @@ PostgreSQL integration tests proving happy and unhappy paths.
   435 total, all passing.
 - [x] (2026-02-12) Stage F: documentation updates and roadmap closure.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Clippy's `expect_used` deny lint applies to standalone helper functions but
   is automatically allowed inside `#[test]`-attributed functions. Test helpers
@@ -137,7 +137,7 @@ PostgreSQL integration tests proving happy and unhappy paths.
   `PostgreSQL` in Rust doc comments; the `private_intra_doc_links` lint
   prohibits linking to private constants in public doc comments.
 
-## Decision Log
+## Decision log
 
 - Decision: Use the existing `branch_ref VARCHAR(255)` and
   `pull_request_ref VARCHAR(255)` columns on the `tasks` table rather than
@@ -187,7 +187,7 @@ PostgreSQL integration tests proving happy and unhappy paths.
   (WHERE NOT NULL) accelerates these queries without constraining cardinality.
   Date/Author: 2026-02-11 / DevBoxer.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 All six stages completed successfully. 48 new tests added (435 total), all
 passing. All quality gates pass: `make check-fmt`, `make lint`, `make test`,
@@ -258,7 +258,7 @@ architecture:
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-### Current Task domain model (key types)
+### Current task domain model (key types)
 
 - `TaskState`: Draft, InProgress, InReview, Paused, Done, Abandoned.
 - `TaskOrigin`: tagged enum with `Issue { issue_ref, metadata }` variant.
