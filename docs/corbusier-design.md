@@ -830,7 +830,7 @@ Corbusier implements this through:
   roadmap items 1.2.2 and 1.2.3 can extend the lifecycle without re-shaping
   issue-origin records.
 
-###### Implementation Decisions (2026-02-11) — Roadmap 1.2.2
+###### Implementation decisions (2026-02-11) — roadmap 1.2.2
 
 - Branch and pull request references are stored as canonical string
   representations (`provider:owner/repo:identifier`) in the existing
@@ -853,7 +853,8 @@ Corbusier implements this through:
   - Performance Criteria: <10s branch creation, 100% association accuracy
   - Data Requirements: Branch name generation rules, base branch validation
 - **Validation Rules:**
-  - Business Rules: Exactly one active branch per task, unique branch names
+  - Business Rules: At most one active branch per task; multiple tasks may
+      share the same branch reference
   - Data Validation: Branch name policy compliance, base branch existence
   - Security Requirements: Repository write permissions verification
   - Compliance Requirements: Branch creation and association audit trails

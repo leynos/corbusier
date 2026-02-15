@@ -200,10 +200,11 @@ impl Task {
         branch_ref: BranchRef,
         clock: &impl Clock,
     ) -> Result<(), TaskDomainError> {
-        if self.branch_ref.is_some() {
-            return Err(TaskDomainError::BranchAlreadyAssociated(self.id));
-        }
-        self.branch_ref = Some(branch_ref);
+        associate_ref(
+            &mut self.branch_ref,
+            branch_ref,
+            TaskDomainError::BranchAlreadyAssociated(self.id),
+        )?;
         self.touch(clock);
         Ok(())
     }
@@ -223,10 +224,11 @@ impl Task {
         pr_ref: PullRequestRef,
         clock: &impl Clock,
     ) -> Result<(), TaskDomainError> {
-        if self.pull_request_ref.is_some() {
-            return Err(TaskDomainError::PullRequestAlreadyAssociated(self.id));
-        }
-        self.pull_request_ref = Some(pr_ref);
+        associate_ref(
+            &mut self.pull_request_ref,
+            pr_ref,
+            TaskDomainError::PullRequestAlreadyAssociated(self.id),
+        )?;
         self.state = TaskState::InReview;
         self.touch(clock);
         Ok(())
@@ -236,4 +238,17 @@ impl Task {
     fn touch(&mut self, clock: &impl Clock) {
         self.updated_at = clock.utc();
     }
+}
+
+/// Sets a reference field if empty, or returns the given error.
+fn associate_ref<T>(
+    field: &mut Option<T>,
+    new_value: T,
+    already_set_error: TaskDomainError,
+) -> Result<(), TaskDomainError> {
+    if field.is_some() {
+        return Err(already_set_error);
+    }
+    *field = Some(new_value);
+    Ok(())
 }

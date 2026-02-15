@@ -245,89 +245,89 @@ async fn associate_pull_request_returns_not_found_for_unknown_task(service: Test
     assert_not_found_error(result);
 }
 
+/// Helper to test that multiple tasks can share the same reference.
+async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
+    tasks: [Task; 2],
+    associate_fn: impl Fn(TaskId) -> Fut1,
+    lookup_fn: F,
+) where
+    F: FnOnce() -> Fut2,
+    Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
+    Fut2: std::future::Future<Output = Result<Vec<Task>, TaskLifecycleError>>,
+{
+    let [ref first, ref second] = tasks;
+
+    associate_fn(first.id())
+        .await
+        .expect("first task association should succeed");
+
+    associate_fn(second.id())
+        .await
+        .expect("second task association should succeed");
+
+    let found = lookup_fn().await.expect("lookup should succeed");
+
+    assert_eq!(found.len(), 2, "expected exactly two tasks");
+    let ids: Vec<_> = found.iter().map(Task::id).collect();
+    assert!(ids.contains(&first.id()), "first task should be in results");
+    assert!(ids.contains(&second.id()), "second task should be in results");
+}
+
 // ── Many-to-many branch sharing ─────────────────────────────────────
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
-    let task1 = create_test_task(&service, 700, "Task 1")
-        .await
-        .expect("first task creation should succeed");
-    let task2 = create_test_task(&service, 701, "Task 2")
-        .await
-        .expect("second task creation should succeed");
-
-    service
-        .associate_branch(AssociateBranchRequest::new(
-            task1.id(),
-            "github",
-            "owner/repo",
-            "shared/branch",
-        ))
-        .await
-        .expect("first task branch association should succeed");
-
-    service
-        .associate_branch(AssociateBranchRequest::new(
-            task2.id(),
-            "github",
-            "owner/repo",
-            "shared/branch",
-        ))
-        .await
-        .expect("second task branch association should succeed");
-
     let branch_ref =
         BranchRef::from_parts("github", "owner/repo", "shared/branch").expect("valid branch ref");
-    let found = service
-        .find_by_branch_ref(&branch_ref)
-        .await
-        .expect("lookup should succeed");
+    let tasks = [
+        create_test_task(&service, 700, "Task 1")
+            .await
+            .expect("first task creation should succeed"),
+        create_test_task(&service, 701, "Task 2")
+            .await
+            .expect("second task creation should succeed"),
+    ];
 
-    assert_eq!(found.len(), 2);
-    let ids: Vec<_> = found.iter().map(Task::id).collect();
-    assert!(ids.contains(&task1.id()));
-    assert!(ids.contains(&task2.id()));
+    assert_multiple_tasks_share_reference(
+        tasks,
+        |task_id| {
+            service.associate_branch(AssociateBranchRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                "shared/branch",
+            ))
+        },
+        || service.find_by_branch_ref(&branch_ref),
+    )
+    .await;
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) {
-    let task1 = create_test_task(&service, 800, "PR share 1")
-        .await
-        .expect("first task creation should succeed");
-    let task2 = create_test_task(&service, 801, "PR share 2")
-        .await
-        .expect("second task creation should succeed");
-
-    service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task1.id(),
-            "github",
-            "owner/repo",
-            99,
-        ))
-        .await
-        .expect("first task PR association should succeed");
-
-    service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task2.id(),
-            "github",
-            "owner/repo",
-            99,
-        ))
-        .await
-        .expect("second task PR association should succeed");
-
     let pr_ref = PullRequestRef::from_parts("github", "owner/repo", 99).expect("valid PR ref");
-    let found = service
-        .find_by_pull_request_ref(&pr_ref)
-        .await
-        .expect("lookup should succeed");
+    let tasks = [
+        create_test_task(&service, 800, "PR share 1")
+            .await
+            .expect("first task creation should succeed"),
+        create_test_task(&service, 801, "PR share 2")
+            .await
+            .expect("second task creation should succeed"),
+    ];
 
-    assert_eq!(found.len(), 2);
-    let ids: Vec<_> = found.iter().map(Task::id).collect();
-    assert!(ids.contains(&task1.id()));
-    assert!(ids.contains(&task2.id()));
+    assert_multiple_tasks_share_reference(
+        tasks,
+        |task_id| {
+            service.associate_pull_request(AssociatePullRequestRequest::new(
+                task_id,
+                "github",
+                "owner/repo",
+                99,
+            ))
+        },
+        || service.find_by_pull_request_ref(&pr_ref),
+    )
+    .await;
 }

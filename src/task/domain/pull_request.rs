@@ -72,8 +72,12 @@ pub struct PullRequestRef {
 
 impl PullRequestRef {
     /// Creates a pull request reference from validated components.
+    ///
+    /// Restricted to crate scope to ensure all external construction goes
+    /// through [`Self::from_parts`], which enforces the canonical-length
+    /// invariant.
     #[must_use]
-    pub const fn new(
+    pub(crate) const fn new(
         provider: IssueProvider,
         repository: RepositoryFullName,
         pull_request_number: PullRequestNumber,

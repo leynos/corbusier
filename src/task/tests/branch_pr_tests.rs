@@ -165,76 +165,95 @@ fn pull_request_ref_parse_canonical_rejects_malformed() {
 
 // ── Task::associate_branch ──────────────────────────────────────────
 
-fn create_test_task(clock: &DefaultClock) -> Result<Task, TaskDomainError> {
-    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1)?;
-    let metadata = ExternalIssueMetadata::new("Test task")?;
-    Ok(Task::new_from_issue(
-        &ExternalIssue::new(issue_ref, metadata),
-        clock,
-    ))
+#[fixture]
+fn test_task(clock: DefaultClock) -> Task {
+    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1).expect("valid issue ref");
+    let metadata = ExternalIssueMetadata::new("Test task").expect("valid metadata");
+    Task::new_from_issue(&ExternalIssue::new(issue_ref, metadata), &clock)
 }
 
 #[rstest]
-fn associate_branch_sets_ref_and_updates_timestamp(clock: DefaultClock) {
-    let mut task = create_test_task(&clock).expect("test task creation should succeed");
-    let original_updated_at = task.updated_at();
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn associate_branch_sets_ref_and_updates_timestamp(
+    mut test_task: Task,
+    clock: DefaultClock,
+) -> Result<(), TaskDomainError> {
+    let original_updated_at = test_task.updated_at();
 
-    let branch =
-        BranchRef::from_parts("github", "owner/repo", "feature/x").expect("valid branch ref");
-    task.associate_branch(branch.clone(), &clock)
-        .expect("association should succeed");
+    let branch = BranchRef::from_parts("github", "owner/repo", "feature/x")?;
+    test_task.associate_branch(branch.clone(), &clock)?;
 
-    assert_eq!(task.branch_ref(), Some(&branch));
-    assert!(task.updated_at() >= original_updated_at);
-    assert_eq!(task.state(), TaskState::Draft);
+    assert_eq!(test_task.branch_ref(), Some(&branch));
+    assert!(test_task.updated_at() >= original_updated_at);
+    assert_eq!(test_task.state(), TaskState::Draft);
+    Ok(())
 }
 
 #[rstest]
-fn associate_branch_rejects_when_already_set(clock: DefaultClock) {
-    let mut task = create_test_task(&clock).expect("test task creation should succeed");
-    let branch1 =
-        BranchRef::from_parts("github", "owner/repo", "branch-1").expect("valid branch ref");
-    task.associate_branch(branch1, &clock)
-        .expect("first association should succeed");
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn associate_branch_rejects_when_already_set(
+    mut test_task: Task,
+    clock: DefaultClock,
+) -> Result<(), TaskDomainError> {
+    let branch1 = BranchRef::from_parts("github", "owner/repo", "branch-1")?;
+    test_task.associate_branch(branch1, &clock)?;
 
-    let branch2 =
-        BranchRef::from_parts("github", "owner/repo", "branch-2").expect("valid branch ref");
-    let result = task.associate_branch(branch2, &clock);
+    let branch2 = BranchRef::from_parts("github", "owner/repo", "branch-2")?;
+    let result = test_task.associate_branch(branch2, &clock);
 
     assert!(matches!(
         result,
         Err(TaskDomainError::BranchAlreadyAssociated(_))
     ));
+    Ok(())
 }
 
 // ── Task::associate_pull_request ────────────────────────────────────
 
 #[rstest]
-fn associate_pull_request_sets_ref_transitions_to_in_review(clock: DefaultClock) {
-    let mut task = create_test_task(&clock).expect("test task creation should succeed");
-    let original_updated_at = task.updated_at();
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn associate_pull_request_sets_ref_transitions_to_in_review(
+    mut test_task: Task,
+    clock: DefaultClock,
+) -> Result<(), TaskDomainError> {
+    let original_updated_at = test_task.updated_at();
 
-    let pr = PullRequestRef::from_parts("github", "owner/repo", 42).expect("valid PR ref");
-    task.associate_pull_request(pr.clone(), &clock)
-        .expect("association should succeed");
+    let pr = PullRequestRef::from_parts("github", "owner/repo", 42)?;
+    test_task.associate_pull_request(pr.clone(), &clock)?;
 
-    assert_eq!(task.pull_request_ref(), Some(&pr));
-    assert_eq!(task.state(), TaskState::InReview);
-    assert!(task.updated_at() >= original_updated_at);
+    assert_eq!(test_task.pull_request_ref(), Some(&pr));
+    assert_eq!(test_task.state(), TaskState::InReview);
+    assert!(test_task.updated_at() >= original_updated_at);
+    Ok(())
 }
 
 #[rstest]
-fn associate_pull_request_rejects_when_already_set(clock: DefaultClock) {
-    let mut task = create_test_task(&clock).expect("test task creation should succeed");
-    let pr1 = PullRequestRef::from_parts("github", "owner/repo", 1).expect("valid PR ref");
-    task.associate_pull_request(pr1, &clock)
-        .expect("first association should succeed");
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn associate_pull_request_rejects_when_already_set(
+    mut test_task: Task,
+    clock: DefaultClock,
+) -> Result<(), TaskDomainError> {
+    let pr1 = PullRequestRef::from_parts("github", "owner/repo", 1)?;
+    test_task.associate_pull_request(pr1, &clock)?;
 
-    let pr2 = PullRequestRef::from_parts("github", "owner/repo", 2).expect("valid PR ref");
-    let result = task.associate_pull_request(pr2, &clock);
+    let pr2 = PullRequestRef::from_parts("github", "owner/repo", 2)?;
+    let result = test_task.associate_pull_request(pr2, &clock);
 
     assert!(matches!(
         result,
         Err(TaskDomainError::PullRequestAlreadyAssociated(_))
     ));
+    Ok(())
 }

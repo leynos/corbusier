@@ -1,4 +1,4 @@
-# Associate Branches and Pull Requests with Tasks (Roadmap 1.2.2)
+# Associate branches and pull requests with tasks (roadmap 1.2.2)
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
