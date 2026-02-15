@@ -166,10 +166,13 @@ fn pull_request_ref_parse_canonical_rejects_malformed() {
 // ── Task::associate_branch ──────────────────────────────────────────
 
 #[fixture]
-fn test_task(clock: DefaultClock) -> Task {
-    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1).expect("valid issue ref");
-    let metadata = ExternalIssueMetadata::new("Test task").expect("valid metadata");
-    Task::new_from_issue(&ExternalIssue::new(issue_ref, metadata), &clock)
+fn test_task(clock: DefaultClock) -> Result<Task, TaskDomainError> {
+    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1)?;
+    let metadata = ExternalIssueMetadata::new("Test task")?;
+    Ok(Task::new_from_issue(
+        &ExternalIssue::new(issue_ref, metadata),
+        &clock,
+    ))
 }
 
 #[rstest]
@@ -178,9 +181,10 @@ fn test_task(clock: DefaultClock) -> Task {
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
 fn associate_branch_sets_ref_and_updates_timestamp(
-    mut test_task: Task,
+    #[from(test_task)] task_result: Result<Task, TaskDomainError>,
     clock: DefaultClock,
 ) -> Result<(), TaskDomainError> {
+    let mut test_task = task_result?;
     let original_updated_at = test_task.updated_at();
 
     let branch = BranchRef::from_parts("github", "owner/repo", "feature/x")?;
@@ -198,9 +202,10 @@ fn associate_branch_sets_ref_and_updates_timestamp(
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
 fn associate_branch_rejects_when_already_set(
-    mut test_task: Task,
+    #[from(test_task)] task_result: Result<Task, TaskDomainError>,
     clock: DefaultClock,
 ) -> Result<(), TaskDomainError> {
+    let mut test_task = task_result?;
     let branch1 = BranchRef::from_parts("github", "owner/repo", "branch-1")?;
     test_task.associate_branch(branch1, &clock)?;
 
@@ -222,9 +227,10 @@ fn associate_branch_rejects_when_already_set(
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
 fn associate_pull_request_sets_ref_transitions_to_in_review(
-    mut test_task: Task,
+    #[from(test_task)] task_result: Result<Task, TaskDomainError>,
     clock: DefaultClock,
 ) -> Result<(), TaskDomainError> {
+    let mut test_task = task_result?;
     let original_updated_at = test_task.updated_at();
 
     let pr = PullRequestRef::from_parts("github", "owner/repo", 42)?;
@@ -242,9 +248,10 @@ fn associate_pull_request_sets_ref_transitions_to_in_review(
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
 fn associate_pull_request_rejects_when_already_set(
-    mut test_task: Task,
+    #[from(test_task)] task_result: Result<Task, TaskDomainError>,
     clock: DefaultClock,
 ) -> Result<(), TaskDomainError> {
+    let mut test_task = task_result?;
     let pr1 = PullRequestRef::from_parts("github", "owner/repo", 1)?;
     test_task.associate_pull_request(pr1, &clock)?;
 

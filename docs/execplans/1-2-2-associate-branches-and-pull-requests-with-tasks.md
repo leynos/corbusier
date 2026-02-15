@@ -29,8 +29,8 @@ After this change, an implementer can:
 - Query all tasks linked to a given branch (many-to-many: multiple tasks may
   share a single branch).
 
-Success is observable in unit tests, behaviour tests (rstest-bdd), and
-PostgreSQL integration tests proving happy and unhappy paths.
+Success is observable in unit tests, behaviour-driven development (BDD) tests
+(rstest-bdd), and PostgreSQL integration tests proving happy and unhappy paths.
 
 ## Constraints
 

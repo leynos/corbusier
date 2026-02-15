@@ -59,9 +59,8 @@ fn assert_pr_already_associated_error<T: std::fmt::Debug>(result: Result<T, Task
 
 fn assert_single_task_found(found: &[Task], expected_id: TaskId) {
     assert_eq!(found.len(), 1, "expected exactly one task");
-    if let Some(task) = found.first() {
-        assert_eq!(task.id(), expected_id, "task ID should match");
-    }
+    let Some(task) = found.first() else { return };
+    assert_eq!(task.id(), expected_id, "task ID should match");
 }
 
 /// Helper to test that duplicate associations are rejected.
