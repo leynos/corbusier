@@ -23,7 +23,7 @@ fn task_has_branch_ref(world: &TaskBranchPrWorld) -> Result<(), eyre::Report> {
 }
 
 #[then("the task can be retrieved by the branch reference")]
-fn task_retrievable_by_branch_ref(world: &mut TaskBranchPrWorld) -> Result<(), eyre::Report> {
+fn task_retrievable_by_branch_ref(world: &TaskBranchPrWorld) -> Result<(), eyre::Report> {
     let task = world
         .last_created_task
         .as_ref()

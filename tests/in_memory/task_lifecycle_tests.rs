@@ -24,16 +24,26 @@ fn service() -> TestService {
     )
 }
 
-/// Helper to assert exactly one task is found with the expected ID.
+/// Asserts exactly one task is found with the expected ID.
+///
+/// # Errors
+///
+/// Returns an error if the result set does not contain exactly one task
+/// matching `expected_id`.
 fn assert_single_task_found(
     found: &[corbusier::task::domain::Task],
     expected_id: corbusier::task::domain::TaskId,
-) {
-    assert_eq!(found.len(), 1, "expected exactly one task");
-    match found.first() {
-        Some(task) => assert_eq!(task.id(), expected_id, "task ID should match"),
-        None => panic!("expected at least one task"),
-    }
+) -> Result<(), eyre::Report> {
+    eyre::ensure!(
+        found.len() == 1,
+        "expected exactly one task, found {}",
+        found.len()
+    );
+    let task = found
+        .first()
+        .ok_or_else(|| eyre::eyre!("expected at least one task"))?;
+    eyre::ensure!(task.id() == expected_id, "task ID mismatch");
+    Ok(())
 }
 
 #[rstest]
@@ -107,7 +117,7 @@ async fn lookup_returns_none_for_missing_reference(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_and_retrieve_by_ref(service: TestService) {
+async fn associate_branch_and_retrieve_by_ref(service: TestService) -> Result<(), eyre::Report> {
     let task = service
         .create_from_issue(CreateTaskFromIssueRequest::new(
             "github",
@@ -134,12 +144,15 @@ async fn associate_branch_and_retrieve_by_ref(service: TestService) {
         .find_by_branch_ref(&branch_ref)
         .await
         .expect("lookup should succeed");
-    assert_single_task_found(&found, task.id());
+    assert_single_task_found(&found, task.id())?;
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_pr_and_verify_state_transition(service: TestService) {
+async fn associate_pr_and_verify_state_transition(
+    service: TestService,
+) -> Result<(), eyre::Report> {
     let task = service
         .create_from_issue(CreateTaskFromIssueRequest::new(
             "github",
@@ -166,7 +179,8 @@ async fn associate_pr_and_verify_state_transition(service: TestService) {
         .find_by_pull_request_ref(&pr_ref)
         .await
         .expect("lookup should succeed");
-    assert_single_task_found(&found, task.id());
+    assert_single_task_found(&found, task.id())?;
+    Ok(())
 }
 
 #[rstest]
@@ -223,4 +237,73 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
         .collect();
     assert!(ids.contains(&task1.id()));
     assert!(ids.contains(&task2.id()));
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) {
+    let task1 = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            304,
+            "PR share 1",
+        ))
+        .await
+        .expect("first task creation should succeed");
+    let task2 = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            305,
+            "PR share 2",
+        ))
+        .await
+        .expect("second task creation should succeed");
+
+    service
+        .associate_pull_request(AssociatePullRequestRequest::new(
+            task1.id(),
+            "github",
+            "corbusier/core",
+            77,
+        ))
+        .await
+        .expect("first task PR association should succeed");
+    service
+        .associate_pull_request(AssociatePullRequestRequest::new(
+            task2.id(),
+            "github",
+            "corbusier/core",
+            77,
+        ))
+        .await
+        .expect("second task PR association should succeed");
+
+    let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 77).expect("valid PR ref");
+    let found = service
+        .find_by_pull_request_ref(&pr_ref)
+        .await
+        .expect("lookup should succeed");
+    assert_eq!(found.len(), 2);
+    let ids: Vec<_> = found
+        .iter()
+        .map(corbusier::task::domain::Task::id)
+        .collect();
+    assert!(ids.contains(&task1.id()));
+    assert!(ids.contains(&task2.id()));
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn find_by_pull_request_ref_returns_empty_when_none_match(service: TestService) {
+    let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 999).expect("valid PR ref");
+    let found = service
+        .find_by_pull_request_ref(&pr_ref)
+        .await
+        .expect("lookup should succeed");
+    assert!(
+        found.is_empty(),
+        "expected empty result for unmatched PR ref"
+    );
 }

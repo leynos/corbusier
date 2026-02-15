@@ -4,6 +4,9 @@ use super::{IssueProvider, RepositoryFullName, TaskDomainError};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Maximum length for a canonical reference stored in a `VARCHAR(255)` column.
+const MAX_CANONICAL_REF_LENGTH: usize = 255;
+
 /// Positive pull request number from an external tracker.
 ///
 /// Validated identically to [`super::IssueNumber`]: must be positive and
@@ -86,17 +89,23 @@ impl PullRequestRef {
     ///
     /// # Errors
     ///
-    /// Returns a [`TaskDomainError`] when any component is invalid.
+    /// Returns a [`TaskDomainError`] when any component is invalid or the
+    /// canonical representation exceeds the `VARCHAR(255)` storage limit.
     pub fn from_parts(
         provider: &str,
         repository: &str,
         pull_request_number: u64,
     ) -> Result<Self, TaskDomainError> {
-        Ok(Self::new(
+        let pr_ref = Self::new(
             IssueProvider::try_from(provider)?,
             RepositoryFullName::new(repository)?,
             PullRequestNumber::new(pull_request_number)?,
-        ))
+        );
+        let canonical = pr_ref.to_canonical();
+        if canonical.len() > MAX_CANONICAL_REF_LENGTH {
+            return Err(TaskDomainError::CanonicalRefTooLong(canonical));
+        }
+        Ok(pr_ref)
     }
 
     /// Produces the canonical storage representation.
@@ -116,11 +125,14 @@ impl PullRequestRef {
     /// Returns [`TaskDomainError::InvalidPullRequestRefFormat`] when the
     /// input does not match the expected format.
     pub fn parse_canonical(s: &str) -> Result<Self, TaskDomainError> {
+        // Split on the first colon for the provider, then split the remainder
+        // on the *last* colon to separate repository from the PR number. This
+        // ensures repository names containing colons are handled correctly.
         let (provider_str, rest) = s
             .split_once(':')
             .ok_or_else(|| TaskDomainError::InvalidPullRequestRefFormat(s.to_owned()))?;
         let (repository_str, number_str) = rest
-            .split_once(':')
+            .rsplit_once(':')
             .ok_or_else(|| TaskDomainError::InvalidPullRequestRefFormat(s.to_owned()))?;
 
         let number: u64 = number_str

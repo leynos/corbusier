@@ -45,6 +45,10 @@ pub enum TaskDomainError {
     /// The canonical pull request reference string could not be parsed.
     #[error("invalid pull request reference format: {0}")]
     InvalidPullRequestRefFormat(String),
+
+    /// A canonical reference exceeds the `VARCHAR(255)` column limit.
+    #[error("canonical reference exceeds 255-character storage limit: {0}")]
+    CanonicalRefTooLong(String),
 }
 
 /// Error returned while parsing task states from persistence.

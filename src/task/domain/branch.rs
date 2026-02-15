@@ -10,6 +10,9 @@ use std::fmt;
 /// 255-character `branch_ref` column.
 const MAX_BRANCH_NAME_LENGTH: usize = 200;
 
+/// Maximum length for a canonical reference stored in a `VARCHAR(255)` column.
+const MAX_CANONICAL_REF_LENGTH: usize = 255;
+
 /// Validated Git branch name.
 ///
 /// Branch names must be non-empty after trimming, must not contain colon
@@ -111,17 +114,23 @@ impl BranchRef {
     ///
     /// # Errors
     ///
-    /// Returns a [`TaskDomainError`] when any component is invalid.
+    /// Returns a [`TaskDomainError`] when any component is invalid or the
+    /// canonical representation exceeds the `VARCHAR(255)` storage limit.
     pub fn from_parts(
         provider: &str,
         repository: &str,
         branch_name: &str,
     ) -> Result<Self, TaskDomainError> {
-        Ok(Self::new(
+        let branch_ref = Self::new(
             IssueProvider::try_from(provider)?,
             RepositoryFullName::new(repository)?,
             BranchName::new(branch_name)?,
-        ))
+        );
+        let canonical = branch_ref.to_canonical();
+        if canonical.len() > MAX_CANONICAL_REF_LENGTH {
+            return Err(TaskDomainError::CanonicalRefTooLong(canonical));
+        }
+        Ok(branch_ref)
     }
 
     /// Produces the canonical storage representation.

@@ -165,15 +165,18 @@ fn pull_request_ref_parse_canonical_rejects_malformed() {
 
 // ── Task::associate_branch ──────────────────────────────────────────
 
-fn create_test_task(clock: &DefaultClock) -> Task {
-    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1).expect("valid issue ref");
-    let metadata = ExternalIssueMetadata::new("Test task").expect("valid metadata");
-    Task::new_from_issue(&ExternalIssue::new(issue_ref, metadata), clock)
+fn create_test_task(clock: &DefaultClock) -> Result<Task, TaskDomainError> {
+    let issue_ref = IssueRef::from_parts("github", "owner/repo", 1)?;
+    let metadata = ExternalIssueMetadata::new("Test task")?;
+    Ok(Task::new_from_issue(
+        &ExternalIssue::new(issue_ref, metadata),
+        clock,
+    ))
 }
 
 #[rstest]
 fn associate_branch_sets_ref_and_updates_timestamp(clock: DefaultClock) {
-    let mut task = create_test_task(&clock);
+    let mut task = create_test_task(&clock).expect("test task creation should succeed");
     let original_updated_at = task.updated_at();
 
     let branch =
@@ -188,7 +191,7 @@ fn associate_branch_sets_ref_and_updates_timestamp(clock: DefaultClock) {
 
 #[rstest]
 fn associate_branch_rejects_when_already_set(clock: DefaultClock) {
-    let mut task = create_test_task(&clock);
+    let mut task = create_test_task(&clock).expect("test task creation should succeed");
     let branch1 =
         BranchRef::from_parts("github", "owner/repo", "branch-1").expect("valid branch ref");
     task.associate_branch(branch1, &clock)
@@ -208,7 +211,7 @@ fn associate_branch_rejects_when_already_set(clock: DefaultClock) {
 
 #[rstest]
 fn associate_pull_request_sets_ref_transitions_to_in_review(clock: DefaultClock) {
-    let mut task = create_test_task(&clock);
+    let mut task = create_test_task(&clock).expect("test task creation should succeed");
     let original_updated_at = task.updated_at();
 
     let pr = PullRequestRef::from_parts("github", "owner/repo", 42).expect("valid PR ref");
@@ -222,7 +225,7 @@ fn associate_pull_request_sets_ref_transitions_to_in_review(clock: DefaultClock)
 
 #[rstest]
 fn associate_pull_request_rejects_when_already_set(clock: DefaultClock) {
-    let mut task = create_test_task(&clock);
+    let mut task = create_test_task(&clock).expect("test task creation should succeed");
     let pr1 = PullRequestRef::from_parts("github", "owner/repo", 1).expect("valid PR ref");
     task.associate_pull_request(pr1, &clock)
         .expect("first association should succeed");

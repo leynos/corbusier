@@ -49,20 +49,12 @@ fn index_pull_request(state: &mut InMemoryTaskState, task: &Task) {
     }
 }
 
-fn remove_branch_index(state: &mut InMemoryTaskState, task_id: TaskId, key: &str) {
-    if let Some(ids) = state.branch_index.get_mut(key) {
+/// Removes a task ID from a string-keyed index, cleaning up the entry if empty.
+fn remove_from_index(index: &mut HashMap<String, Vec<TaskId>>, task_id: TaskId, key: &str) {
+    if let Some(ids) = index.get_mut(key) {
         ids.retain(|id| *id != task_id);
         if ids.is_empty() {
-            state.branch_index.remove(key);
-        }
-    }
-}
-
-fn remove_pr_index(state: &mut InMemoryTaskState, task_id: TaskId, key: &str) {
-    if let Some(ids) = state.pull_request_index.get_mut(key) {
-        ids.retain(|id| *id != task_id);
-        if ids.is_empty() {
-            state.pull_request_index.remove(key);
+            index.remove(key);
         }
     }
 }
@@ -118,10 +110,14 @@ impl TaskRepository for InMemoryTaskRepository {
 
         // Remove old branch/PR index entries before adding updated ones.
         if let Some(old_branch) = old_task.branch_ref() {
-            remove_branch_index(&mut state, task.id(), &old_branch.to_string());
+            remove_from_index(&mut state.branch_index, task.id(), &old_branch.to_string());
         }
         if let Some(old_pr) = old_task.pull_request_ref() {
-            remove_pr_index(&mut state, task.id(), &old_pr.to_string());
+            remove_from_index(
+                &mut state.pull_request_index,
+                task.id(),
+                &old_pr.to_string(),
+            );
         }
 
         index_branch(&mut state, task);

@@ -15,10 +15,10 @@ On approval, this plan must be written to
 ## Purpose / big picture
 
 Implement roadmap item 1.2.2 so that Corbusier can record which Git branch and
-which pull request are associated with a task, retrieve tasks by those
+which pull request (PR) are associated with a task, retrieve tasks by those
 references, and transition task state when a pull request is linked. This
-extends the task lifecycle (built in 1.2.1) from issue-origin tracking to
-full branch-and-PR tracking.
+extends the task lifecycle (built in 1.2.1) from issue-origin tracking to full
+branch-and-PR tracking.
 
 After this change, an implementer can:
 
@@ -58,9 +58,10 @@ PostgreSQL integration tests proving happy and unhappy paths.
   relationship between tasks and pull requests follows the same model.
 - Each individual task has at most one active branch and at most one open pull
   request at any given time (per design doc F-002-RQ-002 and F-002-RQ-004).
-- Do not implement VCS API integration (branch creation, PR creation, naming
-  policies). This plan covers persistence and association only; VCS operations
-  are a separate concern for a future roadmap item.
+- Do not implement version control system (VCS) API integration (branch
+  creation, PR creation, naming policies). This plan covers persistence and
+  association only; VCS operations are a separate concern for a future roadmap
+  item.
 
 ## Tolerances (exception triggers)
 
@@ -83,32 +84,28 @@ PostgreSQL integration tests proving happy and unhappy paths.
   `VARCHAR(255)`. A structured reference (provider + repository + identifier)
   must fit within that limit and be unambiguously parseable. Git branch names
   may contain `/` characters, making naive delimiter-based parsing ambiguous.
-  Severity: medium. Likelihood: medium.
-  Mitigation: use `:` as the delimiter in the canonical string format
-  (`provider:owner/repo:branch-name`). Colons are forbidden in Git ref names
-  by `git-check-ref-format`, so this is unambiguous. Validate this invariant
-  in the `BranchName` constructor.
+  Severity: medium. Likelihood: medium. Mitigation: use `:` as the delimiter in
+  the canonical string format (`provider:owner/repo:branch-name`). Colons are
+  forbidden in Git ref names by `git-check-ref-format`, so this is unambiguous.
+  Validate this invariant in the `BranchName` constructor.
 
 - Risk: The `row_to_task` function in the Postgres adapter currently has a
-  `debug_assert!` that branch/PR fields are `None`. Removing this may mask
-  data integrity issues during transition.
-  Severity: low. Likelihood: low.
+  `debug_assert!` that branch/PR fields are `None`. Removing this may mask data
+  integrity issues during transition. Severity: low. Likelihood: low.
   Mitigation: replace the blanket assert with a workspace-id-only assert
   (workspace_id is still deferred to 1.2.3). Add parsing validation for the
   branch/PR fields instead.
 
 - Risk: State transition on PR association (task → InReview) may conflict with
-  1.2.3's scope ("Enforce task state transitions with validation").
-  Severity: medium. Likelihood: medium.
-  Mitigation: implement the state update as a simple field write in 1.2.2
-  without enforcing transition guards. 1.2.3 will add guard logic. Document
-  this decision clearly.
+  1.2.3's scope ("Enforce task state transitions with validation"). Severity:
+  medium. Likelihood: medium. Mitigation: implement the state update as a
+  simple field write in 1.2.2 without enforcing transition guards. 1.2.3 will
+  add guard logic. Document this decision clearly.
 
 - Risk: Behaviour tests may become brittle if they assert internal
-  representation rather than observable behaviour.
-  Severity: medium. Likelihood: medium.
-  Mitigation: keep `Then` assertions focused on task retrieval outcomes and
-  error surfaces, not internal field representations.
+  representation rather than observable behaviour. Severity: medium.
+  Likelihood: medium. Mitigation: keep `Then` assertions focused on task
+  retrieval outcomes and error surfaces, not internal field representations.
 
 ## Progress
 
@@ -144,32 +141,29 @@ PostgreSQL integration tests proving happy and unhappy paths.
 
 - Decision: Use the existing `branch_ref VARCHAR(255)` and
   `pull_request_ref VARCHAR(255)` columns on the `tasks` table rather than
-  introducing join tables.
-  Rationale: the columns were explicitly reserved for this purpose in the
-  1.2.1 implementation decision ("Keep branch, pull request, and workspace
-  references nullable in 1.2.1 so roadmap items 1.2.2 and 1.2.3 can extend
-  the lifecycle without re-shaping issue-origin records"). Each task has at
-  most one branch and one PR. The many-to-many relationship (multiple tasks
-  sharing a branch) is naturally modelled by allowing the same string value
-  across multiple rows without a unique constraint on these columns.
-  Date/Author: 2026-02-11 / DevBoxer.
+  introducing join tables. Rationale: the columns were explicitly reserved for
+  this purpose in the 1.2.1 implementation decision ("Keep branch, pull
+  request, and workspace references nullable in 1.2.1 so roadmap items 1.2.2
+  and 1.2.3 can extend the lifecycle without re-shaping issue-origin records").
+  Each task has at most one branch and one PR. The many-to-many relationship
+  (multiple tasks sharing a branch) is naturally modelled by allowing the same
+  string value across multiple rows without a unique constraint on these
+  columns. Date/Author: 2026-02-11 / DevBoxer.
 
 - Decision: Store branch and PR references as canonical strings using `:`
   as delimiter: `provider:owner/repo:branch-name` for branches,
-  `provider:owner/repo:42` for pull requests.
-  Rationale: colons are forbidden in Git ref names by `git-check-ref-format`
-  and are not valid in GitHub/GitLab owner or repository names, making parsing
-  unambiguous. The format fits within VARCHAR(255) for any reasonable ref.
-  This avoids the complexity of JSONB migration while remaining human-readable
-  and deterministic.
-  Date/Author: 2026-02-11 / DevBoxer.
+  `provider:owner/repo:42` for pull requests. Rationale: colons are forbidden
+  in Git ref names by `git-check-ref-format` and are not valid in GitHub/GitLab
+  owner or repository names, making parsing unambiguous. The format fits within
+  VARCHAR(255) for any reasonable ref. This avoids the complexity of JSONB
+  migration while remaining human-readable and deterministic. Date/Author:
+  2026-02-11 / DevBoxer.
 
 - Decision: Do not add unique indexes on `branch_ref` or `pull_request_ref`.
   Rationale: the roadmap explicitly states "multiple tasks may contribute to a
   single branch", requiring a many-to-many relationship. A unique index would
-  prevent this. Uniqueness of association is enforced at the domain level
-  (each task has at most one branch/PR), not at the database level across
-  tasks.
+  prevent this. Uniqueness of association is enforced at the domain level (each
+  task has at most one branch/PR), not at the database level across tasks.
   Date/Author: 2026-02-11 / DevBoxer.
 
 - Decision: When a pull request is associated with a task, transition the task
@@ -178,22 +172,19 @@ PostgreSQL integration tests proving happy and unhappy paths.
   state updates". The natural mapping is PR → InReview. Transition validation
   (e.g., rejecting InReview → InReview) is deferred to 1.2.3 which explicitly
   covers "Enforce task state transitions with validation". In 1.2.2 the state
-  update is unconditional.
-  Date/Author: 2026-02-11 / DevBoxer.
+  update is unconditional. Date/Author: 2026-02-11 / DevBoxer.
 
 - Decision: Introduce a `VcsProvider` type alias for `IssueProvider` rather
-  than renaming the existing enum.
-  Rationale: `BranchRef` and `PullRequestRef` use the same provider concept
-  as `IssueRef` but the name `IssueProvider` is misleading for branch/PR
-  contexts. A type alias avoids breaking existing code while giving new types
-  a natural name. A full rename can follow as a separate refactoring commit.
-  Date/Author: 2026-02-11 / DevBoxer.
+  than renaming the existing enum. Rationale: `BranchRef` and `PullRequestRef`
+  use the same provider concept as `IssueRef` but the name `IssueProvider` is
+  misleading for branch/PR contexts. A type alias avoids breaking existing code
+  while giving new types a natural name. A full rename can follow as a separate
+  refactoring commit. Date/Author: 2026-02-11 / DevBoxer.
 
 - Decision: Add a non-unique index on `branch_ref` for query performance but
-  not for uniqueness enforcement.
-  Rationale: `find_by_branch_ref` and `find_all_by_branch_ref` need efficient
-  lookups. A B-tree index on the column (WHERE NOT NULL) accelerates these
-  queries without constraining cardinality.
+  not for uniqueness enforcement. Rationale: `find_by_branch_ref` and
+  `find_all_by_branch_ref` need efficient lookups. A B-tree index on the column
+  (WHERE NOT NULL) accelerates these queries without constraining cardinality.
   Date/Author: 2026-02-11 / DevBoxer.
 
 ## Outcomes & Retrospective
@@ -206,14 +197,14 @@ Deviations from the original plan:
 
 - Stages B and C were merged into a single pass for efficiency.
 - The `VcsProvider` type alias was implemented as planned but is not yet used
-  externally; existing code continues to reference `IssueProvider` directly.
-  A separate refactoring pass could introduce this alias more broadly.
+  externally; existing code continues to reference `IssueProvider` directly. A
+  separate refactoring pass could introduce this alias more broadly.
 
 Lessons learned:
 
 - The `IssueRef` pattern (validated value object with `from_parts`,
-  `to_canonical`, `parse_canonical`) proved highly reusable for `BranchRef`
-  and `PullRequestRef`.
+  `to_canonical`, `parse_canonical`) proved highly reusable for `BranchRef` and
+  `PullRequestRef`.
 - Clippy's strict deny configuration requires careful attention in test
   helpers: `expect_used` is allowed in `#[test]` functions but not in
   standalone helpers.
@@ -310,16 +301,18 @@ no colon characters (reserved as delimiter), total length at most 200
 characters (leaving room for provider:repo prefix in the 255-char column). Add
 `as_str()`, `Display`, `Serialize/Deserialize` (via `serde(transparent)`).
 
-Define `BranchRef`, a composite value object with fields `provider:
-IssueProvider` (reuse existing enum), `repository: RepositoryFullName` (reuse
-existing type), and `branch_name: BranchName`. Add a `from_parts(provider: &str,
-repository: &str, branch_name: &str) -> Result<Self, TaskDomainError>`
-constructor that delegates validation to each component. Add
-`to_canonical(&self) -> String` returning `"provider:owner/repo:branch-name"`
-and `fn parse_canonical(s: &str) -> Result<Self, TaskDomainError>` for
-round-trip parsing. Implement `Display` (delegates to `to_canonical`) and
-`TryFrom<&str>` (delegates to `parse_canonical`). Derive `Debug, Clone,
-PartialEq, Eq, Hash, Serialize, Deserialize`.
+Define `BranchRef`, a composite value object with fields
+`provider: IssueProvider` (reuse existing enum),
+`repository: RepositoryFullName` (reuse existing type), and
+`branch_name: BranchName`. Add a
+`from_parts(provider: &str, repository: &str, branch_name: &str)`
+`-> Result<Self, TaskDomainError>` constructor that delegates validation to
+each component. Add `to_canonical(&self) -> String` returning
+`"provider:owner/repo:branch-name"` and
+`fn parse_canonical(s: &str) -> Result<Self, TaskDomainError>` for round-trip
+parsing. Implement `Display` (delegates to `to_canonical`) and `TryFrom<&str>`
+(delegates to `parse_canonical`). Derive
+`Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize`.
 
 **New file `src/task/domain/pull_request.rs`:**
 
@@ -327,11 +320,11 @@ Define `PullRequestNumber`, a `u64` newtype with the same validation as
 `IssueNumber` (positive, fits `i64::MAX`). Add `value()`, `Display`,
 `Serialize/Deserialize`.
 
-Define `PullRequestRef`, a composite value object with fields `provider:
-IssueProvider`, `repository: RepositoryFullName`, and `pull_request_number:
-PullRequestNumber`. Add `from_parts`, `to_canonical` (returning
-`"provider:owner/repo:42"`), `parse_canonical`, `Display`, `TryFrom<&str>`.
-Derive same traits as `BranchRef`.
+Define `PullRequestRef`, a composite value object with fields
+`provider: IssueProvider`, `repository: RepositoryFullName`, and
+`pull_request_number: PullRequestNumber`. Add `from_parts`, `to_canonical`
+(returning `"provider:owner/repo:42"`), `parse_canonical`, `Display`,
+`TryFrom<&str>`. Derive same traits as `BranchRef`.
 
 **Modify `src/task/domain/error.rs`:**
 
@@ -349,9 +342,9 @@ Add four new variants to `TaskDomainError`:
 
 **Modify `src/task/domain/mod.rs`:**
 
-Add `mod branch; mod pull_request;` and re-export: `BranchName, BranchRef,
-PullRequestNumber, PullRequestRef`. Add `pub type VcsProvider =
-IssueProvider;`.
+Add `mod branch; mod pull_request;` and re-export:
+`BranchName, BranchRef, PullRequestNumber, PullRequestRef`. Add
+`pub type VcsProvider = IssueProvider;`.
 
 Go/no-go: `make check-fmt && make lint` pass. New types compile cleanly.
 
@@ -366,7 +359,7 @@ Add optional fields to `Task`:
 
 Add corresponding fields to `PersistedTaskData`.
 
-Update `new_from_issue` to initialise both as `None`.
+Update `new_from_issue` to initialize both as `None`.
 
 Update `from_persisted` to populate from `PersistedTaskData`.
 
@@ -377,14 +370,13 @@ Add accessor methods:
 
 Add mutation methods:
 
-- `pub fn associate_branch(&mut self, branch_ref: BranchRef, clock: &impl
-  Clock) -> Result<(), TaskDomainError>` — returns
-  `BranchAlreadyAssociated` if already set; otherwise sets field and updates
-  `updated_at`.
-- `pub fn associate_pull_request(&mut self, pr_ref: PullRequestRef, clock:
-  &impl Clock) -> Result<(), TaskDomainError>` — returns
-  `PullRequestAlreadyAssociated` if already set; otherwise sets field,
-  transitions state to `InReview`, and updates `updated_at`.
+- `associate_branch(&mut self, BranchRef, &impl Clock)`
+  `-> Result<(), TaskDomainError>` — returns `BranchAlreadyAssociated` if
+  already set; otherwise sets field and updates `updated_at`.
+- `associate_pull_request(&mut self, PullRequestRef, &impl Clock)`
+  `-> Result<(), TaskDomainError>` — returns `PullRequestAlreadyAssociated` if
+  already set; otherwise sets field, transitions state to `InReview`, and
+  updates `updated_at`.
 
 **Modify `src/task/ports/repository.rs`:**
 
@@ -393,8 +385,8 @@ Add three new methods to the `TaskRepository` trait:
 - `async fn update(&self, task: &Task) -> TaskRepositoryResult<()>` — persists
   changes to an existing task.
 - `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) ->
-  TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the branch
-  (may be multiple due to many-to-many).
+  TaskRepositoryResult<Vec<Task>>
+  ` — returns all tasks linked to the branch (may be multiple due to many-to-many).
 - `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) ->
   TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the PR.
 
@@ -408,19 +400,20 @@ implementations with `todo!()` stubs.
 
 **Modify `src/task/adapters/postgres/repository.rs`:**
 
-Update `to_new_row`: serialise `task.branch_ref()` and
+Update `to_new_row`: serialize `task.branch_ref()` and
 `task.pull_request_ref()` using their `to_canonical()` / `to_string()` methods
 (replacing the hardcoded `None` values).
 
-Update `row_to_task`: remove the blanket `debug_assert!` for branch/PR.
-Replace with workspace-only assert. Parse `branch_ref` and `pull_request_ref`
-strings into domain types using `BranchRef::parse_canonical` and
+Update `row_to_task`: remove the blanket `debug_assert!` for branch/PR. Replace
+with workspace-only assert. Parse `branch_ref` and `pull_request_ref` strings
+into domain types using `BranchRef::parse_canonical` and
 `PullRequestRef::parse_canonical`, mapping parse errors via
 `TaskRepositoryError::persistence`.
 
-Implement `update`: use `diesel::update(tasks::table.filter(tasks::id.eq(...)))
-.set((...))` to write `branch_ref`, `pull_request_ref`, `state`, and
-`updated_at`. Return `NotFound` if zero rows affected.
+Implement `update`: use
+`diesel::update(tasks::table.filter(tasks::id.eq(...))) .set((...))` to write
+`branch_ref`, `pull_request_ref`, `state`, and `updated_at`. Return `NotFound`
+if zero rows affected.
 
 Implement `find_by_branch_ref`: filter by `tasks::branch_ref.eq(canonical)`,
 collect all matching rows, map each via `row_to_task`.
@@ -465,8 +458,7 @@ canonical string, return cloned tasks.
 
 **Update `tests/postgres/helpers.rs`:**
 
-Add the new migration SQL constant and apply it in the template setup
-function.
+Add the new migration SQL constant and apply it in the template setup function.
 
 Go/no-go: `make check-fmt && make lint` pass. Existing tests still pass (1.2.1
 behaviour preserved).
@@ -497,8 +489,8 @@ Add service methods to `TaskLifecycleService`:
   updated task.
 - `associate_pull_request(request) -> TaskLifecycleResult<Task>`: validate
   inputs via `PullRequestRef::from_parts`, fetch task by ID, call
-  `task.associate_pull_request(...)` (which also transitions to InReview),
-  call `repository.update(&task)`, return updated task.
+  `task.associate_pull_request(...)` (which also transitions to InReview), call
+  `repository.update(&task)`, return updated task.
 - `find_by_branch_ref(branch_ref) -> TaskLifecycleResult<Vec<Task>>`:
   delegate to `repository.find_by_branch_ref`.
 - `find_by_pull_request_ref(pr_ref) -> TaskLifecycleResult<Vec<Task>>`:
@@ -590,8 +582,7 @@ Go/no-go: `make check-fmt && make lint` pass.
 
 Follow the exact pattern of `tests/task_issue_steps/`: `mod.rs`, `world.rs`,
 `given.rs`, `when.rs`, `then.rs`. Extend a new world struct
-(`TaskBranchPrWorld`) containing the service, pending refs, and result
-holders.
+(`TaskBranchPrWorld`) containing the service, pending refs, and result holders.
 
 **BDD runner — new file `tests/task_branch_pr_association_steps.rs`:**
 
@@ -770,7 +761,7 @@ Quality criteria:
 - If adapter work fails midway: existing 1.2.1 tests provide a safety net.
   All 1.2.1 behaviour must pass before proceeding.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Files to create:
 
@@ -816,12 +807,12 @@ Domain types (all in `src/task/domain/`):
 
 - `BranchName` — string newtype, validated (non-empty, no colons, ≤200 chars).
 - `BranchRef` — `{ provider: IssueProvider, repository: RepositoryFullName,
-  branch_name: BranchName }`. Canonical format:
-  `"provider:owner/repo:branch-name"`.
+  branch_name: BranchName
+  }`. Canonical format: `"provider:owner/repo:branch-name"`.
 - `PullRequestNumber` — `u64` newtype, validated (positive, ≤ `i64::MAX`).
 - `PullRequestRef` — `{ provider: IssueProvider, repository:
-  RepositoryFullName, pull_request_number: PullRequestNumber }`. Canonical
-  format: `"provider:owner/repo:42"`.
+  RepositoryFullName, pull_request_number: PullRequestNumber
+  }`. Canonical format: `"provider:owner/repo:42"`.
 - `VcsProvider` — type alias for `IssueProvider`.
 
 Port contract extensions (in `src/task/ports/repository.rs`):
