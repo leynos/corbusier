@@ -144,12 +144,23 @@ async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
 }
 
 #[rstest]
+#[case::branch("branch")]
+#[case::pull_request("pull_request")]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_returns_not_found_for_unknown_task(service: TestService) {
+async fn association_returns_not_found_for_unknown_task(service: TestService, #[case] kind: &str) {
     let unknown_id = TaskId::new();
-    let request = AssociateBranchRequest::new(unknown_id, "github", "owner/repo", "main");
 
-    let result = service.associate_branch(request).await;
+    let result: Result<Task, TaskLifecycleError> = match kind {
+        "branch" => {
+            let request = AssociateBranchRequest::new(unknown_id, "github", "owner/repo", "main");
+            service.associate_branch(request).await
+        }
+        "pull_request" => {
+            let request = AssociatePullRequestRequest::new(unknown_id, "github", "owner/repo", 1);
+            service.associate_pull_request(request).await
+        }
+        other => panic!("unknown association kind: {other}"),
+    };
 
     assert_not_found_error(result);
 }
@@ -232,17 +243,6 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(service: TestServ
         assert_pr_already_associated_error,
     )
     .await;
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn associate_pull_request_returns_not_found_for_unknown_task(service: TestService) {
-    let unknown_id = TaskId::new();
-    let request = AssociatePullRequestRequest::new(unknown_id, "github", "owner/repo", 1);
-
-    let result = service.associate_pull_request(request).await;
-
-    assert_not_found_error(result);
 }
 
 /// Helper to test that multiple tasks can share the same reference.

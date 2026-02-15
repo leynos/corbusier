@@ -1,15 +1,15 @@
 # Associate branches and pull requests with tasks (roadmap 1.2.2)
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
+`Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
 `PLANS.md` is not present in this repository as of 2026-02-11, so this plan is
 the controlling execution document for this feature.
 
-On approval, this plan must be written to
+This plan resides at
 `docs/execplans/1-2-2-associate-branches-and-pull-requests-with-tasks.md`.
 
 ## Purpose / big picture
