@@ -5,7 +5,9 @@ use super::{
     schema::tasks,
 };
 use crate::task::{
-    domain::{IssueRef, PersistedTaskData, Task, TaskId, TaskOrigin, TaskState},
+    domain::{
+        BranchRef, IssueRef, PersistedTaskData, PullRequestRef, Task, TaskId, TaskOrigin, TaskState,
+    },
     ports::{TaskRepository, TaskRepositoryError, TaskRepositoryResult},
 };
 use async_trait::async_trait;
@@ -45,6 +47,24 @@ impl PostgresTaskRepository {
     }
 }
 
+/// Generates a `find_by_*_ref` body that filters `tasks` by a nullable
+/// `VARCHAR` column and maps the resulting rows to domain `Task` values.
+macro_rules! find_tasks_by_ref_column {
+    ($self:expr, $ref_str:expr, $column:expr) => {{
+        let value = $ref_str;
+        $self
+            .run_blocking(move |connection| {
+                let rows = tasks::table
+                    .filter($column.eq(&value))
+                    .select(TaskRow::as_select())
+                    .load::<TaskRow>(connection)
+                    .map_err(TaskRepositoryError::persistence)?;
+                rows.into_iter().map(row_to_task).collect()
+            })
+            .await
+    }};
+}
+
 #[async_trait]
 impl TaskRepository for PostgresTaskRepository {
     async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
@@ -53,9 +73,8 @@ impl TaskRepository for PostgresTaskRepository {
         let new_row = to_new_row(task)?;
 
         self.run_blocking(move |connection| {
-            // This pre-check improves semantic error reporting but is not relied
-            // on for correctness: the unique index still enforces integrity in
-            // the TOCTOU window between check and insert.
+            // Pre-check for semantic error reporting; the unique index still
+            // enforces integrity in the TOCTOU window between check and insert.
             let duplicate_issue = find_task_by_issue_ref(connection, &issue_ref)?;
             if duplicate_issue.is_some() {
                 return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref.clone()));
@@ -76,6 +95,32 @@ impl TaskRepository for PostgresTaskRepository {
                     _ => TaskRepositoryError::persistence(err),
                 })?;
 
+            Ok(())
+        })
+        .await
+    }
+
+    async fn update(&self, task: &Task) -> TaskRepositoryResult<()> {
+        let task_id = task.id().into_inner();
+        let branch_val = task.branch_ref().map(ToString::to_string);
+        let pr_val = task.pull_request_ref().map(ToString::to_string);
+        let state_val = task.state().as_str().to_owned();
+        let updated_val = task.updated_at();
+
+        self.run_blocking(move |connection| {
+            let updated_count = diesel::update(tasks::table.filter(tasks::id.eq(task_id)))
+                .set((
+                    tasks::branch_ref.eq(&branch_val),
+                    tasks::pull_request_ref.eq(&pr_val),
+                    tasks::state.eq(&state_val),
+                    tasks::updated_at.eq(updated_val),
+                ))
+                .execute(connection)
+                .map_err(TaskRepositoryError::persistence)?;
+
+            if updated_count == 0 {
+                return Err(TaskRepositoryError::NotFound(TaskId::from_uuid(task_id)));
+            }
             Ok(())
         })
         .await
@@ -102,6 +147,19 @@ impl TaskRepository for PostgresTaskRepository {
         })
         .await
     }
+
+    async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>> {
+        let ref_str = branch_ref.to_string();
+        find_tasks_by_ref_column!(self, ref_str, tasks::branch_ref)
+    }
+
+    async fn find_by_pull_request_ref(
+        &self,
+        pr_ref: &PullRequestRef,
+    ) -> TaskRepositoryResult<Vec<Task>> {
+        let ref_str = pr_ref.to_string();
+        find_tasks_by_ref_column!(self, ref_str, tasks::pull_request_ref)
+    }
 }
 
 fn to_new_row(task: &Task) -> TaskRepositoryResult<NewTaskRow> {
@@ -110,8 +168,8 @@ fn to_new_row(task: &Task) -> TaskRepositoryResult<NewTaskRow> {
     Ok(NewTaskRow {
         id: task.id().into_inner(),
         origin,
-        branch_ref: None,
-        pull_request_ref: None,
+        branch_ref: task.branch_ref().map(ToString::to_string),
+        pull_request_ref: task.pull_request_ref().map(ToString::to_string),
         state: task.state().as_str().to_owned(),
         workspace_id: None,
         created_at: task.created_at(),
@@ -131,11 +189,10 @@ fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
         updated_at,
     } = row;
 
-    let has_deferred_links =
-        branch_ref.is_some() || pull_request_ref.is_some() || workspace_id.is_some();
+    // workspace_id is still deferred to roadmap item 1.2.3.
     debug_assert!(
-        !has_deferred_links,
-        "deferred task link/workspace columns should remain unset until roadmap items 1.2.2 and 1.2.3"
+        workspace_id.is_none(),
+        "workspace column should remain unset until roadmap item 1.2.3"
     );
 
     let origin = serde_json::from_value::<TaskOrigin>(persisted_origin)
@@ -143,9 +200,20 @@ fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
     let state =
         TaskState::try_from(persisted_state.as_str()).map_err(TaskRepositoryError::persistence)?;
 
+    let parsed_branch = branch_ref
+        .map(|s| BranchRef::parse_canonical(&s))
+        .transpose()
+        .map_err(TaskRepositoryError::persistence)?;
+    let parsed_pr = pull_request_ref
+        .map(|s| PullRequestRef::parse_canonical(&s))
+        .transpose()
+        .map_err(TaskRepositoryError::persistence)?;
+
     let data = PersistedTaskData {
         id: TaskId::from_uuid(id),
         origin,
+        branch_ref: parsed_branch,
+        pull_request_ref: parsed_pr,
         state,
         created_at,
         updated_at,

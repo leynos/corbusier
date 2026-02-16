@@ -1,6 +1,6 @@
-//! Repository port for task persistence and issue-reference lookup.
+//! Repository port for task persistence, lookup, and association management.
 
-use crate::task::domain::{IssueRef, Task, TaskId};
+use crate::task::domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskId};
 use async_trait::async_trait;
 use std::sync::Arc;
 use thiserror::Error;
@@ -20,6 +20,14 @@ pub trait TaskRepository: Send + Sync {
     /// reference already maps to a task.
     async fn store(&self, task: &Task) -> TaskRepositoryResult<()>;
 
+    /// Persists changes to an existing task (branch/PR associations, state,
+    /// timestamps).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskRepositoryError::NotFound`] when the task does not exist.
+    async fn update(&self, task: &Task) -> TaskRepositoryResult<()>;
+
     /// Finds a task by internal task identifier.
     ///
     /// Returns `None` when the task does not exist.
@@ -29,6 +37,19 @@ pub trait TaskRepository: Send + Sync {
     ///
     /// Returns `None` when no task is associated with the issue reference.
     async fn find_by_issue_ref(&self, issue_ref: &IssueRef) -> TaskRepositoryResult<Option<Task>>;
+
+    /// Returns all tasks linked to the given branch reference.
+    ///
+    /// Multiple tasks may share a branch (many-to-many relationship).
+    async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>>;
+
+    /// Returns all tasks linked to the given pull request reference.
+    ///
+    /// Multiple tasks may share a pull request (many-to-many relationship).
+    async fn find_by_pull_request_ref(
+        &self,
+        pr_ref: &PullRequestRef,
+    ) -> TaskRepositoryResult<Vec<Task>>;
 }
 
 /// Errors returned by task repository implementations.

@@ -1,4 +1,4 @@
-//! Service orchestration tests for issue-to-task creation.
+//! Service orchestration tests for task lifecycle operations.
 
 use std::sync::Arc;
 

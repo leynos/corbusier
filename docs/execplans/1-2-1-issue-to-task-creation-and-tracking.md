@@ -63,10 +63,9 @@ unhappy paths.
 
 - Risk: Existing migrations do not currently create a `tasks` table, while
   schema and design references for task lifecycle assume one exists. Severity:
-  high
-  Likelihood: high
-  Mitigation: add a dedicated migration for task lifecycle foundations and
-  verify Diesel schema regeneration plus migration ordering.
+  high Likelihood: high Mitigation: add a dedicated migration for task
+  lifecycle foundations and verify Diesel schema regeneration plus migration
+  ordering.
 
 - Risk: Duplicate issue-task creation if uniqueness is checked only in-memory.
   Severity: high Likelihood: medium Mitigation: enforce uniqueness in adapter
@@ -127,8 +126,8 @@ unhappy paths.
 ## Outcomes & Retrospective
 
 Initial planning outcome: requirements and architecture constraints are now
-captured in an executable implementation sequence. Outcomes, deviations,
-and lessons learned will be filled in after execution.
+captured in an executable implementation sequence. Outcomes, deviations, and
+lessons learned will be filled in after execution.
 
 ## Context and orientation
 
