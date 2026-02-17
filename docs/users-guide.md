@@ -172,3 +172,72 @@ async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Task state transitions
+
+Task state transitions are validated against the domain state machine. Invalid
+transitions are rejected with a typed `TaskDomainError::InvalidStateTransition`
+error that includes the task ID and the requested `from` and `to` states.
+
+Allowed transitions:
+
+| From state    | Allowed target states                      |
+| ------------- | ------------------------------------------ |
+| `draft`       | `in_progress`, `in_review`, `abandoned`    |
+| `in_progress` | `in_review`, `paused`, `done`, `abandoned` |
+| `in_review`   | `in_progress`, `done`, `abandoned`         |
+| `paused`      | `in_progress`, `abandoned`                 |
+| `done`        | *(terminal)*                               |
+| `abandoned`   | *(terminal)*                               |
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::task::{
+    adapters::memory::InMemoryTaskRepository,
+    domain::{TaskDomainError, TaskState},
+    services::{
+        CreateTaskFromIssueRequest, TaskLifecycleError, TaskLifecycleService,
+        TransitionTaskRequest,
+    },
+};
+use mockable::DefaultClock;
+
+async fn transition_task_states() -> Result<(), Box<dyn std::error::Error>> {
+    let service = TaskLifecycleService::new(
+        Arc::new(InMemoryTaskRepository::new()),
+        Arc::new(DefaultClock),
+    );
+
+    let task = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            330,
+            "Validate task transitions",
+        ))
+        .await?;
+
+    let transitioned = service
+        .transition_task(TransitionTaskRequest::new(task.id(), "in_progress"))
+        .await?;
+    assert_eq!(transitioned.state(), TaskState::InProgress);
+
+    let invalid = service
+        .transition_task(TransitionTaskRequest::new(task.id(), "draft"))
+        .await;
+
+    assert!(matches!(
+        invalid,
+        Err(TaskLifecycleError::Domain(
+            TaskDomainError::InvalidStateTransition {
+                from: TaskState::InProgress,
+                to: TaskState::Draft,
+                ..
+            }
+        ))
+    ));
+
+    Ok(())
+}
+```

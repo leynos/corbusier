@@ -50,13 +50,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §2.2.2 and §4.1.1.2.
   - [x] Success criteria: task records include branch and pull request
     references for all linked work items.
-- [ ] 1.2.3 Enforce task state transitions with validation. Requires 1.2.1. See
+- [x] 1.2.3 Enforce task state transitions with validation. Requires 1.2.1. See
   corbusier-design.md §4.3.1.2 and §4.4.1.1.
-  - [ ] Define allowed transitions and terminal states. See
+  - [x] Define allowed transitions and terminal states. See
     corbusier-design.md §4.3.1.2.
-  - [ ] Reject invalid transitions with typed errors. See
+  - [x] Reject invalid transitions with typed errors. See
     corbusier-design.md §4.4.1.1.
-  - [ ] Success criteria: invalid task transitions are rejected with an
+  - [x] Success criteria: invalid task transitions are rejected with an
     auditable error event.
 
 ### 1.3. Agent backend orchestration
