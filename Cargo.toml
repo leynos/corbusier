@@ -34,7 +34,7 @@ tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
 # Embedded PostgreSQL support (tests and tooling)
 pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "async-api"] }
-postgresql_embedded = "0.20.0"
+postgresql_embedded = "0.20.1"
 
 [dev-dependencies]
 rstest = "0.26.1"
