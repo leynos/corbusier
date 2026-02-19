@@ -44,19 +44,16 @@ impl TaskState {
     /// Returns whether this state can transition to the target state.
     #[must_use]
     pub const fn can_transition_to(self, target: Self) -> bool {
-        matches!(
-            (self, target),
-            (
-                Self::Draft | Self::InReview | Self::Paused,
-                Self::InProgress
-            ) | (Self::Draft | Self::InProgress, Self::InReview)
-                | (
-                    Self::Draft | Self::InProgress | Self::InReview | Self::Paused,
-                    Self::Abandoned
-                )
-                | (Self::InProgress, Self::Paused | Self::Done)
-                | (Self::InReview, Self::Done)
-        )
+        match self {
+            Self::Draft => matches!(target, Self::InProgress | Self::InReview | Self::Abandoned),
+            Self::InProgress => matches!(
+                target,
+                Self::InReview | Self::Paused | Self::Done | Self::Abandoned
+            ),
+            Self::InReview => matches!(target, Self::InProgress | Self::Done | Self::Abandoned),
+            Self::Paused => matches!(target, Self::InProgress | Self::Abandoned),
+            Self::Done | Self::Abandoned => false,
+        }
     }
 
     /// Returns whether this state is terminal.
@@ -249,7 +246,8 @@ impl Task {
     ///
     /// Returns [`TaskDomainError::PullRequestAlreadyAssociated`] if a pull
     /// request is already set, or [`TaskDomainError::InvalidStateTransition`]
-    /// when the task cannot transition to [`TaskState::InReview`].
+    /// when the task cannot transition to [`TaskState::InReview`] from its
+    /// current state.
     pub fn associate_pull_request(
         &mut self,
         pr_ref: PullRequestRef,
@@ -258,16 +256,15 @@ impl Task {
         if self.pull_request_ref.is_some() {
             return Err(TaskDomainError::PullRequestAlreadyAssociated(self.id));
         }
-        if !self.state.can_transition_to(TaskState::InReview) {
-            return Err(TaskDomainError::InvalidStateTransition {
-                task_id: self.id,
-                from: self.state,
-                to: TaskState::InReview,
-            });
+
+        if self.state == TaskState::InReview {
+            self.pull_request_ref = Some(pr_ref);
+            self.touch(clock);
+            return Ok(());
         }
+
+        self.transition_to(TaskState::InReview, clock)?;
         self.pull_request_ref = Some(pr_ref);
-        self.state = TaskState::InReview;
-        self.touch(clock);
         Ok(())
     }
 

@@ -50,3 +50,19 @@ fn transition_fails_with_invalid_state_transition(
 
     Ok(())
 }
+
+#[then("the transition fails with an invalid state error")]
+fn transition_fails_with_invalid_state_error(
+    world: &TaskTransitionWorld,
+) -> Result<(), eyre::Report> {
+    let result = world
+        .last_transition_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("missing transition result"))?;
+
+    if !matches!(result, Err(TaskLifecycleError::InvalidState(_))) {
+        return Err(eyre::eyre!("expected InvalidState error, got {result:?}"));
+    }
+
+    Ok(())
+}

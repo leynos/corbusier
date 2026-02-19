@@ -21,3 +21,10 @@ Feature: Task state transitions
     And the task has been transitioned to "abandoned"
     When the task is transitioned to "in_progress"
     Then the transition fails with an invalid state transition error
+
+  Scenario: Reject transition with an invalid state string
+    Given an external issue "github" "corbusier/core" #323
+    And the issue has title "Transition parse error path"
+    And the issue has been converted into a task
+    When the task is transitioned to "invalid_state"
+    Then the transition fails with an invalid state error

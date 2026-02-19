@@ -32,3 +32,12 @@ async fn reject_draft_to_done(world: TaskTransitionWorld) {
 async fn reject_transition_from_terminal(world: TaskTransitionWorld) {
     let _ = world;
 }
+
+#[scenario(
+    path = "tests/features/task_state_transitions.feature",
+    name = "Reject transition with an invalid state string"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_transition_with_invalid_state_string(world: TaskTransitionWorld) {
+    let _ = world;
+}

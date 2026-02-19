@@ -181,6 +181,8 @@ error that includes the task ID and the requested `from` and `to` states.
 
 Allowed transitions:
 
+Table 1. Allowed task state transitions.
+
 | From state    | Allowed target states                      |
 | ------------- | ------------------------------------------ |
 | `draft`       | `in_progress`, `in_review`, `abandoned`    |

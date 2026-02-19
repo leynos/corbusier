@@ -1,8 +1,9 @@
 # Enforce task state transitions with validation (roadmap 1.2.3)
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -32,7 +33,8 @@ After this change, a developer can:
   to `InReview`), but observe that it fails on tasks in terminal states.
 
 Success is observable by running `make all` and seeing all existing tests plus
-new unit tests, BDD scenarios, and integration tests pass.
+new unit tests, Behaviour-Driven Development (BDD) scenarios, and integration
+tests pass.
 
 ## Constraints
 
@@ -58,7 +60,7 @@ new unit tests, BDD scenarios, and integration tests pass.
 - Update `docs/users-guide.md` with new behaviour and code examples.
 - Update `docs/roadmap.md` to mark 1.2.3 as complete.
 - Use en-GB-oxendict spelling in comments and documentation.
-- The `TaskState` enum's `serde(rename_all = "snake_case")` serialisation
+- The `TaskState` enum's `serde(rename_all = "snake_case")` serialization
   format must not change.
 - No new external crate dependencies.
 
@@ -287,9 +289,10 @@ limits.
 
 Edit `src/task/services/lifecycle.rs`:
 
-B1. Add `TransitionTaskRequest` DTO after `AssociatePullRequestRequest`. Takes
-`task_id: TaskId` and `target_state: String` (string at service boundary,
-matching the pattern of other request DTOs). Constructor:
+B1. Add `TransitionTaskRequest` data transfer object (DTO) after
+`AssociatePullRequestRequest`. Takes `task_id: TaskId` and
+`target_state: String` (string at service boundary, matching the pattern of
+other request DTOs). Constructor:
 `new(task_id: TaskId, target_state: impl Into<String>)`.
 
 B2. Add `InvalidState` variant to `TaskLifecycleError`:
@@ -333,7 +336,7 @@ C4. Unhappy-path test: `transition_from_draft_to_done_is_rejected` -- creates a
 correct fields, asserts state unchanged.
 
 C5. Terminal state test: `terminal_state_rejects_all_transitions` --
-parametrised over `Done` and `Abandoned`, navigates to each terminal state,
+parameterized over `Done` and `Abandoned`, navigates to each terminal state,
 then asserts all outgoing transitions are rejected.
 
 Register the new module in `src/task/tests/mod.rs`:
@@ -450,7 +453,7 @@ Quality criteria (what "done" means):
 - Formatting: `cargo fmt --all -- --check` reports no changes needed.
 - Documentation: `cargo doc --no-deps` builds without warnings.
 
-Quality method (how we check):
+Quality method (verification approach):
 
     make all
 
