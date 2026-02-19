@@ -58,11 +58,11 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     pairs, invalid transitions return typed error variants, and terminal states
     reject all outgoing transitions in tested paths.
 
-### 1.3. Agent backend orchestration
-
 [^1]: `docs/corbusier-design.md` §4.3.1.2 and §4.4.1.1.
 [^2]: `docs/corbusier-design.md` §4.3.1.2.
 [^3]: `docs/corbusier-design.md` §4.4.1.1.
+
+### 1.3. Agent backend orchestration
 
 - [ ] 1.3.1 Implement agent backend registration and discovery. See
   corbusier-design.md §2.2.3.
