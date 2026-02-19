@@ -229,6 +229,8 @@ metadata.
 
 ### State machine definition
 
+Table 1. Allowed task state transitions for roadmap item 1.2.3.
+
 | From state   | Allowed target states                     |
 | ------------ | ----------------------------------------- |
 | `Draft`      | `InProgress`, `InReview`, `Abandoned`     |
@@ -480,6 +482,8 @@ re-running `make all` from the repository root will identify remaining issues.
 
 ### New files (9)
 
+Table 2. New files added for this implementation.
+
 | File                                                     | Purpose                      |
 | -------------------------------------------------------- | ---------------------------- |
 | `docs/execplans/1-2-3-enforce-task-state-transitions.md` | This ExecPlan                |
@@ -493,6 +497,8 @@ re-running `make all` from the repository root will identify remaining issues.
 | `tests/task_state_transition_steps/then.rs`              | Then step definitions        |
 
 ### Modified files (10)
+
+Table 3. Existing files modified for this implementation.
 
 | File                                      | Change                                                                                              |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
