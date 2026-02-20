@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
-    domain::{BranchRef, IssueRef, PullRequestRef, TaskState},
+    domain::{
+        BranchRef, IssueRef, ParseTaskStateError, PullRequestRef, TaskDomainError, TaskState,
+    },
     ports::TaskRepositoryError,
     services::{
         AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
-        TaskLifecycleService,
+        TaskLifecycleError, TaskLifecycleService, TransitionTaskRequest,
     },
 };
 use mockable::DefaultClock;
@@ -306,4 +308,70 @@ async fn find_by_pull_request_ref_returns_empty_when_none_match(service: TestSer
         found.is_empty(),
         "expected empty result for unmatched PR ref"
     );
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn transition_task_from_draft_to_in_progress(service: TestService) {
+    let task = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            306,
+            "Transition happy path",
+        ))
+        .await
+        .expect("task creation should succeed");
+    let transitioned = service
+        .transition_task(TransitionTaskRequest::new(task.id(), "in_progress"))
+        .await
+        .expect("transition should succeed");
+    assert_eq!(transitioned.state(), TaskState::InProgress);
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn transition_rejects_invalid_state_change(service: TestService) {
+    let task = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            307,
+            "Transition invalid path",
+        ))
+        .await
+        .expect("task creation should succeed");
+    let result = service
+        .transition_task(TransitionTaskRequest::new(task.id(), "done"))
+        .await;
+    assert!(matches!(
+        result,
+        Err(TaskLifecycleError::Domain(
+            TaskDomainError::InvalidStateTransition {
+                from: TaskState::Draft,
+                to: TaskState::Done,
+                ..
+            }
+        ))
+    ));
+}
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn transition_rejects_unknown_state_string(service: TestService) {
+    let task = service
+        .create_from_issue(CreateTaskFromIssueRequest::new(
+            "github",
+            "corbusier/core",
+            308,
+            "Transition parse failure",
+        ))
+        .await
+        .expect("task creation should succeed");
+    let result = service
+        .transition_task(TransitionTaskRequest::new(task.id(), "nonexistent_state"))
+        .await;
+    assert!(matches!(
+        result,
+        Err(TaskLifecycleError::InvalidState(ParseTaskStateError(_)))
+    ));
 }

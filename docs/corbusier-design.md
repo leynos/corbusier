@@ -874,6 +874,23 @@ Corbusier implements this through:
   - Security Requirements: State change authorization and audit logging
   - Compliance Requirements: Complete state transition history preservation
 
+###### Implementation decisions (2026-02-17) — roadmap 1.2.3
+
+- Task-state transition rules are implemented as
+  `TaskState::can_transition_to(target)` with terminal-state detection via
+  `TaskState::is_terminal()`.
+- Invalid state changes return
+  `TaskDomainError::InvalidStateTransition { task_id, from, to }`, giving an
+  auditable, typed rejection at the domain boundary.
+- The lifecycle service exposes `transition_task` with a string target state at
+  the service boundary and maps parse failures to
+  `TaskLifecycleError::InvalidState`.
+- `associate_pull_request` now validates transition eligibility before mutating
+  pull-request association fields, so terminal states reject PR association.
+- `TransitionContext` and domain-event emission shown in the conceptual section
+  remain deferred. Roadmap 1.2.3 is scoped to transition validation and typed
+  rejection only.
+
 ##### F-002-RQ-004: PR Lifecycle Integration
 
 - **Technical Specifications:**

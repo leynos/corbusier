@@ -7,6 +7,7 @@ use super::{
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Task lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -38,6 +39,33 @@ impl TaskState {
             Self::Done => "done",
             Self::Abandoned => "abandoned",
         }
+    }
+
+    /// Returns whether this state can transition to the target state.
+    #[must_use]
+    pub const fn can_transition_to(self, target: Self) -> bool {
+        match self {
+            Self::Draft => matches!(target, Self::InProgress | Self::InReview | Self::Abandoned),
+            Self::InProgress => matches!(
+                target,
+                Self::InReview | Self::Paused | Self::Done | Self::Abandoned
+            ),
+            Self::InReview => matches!(target, Self::InProgress | Self::Done | Self::Abandoned),
+            Self::Paused => matches!(target, Self::InProgress | Self::Abandoned),
+            Self::Done | Self::Abandoned => false,
+        }
+    }
+
+    /// Returns whether this state is terminal.
+    #[must_use]
+    pub const fn is_terminal(self) -> bool {
+        matches!(self, Self::Done | Self::Abandoned)
+    }
+}
+
+impl fmt::Display for TaskState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -212,24 +240,53 @@ impl Task {
     /// Associates a pull request with this task.
     ///
     /// Transitions the task state to [`TaskState::InReview`] as a side
-    /// effect. State transition validation (guard logic) is deferred to
-    /// roadmap item 1.2.3.
+    /// effect.
     ///
     /// # Errors
     ///
     /// Returns [`TaskDomainError::PullRequestAlreadyAssociated`] if a pull
-    /// request is already set.
+    /// request is already set, or [`TaskDomainError::InvalidStateTransition`]
+    /// when the task cannot transition to [`TaskState::InReview`] from its
+    /// current state.
     pub fn associate_pull_request(
         &mut self,
         pr_ref: PullRequestRef,
         clock: &impl Clock,
     ) -> Result<(), TaskDomainError> {
-        associate_ref(
-            &mut self.pull_request_ref,
-            pr_ref,
-            TaskDomainError::PullRequestAlreadyAssociated(self.id),
-        )?;
-        self.state = TaskState::InReview;
+        if self.pull_request_ref.is_some() {
+            return Err(TaskDomainError::PullRequestAlreadyAssociated(self.id));
+        }
+
+        if self.state == TaskState::InReview {
+            self.pull_request_ref = Some(pr_ref);
+            self.touch(clock);
+            return Ok(());
+        }
+
+        self.transition_to(TaskState::InReview, clock)?;
+        self.pull_request_ref = Some(pr_ref);
+        Ok(())
+    }
+
+    /// Transitions the task state when the transition is permitted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskDomainError::InvalidStateTransition`] when the current
+    /// task state cannot transition to `target`.
+    pub fn transition_to(
+        &mut self,
+        target: TaskState,
+        clock: &impl Clock,
+    ) -> Result<(), TaskDomainError> {
+        if !self.state.can_transition_to(target) {
+            return Err(TaskDomainError::InvalidStateTransition {
+                task_id: self.id,
+                from: self.state,
+                to: target,
+            });
+        }
+        self.state = target;
         self.touch(clock);
         Ok(())
     }

@@ -5,8 +5,8 @@
 
 use crate::task::{
     domain::{
-        BranchRef, ExternalIssue, ExternalIssueMetadata, IssueRef, PullRequestRef, Task,
-        TaskDomainError, TaskId,
+        BranchRef, ExternalIssue, ExternalIssueMetadata, IssueRef, ParseTaskStateError,
+        PullRequestRef, Task, TaskDomainError, TaskId, TaskState,
     },
     ports::{TaskRepository, TaskRepositoryError},
 };
@@ -131,12 +131,33 @@ impl AssociatePullRequestRequest {
     }
 }
 
+/// Request payload for transitioning an existing task to a new state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionTaskRequest {
+    task_id: TaskId,
+    target_state: String,
+}
+
+impl TransitionTaskRequest {
+    /// Creates a task state transition request.
+    #[must_use]
+    pub fn new(task_id: TaskId, target_state: impl Into<String>) -> Self {
+        Self {
+            task_id,
+            target_state: target_state.into(),
+        }
+    }
+}
+
 /// Service-level errors for task lifecycle operations.
 #[derive(Debug, Error)]
 pub enum TaskLifecycleError {
     /// Domain validation failed.
     #[error(transparent)]
     Domain(#[from] TaskDomainError),
+    /// Requested state string could not be parsed.
+    #[error(transparent)]
+    InvalidState(#[from] ParseTaskStateError),
     /// Repository operation failed.
     #[error(transparent)]
     Repository(#[from] TaskRepositoryError),
@@ -285,6 +306,30 @@ where
         let pr_ref = PullRequestRef::from_parts(&provider, &repository, pull_request_number)?;
         let mut task = self.find_task_by_id_or_error(task_id).await?;
         task.associate_pull_request(pr_ref, &*self.clock)?;
+        self.repository.update(&task).await?;
+        Ok(task)
+    }
+
+    /// Transitions an existing task to a target state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::InvalidState`] when `target_state`
+    /// cannot be parsed, [`TaskLifecycleError::Domain`] when transition
+    /// validation fails, or [`TaskLifecycleError::Repository`] when lookup
+    /// or persistence fails.
+    pub async fn transition_task(
+        &self,
+        request: TransitionTaskRequest,
+    ) -> TaskLifecycleResult<Task> {
+        let TransitionTaskRequest {
+            task_id,
+            target_state,
+        } = request;
+
+        let parsed_target_state = TaskState::try_from(target_state.as_str())?;
+        let mut task = self.find_task_by_id_or_error(task_id).await?;
+        task.transition_to(parsed_target_state, &*self.clock)?;
         self.repository.update(&task).await?;
         Ok(task)
     }

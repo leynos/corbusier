@@ -38,6 +38,17 @@ pub enum TaskDomainError {
     #[error("task {0} already has an associated pull request")]
     PullRequestAlreadyAssociated(super::TaskId),
 
+    /// The requested task state transition is invalid.
+    #[error("invalid state transition for task {task_id}: cannot move from {from} to {to}")]
+    InvalidStateTransition {
+        /// Task identifier for the rejected transition.
+        task_id: super::TaskId,
+        /// Current state before transition was requested.
+        from: super::TaskState,
+        /// Requested target state.
+        to: super::TaskState,
+    },
+
     /// The canonical branch reference string could not be parsed.
     #[error("invalid branch reference format: {0}")]
     InvalidBranchRefFormat(String),

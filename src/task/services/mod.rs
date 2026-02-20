@@ -4,5 +4,5 @@ mod lifecycle;
 
 pub use lifecycle::{
     AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
-    TaskLifecycleError, TaskLifecycleService,
+    TaskLifecycleError, TaskLifecycleService, TransitionTaskRequest,
 };
