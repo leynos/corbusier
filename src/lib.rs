@@ -14,9 +14,11 @@
 //!
 //! # Modules
 //!
+//! - [`agent_backend`]: Agent backend registration and discovery
 //! - [`message`]: Canonical message format and validation
 //! - [`task`]: Issue-to-task creation and lifecycle tracking
 
+pub mod agent_backend;
 pub mod message;
 pub mod task;
 pub mod worker;

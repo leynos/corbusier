@@ -243,3 +243,64 @@ async fn transition_task_states() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+### Agent backend registration
+
+The `agent_backend` module provides a registry where agent backends declare
+their identity and capabilities. Backends are registered by name and can be
+listed, looked up, deactivated, and reactivated.
+
+```rust,no_run
+use std::sync::Arc;
+use corbusier::agent_backend::{
+    adapters::memory::InMemoryBackendRegistry,
+    services::{BackendRegistryService, RegisterBackendRequest},
+};
+use mockable::DefaultClock;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let service = BackendRegistryService::new(
+        Arc::new(InMemoryBackendRegistry::new()),
+        Arc::new(DefaultClock),
+    );
+
+    // Register two backends.
+    let claude = service
+        .register(RegisterBackendRequest::new(
+            "claude_code_sdk",
+            "Claude Code SDK",
+            "1.0.0",
+            "Anthropic",
+            true,
+            true,
+        ))
+        .await?;
+
+    service
+        .register(RegisterBackendRequest::new(
+            "codex_cli",
+            "Codex CLI",
+            "0.9.0",
+            "OpenAI",
+            false,
+            true,
+        ))
+        .await?;
+
+    // List all registered backends.
+    let all = service.list_all().await?;
+    assert_eq!(all.len(), 2);
+
+    // Look up a backend by name.
+    let found = service.find_by_name("claude_code_sdk").await?;
+    assert!(found.is_some());
+
+    // Deactivate a backend — it no longer appears in active listings.
+    service.deactivate(claude.id()).await?;
+    let active = service.list_active().await?;
+    assert_eq!(active.len(), 1);
+
+    Ok(())
+}
+```

@@ -37,6 +37,10 @@ pub const ADD_TASKS_SCHEMA_SQL: &str =
 pub const ADD_BRANCH_PR_INDEXES_SQL: &str =
     include_str!("../../migrations/2026-02-11-000000_add_branch_pr_lookup_indexes/up.sql");
 
+/// SQL to add agent backend registrations table for roadmap 1.3.1.
+pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
+    include_str!("../../migrations/2026-02-25-000000_add_backend_registrations_table/up.sql");
+
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
 
@@ -77,6 +81,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     conn.batch_execute(ADD_TASKS_SCHEMA_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }

@@ -1,8 +1,9 @@
-//! `PostgreSQL` integration tests for the message and task repositories.
+//! `PostgreSQL` integration tests for the message, task, and backend registry repositories.
 //!
 //! Tests are organized into modules by functionality:
 //! - `cluster`: Embedded `PostgreSQL` cluster lifecycle helpers
 //! - `audit_tests`: Audit context capture and verification
+//! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `crud_tests`: Basic CRUD operations
 //! - `sequence_tests`: Sequence number management
 //! - `serialization_tests`: Role parsing, JSONB round-trips, metadata handling
@@ -19,6 +20,7 @@ mod postgres {
     pub mod helpers;
 
     mod audit_tests;
+    mod backend_registry_tests;
     mod crud_tests;
     mod sequence_tests;
     mod serialization_tests;
