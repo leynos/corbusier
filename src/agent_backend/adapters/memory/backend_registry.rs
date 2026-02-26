@@ -60,8 +60,25 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
 
-        if !state.backends.contains_key(&registration.id()) {
-            return Err(BackendRegistryError::NotFound(registration.id()));
+        let old_name = state
+            .backends
+            .get(&registration.id())
+            .ok_or(BackendRegistryError::NotFound(registration.id()))?
+            .name()
+            .clone();
+
+        if *registration.name() != old_name {
+            if let Some(&indexed_id) = state.name_index.get(registration.name())
+                && indexed_id != registration.id()
+            {
+                return Err(BackendRegistryError::DuplicateBackendName(
+                    registration.name().clone(),
+                ));
+            }
+            state.name_index.remove(&old_name);
+            state
+                .name_index
+                .insert(registration.name().clone(), registration.id());
         }
 
         state

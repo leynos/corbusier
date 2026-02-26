@@ -12,12 +12,17 @@ fn create_test_registration(
     raw_name: &str,
     supports_streaming: bool,
     supports_tool_calls: bool,
-) -> AgentBackendRegistration {
+) -> Result<AgentBackendRegistration, BackendDomainError> {
     let clock = DefaultClock;
-    let name = BackendName::new(raw_name).expect("valid name");
+    let name = BackendName::new(raw_name)?;
     let capabilities = AgentCapabilities::new(supports_streaming, supports_tool_calls);
-    let info = BackendInfo::new("Test Backend", "1.0.0", "Test").expect("valid info");
-    AgentBackendRegistration::new(name, capabilities, info, &clock)
+    let info = BackendInfo::new("Test Backend", "1.0.0", "Test")?;
+    Ok(AgentBackendRegistration::new(
+        name,
+        capabilities,
+        info,
+        &clock,
+    ))
 }
 
 // ── BackendName validation ─────────────────────────────────────────
@@ -111,51 +116,62 @@ fn valid_backend_info_is_accepted() {
 }
 
 #[rstest]
-fn empty_display_name_is_rejected() {
-    let result = BackendInfo::new("", "1.0.0", "Anthropic");
-    assert!(matches!(result, Err(BackendDomainError::EmptyDisplayName)));
-}
-
-#[rstest]
-fn empty_version_is_rejected() {
-    let result = BackendInfo::new("SDK", "", "Anthropic");
-    assert!(matches!(result, Err(BackendDomainError::EmptyVersion)));
-}
-
-#[rstest]
-fn empty_provider_is_rejected() {
-    let result = BackendInfo::new("SDK", "1.0.0", "");
-    assert!(matches!(result, Err(BackendDomainError::EmptyProvider)));
+#[case("", "1.0.0", "Anthropic", BackendDomainError::EmptyDisplayName)]
+#[case("SDK", "", "Anthropic", BackendDomainError::EmptyVersion)]
+#[case("SDK", "1.0.0", "", BackendDomainError::EmptyProvider)]
+fn empty_backend_info_field_is_rejected(
+    #[case] display_name: &str,
+    #[case] version: &str,
+    #[case] provider: &str,
+    #[case] expected: BackendDomainError,
+) {
+    let result = BackendInfo::new(display_name, version, provider);
+    assert_eq!(result, Err(expected));
 }
 
 // ── AgentBackendRegistration construction ──────────────────────────
 
 #[rstest]
-fn new_registration_defaults_to_active() {
-    let registration = create_test_registration("test_backend", true, true);
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn new_registration_defaults_to_active() -> Result<(), BackendDomainError> {
+    let registration = create_test_registration("test_backend", true, true)?;
 
     assert_eq!(registration.status(), BackendStatus::Active);
     assert_eq!(registration.name().as_str(), "test_backend");
     assert_eq!(registration.created_at(), registration.updated_at());
+    Ok(())
 }
 
 #[rstest]
-fn deactivate_changes_status_to_inactive() {
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn deactivate_changes_status_to_inactive() -> Result<(), BackendDomainError> {
     let clock = DefaultClock;
-    let mut registration = create_test_registration("test_backend", true, false);
+    let mut registration = create_test_registration("test_backend", true, false)?;
     registration.deactivate(&clock);
 
     assert_eq!(registration.status(), BackendStatus::Inactive);
+    Ok(())
 }
 
 #[rstest]
-fn activate_changes_status_to_active() {
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn activate_changes_status_to_active() -> Result<(), BackendDomainError> {
     let clock = DefaultClock;
-    let mut registration = create_test_registration("test_backend", true, false);
+    let mut registration = create_test_registration("test_backend", true, false)?;
     registration.deactivate(&clock);
     registration.activate(&clock);
 
     assert_eq!(registration.status(), BackendStatus::Active);
+    Ok(())
 }
 
 #[rstest]

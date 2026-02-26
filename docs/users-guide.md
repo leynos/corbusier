@@ -244,7 +244,7 @@ async fn transition_task_states() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Agent backend registration
+## Agent backend registration
 
 The `agent_backend` module provides a registry where agent backends declare
 their identity and capabilities. Backends are registered by name and can be

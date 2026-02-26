@@ -67,12 +67,21 @@ pub enum BackendRegistryError {
     #[error("backend not found: {0}")]
     NotFound(BackendId),
 
+    /// Persisted data could not be reconstructed into domain types.
+    #[error("invalid persisted data: {0}")]
+    InvalidPersistedData(Arc<dyn std::error::Error + Send + Sync>),
+
     /// Persistence-layer failure.
     #[error("persistence error: {0}")]
     Persistence(Arc<dyn std::error::Error + Send + Sync>),
 }
 
 impl BackendRegistryError {
+    /// Wraps a data-quality or deserialization error from persisted rows.
+    pub fn invalid_persisted_data(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::InvalidPersistedData(Arc::new(err))
+    }
+
     /// Wraps a persistence error.
     pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Persistence(Arc::new(err))

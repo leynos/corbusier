@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::{DatabaseErrorKind, Error as DieselError, QueryResult};
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 
 /// `PostgreSQL` connection pool type used by backend registry adapters.
 pub type BackendPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -45,40 +45,6 @@ impl PostgresBackendRegistry {
         })
         .await
         .map_err(BackendRegistryError::persistence)?
-    }
-
-    /// Runs a Diesel query that returns at most one row, converting
-    /// it to an optional [`AgentBackendRegistration`].
-    async fn query_single<F>(
-        &self,
-        query_fn: F,
-    ) -> BackendRegistryResult<Option<AgentBackendRegistration>>
-    where
-        F: FnOnce(&mut PgConnection) -> QueryResult<Option<BackendRegistrationRow>>
-            + Send
-            + 'static,
-    {
-        self.run_blocking(move |connection| {
-            let row = query_fn(connection).map_err(BackendRegistryError::persistence)?;
-            row.map(row_to_registration).transpose()
-        })
-        .await
-    }
-
-    /// Runs a Diesel query that returns multiple rows, converting
-    /// them to a [`Vec`] of [`AgentBackendRegistration`].
-    async fn query_list<F>(
-        &self,
-        query_fn: F,
-    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>>
-    where
-        F: FnOnce(&mut PgConnection) -> QueryResult<Vec<BackendRegistrationRow>> + Send + 'static,
-    {
-        self.run_blocking(move |connection| {
-            let rows = query_fn(connection).map_err(BackendRegistryError::persistence)?;
-            rows.into_iter().map(row_to_registration).collect()
-        })
-        .await
     }
 }
 
@@ -111,22 +77,17 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
 
     async fn update(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()> {
         let backend_id = registration.id().into_inner();
-        let status_val = registration.status().as_str().to_owned();
-        let capabilities_val = serde_json::to_value(registration.capabilities())
-            .map_err(BackendRegistryError::persistence)?;
-        let backend_info_val = serde_json::to_value(registration.backend_info())
-            .map_err(BackendRegistryError::persistence)?;
-        let updated_val = registration.updated_at();
+        let serialized = serialize_registration_fields(registration)?;
 
         self.run_blocking(move |connection| {
             let updated_count = diesel::update(
                 backend_registrations::table.filter(backend_registrations::id.eq(backend_id)),
             )
             .set((
-                backend_registrations::status.eq(&status_val),
-                backend_registrations::capabilities.eq(&capabilities_val),
-                backend_registrations::backend_info.eq(&backend_info_val),
-                backend_registrations::updated_at.eq(updated_val),
+                backend_registrations::status.eq(&serialized.status),
+                backend_registrations::capabilities.eq(&serialized.capabilities),
+                backend_registrations::backend_info.eq(&serialized.backend_info),
+                backend_registrations::updated_at.eq(serialized.updated_at),
             ))
             .execute(connection)
             .map_err(BackendRegistryError::persistence)?;
@@ -145,12 +106,14 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         &self,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        self.query_single(move |connection| {
-            backend_registrations::table
+        self.run_blocking(move |connection| {
+            let row = backend_registrations::table
                 .filter(backend_registrations::id.eq(id.into_inner()))
                 .select(BackendRegistrationRow::as_select())
                 .first::<BackendRegistrationRow>(connection)
                 .optional()
+                .map_err(BackendRegistryError::persistence)?;
+            row.map(row_to_registration).transpose()
         })
         .await
     }
@@ -160,52 +123,79 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let name_str = name.as_str().to_owned();
-        self.query_single(move |connection| {
-            backend_registrations::table
+        self.run_blocking(move |connection| {
+            let row = backend_registrations::table
                 .filter(backend_registrations::name.eq(&name_str))
                 .select(BackendRegistrationRow::as_select())
                 .first::<BackendRegistrationRow>(connection)
                 .optional()
+                .map_err(BackendRegistryError::persistence)?;
+            row.map(row_to_registration).transpose()
         })
         .await
     }
 
     async fn list_active(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        self.query_list(move |connection| {
-            backend_registrations::table
-                .filter(backend_registrations::status.eq("active"))
+        self.run_blocking(move |connection| {
+            let rows = backend_registrations::table
+                .filter(backend_registrations::status.eq(BackendStatus::Active.as_str()))
                 .select(BackendRegistrationRow::as_select())
                 .load::<BackendRegistrationRow>(connection)
+                .map_err(BackendRegistryError::persistence)?;
+            rows.into_iter().map(row_to_registration).collect()
         })
         .await
     }
 
     async fn list_all(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        self.query_list(move |connection| {
-            backend_registrations::table
+        self.run_blocking(move |connection| {
+            let rows = backend_registrations::table
                 .select(BackendRegistrationRow::as_select())
                 .load::<BackendRegistrationRow>(connection)
+                .map_err(BackendRegistryError::persistence)?;
+            rows.into_iter().map(row_to_registration).collect()
         })
         .await
     }
 }
 
-fn to_new_row(
+/// Mutable fields serialized to database-compatible types.
+struct SerializedFields {
+    status: String,
+    capabilities: serde_json::Value,
+    backend_info: serde_json::Value,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+fn serialize_registration_fields(
     registration: &AgentBackendRegistration,
-) -> BackendRegistryResult<NewBackendRegistrationRow> {
+) -> BackendRegistryResult<SerializedFields> {
     let capabilities = serde_json::to_value(registration.capabilities())
         .map_err(BackendRegistryError::persistence)?;
     let backend_info = serde_json::to_value(registration.backend_info())
         .map_err(BackendRegistryError::persistence)?;
 
-    Ok(NewBackendRegistrationRow {
-        id: registration.id().into_inner(),
-        name: registration.name().as_str().to_owned(),
+    Ok(SerializedFields {
         status: registration.status().as_str().to_owned(),
         capabilities,
         backend_info,
-        created_at: registration.created_at(),
         updated_at: registration.updated_at(),
+    })
+}
+
+fn to_new_row(
+    registration: &AgentBackendRegistration,
+) -> BackendRegistryResult<NewBackendRegistrationRow> {
+    let serialized = serialize_registration_fields(registration)?;
+
+    Ok(NewBackendRegistrationRow {
+        id: registration.id().into_inner(),
+        name: registration.name().as_str().to_owned(),
+        status: serialized.status,
+        capabilities: serialized.capabilities,
+        backend_info: serialized.backend_info,
+        created_at: registration.created_at(),
+        updated_at: serialized.updated_at,
     })
 }
 
@@ -222,13 +212,14 @@ fn row_to_registration(
         updated_at,
     } = row;
 
-    let parsed_name = BackendName::new(&name).map_err(BackendRegistryError::persistence)?;
-    let parsed_status =
-        BackendStatus::try_from(status.as_str()).map_err(BackendRegistryError::persistence)?;
-    let parsed_capabilities: AgentCapabilities =
-        serde_json::from_value(capabilities).map_err(BackendRegistryError::persistence)?;
-    let parsed_info: BackendInfo =
-        serde_json::from_value(backend_info).map_err(BackendRegistryError::persistence)?;
+    let parsed_name =
+        BackendName::new(&name).map_err(BackendRegistryError::invalid_persisted_data)?;
+    let parsed_status = BackendStatus::try_from(status.as_str())
+        .map_err(BackendRegistryError::invalid_persisted_data)?;
+    let parsed_capabilities: AgentCapabilities = serde_json::from_value(capabilities)
+        .map_err(BackendRegistryError::invalid_persisted_data)?;
+    let parsed_info: BackendInfo = serde_json::from_value(backend_info)
+        .map_err(BackendRegistryError::invalid_persisted_data)?;
 
     let data = PersistedBackendData {
         id: BackendId::from_uuid(id),

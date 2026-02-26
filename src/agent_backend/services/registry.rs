@@ -17,14 +17,22 @@ use thiserror::Error;
 /// Request payload for registering a new agent backend.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisterBackendRequest {
-    name: String,
-    display_name: String,
-    version: String,
-    provider: String,
-    supports_streaming: bool,
-    supports_tool_calls: bool,
-    content_types: Vec<String>,
-    max_context_window: Option<u64>,
+    /// Backend identifier string (validated as [`BackendName`] on registration).
+    pub name: String,
+    /// Human-readable display name for the backend.
+    pub display_name: String,
+    /// Version string of the backend.
+    pub version: String,
+    /// Provider/vendor of the backend.
+    pub provider: String,
+    /// Whether the backend supports streaming responses.
+    pub supports_streaming: bool,
+    /// Whether the backend supports tool call invocations.
+    pub supports_tool_calls: bool,
+    /// MIME types the backend can handle.
+    pub content_types: Vec<String>,
+    /// Maximum context window size in tokens, if known.
+    pub max_context_window: Option<u64>,
 }
 
 impl RegisterBackendRequest {
@@ -84,6 +92,9 @@ pub enum BackendRegistryServiceError {
     /// Repository operation failed.
     #[error(transparent)]
     Repository(#[from] BackendRegistryError),
+    /// No backend exists with the given identifier.
+    #[error("backend {0} not found")]
+    NotFound(BackendId),
 }
 
 /// Result type for backend registry service operations.
@@ -202,8 +213,9 @@ where
     ///
     /// # Errors
     ///
-    /// Returns [`BackendRegistryServiceError::Repository`] when the backend is
-    /// not found or persistence fails.
+    /// Returns [`BackendRegistryServiceError::NotFound`] when no backend has
+    /// the given ID, or [`BackendRegistryServiceError::Repository`] when
+    /// persistence fails.
     pub async fn deactivate(
         &self,
         id: BackendId,
@@ -218,8 +230,9 @@ where
     ///
     /// # Errors
     ///
-    /// Returns [`BackendRegistryServiceError::Repository`] when the backend is
-    /// not found or persistence fails.
+    /// Returns [`BackendRegistryServiceError::NotFound`] when no backend has
+    /// the given ID, or [`BackendRegistryServiceError::Repository`] when
+    /// persistence fails.
     pub async fn activate(
         &self,
         id: BackendId,
@@ -237,6 +250,6 @@ where
         self.repository
             .find_by_id(id)
             .await?
-            .ok_or_else(|| BackendRegistryError::NotFound(id).into())
+            .ok_or(BackendRegistryServiceError::NotFound(id))
     }
 }

@@ -15,7 +15,7 @@ a registry where backends declare their identity and capabilities. This plan
 adds a new `agent_backend` subsystem that lets callers register agent backends,
 look them up by ID or name, list all registered backends, and deregister them.
 
-After this change a caller can:
+After this change, a caller can:
 
 1. Register two distinct backends (e.g. "claude_code_sdk" and "codex_cli")
    with capability metadata.
@@ -24,7 +24,8 @@ After this change a caller can:
 4. Deregister a backend and confirm it no longer appears in listings.
 
 Observable success: `make all` passes, including new unit tests, in-memory
-integration tests, BDD feature tests, and Postgres integration tests that
+integration tests, behaviour-driven development (BDD) feature tests, and
+Postgres integration tests that
 exercise the full registration-and-discovery lifecycle.
 
 ## Constraints
@@ -60,7 +61,7 @@ exercise the full registration-and-discovery lifecycle.
 ## Risks
 
 - Risk: The design document does not define concrete `AgentCapabilities` or
-  `BackendInfo` struct fields — we must infer them from the trait signature and
+  `BackendInfo` struct fields — they must be inferred from the trait signature and
   the table of known backends (Claude Code SDK, Codex CLI).
   Severity: low
   Likelihood: high

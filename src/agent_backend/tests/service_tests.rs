@@ -34,37 +34,33 @@ fn codex_request() -> RegisterBackendRequest {
 async fn register_backend(
     service: &TestService,
     request: RegisterBackendRequest,
-) -> AgentBackendRegistration {
-    service
-        .register(request)
-        .await
-        .expect("registration should succeed")
+) -> Result<AgentBackendRegistration, BackendRegistryServiceError> {
+    service.register(request).await
 }
 
 async fn register_and_deactivate(
     service: &TestService,
     request: RegisterBackendRequest,
-) -> AgentBackendRegistration {
-    let created = register_backend(service, request).await;
-    service
-        .deactivate(created.id())
-        .await
-        .expect("deactivation should succeed")
+) -> Result<AgentBackendRegistration, BackendRegistryServiceError> {
+    let created = register_backend(service, request).await?;
+    service.deactivate(created.id()).await
 }
 
-async fn setup_active_and_inactive(service: &TestService) {
-    let claude = register_backend(service, claude_request()).await;
-    register_backend(service, codex_request()).await;
-    service
-        .deactivate(claude.id())
-        .await
-        .expect("deactivation should succeed");
+async fn setup_active_and_inactive(
+    service: &TestService,
+) -> Result<(), BackendRegistryServiceError> {
+    let claude = register_backend(service, claude_request()).await?;
+    register_backend(service, codex_request()).await?;
+    service.deactivate(claude.id()).await?;
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn register_and_retrieve_by_id(service: TestService) {
-    let created = register_backend(&service, claude_request()).await;
+    let created = register_backend(&service, claude_request())
+        .await
+        .expect("registration should succeed");
 
     let found = service
         .find_by_id(created.id())
@@ -77,7 +73,9 @@ async fn register_and_retrieve_by_id(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn register_and_retrieve_by_name(service: TestService) {
-    let created = register_backend(&service, claude_request()).await;
+    let created = register_backend(&service, claude_request())
+        .await
+        .expect("registration should succeed");
 
     let found = service
         .find_by_name("claude_code_sdk")
@@ -108,7 +106,9 @@ async fn duplicate_name_is_rejected(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn deactivate_changes_status(service: TestService) {
-    let deactivated = register_and_deactivate(&service, claude_request()).await;
+    let deactivated = register_and_deactivate(&service, claude_request())
+        .await
+        .expect("register and deactivate should succeed");
 
     assert_eq!(deactivated.status(), BackendStatus::Inactive);
 }
@@ -116,7 +116,9 @@ async fn deactivate_changes_status(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn list_active_excludes_inactive(service: TestService) {
-    setup_active_and_inactive(&service).await;
+    setup_active_and_inactive(&service)
+        .await
+        .expect("setup should succeed");
 
     let active = service.list_active().await.expect("listing should succeed");
 
@@ -130,7 +132,9 @@ async fn list_active_excludes_inactive(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn list_all_includes_inactive(service: TestService) {
-    setup_active_and_inactive(&service).await;
+    setup_active_and_inactive(&service)
+        .await
+        .expect("setup should succeed");
 
     let all = service.list_all().await.expect("listing should succeed");
 
@@ -164,7 +168,9 @@ async fn invalid_name_in_registration_is_rejected(service: TestService) {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn activate_restores_status(service: TestService) {
-    let deactivated = register_and_deactivate(&service, claude_request()).await;
+    let deactivated = register_and_deactivate(&service, claude_request())
+        .await
+        .expect("register and deactivate should succeed");
 
     let activated = service
         .activate(deactivated.id())

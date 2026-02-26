@@ -26,8 +26,8 @@ impl BackendName {
     /// Returns [`BackendDomainError::EmptyBackendName`] when the value is empty
     /// after trimming, [`BackendDomainError::InvalidBackendName`] when it
     /// contains characters outside `[a-z0-9_]`, or
-    /// [`BackendDomainError::BackendNameTooLong`] when it exceeds 100
-    /// characters.
+    /// [`BackendDomainError::BackendNameTooLong`] when the normalised value
+    /// exceeds 100 characters.
     pub fn new(value: impl Into<String>) -> Result<Self, BackendDomainError> {
         let raw = value.into();
         let normalized = raw.trim().to_ascii_lowercase();
@@ -36,16 +36,16 @@ impl BackendName {
             return Err(BackendDomainError::EmptyBackendName);
         }
 
-        if normalized.len() > MAX_NAME_LENGTH {
-            return Err(BackendDomainError::BackendNameTooLong(raw));
-        }
-
         let is_valid = normalized
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
 
         if !is_valid {
-            return Err(BackendDomainError::InvalidBackendName(raw));
+            return Err(BackendDomainError::InvalidBackendName(normalized));
+        }
+
+        if normalized.len() > MAX_NAME_LENGTH {
+            return Err(BackendDomainError::BackendNameTooLong(normalized));
         }
 
         Ok(Self(normalized))
