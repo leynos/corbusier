@@ -78,5 +78,5 @@ pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
 
 /// Builds a [`RegisterBackendRequest`] from a name and provider.
 pub fn build_request(name: &str, provider: &str) -> RegisterBackendRequest {
-    RegisterBackendRequest::new(name, name, "1.0.0", provider, true, true)
+    RegisterBackendRequest::new(name, name, "1.0.0", provider).with_capabilities(true, true)
 }

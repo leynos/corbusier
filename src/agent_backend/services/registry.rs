@@ -29,29 +29,35 @@ pub struct RegisterBackendRequest {
 
 impl RegisterBackendRequest {
     /// Creates a request with required backend fields.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "registration bundles all mandatory fields for a single domain aggregate"
-    )]
     #[must_use]
     pub fn new(
         name: impl Into<String>,
         display_name: impl Into<String>,
         version: impl Into<String>,
         provider: impl Into<String>,
-        supports_streaming: bool,
-        supports_tool_calls: bool,
     ) -> Self {
         Self {
             name: name.into(),
             display_name: display_name.into(),
             version: version.into(),
             provider: provider.into(),
-            supports_streaming,
-            supports_tool_calls,
+            supports_streaming: false,
+            supports_tool_calls: false,
             content_types: Vec::new(),
             max_context_window: None,
         }
+    }
+
+    /// Sets the streaming and tool call capabilities.
+    #[must_use]
+    pub const fn with_capabilities(
+        mut self,
+        supports_streaming: bool,
+        supports_tool_calls: bool,
+    ) -> Self {
+        self.supports_streaming = supports_streaming;
+        self.supports_tool_calls = supports_tool_calls;
+        self
     }
 
     /// Sets supported content types.

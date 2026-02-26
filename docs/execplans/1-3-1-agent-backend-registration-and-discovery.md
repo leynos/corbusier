@@ -660,19 +660,19 @@ All commands run from `/home/user/project`.
 
 1. Create directory structure:
 
-```plaintext
-mkdir -p src/agent_backend/{domain,ports,adapters/{memory,postgres},services,tests}
-mkdir -p tests/backend_registration_steps
-mkdir -p migrations/2026-02-25-000000_add_backend_registrations_table
-```
+   ```plaintext
+   mkdir -p src/agent_backend/{domain,ports,adapters/{memory,postgres},services,tests}
+   mkdir -p tests/backend_registration_steps
+   mkdir -p migrations/2026-02-25-000000_add_backend_registrations_table
+   ```
 
 2. Write domain layer files (Stage A), then run:
 
-```bash
-cargo check 2>&1 | head -20
-```
+   ```bash
+   cargo check 2>&1 | head -20
+   ```
 
-Expected: compiles with no errors.
+   Expected: compiles with no errors.
 
 3. Write port layer (Stage B), then `cargo check`.
 
@@ -682,45 +682,47 @@ Expected: compiles with no errors.
 
 6. Write unit tests (Stage E), then:
 
-```bash
-set -o pipefail; cargo nextest run --lib 2>&1 | tee /tmp/unit-tests.log
-```
+   ```bash
+   set -o pipefail; cargo nextest run --lib 2>&1 | tee /tmp/unit-tests.log
+   ```
 
-Expected: all new tests pass.
+   Expected: all new tests pass.
 
 7. Write in-memory integration tests (Stage F), then:
 
-```bash
-set -o pipefail; cargo nextest run --test in_memory 2>&1 | tee /tmp/inmem-tests.log
-```
+   ```bash
+   set -o pipefail; cargo nextest run --test in_memory 2>&1 | tee /tmp/inmem-tests.log
+   ```
 
-Expected: all tests pass including new backend registry tests.
+   Expected: all tests pass including new backend registry tests.
 
 8. Write BDD tests (Stage G), then:
 
-```bash
-set -o pipefail; cargo nextest run --test backend_registration_steps 2>&1 | tee /tmp/bdd-tests.log
-```
+   ```bash
+   set -o pipefail; cargo nextest run --test backend_registration_steps 2>&1 | tee /tmp/bdd-tests.log
+   ```
 
-Expected: all scenarios pass.
+   Expected: all scenarios pass.
 
-9. Write migration (Stage H), then create Postgres adapter (Stage I), then:
+9. Write migration (Stage H), then create Postgres adapter
+   (Stage I), then:
 
-```bash
-set -o pipefail; cargo nextest run --test postgres 2>&1 | tee /tmp/pg-tests.log
-```
+   ```bash
+   set -o pipefail; cargo nextest run --test postgres 2>&1 | tee /tmp/pg-tests.log
+   ```
 
-Expected: all Postgres tests pass including new backend registry tests.
+   Expected: all Postgres tests pass including new backend
+   registry tests.
 
 10. Update documentation (Stage K).
 
 11. Final validation:
 
-```bash
-set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
-```
+    ```bash
+    set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
+    ```
 
-Expected: exit code 0, no warnings, no failures.
+    Expected: exit code 0, no warnings, no failures.
 
 ## Validation and acceptance
 

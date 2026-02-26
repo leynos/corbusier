@@ -7,6 +7,19 @@ use crate::agent_backend::domain::{
 use mockable::DefaultClock;
 use rstest::rstest;
 
+/// Helper to create a test registration with sensible defaults.
+fn create_test_registration(
+    raw_name: &str,
+    supports_streaming: bool,
+    supports_tool_calls: bool,
+) -> AgentBackendRegistration {
+    let clock = DefaultClock;
+    let name = BackendName::new(raw_name).expect("valid name");
+    let capabilities = AgentCapabilities::new(supports_streaming, supports_tool_calls);
+    let info = BackendInfo::new("Test Backend", "1.0.0", "Test").expect("valid info");
+    AgentBackendRegistration::new(name, capabilities, info, &clock)
+}
+
 // ── BackendName validation ─────────────────────────────────────────
 
 #[rstest]
@@ -119,12 +132,7 @@ fn empty_provider_is_rejected() {
 
 #[rstest]
 fn new_registration_defaults_to_active() {
-    let clock = DefaultClock;
-    let name = BackendName::new("test_backend").expect("valid name");
-    let capabilities = AgentCapabilities::new(true, true);
-    let info = BackendInfo::new("Test Backend", "1.0.0", "Test").expect("valid info");
-
-    let registration = AgentBackendRegistration::new(name, capabilities, info, &clock);
+    let registration = create_test_registration("test_backend", true, true);
 
     assert_eq!(registration.status(), BackendStatus::Active);
     assert_eq!(registration.name().as_str(), "test_backend");
@@ -134,11 +142,7 @@ fn new_registration_defaults_to_active() {
 #[rstest]
 fn deactivate_changes_status_to_inactive() {
     let clock = DefaultClock;
-    let name = BackendName::new("test_backend").expect("valid name");
-    let capabilities = AgentCapabilities::new(true, false);
-    let info = BackendInfo::new("Test", "1.0.0", "Test").expect("valid info");
-
-    let mut registration = AgentBackendRegistration::new(name, capabilities, info, &clock);
+    let mut registration = create_test_registration("test_backend", true, false);
     registration.deactivate(&clock);
 
     assert_eq!(registration.status(), BackendStatus::Inactive);
@@ -147,11 +151,7 @@ fn deactivate_changes_status_to_inactive() {
 #[rstest]
 fn activate_changes_status_to_active() {
     let clock = DefaultClock;
-    let name = BackendName::new("test_backend").expect("valid name");
-    let capabilities = AgentCapabilities::new(true, false);
-    let info = BackendInfo::new("Test", "1.0.0", "Test").expect("valid info");
-
-    let mut registration = AgentBackendRegistration::new(name, capabilities, info, &clock);
+    let mut registration = create_test_registration("test_backend", true, false);
     registration.deactivate(&clock);
     registration.activate(&clock);
 

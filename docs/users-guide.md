@@ -267,25 +267,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Register two backends.
     let claude = service
-        .register(RegisterBackendRequest::new(
-            "claude_code_sdk",
-            "Claude Code SDK",
-            "1.0.0",
-            "Anthropic",
-            true,
-            true,
-        ))
+        .register(
+            RegisterBackendRequest::new(
+                "claude_code_sdk",
+                "Claude Code SDK",
+                "1.0.0",
+                "Anthropic",
+            )
+            .with_capabilities(true, true),
+        )
         .await?;
 
     service
-        .register(RegisterBackendRequest::new(
-            "codex_cli",
-            "Codex CLI",
-            "0.9.0",
-            "OpenAI",
-            false,
-            true,
-        ))
+        .register(
+            RegisterBackendRequest::new(
+                "codex_cli",
+                "Codex CLI",
+                "0.9.0",
+                "OpenAI",
+            )
+            .with_capabilities(false, true),
+        )
         .await?;
 
     // List all registered backends.

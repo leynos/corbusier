@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
+use diesel::result::{DatabaseErrorKind, Error as DieselError, QueryResult};
 
 /// `PostgreSQL` connection pool type used by backend registry adapters.
 pub type BackendPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -45,6 +45,40 @@ impl PostgresBackendRegistry {
         })
         .await
         .map_err(BackendRegistryError::persistence)?
+    }
+
+    /// Runs a Diesel query that returns at most one row, converting
+    /// it to an optional [`AgentBackendRegistration`].
+    async fn query_single<F>(
+        &self,
+        query_fn: F,
+    ) -> BackendRegistryResult<Option<AgentBackendRegistration>>
+    where
+        F: FnOnce(&mut PgConnection) -> QueryResult<Option<BackendRegistrationRow>>
+            + Send
+            + 'static,
+    {
+        self.run_blocking(move |connection| {
+            let row = query_fn(connection).map_err(BackendRegistryError::persistence)?;
+            row.map(row_to_registration).transpose()
+        })
+        .await
+    }
+
+    /// Runs a Diesel query that returns multiple rows, converting
+    /// them to a [`Vec`] of [`AgentBackendRegistration`].
+    async fn query_list<F>(
+        &self,
+        query_fn: F,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>>
+    where
+        F: FnOnce(&mut PgConnection) -> QueryResult<Vec<BackendRegistrationRow>> + Send + 'static,
+    {
+        self.run_blocking(move |connection| {
+            let rows = query_fn(connection).map_err(BackendRegistryError::persistence)?;
+            rows.into_iter().map(row_to_registration).collect()
+        })
+        .await
     }
 }
 
@@ -111,14 +145,12 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         &self,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        self.run_blocking(move |connection| {
-            let row = backend_registrations::table
+        self.query_single(move |connection| {
+            backend_registrations::table
                 .filter(backend_registrations::id.eq(id.into_inner()))
                 .select(BackendRegistrationRow::as_select())
                 .first::<BackendRegistrationRow>(connection)
                 .optional()
-                .map_err(BackendRegistryError::persistence)?;
-            row.map(row_to_registration).transpose()
         })
         .await
     }
@@ -128,37 +160,31 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let name_str = name.as_str().to_owned();
-        self.run_blocking(move |connection| {
-            let row = backend_registrations::table
+        self.query_single(move |connection| {
+            backend_registrations::table
                 .filter(backend_registrations::name.eq(&name_str))
                 .select(BackendRegistrationRow::as_select())
                 .first::<BackendRegistrationRow>(connection)
                 .optional()
-                .map_err(BackendRegistryError::persistence)?;
-            row.map(row_to_registration).transpose()
         })
         .await
     }
 
     async fn list_active(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        self.run_blocking(move |connection| {
-            let rows = backend_registrations::table
+        self.query_list(move |connection| {
+            backend_registrations::table
                 .filter(backend_registrations::status.eq("active"))
                 .select(BackendRegistrationRow::as_select())
                 .load::<BackendRegistrationRow>(connection)
-                .map_err(BackendRegistryError::persistence)?;
-            rows.into_iter().map(row_to_registration).collect()
         })
         .await
     }
 
     async fn list_all(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        self.run_blocking(move |connection| {
-            let rows = backend_registrations::table
+        self.query_list(move |connection| {
+            backend_registrations::table
                 .select(BackendRegistrationRow::as_select())
                 .load::<BackendRegistrationRow>(connection)
-                .map_err(BackendRegistryError::persistence)?;
-            rows.into_iter().map(row_to_registration).collect()
         })
         .await
     }

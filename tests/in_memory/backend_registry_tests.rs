@@ -22,18 +22,13 @@ fn service() -> TestService {
 }
 
 fn claude_request() -> RegisterBackendRequest {
-    RegisterBackendRequest::new(
-        "claude_code_sdk",
-        "Claude Code SDK",
-        "1.0.0",
-        "Anthropic",
-        true,
-        true,
-    )
+    RegisterBackendRequest::new("claude_code_sdk", "Claude Code SDK", "1.0.0", "Anthropic")
+        .with_capabilities(true, true)
 }
 
 fn codex_request() -> RegisterBackendRequest {
-    RegisterBackendRequest::new("codex_cli", "Codex CLI", "0.9.0", "OpenAI", false, true)
+    RegisterBackendRequest::new("codex_cli", "Codex CLI", "0.9.0", "OpenAI")
+        .with_capabilities(false, true)
 }
 
 #[rstest]
