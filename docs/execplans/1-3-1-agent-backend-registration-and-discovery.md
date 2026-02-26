@@ -25,7 +25,7 @@ After this change, a caller can:
    (inactive backends still appear in `list_all`).
 
 Observable success: `make all` passes, including new unit tests, in-memory
-integration tests, behaviour-driven development (BDD) feature tests, and
+integration tests, Behaviour-Driven Development (BDD) feature tests, and
 Postgres integration tests that
 exercise the full registration-and-discovery lifecycle.
 
