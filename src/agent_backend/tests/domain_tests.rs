@@ -83,14 +83,14 @@ fn backend_name_length_boundary(#[case] length: usize, #[case] expected_ok: bool
 
 #[rstest]
 #[case("  ".to_owned() + &"a".repeat(100) + "  ", true,
-    "padded input whose normalised length is exactly 100 should be accepted")]
+    "padded input whose normalized length is exactly 100 should be accepted")]
 #[case("  ".to_owned() + &"a".repeat(101) + "  ", false,
-    "padded input whose normalised length is 101 should be rejected")]
+    "padded input whose normalized length is 101 should be rejected")]
 #[case("A".repeat(100), true,
-    "uppercase input whose normalised length is exactly 100 should be accepted")]
+    "uppercase input whose normalized length is exactly 100 should be accepted")]
 #[case("A".repeat(101), false,
-    "uppercase input whose normalised length is 101 should be rejected")]
-fn backend_name_normalised_length_boundary(
+    "uppercase input whose normalized length is 101 should be rejected")]
+fn backend_name_normalized_length_boundary(
     #[case] input: String,
     #[case] expected_ok: bool,
     #[case] label: &str,

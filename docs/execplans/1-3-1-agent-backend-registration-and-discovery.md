@@ -98,7 +98,7 @@ exercise the full registration-and-discovery lifecycle.
 - [x] Stage G: BDD feature tests — 3 scenarios pass
 - [x] Stage H: Database migration
 - [x] Stage I: Postgres adapter (schema, models, repository)
-- [x] Stage J: Postgres integration tests — 5 tests compiled clean
+- [x] Stage J: Postgres integration tests — 5 tests passed
 - [x] Stage K: Documentation updates (users-guide, roadmap, design doc decisions)
 - [x] Stage L: Final validation (make all, review)
 
@@ -649,11 +649,13 @@ will be:
 
 ### Stage L: Final validation
 
-Run `make all` and confirm all checks pass. Review the diff for:
+Run `make all`, `make markdownlint`, `make nixie`, and `make fmt` and confirm
+all checks pass. Review the diff for:
 
 - No unused imports or dead code.
 - No Clippy warnings.
-- Formatting compliance.
+- Formatting compliance (Rust and Markdown).
+- Mermaid diagram validity.
 - Module-level and public-item doc comments present.
 
 ## Concrete steps
@@ -722,9 +724,12 @@ All commands run from `/home/user/project`.
 
     ```bash
     set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
+    set -o pipefail; make markdownlint 2>&1 | tee /tmp/markdownlint.log
+    set -o pipefail; make nixie 2>&1 | tee /tmp/nixie.log
+    set -o pipefail; make fmt 2>&1 | tee /tmp/fmt.log
     ```
 
-    Expected: exit code 0, no warnings, no failures.
+    Expected: exit code 0 for each command, no warnings, no failures.
 
 ## Validation and acceptance
 
