@@ -435,6 +435,23 @@ Corbusier implements this through:
   - External Dependencies: None
   - Integration Requirements: Task service integration, VCS workflow hooks
 
+###### Implementation decisions (2026-02-26) — roadmap 1.4.1
+
+- Slash-command parsing uses a constrained grammar:
+  `/<command> key=value key2="quoted value"` with a required leading slash and
+  explicit `key=value` parameter tokens.
+- Command definitions are provided through a dedicated `SlashCommandRegistry`
+  port so the domain/service layer remains adapter-agnostic.
+- Parameter validation is schema-driven and typed (`string`, `number`,
+  `boolean`, `select`) with typed errors for unknown parameters, missing
+  required parameters, and invalid values.
+- Template expansion and tool-argument rendering use `minijinja`.
+- Deterministic tool-call identifiers are generated from canonicalized command
+  input and rendered arguments, and execution produces audit metadata via
+  `SlashCommandExpansion` and `ToolCallAudit` records.
+- Implementation is scoped to existing message metadata storage; no new
+  persistence schema changes are required for roadmap 1.4.1.
+
 #### 2.1.2 Tool Orchestration Features
 
 | Feature ID | Feature Name                    | Category           | Priority | Status   |

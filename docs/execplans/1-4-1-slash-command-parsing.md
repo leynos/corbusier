@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document defines implementation for roadmap item 1.4.1 in
 `docs/roadmap.md`:
@@ -14,7 +14,7 @@ This document defines implementation for roadmap item 1.4.1 in
 - Add template expansion and parameter validation using `minijinja`.
 - Achieve deterministic tool call sequences with auditable records.
 
-Execution phase must not begin until this plan is explicitly approved.
+Execution phase was approved and completed in this implementation turn.
 
 ## Purpose / big picture
 
@@ -97,14 +97,14 @@ slash-command execution remains close to canonical message and audit metadata
 
 - [x] (2026-02-26 17:34Z) Gathered roadmap/design/testing constraints and
       drafted this ExecPlan.
-- [ ] Stage A: Confirm command grammar, registry contract, and deterministic
-      planning rules.
-- [ ] Stage B: Implement domain, port, service, and adapter code for parser,
-      registry, expansion, and deterministic planning.
-- [ ] Stage C: Add unit, integration, and BDD coverage for happy/unhappy/edge
-      cases.
-- [ ] Stage D: Update user/design docs, run quality gates, and mark roadmap
-      item 1.4.1 complete.
+- [x] (2026-02-26 18:08Z) Stage A: Confirmed command grammar, registry
+      contract, and deterministic planning rules.
+- [x] (2026-02-26 18:15Z) Stage B: Implemented domain, port, service, and
+      adapter code for parser, registry, expansion, and deterministic planning.
+- [x] (2026-02-26 18:18Z) Stage C: Added unit, integration, and BDD coverage
+      for happy/unhappy/edge cases.
+- [x] (2026-02-26 18:25Z) Stage D: Updated user/design docs, passed quality
+      gates, and marked roadmap item 1.4.1 complete.
 
 ## Surprises & discoveries
 
@@ -117,6 +117,12 @@ slash-command execution remains close to canonical message and audit metadata
 - The repository already stores slash expansion metadata in
   `MessageMetadata::slash_command_expansion`, so 1.4.1 can remain
   migration-free unless a hard schema gap is discovered during implementation.
+- `minijinja` in this environment did not expose a `tojson` filter in template
+  rendering defaults; built-in command templates were adjusted to emit valid
+  JSON without relying on that filter.
+- Clippy guardrails (`cognitive_complexity`, `excessive_nesting`,
+  `indexing_slicing`, and strict docs) required parser/service refactors and
+  tighter test annotations during implementation.
 
 ## Decision log
 
@@ -136,22 +142,53 @@ slash-command execution remains close to canonical message and audit metadata
   persistence migrations while still satisfying auditability requirements.
   Date/Author: 2026-02-26 / plan author.
 
+- Decision: Keep built-in tool argument templates JSON-safe without
+  `tojson`-filter dependence. Rationale: this keeps runtime rendering portable
+  across `minijinja` filter configurations while preserving deterministic
+  output. Date/Author: 2026-02-26 / implementation author.
+
 ## Outcomes & retrospective
 
-Not yet implemented. This section will be completed when the feature reaches
-`Status: COMPLETE` with command outputs, pass/fail summaries, and lessons
-learned.
+Roadmap 1.4.1 was implemented with the following outcomes:
+
+- Added slash-command domain model, parser, typed validation, execution output,
+  and error types under `src/message/domain/slash_command/`.
+- Added `SlashCommandRegistry` port and an in-memory registry adapter with
+  built-in `/task` and `/review` definitions.
+- Added `SlashCommandService` with parse -> lookup -> validate -> render ->
+  deterministic call-id planning -> audit record generation.
+- Added unit tests (`rstest`), in-memory integration tests, PostgreSQL
+  integration tests (using existing `pg-embed-setup-unpriv` fixture pipeline),
+  and BDD scenarios (`rstest-bdd`).
+- Updated `docs/users-guide.md`, `docs/corbusier-design.md`, and
+  `docs/roadmap.md` (marked 1.4.1 done).
+
+Validation evidence:
+
+- `make check-fmt` passed.
+- `make lint` passed.
+- `make test` passed (514 tests, 514 passed, 1 skipped).
+
+Lessons learned:
+
+- Treat deterministic sequencing as a first-class contract and test it at both
+  unit and behavioural levels.
+- Keep slash-command templates intentionally simple and JSON-explicit to avoid
+  runtime filter coupling.
 
 ## Context and orientation
 
 Current relevant code and docs:
 
-- `docs/roadmap.md` defines 1.4.1 as pending.
+- `docs/roadmap.md` marks 1.4.1 as complete.
 - `docs/corbusier-design.md` section 2.1.1 defines F-004 and section 6.1.1
   models slash command execution within the conversation component.
 - `src/message/domain/metadata.rs` already includes `SlashCommandExpansion`
   and tool-call audit metadata.
-- No parser/registry/template-execution subsystem exists yet.
+- Slash-command parser/registry/template-execution now exists in
+  `src/message/domain/slash_command/`, `src/message/ports/slash_command.rs`,
+  `src/message/adapters/memory/slash_command.rs`, and
+  `src/message/services/slash_command.rs`.
 - `tests/in_memory.rs` and `tests/postgres.rs` are the integration test module
   entrypoints that must register new test modules.
 - Existing BDD style is split between single-file scenarios and directory-based

@@ -59,6 +59,44 @@ assert_eq!(metadata.tool_call_audits.len(), 1);
 assert!(metadata.agent_response_audit.is_some());
 ```
 
+## Slash command execution
+
+Corbusier provides a slash-command orchestration service that parses commands,
+validates typed parameters, renders templates using `minijinja`, and produces
+deterministic tool-call plans with auditable metadata.
+
+Supported command grammar:
+
+- `/<command> key=value key2="quoted value"`
+- Required parameters are enforced per command schema.
+- Unknown parameters are rejected with typed errors.
+
+The default in-memory registry includes `/task` and `/review` command
+definitions.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::message::{
+    adapters::memory::InMemorySlashCommandRegistry,
+    services::SlashCommandService,
+};
+
+fn execute_command() -> Result<(), Box<dyn std::error::Error>> {
+    let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
+
+    let result = service.execute("/task action=start issue=123")?;
+
+    assert_eq!(result.expansion.command, "/task");
+    assert!(!result.planned_tool_calls.is_empty());
+    assert_eq!(result.planned_tool_calls.len(), result.tool_call_audits.len());
+    Ok(())
+}
+```
+
+Repeated execution with the same command string and parameter values produces
+the same ordered tool-call sequence and call identifiers.
+
 ## Issue-to-task creation
 
 Corbusier can create an internal task directly from external issue metadata and

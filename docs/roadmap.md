@@ -92,12 +92,12 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.4. Slash command system
 
-- [ ] 1.4.1 Deliver slash command parsing and template execution. Requires
+- [x] 1.4.1 Deliver slash command parsing and template execution. Requires
   1.1.1. See corbusier-design.md §2.1.1.
-  - [ ] Implement command parser and registry. See corbusier-design.md §2.1.1.
-  - [ ] Add template expansion and parameter validation. See
+  - [x] Implement command parser and registry. See corbusier-design.md §2.1.1.
+  - [x] Add template expansion and parameter validation. See
     corbusier-design.md §2.1.1.
-  - [ ] Success criteria: commands produce deterministic tool call sequences
+  - [x] Success criteria: commands produce deterministic tool call sequences
     with auditable records.
 
 ## 2. Tool plane and workflow governance
