@@ -21,7 +21,8 @@ After this change, a caller can:
    with capability metadata.
 2. List all registered backends and confirm both appear.
 3. Look up a backend by name or ID.
-4. Deregister a backend and confirm it no longer appears in listings.
+4. Deregister a backend and confirm it no longer appears in active listings
+   (inactive backends still appear in `list_all`).
 
 Observable success: `make all` passes, including new unit tests, in-memory
 integration tests, behaviour-driven development (BDD) feature tests, and
