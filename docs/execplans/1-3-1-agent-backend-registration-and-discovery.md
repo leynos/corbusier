@@ -695,7 +695,7 @@ All commands run from `/home/user/project`.
    set -o pipefail; cargo nextest run --test in_memory 2>&1 | tee /tmp/inmem-tests.log
    ```
 
-   Expected: all tests pass including new backend registry tests.
+   Expected: all tests pass, including new backend registry tests.
 
 8. Write BDD tests (Stage G), then:
 
@@ -712,7 +712,7 @@ All commands run from `/home/user/project`.
    set -o pipefail; cargo nextest run --test postgres 2>&1 | tee /tmp/pg-tests.log
    ```
 
-   Expected: all Postgres tests pass including new backend
+   Expected: all Postgres tests pass, including new backend
    registry tests.
 
 10. Update documentation (Stage K).

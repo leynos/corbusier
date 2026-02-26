@@ -45,14 +45,10 @@ fn backend_name_is_trimmed_and_lowercased() {
 }
 
 #[rstest]
-fn empty_backend_name_is_rejected() {
-    let result = BackendName::new("");
-    assert!(matches!(result, Err(BackendDomainError::EmptyBackendName)));
-}
-
-#[rstest]
-fn whitespace_only_backend_name_is_rejected() {
-    let result = BackendName::new("   ");
+#[case("")]
+#[case("   ")]
+fn empty_or_whitespace_backend_name_is_rejected(#[case] input: &str) {
+    let result = BackendName::new(input);
     assert!(matches!(result, Err(BackendDomainError::EmptyBackendName)));
 }
 
@@ -70,20 +66,19 @@ fn invalid_characters_in_backend_name_rejected(#[case] input: &str) {
 }
 
 #[rstest]
-fn backend_name_exceeding_100_chars_is_rejected() {
-    let long_name = "a".repeat(101);
-    let result = BackendName::new(&long_name);
-    assert!(matches!(
-        result,
-        Err(BackendDomainError::BackendNameTooLong(_))
-    ));
-}
-
-#[rstest]
-fn backend_name_at_100_chars_is_accepted() {
-    let name = "a".repeat(100);
+#[case(100, true)]
+#[case(101, false)]
+fn backend_name_length_boundary(#[case] length: usize, #[case] expected_ok: bool) {
+    let name = "a".repeat(length);
     let result = BackendName::new(&name);
-    assert!(result.is_ok());
+    if expected_ok {
+        assert!(result.is_ok(), "expected length {length} to be accepted");
+    } else {
+        assert!(
+            matches!(result, Err(BackendDomainError::BackendNameTooLong(_))),
+            "expected length {length} to be rejected"
+        );
+    }
 }
 
 // ── BackendStatus round-trip ───────────────────────────────────────
