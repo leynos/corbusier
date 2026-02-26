@@ -132,46 +132,34 @@ fn empty_backend_info_field_is_rejected(
 // ── AgentBackendRegistration construction ──────────────────────────
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn new_registration_defaults_to_active() -> Result<(), BackendDomainError> {
-    let registration = create_test_registration("test_backend", true, true)?;
+fn new_registration_defaults_to_active() {
+    let registration =
+        create_test_registration("test_backend", true, true).expect("valid registration");
 
     assert_eq!(registration.status(), BackendStatus::Active);
     assert_eq!(registration.name().as_str(), "test_backend");
     assert_eq!(registration.created_at(), registration.updated_at());
-    Ok(())
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn deactivate_changes_status_to_inactive() -> Result<(), BackendDomainError> {
+fn deactivate_changes_status_to_inactive() {
     let clock = DefaultClock;
-    let mut registration = create_test_registration("test_backend", true, false)?;
+    let mut registration =
+        create_test_registration("test_backend", true, false).expect("valid registration");
     registration.deactivate(&clock);
 
     assert_eq!(registration.status(), BackendStatus::Inactive);
-    Ok(())
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Test uses assertions for verification while returning Result for error propagation"
-)]
-fn activate_changes_status_to_active() -> Result<(), BackendDomainError> {
+fn activate_changes_status_to_active() {
     let clock = DefaultClock;
-    let mut registration = create_test_registration("test_backend", true, false)?;
+    let mut registration =
+        create_test_registration("test_backend", true, false).expect("valid registration");
     registration.deactivate(&clock);
     registration.activate(&clock);
 
     assert_eq!(registration.status(), BackendStatus::Active);
-    Ok(())
 }
 
 #[rstest]

@@ -538,8 +538,8 @@ CREATE TABLE backend_registrations (
     id UUID PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'active',
-    capabilities JSONB NOT NULL DEFAULT '{}',
-    backend_info JSONB NOT NULL DEFAULT '{}',
+    capabilities JSONB NOT NULL,
+    backend_info JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT backend_registrations_status_check CHECK (
@@ -700,7 +700,7 @@ All commands run from `/home/user/project`.
 8. Write BDD tests (Stage G), then:
 
    ```bash
-   set -o pipefail; cargo nextest run --test backend_registration_steps 2>&1 | tee /tmp/bdd-tests.log
+   set -o pipefail; cargo nextest run --test backend_registration_scenarios 2>&1 | tee /tmp/bdd-tests.log
    ```
 
    Expected: all scenarios pass.
@@ -828,8 +828,8 @@ CREATE TABLE backend_registrations (
     id UUID PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'active',
-    capabilities JSONB NOT NULL DEFAULT '{}',
-    backend_info JSONB NOT NULL DEFAULT '{}',
+    capabilities JSONB NOT NULL,
+    backend_info JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT backend_registrations_status_check CHECK (

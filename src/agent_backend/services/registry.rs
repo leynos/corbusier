@@ -222,7 +222,10 @@ where
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
         let mut registration = self.find_by_id_or_error(id).await?;
         registration.deactivate(&*self.clock);
-        self.repository.update(&registration).await?;
+        self.repository
+            .update(&registration)
+            .await
+            .map_err(|err| Self::translate_not_found(err, id))?;
         Ok(registration)
     }
 
@@ -239,8 +242,21 @@ where
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
         let mut registration = self.find_by_id_or_error(id).await?;
         registration.activate(&*self.clock);
-        self.repository.update(&registration).await?;
+        self.repository
+            .update(&registration)
+            .await
+            .map_err(|err| Self::translate_not_found(err, id))?;
         Ok(registration)
+    }
+
+    fn translate_not_found(
+        err: BackendRegistryError,
+        id: BackendId,
+    ) -> BackendRegistryServiceError {
+        match err {
+            BackendRegistryError::NotFound(_) => BackendRegistryServiceError::NotFound(id),
+            other => BackendRegistryServiceError::Repository(other),
+        }
     }
 
     async fn find_by_id_or_error(
