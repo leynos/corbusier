@@ -109,7 +109,7 @@ exercise the full registration-and-discovery lifecycle.
   conflicts when both `X.rs` and `X/mod.rs` exist). Resolved by naming the
   entry point `backend_registration_scenarios.rs` instead of
   `backend_registration_steps.rs`.
-- Stages A-I were implemented in a single pass with only one compilation
+- Stages A-I were implemented in a single pass, with only one compilation
   error (forgetting to read `lib.rs` before editing it). The patterns from
   the `task` subsystem transferred cleanly to `agent_backend`.
 
