@@ -18,7 +18,9 @@ pub enum SlashCommandError {
     InvalidCommandName(String),
 
     /// A parameter token does not match `key=value`.
-    #[error("invalid parameter token '{token}': expected key=value")]
+    #[error(
+        "invalid parameter token '{token}': expected key=value (quote values containing backslashes)"
+    )]
     InvalidParameterToken {
         /// The malformed token text.
         token: String,
@@ -94,7 +96,17 @@ pub enum SlashCommandError {
         reason: String,
     },
 
-    /// Registry operation failed.
-    #[error("slash-command registry error: {0}")]
-    Registry(String),
+    /// Registry contains invalid command definitions.
+    #[error("slash-command registry definition error: {reason}")]
+    RegistryInvalidDefinition {
+        /// Registry failure reason.
+        reason: String,
+    },
+
+    /// Registry is unavailable.
+    #[error("slash-command registry unavailable: {reason}")]
+    RegistryUnavailable {
+        /// Registry failure reason.
+        reason: String,
+    },
 }

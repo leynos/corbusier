@@ -10,11 +10,11 @@ use crate::message::domain::{SlashCommandExpansion, ToolCallAudit};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlannedToolCall {
     /// Stable call identifier.
-    pub call_id: String,
+    call_id: String,
     /// Tool name.
-    pub tool_name: String,
+    tool_name: String,
     /// Tool arguments payload.
-    pub arguments: Value,
+    arguments: Value,
 }
 
 impl PlannedToolCall {
@@ -27,19 +27,37 @@ impl PlannedToolCall {
             arguments,
         }
     }
+
+    /// Returns the stable call identifier.
+    #[must_use]
+    pub fn call_id(&self) -> &str {
+        &self.call_id
+    }
+
+    /// Returns the target tool name.
+    #[must_use]
+    pub fn tool_name(&self) -> &str {
+        &self.tool_name
+    }
+
+    /// Returns rendered JSON arguments.
+    #[must_use]
+    pub const fn arguments(&self) -> &Value {
+        &self.arguments
+    }
 }
 
 /// Output produced by slash-command execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SlashCommandExecution {
     /// Parsed invocation.
-    pub invocation: SlashCommandInvocation,
+    invocation: SlashCommandInvocation,
     /// Expansion metadata for message persistence.
-    pub expansion: SlashCommandExpansion,
+    expansion: SlashCommandExpansion,
     /// Planned deterministic tool calls.
-    pub planned_tool_calls: Vec<PlannedToolCall>,
+    planned_tool_calls: Vec<PlannedToolCall>,
     /// Auditable tool call records.
-    pub tool_call_audits: Vec<ToolCallAudit>,
+    tool_call_audits: Vec<ToolCallAudit>,
 }
 
 impl SlashCommandExecution {
@@ -57,5 +75,35 @@ impl SlashCommandExecution {
             planned_tool_calls,
             tool_call_audits,
         }
+    }
+
+    /// Returns the parsed slash-command invocation.
+    #[must_use]
+    pub const fn invocation(&self) -> &SlashCommandInvocation {
+        &self.invocation
+    }
+
+    /// Returns expansion metadata.
+    #[must_use]
+    pub const fn expansion(&self) -> &SlashCommandExpansion {
+        &self.expansion
+    }
+
+    /// Returns deterministic planned tool calls.
+    #[must_use]
+    pub fn planned_tool_calls(&self) -> &[PlannedToolCall] {
+        &self.planned_tool_calls
+    }
+
+    /// Returns auditable tool call records.
+    #[must_use]
+    pub fn tool_call_audits(&self) -> &[ToolCallAudit] {
+        &self.tool_call_audits
+    }
+
+    /// Consumes the execution and returns expansion metadata plus audits.
+    #[must_use]
+    pub fn into_expansion_and_audits(self) -> (SlashCommandExpansion, Vec<ToolCallAudit>) {
+        (self.expansion, self.tool_call_audits)
     }
 }

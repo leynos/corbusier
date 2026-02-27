@@ -23,3 +23,18 @@ Feature: Slash command parsing and template execution
     Given a slash command service with built-in commands
     When I execute the slash command twice "/review action=sync include_summary=true"
     Then both executions produce identical tool plans
+
+  Scenario: Invalid boolean parameter is rejected
+    Given a slash command service with built-in commands
+    When I execute the slash command "/review action=sync include_summary=notabool"
+    Then the slash command fails with invalid boolean parameter "include_summary" for command "review"
+
+  Scenario: Invalid tool arguments template is rejected
+    Given a slash command service with an invalid tool arguments template
+    When I execute the slash command "/broken value=test"
+    Then the slash command fails with invalid tool arguments template for tool "broken_tool"
+
+  Scenario: Quoted values preserve spaces and escaping
+    Given a slash command service with built-in commands
+    When I execute the slash command '/task action=start issue="ENG 123"'
+    Then the command expansion records issue parameter "ENG 123"

@@ -22,7 +22,13 @@ impl InMemorySlashCommandRegistry {
         Self {
             commands: default_commands()
                 .into_iter()
-                .map(|definition| (definition.command.clone(), definition))
+                .map(|definition| {
+                    debug_assert!(
+                        definition.validate_schema().is_ok(),
+                        "built-in slash command definitions must remain valid",
+                    );
+                    (definition.command.to_ascii_lowercase(), definition)
+                })
                 .collect(),
         }
     }
@@ -37,7 +43,12 @@ impl InMemorySlashCommandRegistry {
         definitions: impl IntoIterator<Item = SlashCommandDefinition>,
     ) -> SlashCommandRegistryResult<Self> {
         let mut commands = HashMap::new();
-        for definition in definitions {
+        for mut definition in definitions {
+            definition.command = definition.command.to_ascii_lowercase();
+            definition
+                .validate_schema()
+                .map_err(|error| SlashCommandRegistryError::InvalidDefinition(error.to_string()))?;
+
             if commands
                 .insert(definition.command.clone(), definition)
                 .is_some()
@@ -91,8 +102,8 @@ fn default_commands() -> Vec<SlashCommandDefinition> {
         .with_tool_call(ToolCallTemplate::new(
             "task_service",
             concat!(
-                "{\"action\":\"{{ action }}\",",
-                "\"issue\":{% if issue is none %}null{% else %}\"{{ issue }}\"{% endif %}}",
+                "{\"action\":{{ action | json_string }},",
+                "\"issue\":{% if issue is none %}null{% else %}{{ issue | json_string }}{% endif %}}",
             ),
         )),
         SlashCommandDefinition::new(
@@ -112,7 +123,7 @@ fn default_commands() -> Vec<SlashCommandDefinition> {
         .with_tool_call(ToolCallTemplate::new(
             "review_service",
             concat!(
-                "{\"action\":\"{{ action }}\",",
+                "{\"action\":{{ action | json_string }},",
                 "\"include_summary\":",
                 "{% if include_summary is none %}null{% else %}{{ include_summary }}{% endif %}}",
             ),

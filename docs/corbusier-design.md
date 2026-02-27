@@ -432,7 +432,7 @@ Corbusier implements this through:
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management)
   - System Dependencies: Template engine, command parser
-  - External Dependencies: None
+  - External Dependencies: `minijinja`
   - Integration Requirements: Task service integration, VCS workflow hooks
 
 ###### Implementation decisions (2026-02-26) — roadmap 1.4.1
@@ -446,9 +446,14 @@ Corbusier implements this through:
   `boolean`, `select`) with typed errors for unknown parameters, missing
   required parameters, and invalid values.
 - Template expansion and tool-argument rendering use `minijinja`.
-- Deterministic tool-call identifiers are generated from canonicalized command
-  input and rendered arguments, and execution produces audit metadata via
-  `SlashCommandExpansion` and `ToolCallAudit` records.
+- Deterministic tool-call identifiers are generated from a canonical payload
+  string with this exact order and encoding:
+  `command=<value>;index=<value>;tool_name=<value>;parameters=<k=v;...>;arguments=<json>`.
+   Parameter entries are emitted in sorted key order from `BTreeMap`, values
+  use JSON value stringification, and the payload is hashed using Rust's
+  `DefaultHasher` before formatting as `sc-<index>-<16-hex>`.
+- Execution produces audit metadata via `SlashCommandExpansion` and
+  `ToolCallAudit` records.
 - Implementation is scoped to existing message metadata storage; no new
   persistence schema changes are required for roadmap 1.4.1.
 
@@ -1337,6 +1342,7 @@ you to also send your logs for further analysis.
 | chrono      | 0.4.43  | Date/time handling               | crates.io |
 | uuid        | 1.19.0  | UUID generation                  | crates.io |
 | thiserror   | 2.0.17  | Error derive macros              | crates.io |
+| minijinja   | 2.16.0  | Template rendering               | crates.io |
 | async-trait | 0.1.89  | Async trait support              | crates.io |
 | mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
 | diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |

@@ -53,7 +53,11 @@ impl CommandParameterSpec {
     /// Adds allowed options for `select` parameters.
     #[must_use]
     pub fn with_options(mut self, options: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        self.options = options.into_iter().map(Into::into).collect();
+        self.options = options
+            .into_iter()
+            .map(Into::into)
+            .map(|option: String| option.to_ascii_lowercase())
+            .collect();
         self
     }
 }
@@ -126,6 +130,15 @@ impl SlashCommandDefinition {
         self
     }
 
+    /// Validates the command definition schema.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SlashCommandError`] when parameter definitions are invalid.
+    pub(crate) fn validate_schema(&self) -> Result<(), SlashCommandError> {
+        validate_parameter_definitions(&self.command, &self.parameters)
+    }
+
     /// Validates and converts raw invocation parameters.
     ///
     /// # Errors
@@ -136,8 +149,6 @@ impl SlashCommandDefinition {
         &self,
         provided: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, Value>, SlashCommandError> {
-        validate_parameter_definitions(&self.command, &self.parameters)?;
-
         for key in provided.keys() {
             if !self
                 .parameters
@@ -217,7 +228,7 @@ fn parse_parameter_value(
             Err(SlashCommandError::InvalidParameterValue {
                 command: command.to_owned(),
                 parameter: parameter.name.clone(),
-                reason: "expected an integer".to_owned(),
+                reason: "expected an integer number".to_owned(),
             })
         }
         CommandParameterType::Boolean => match raw.to_ascii_lowercase().as_str() {
@@ -226,19 +237,22 @@ fn parse_parameter_value(
             _ => Err(SlashCommandError::InvalidParameterValue {
                 command: command.to_owned(),
                 parameter: parameter.name.clone(),
-                reason: "expected true or false".to_owned(),
+                reason: "expected true or false (case-insensitive)".to_owned(),
             }),
         },
-        CommandParameterType::Select => {
-            if parameter.options.iter().any(|option| option == raw) {
-                Ok(Value::String(raw.to_owned()))
-            } else {
-                Err(SlashCommandError::InvalidParameterValue {
-                    command: command.to_owned(),
-                    parameter: parameter.name.clone(),
-                    reason: format!("expected one of [{}]", parameter.options.join(", ")),
-                })
-            }
-        }
+        CommandParameterType::Select => parameter
+            .options
+            .iter()
+            .find(|option| option.eq_ignore_ascii_case(raw))
+            .map_or_else(
+                || {
+                    Err(SlashCommandError::InvalidParameterValue {
+                        command: command.to_owned(),
+                        parameter: parameter.name.clone(),
+                        reason: format!("expected one of [{}]", parameter.options.join(", ")),
+                    })
+                },
+                |option| Ok(Value::String(option.clone())),
+            ),
     }
 }

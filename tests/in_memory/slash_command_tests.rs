@@ -31,9 +31,10 @@ fn slash_command_execution_metadata_round_trip_in_memory(
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
 
     let execution = service.execute("/task action=start issue=42")?;
+    let (command_expansion, tool_call_audits) = execution.into_expansion_and_audits();
     let metadata = MessageMetadata::empty()
-        .with_slash_command_expansion(execution.expansion)
-        .with_tool_call_audits(execution.tool_call_audits);
+        .with_slash_command_expansion(command_expansion)
+        .with_tool_call_audits(tool_call_audits);
 
     let message = Message::builder(conversation_id, Role::System, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new(
@@ -55,7 +56,7 @@ fn slash_command_execution_metadata_round_trip_in_memory(
             .metadata()
             .slash_command_expansion
             .as_ref()
-            .map(|expansion| expansion.command.as_str()),
+            .map(|persisted_expansion| persisted_expansion.command.as_str()),
         Some("/task")
     );
     assert_eq!(persisted.metadata().tool_call_audits.len(), 1);

@@ -1,18 +1,17 @@
 //! Slash-command orchestration service.
 
-use minijinja::Environment;
+use minijinja::{Environment, Error as MiniJinjaError, ErrorKind as MiniJinjaErrorKind};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use crate::message::domain::{
     PlannedToolCall, SlashCommandError, SlashCommandExecution, SlashCommandExpansion,
     SlashCommandInvocation, ToolCallAudit, ToolCallStatus,
 };
-use crate::message::ports::slash_command::SlashCommandRegistry;
-
-const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
-const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+use crate::message::ports::slash_command::{SlashCommandRegistry, SlashCommandRegistryError};
 
 /// Service that executes slash commands using a registry.
 #[derive(Clone)]
@@ -21,6 +20,7 @@ where
     R: SlashCommandRegistry,
 {
     registry: Arc<R>,
+    environment: Arc<Environment<'static>>,
 }
 
 impl<R> SlashCommandService<R>
@@ -29,8 +29,11 @@ where
 {
     /// Creates a new slash-command service.
     #[must_use]
-    pub const fn new(registry: Arc<R>) -> Self {
-        Self { registry }
+    pub fn new(registry: Arc<R>) -> Self {
+        Self {
+            registry,
+            environment: Arc::new(create_template_environment()),
+        }
     }
 
     /// Executes a raw slash-command input and returns deterministic output.
@@ -44,17 +47,19 @@ where
         let definition = self
             .registry
             .find_by_name(invocation.command())
-            .map_err(|error| SlashCommandError::Registry(error.to_string()))?
+            .map_err(map_registry_error)?
             .ok_or_else(|| SlashCommandError::UnknownCommand(invocation.command().to_owned()))?;
 
         let validated_parameters = definition.validate_parameters(invocation.parameters())?;
         let expanded_content = render_template(
+            self.environment.as_ref(),
             invocation.command(),
             &definition.expansion_template,
             &validated_parameters,
         )?;
 
         let planned_tool_calls = Self::plan_tool_calls(
+            self.environment.as_ref(),
             invocation.command(),
             &definition.tool_calls,
             &validated_parameters,
@@ -62,7 +67,9 @@ where
 
         let tool_call_audits = planned_tool_calls
             .iter()
-            .map(|call| ToolCallAudit::new(&call.call_id, &call.tool_name, ToolCallStatus::Queued))
+            .map(|call| {
+                ToolCallAudit::new(call.call_id(), call.tool_name(), ToolCallStatus::Queued)
+            })
             .collect();
 
         let expansion = build_expansion(
@@ -79,6 +86,7 @@ where
     }
 
     fn plan_tool_calls(
+        environment: &Environment<'_>,
         command: &str,
         templates: &[crate::message::domain::ToolCallTemplate],
         parameters: &BTreeMap<String, Value>,
@@ -87,8 +95,12 @@ where
             .iter()
             .enumerate()
             .map(|(index, template)| {
-                let rendered_arguments =
-                    render_template(command, &template.arguments_template, parameters)?;
+                let rendered_arguments = render_template(
+                    environment,
+                    command,
+                    &template.arguments_template,
+                    parameters,
+                )?;
                 let arguments: Value =
                     serde_json::from_str(&rendered_arguments).map_err(|error| {
                         SlashCommandError::InvalidToolArgumentsTemplate {
@@ -103,7 +115,7 @@ where
                     tool_name: &template.tool_name,
                     parameters,
                     arguments: &arguments,
-                })?;
+                });
 
                 Ok(PlannedToolCall::new(
                     call_id,
@@ -116,11 +128,11 @@ where
 }
 
 fn render_template(
+    environment: &Environment<'_>,
     command: &str,
     template: &str,
     parameters: &BTreeMap<String, Value>,
 ) -> Result<String, SlashCommandError> {
-    let environment = Environment::new();
     let context = build_template_context(command, parameters);
     environment
         .render_str(template, context)
@@ -154,47 +166,32 @@ fn build_expansion(
     expansion
 }
 
-fn build_deterministic_call_id(
-    input: &DeterministicCallIdInput<'_>,
-) -> Result<String, SlashCommandError> {
-    let mut payload = Map::new();
-    payload.insert(
-        "command".to_owned(),
-        Value::String(input.command.to_owned()),
-    );
-    payload.insert("index".to_owned(), Value::String(input.index.to_string()));
-    payload.insert(
-        "tool_name".to_owned(),
-        Value::String(input.tool_name.to_owned()),
-    );
-    payload.insert(
-        "parameters".to_owned(),
-        serde_json::to_value(input.parameters).map_err(|error| {
-            SlashCommandError::TemplateRender {
-                command: input.command.to_owned(),
-                reason: error.to_string(),
-            }
-        })?,
-    );
-    payload.insert("arguments".to_owned(), input.arguments.clone());
-
-    let canonical =
-        serde_json::to_string(&payload).map_err(|error| SlashCommandError::TemplateRender {
-            command: input.command.to_owned(),
-            reason: error.to_string(),
-        })?;
-
-    let hash = fnv1a_hash(&canonical);
-    Ok(format!("sc-{}-{hash:016x}", input.index))
+fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
+    let canonical = canonical_call_id_payload(input);
+    let mut hasher = DefaultHasher::new();
+    canonical.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("sc-{}-{hash:016x}", input.index)
 }
 
-fn fnv1a_hash(input: &str) -> u64 {
-    let mut hash = FNV_OFFSET_BASIS;
-    for byte in input.bytes() {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
+fn canonical_call_id_payload(input: &DeterministicCallIdInput<'_>) -> String {
+    let mut canonical = String::new();
+    canonical.push_str("command=");
+    canonical.push_str(input.command);
+    canonical.push_str(";index=");
+    canonical.push_str(&input.index.to_string());
+    canonical.push_str(";tool_name=");
+    canonical.push_str(input.tool_name);
+    canonical.push_str(";parameters=");
+    for (key, value) in input.parameters {
+        canonical.push_str(key);
+        canonical.push('=');
+        canonical.push_str(&value.to_string());
+        canonical.push(';');
     }
-    hash
+    canonical.push_str(";arguments=");
+    canonical.push_str(&input.arguments.to_string());
+    canonical
 }
 
 struct DeterministicCallIdInput<'a> {
@@ -203,4 +200,30 @@ struct DeterministicCallIdInput<'a> {
     tool_name: &'a str,
     parameters: &'a BTreeMap<String, Value>,
     arguments: &'a Value,
+}
+
+fn create_template_environment() -> Environment<'static> {
+    let mut environment = Environment::new();
+    environment.add_filter("json_string", json_string_filter);
+    environment
+}
+
+fn json_string_filter(value: &str) -> Result<String, MiniJinjaError> {
+    serde_json::to_string(&value).map_err(|error| {
+        MiniJinjaError::new(
+            MiniJinjaErrorKind::InvalidOperation,
+            format!("failed to encode string as JSON: {error}"),
+        )
+    })
+}
+
+fn map_registry_error(error: SlashCommandRegistryError) -> SlashCommandError {
+    match error {
+        SlashCommandRegistryError::InvalidDefinition(reason) => {
+            SlashCommandError::RegistryInvalidDefinition { reason }
+        }
+        SlashCommandRegistryError::Unavailable(reason) => {
+            SlashCommandError::RegistryUnavailable { reason }
+        }
+    }
 }

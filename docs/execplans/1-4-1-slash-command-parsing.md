@@ -159,7 +159,7 @@ Roadmap 1.4.1 was implemented with the following outcomes:
   deterministic call-id planning -> audit record generation.
 - Added unit tests (`rstest`), in-memory integration tests, PostgreSQL
   integration tests (using existing `pg-embed-setup-unpriv` fixture pipeline),
-  and BDD scenarios (`rstest-bdd`).
+  and behaviour-driven development (BDD) scenarios (`rstest-bdd`).
 - Updated `docs/users-guide.md`, `docs/corbusier-design.md`, and
   `docs/roadmap.md` (marked 1.4.1 done).
 

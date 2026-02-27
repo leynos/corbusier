@@ -70,6 +70,8 @@ Supported command grammar:
 - `/<command> key=value key2="quoted value"`
 - Required parameters are enforced per command schema.
 - Unknown parameters are rejected with typed errors.
+- Boolean parameter values are case-insensitive (`true`/`false`).
+- `number` parameters currently accept integer values only.
 
 The default in-memory registry includes `/task` and `/review` command
 definitions.
@@ -87,9 +89,9 @@ fn execute_command() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = service.execute("/task action=start issue=123")?;
 
-    assert_eq!(result.expansion.command, "/task");
-    assert!(!result.planned_tool_calls.is_empty());
-    assert_eq!(result.planned_tool_calls.len(), result.tool_call_audits.len());
+    assert_eq!(result.expansion().command, "/task");
+    assert!(!result.planned_tool_calls().is_empty());
+    assert_eq!(result.planned_tool_calls().len(), result.tool_call_audits().len());
     Ok(())
 }
 ```
