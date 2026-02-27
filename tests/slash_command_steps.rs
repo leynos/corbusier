@@ -27,6 +27,39 @@ fn world() -> SlashCommandWorld {
     SlashCommandWorld::default()
 }
 
+// Helper functions to reduce duplication in step implementations
+fn get_service(
+    world: &SlashCommandWorld,
+) -> Result<&SlashCommandService<InMemorySlashCommandRegistry>> {
+    world
+        .service
+        .as_ref()
+        .ok_or_else(|| eyre!("slash command service was not initialized"))
+}
+
+fn execute_and_store_success(world: &mut SlashCommandWorld, command: &str) -> Result<()> {
+    let execution = get_service(world)?.execute(command)?;
+    world.first_execution = Some(execution);
+    world.last_error = None;
+    Ok(())
+}
+
+fn execute_and_store_error(world: &mut SlashCommandWorld, command: &str) -> Result<()> {
+    world.last_error = get_service(world)?.execute(command).err();
+    world.first_execution = None;
+    Ok(())
+}
+
+fn execute_twice_and_store(world: &mut SlashCommandWorld, command: &str) -> Result<()> {
+    let service = get_service(world)?;
+    let first_execution = service.execute(command)?;
+    let second_execution = service.execute(command)?;
+    world.first_execution = Some(first_execution);
+    world.second_execution = Some(second_execution);
+    world.last_error = None;
+    Ok(())
+}
+
 #[given("a slash command service with built-in commands")]
 fn slash_command_service(world: &mut SlashCommandWorld) {
     world.service = Some(SlashCommandService::new(Arc::new(
@@ -60,93 +93,37 @@ fn slash_command_service_with_invalid_template(world: &mut SlashCommandWorld) ->
 
 #[when("I execute the slash command \"/task action=start issue=123\"")]
 fn execute_valid_task_command(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    let execution = service.execute("/task action=start issue=123")?;
-    world.first_execution = Some(execution);
-    world.last_error = None;
-    Ok(())
+    execute_and_store_success(world, "/task action=start issue=123")
 }
 
 #[when("I execute the slash command \"/missing action=start\"")]
 fn execute_missing_command(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    world.last_error = service.execute("/missing action=start").err();
-    world.first_execution = None;
-    Ok(())
+    execute_and_store_error(world, "/missing action=start")
 }
 
 #[when("I execute the slash command \"/task issue=123\"")]
 fn execute_missing_parameter(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    world.last_error = service.execute("/task issue=123").err();
-    world.first_execution = None;
-    Ok(())
+    execute_and_store_error(world, "/task issue=123")
 }
 
 #[when("I execute the slash command twice \"/review action=sync include_summary=true\"")]
 fn execute_command_twice(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    let first_execution = service.execute("/review action=sync include_summary=true")?;
-    let second_execution = service.execute("/review action=sync include_summary=true")?;
-    world.first_execution = Some(first_execution);
-    world.second_execution = Some(second_execution);
-    world.last_error = None;
-    Ok(())
+    execute_twice_and_store(world, "/review action=sync include_summary=true")
 }
 
 #[when("I execute the slash command \"/review action=sync include_summary=notabool\"")]
 fn execute_invalid_boolean_parameter(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    world.last_error = service
-        .execute("/review action=sync include_summary=notabool")
-        .err();
-    world.first_execution = None;
-    Ok(())
+    execute_and_store_error(world, "/review action=sync include_summary=notabool")
 }
 
 #[when("I execute the slash command \"/broken value=test\"")]
 fn execute_broken_command(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    world.last_error = service.execute("/broken value=test").err();
-    world.first_execution = None;
-    Ok(())
+    execute_and_store_error(world, "/broken value=test")
 }
 
 #[when("I execute the slash command '/task action=start issue=\"ENG 123\"'")]
 fn execute_quoted_task_command(world: &mut SlashCommandWorld) -> Result<()> {
-    let service = world
-        .service
-        .as_ref()
-        .ok_or_else(|| eyre!("slash command service was not initialized"))?;
-
-    let execution = service.execute("/task action=start issue=\"ENG 123\"")?;
-    world.first_execution = Some(execution);
-    world.last_error = None;
-    Ok(())
+    execute_and_store_success(world, "/task action=start issue=\"ENG 123\"")
 }
 
 #[then("the command expansion is recorded")]

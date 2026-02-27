@@ -82,52 +82,81 @@ fn parse_command_token(token: &str) -> Result<String, SlashCommandError> {
 }
 
 fn tokenize(input: &str) -> Result<Vec<String>, SlashCommandError> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes: Option<char> = None;
-    let mut escaped = false;
+    let mut state = TokenizeState::new();
 
     for character in input.chars() {
-        if let Some(quote_char) = in_quotes {
-            if escaped {
-                current.push(character);
-                escaped = false;
-                continue;
-            }
-
-            match character {
-                '\\' => escaped = true,
-                _ if character == quote_char => in_quotes = None,
-                _ => current.push(character),
-            }
-            continue;
-        }
-
-        match character {
-            '"' | '\'' => in_quotes = Some(character),
-            _ if character.is_whitespace() => {
-                if !current.is_empty() {
-                    tokens.push(std::mem::take(&mut current));
-                }
-            }
-            '\\' => {
-                current.push(character);
-                return Err(SlashCommandError::InvalidParameterToken {
-                    token: current.clone(),
-                });
-            }
-            _ => current.push(character),
+        if let Some(quote_char) = state.in_quotes {
+            process_quoted_character(character, quote_char, &mut state);
+        } else {
+            process_unquoted_character(character, &mut state)?;
         }
     }
 
-    if in_quotes.is_some() || escaped {
+    validate_final_state(state)
+}
+
+fn process_quoted_character(character: char, quote_char: char, state: &mut TokenizeState) {
+    if state.escaped {
+        state.current.push(character);
+        state.escaped = false;
+        return;
+    }
+
+    match character {
+        '\\' => state.escaped = true,
+        _ if character == quote_char => state.in_quotes = None,
+        _ => state.current.push(character),
+    }
+}
+
+fn process_unquoted_character(
+    character: char,
+    state: &mut TokenizeState,
+) -> Result<(), SlashCommandError> {
+    match character {
+        '"' | '\'' => state.in_quotes = Some(character),
+        _ if character.is_whitespace() => state.flush_current(),
+        '\\' => {
+            state.current.push(character);
+            return Err(SlashCommandError::InvalidParameterToken {
+                token: state.current.clone(),
+            });
+        }
+        _ => state.current.push(character),
+    }
+    Ok(())
+}
+
+fn validate_final_state(mut state: TokenizeState) -> Result<Vec<String>, SlashCommandError> {
+    if state.in_quotes.is_some() || state.escaped {
         return Err(SlashCommandError::UnterminatedQuotedValue);
     }
-    if !current.is_empty() {
-        tokens.push(current);
+    state.flush_current();
+    Ok(state.tokens)
+}
+
+struct TokenizeState {
+    tokens: Vec<String>,
+    current: String,
+    in_quotes: Option<char>,
+    escaped: bool,
+}
+
+impl TokenizeState {
+    const fn new() -> Self {
+        Self {
+            tokens: Vec::new(),
+            current: String::new(),
+            in_quotes: None,
+            escaped: false,
+        }
     }
 
-    Ok(tokens)
+    fn flush_current(&mut self) {
+        if !self.current.is_empty() {
+            self.tokens.push(std::mem::take(&mut self.current));
+        }
+    }
 }
 
 fn is_valid_identifier(value: &str) -> bool {
