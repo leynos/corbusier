@@ -2,9 +2,8 @@
 
 use minijinja::{Environment, Error as MiniJinjaError, ErrorKind as MiniJinjaErrorKind};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use crate::message::domain::{
@@ -168,10 +167,35 @@ fn build_expansion(
 
 fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
     let canonical = canonical_call_id_payload(input);
-    let mut hasher = DefaultHasher::new();
-    canonical.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("sc-{}-{hash:016x}", input.index)
+    let digest = Sha256::digest(canonical.as_bytes());
+    let mut hash_suffix = String::with_capacity(16);
+    for byte in digest.iter().take(8) {
+        hash_suffix.push(hex_nibble_character(byte >> 4));
+        hash_suffix.push(hex_nibble_character(byte & 0x0f));
+    }
+    format!("sc-{}-{hash_suffix}", input.index)
+}
+
+const fn hex_nibble_character(nibble: u8) -> char {
+    match nibble {
+        0 => '0',
+        1 => '1',
+        2 => '2',
+        3 => '3',
+        4 => '4',
+        5 => '5',
+        6 => '6',
+        7 => '7',
+        8 => '8',
+        9 => '9',
+        10 => 'a',
+        11 => 'b',
+        12 => 'c',
+        13 => 'd',
+        14 => 'e',
+        15 => 'f',
+        _ => '?',
+    }
 }
 
 fn canonical_call_id_payload(input: &DeterministicCallIdInput<'_>) -> String {
@@ -219,11 +243,11 @@ fn json_string_filter(value: &str) -> Result<String, MiniJinjaError> {
 
 fn map_registry_error(error: SlashCommandRegistryError) -> SlashCommandError {
     match error {
-        SlashCommandRegistryError::InvalidDefinition(reason) => {
-            SlashCommandError::RegistryInvalidDefinition { reason }
+        SlashCommandRegistryError::InvalidDefinition(source) => {
+            SlashCommandError::RegistryInvalidDefinition { source }
         }
-        SlashCommandRegistryError::Unavailable(reason) => {
-            SlashCommandError::RegistryUnavailable { reason }
+        SlashCommandRegistryError::Unavailable(source) => {
+            SlashCommandError::RegistryUnavailable { source }
         }
     }
 }

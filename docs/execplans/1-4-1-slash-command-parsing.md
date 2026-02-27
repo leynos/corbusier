@@ -47,7 +47,8 @@ slash-command execution remains close to canonical message and audit metadata
   - Adapters in `src/message/adapters/` implement those ports only.
 - Do not regress existing message and task behaviour covered by current tests.
 - Use `minijinja` for template rendering and parameter interpolation.
-- Use `rstest` for unit tests and `rstest-bdd` for behavioural tests.
+- Use `rstest` for unit tests and `rstest-bdd` for behaviour-driven
+  development (BDD) tests.
 - Cover happy paths, unhappy paths, and deterministic-order edge cases.
 - Use `pg-embed-setup-unpriv` fixtures for Postgres-backed integration tests.
 - Keep each Rust file under 400 lines.
@@ -89,7 +90,7 @@ slash-command execution remains close to canonical message and audit metadata
   parameters fully before rendering; render in a fail-fast service path that
   returns typed errors and emits no tool plan on failure.
 
-- Risk: Behavioural test wiring conflicts with existing `rstest-bdd` naming.
+- Risk: BDD test wiring conflicts with existing `rstest-bdd` naming.
   Severity: low. Likelihood: medium. Mitigation: use a dedicated scenario
   entrypoint filename that differs from the step-definition directory name.
 
@@ -159,7 +160,7 @@ Roadmap 1.4.1 was implemented with the following outcomes:
   deterministic call-id planning -> audit record generation.
 - Added unit tests (`rstest`), in-memory integration tests, PostgreSQL
   integration tests (using existing `pg-embed-setup-unpriv` fixture pipeline),
-  and behaviour-driven development (BDD) scenarios (`rstest-bdd`).
+  and BDD scenarios (`rstest-bdd`).
 - Updated `docs/users-guide.md`, `docs/corbusier-design.md`, and
   `docs/roadmap.md` (marked 1.4.1 done).
 
@@ -264,7 +265,7 @@ Integration tests for:
 - in-memory end-to-end slash execution workflow,
 - Postgres persistence round-trip of expansion and audit metadata.
 
-Behavioural tests (`rstest-bdd`) for:
+BDD tests (`rstest-bdd`) for:
 
 - valid slash command expansion producing expected tool plan,
 - unknown command rejection,

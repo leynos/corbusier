@@ -2,6 +2,48 @@
 
 use thiserror::Error;
 
+/// Errors for slash-command definition schema validation.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum SlashCommandSchemaError {
+    /// Parameter schema is invalid.
+    #[error("invalid parameter definition for '{parameter}' in command '/{command}': {reason}")]
+    InvalidParameterDefinition {
+        /// Command name.
+        command: String,
+        /// Parameter name.
+        parameter: String,
+        /// Validation reason.
+        reason: String,
+    },
+
+    /// Command schema is invalid.
+    #[error("invalid command definition for '/{command}': {reason}")]
+    InvalidCommandDefinition {
+        /// Command name.
+        command: String,
+        /// Validation reason.
+        reason: String,
+    },
+}
+
+/// Typed unavailable error for slash-command registries.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[error("{reason}")]
+pub struct SlashCommandRegistryUnavailableError {
+    /// Registry failure reason.
+    pub reason: String,
+}
+
+impl SlashCommandRegistryUnavailableError {
+    /// Creates a typed registry-unavailable error.
+    #[must_use]
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
+}
+
 /// Errors for slash-command parsing, validation, and execution.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SlashCommandError {
@@ -97,16 +139,16 @@ pub enum SlashCommandError {
     },
 
     /// Registry contains invalid command definitions.
-    #[error("slash-command registry definition error: {reason}")]
+    #[error("slash-command registry definition error: {source}")]
     RegistryInvalidDefinition {
-        /// Registry failure reason.
-        reason: String,
+        /// Registry definition failure.
+        source: SlashCommandSchemaError,
     },
 
     /// Registry is unavailable.
-    #[error("slash-command registry unavailable: {reason}")]
+    #[error("slash-command registry unavailable: {source}")]
     RegistryUnavailable {
-        /// Registry failure reason.
-        reason: String,
+        /// Registry availability failure.
+        source: SlashCommandRegistryUnavailableError,
     },
 }

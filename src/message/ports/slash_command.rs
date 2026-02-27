@@ -4,7 +4,9 @@
 
 use thiserror::Error;
 
-use crate::message::domain::SlashCommandDefinition;
+use crate::message::domain::{
+    SlashCommandDefinition, SlashCommandRegistryUnavailableError, SlashCommandSchemaError,
+};
 
 /// Result type for slash-command registry operations.
 pub type SlashCommandRegistryResult<T> = Result<T, SlashCommandRegistryError>;
@@ -34,9 +36,9 @@ pub trait SlashCommandRegistry: Send + Sync {
 pub enum SlashCommandRegistryError {
     /// The registry contains invalid command definitions.
     #[error("invalid slash-command definition: {0}")]
-    InvalidDefinition(String),
+    InvalidDefinition(SlashCommandSchemaError),
 
     /// General storage or adapter failure.
     #[error("slash-command registry unavailable: {0}")]
-    Unavailable(String),
+    Unavailable(SlashCommandRegistryUnavailableError),
 }

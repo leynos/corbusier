@@ -96,6 +96,28 @@ fn registry_rejects_invalid_parameter_schema_during_registration() {
 }
 
 #[rstest]
+fn registry_rejects_options_for_non_select_parameter() {
+    let invalid_definition = SlashCommandDefinition::new("task", "Task", "Task").with_parameter(
+        CommandParameterSpec::new("issue", CommandParameterType::String, true)
+            .with_options(["unused"]),
+    );
+
+    let error = InMemorySlashCommandRegistry::with_commands([invalid_definition])
+        .expect_err("registry should reject options on non-select parameter");
+
+    assert!(matches!(
+        error,
+        crate::message::ports::slash_command::SlashCommandRegistryError::InvalidDefinition(
+            crate::message::domain::SlashCommandSchemaError::InvalidParameterDefinition {
+                parameter,
+                reason,
+                ..
+            }
+        ) if parameter == "issue" && reason == "only Select parameters may provide options"
+    ));
+}
+
+#[rstest]
 fn parser_reports_unquoted_backslash_token_with_hint() {
     let error = SlashCommandInvocation::parse(r"/task action=start issue=C:\folder")
         .expect_err("unquoted backslashes should be rejected");
@@ -197,7 +219,25 @@ fn service_accepts_number_parameter_boundaries() {
 #[rstest]
 #[case("1.0")]
 #[case("1e3")]
-fn service_rejects_non_integer_number_parameter_values(#[case] value: &str) {
+fn service_accepts_floating_point_number_parameter_values(#[case] value: &str) {
+    let definition =
+        SlashCommandDefinition::new("set-count", "Set count", "Count {{ count }}").with_parameter(
+            CommandParameterSpec::new("count", CommandParameterType::Number, true),
+        );
+    let registry =
+        InMemorySlashCommandRegistry::with_commands([definition]).expect("registry should build");
+    let service = SlashCommandService::new(Arc::new(registry));
+
+    service
+        .execute(&format!("/set-count count={value}"))
+        .expect("floating-point value should parse");
+}
+
+#[rstest]
+#[case("NaN")]
+#[case("inf")]
+#[case("-inf")]
+fn service_rejects_non_finite_number_parameter_values(#[case] value: &str) {
     let definition =
         SlashCommandDefinition::new("set-count", "Set count", "Count {{ count }}").with_parameter(
             CommandParameterSpec::new("count", CommandParameterType::Number, true),
@@ -208,14 +248,14 @@ fn service_rejects_non_integer_number_parameter_values(#[case] value: &str) {
 
     let error = service
         .execute(&format!("/set-count count={value}"))
-        .expect_err("non-integer value should fail");
+        .expect_err("non-finite value should fail");
 
     assert_eq!(
         error,
         SlashCommandError::InvalidParameterValue {
             command: "set-count".to_owned(),
             parameter: "count".to_owned(),
-            reason: "expected an integer number".to_owned(),
+            reason: "expected a number".to_owned(),
         }
     );
 }

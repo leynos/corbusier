@@ -34,7 +34,7 @@ Feature: Slash command parsing and template execution
     When I execute the slash command "/broken value=test"
     Then the slash command fails with invalid tool arguments template for tool "broken_tool"
 
-  Scenario: Quoted values preserve spaces and escaping
+  Scenario: Quoted values preserve spaces
     Given a slash command service with built-in commands
     When I execute the slash command '/task action=start issue="ENG 123"'
     Then the command expansion records issue parameter "ENG 123"

@@ -304,7 +304,7 @@ async fn invalid_tool_arguments_template(world: SlashCommandWorld) {
 
 #[scenario(
     path = "tests/features/slash_command.feature",
-    name = "Quoted values preserve spaces and escaping"
+    name = "Quoted values preserve spaces"
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn quoted_value_preservation(world: SlashCommandWorld) {

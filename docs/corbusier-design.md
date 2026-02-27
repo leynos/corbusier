@@ -449,9 +449,14 @@ Corbusier implements this through:
 - Deterministic tool-call identifiers are generated from a canonical payload
   string with this exact order and encoding:
   `command=<value>;index=<value>;tool_name=<value>;parameters=<k=v;...>;arguments=<json>`.
-   Parameter entries are emitted in sorted key order from `BTreeMap`, values
-  use JSON value stringification, and the payload is hashed using Rust's
-  `DefaultHasher` before formatting as `sc-<index>-<16-hex>`.
+  Parameter entries are emitted in sorted key order from `BTreeMap`, values use
+  JSON stringification (`serde_json::Value::to_string()`), and the canonical
+  payload is encoded as UTF-8 bytes before hashing.
+- Hash algorithm decision: use SHA-256, take the first 8 digest bytes
+  (big-endian) as a `u64`, and format as `sc-<index>-<16-hex>`.
+- Compatibility note: existing audit records remain immutable. Readers should
+  treat historical call IDs as opaque and accept both legacy and SHA-256-derived
+  ID forms without migration.
 - Execution produces audit metadata via `SlashCommandExpansion` and
   `ToolCallAudit` records.
 - Implementation is scoped to existing message metadata storage; no new

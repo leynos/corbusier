@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::collections::{BTreeMap, HashSet};
 
-use super::SlashCommandError;
+use super::{SlashCommandError, SlashCommandSchemaError};
 
 /// Parameter type for slash-command validation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ use super::SlashCommandError;
 pub enum CommandParameterType {
     /// Free-form string value.
     String,
-    /// Integer value.
+    /// Numeric value.
     Number,
     /// Boolean value (`true` or `false`).
     Boolean,
@@ -134,8 +134,9 @@ impl SlashCommandDefinition {
     ///
     /// # Errors
     ///
-    /// Returns [`SlashCommandError`] when parameter definitions are invalid.
-    pub(crate) fn validate_schema(&self) -> Result<(), SlashCommandError> {
+    /// Returns [`SlashCommandSchemaError`] when parameter definitions are
+    /// invalid.
+    pub(crate) fn validate_schema(&self) -> Result<(), SlashCommandSchemaError> {
         validate_parameter_definitions(&self.command, &self.parameters)
     }
 
@@ -188,11 +189,11 @@ impl SlashCommandDefinition {
 fn validate_parameter_definitions(
     command: &str,
     parameters: &[CommandParameterSpec],
-) -> Result<(), SlashCommandError> {
+) -> Result<(), SlashCommandSchemaError> {
     let mut names = HashSet::new();
     for parameter in parameters {
         if !names.insert(parameter.name.clone()) {
-            return Err(SlashCommandError::InvalidParameterDefinition {
+            return Err(SlashCommandSchemaError::InvalidParameterDefinition {
                 command: command.to_owned(),
                 parameter: parameter.name.clone(),
                 reason: "duplicate parameter definition".to_owned(),
@@ -201,10 +202,19 @@ fn validate_parameter_definitions(
         if matches!(parameter.parameter_type, CommandParameterType::Select)
             && parameter.options.is_empty()
         {
-            return Err(SlashCommandError::InvalidParameterDefinition {
+            return Err(SlashCommandSchemaError::InvalidParameterDefinition {
                 command: command.to_owned(),
                 parameter: parameter.name.clone(),
                 reason: "select parameters must provide options".to_owned(),
+            });
+        }
+        if !matches!(parameter.parameter_type, CommandParameterType::Select)
+            && !parameter.options.is_empty()
+        {
+            return Err(SlashCommandSchemaError::InvalidParameterDefinition {
+                command: command.to_owned(),
+                parameter: parameter.name.clone(),
+                reason: "only Select parameters may provide options".to_owned(),
             });
         }
     }
@@ -225,10 +235,15 @@ fn parse_parameter_value(
             if let Ok(unsigned) = raw.parse::<u64>() {
                 return Ok(Value::Number(Number::from(unsigned)));
             }
+            if let Ok(float_value) = raw.parse::<f64>()
+                && let Some(number) = Number::from_f64(float_value)
+            {
+                return Ok(Value::Number(number));
+            }
             Err(SlashCommandError::InvalidParameterValue {
                 command: command.to_owned(),
                 parameter: parameter.name.clone(),
-                reason: "expected an integer number".to_owned(),
+                reason: "expected a number".to_owned(),
             })
         }
         CommandParameterType::Boolean => match raw.to_ascii_lowercase().as_str() {

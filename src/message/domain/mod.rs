@@ -37,5 +37,6 @@ pub use metadata::{MessageMetadata, SlashCommandExpansion};
 pub use role::{ParseRoleError, Role};
 pub use slash_command::{
     CommandParameterSpec, CommandParameterType, PlannedToolCall, SlashCommandDefinition,
-    SlashCommandError, SlashCommandExecution, SlashCommandInvocation, ToolCallTemplate,
+    SlashCommandError, SlashCommandExecution, SlashCommandInvocation,
+    SlashCommandRegistryUnavailableError, SlashCommandSchemaError, ToolCallTemplate,
 };

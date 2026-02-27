@@ -8,6 +8,7 @@ use corbusier::message::{
     adapters::memory::{InMemoryMessageRepository, InMemorySlashCommandRegistry},
     domain::{
         ContentPart, ConversationId, Message, MessageMetadata, Role, SequenceNumber, TextPart,
+        ToolCallStatus,
     },
     ports::repository::MessageRepository,
     services::SlashCommandService,
@@ -59,7 +60,41 @@ fn slash_command_execution_metadata_round_trip_in_memory(
             .map(|persisted_expansion| persisted_expansion.command.as_str()),
         Some("/task")
     );
+    assert_eq!(
+        persisted
+            .metadata()
+            .slash_command_expansion
+            .as_ref()
+            .and_then(|persisted_expansion| {
+                persisted_expansion
+                    .parameters
+                    .get("action")
+                    .and_then(serde_json::Value::as_str)
+            }),
+        Some("start")
+    );
+    assert_eq!(
+        persisted
+            .metadata()
+            .slash_command_expansion
+            .as_ref()
+            .and_then(|persisted_expansion| {
+                persisted_expansion
+                    .parameters
+                    .get("issue")
+                    .and_then(serde_json::Value::as_str)
+            }),
+        Some("42")
+    );
     assert_eq!(persisted.metadata().tool_call_audits.len(), 1);
+    let first_audit = persisted
+        .metadata()
+        .tool_call_audits
+        .first()
+        .ok_or_else(|| std::io::Error::other("expected tool call audit"))?;
+    assert_eq!(first_audit.tool_name, "task_service");
+    assert_eq!(first_audit.status, ToolCallStatus::Queued);
+    assert!(first_audit.call_id.starts_with("sc-0-"));
     Ok(())
 }
 

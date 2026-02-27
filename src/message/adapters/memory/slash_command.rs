@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 
 use crate::message::domain::{
-    CommandParameterSpec, CommandParameterType, SlashCommandDefinition, ToolCallTemplate,
+    CommandParameterSpec, CommandParameterType, SlashCommandDefinition, SlashCommandSchemaError,
+    ToolCallTemplate,
 };
 use crate::message::ports::slash_command::{
     SlashCommandRegistry, SlashCommandRegistryError, SlashCommandRegistryResult,
@@ -22,12 +23,14 @@ impl InMemorySlashCommandRegistry {
         Self {
             commands: default_commands()
                 .into_iter()
-                .map(|definition| {
+                .map(|raw_definition| {
+                    let mut definition = raw_definition;
                     debug_assert!(
                         definition.validate_schema().is_ok(),
                         "built-in slash command definitions must remain valid",
                     );
-                    (definition.command.to_ascii_lowercase(), definition)
+                    definition.command = definition.command.to_ascii_lowercase();
+                    (definition.command.clone(), definition)
                 })
                 .collect(),
         }
@@ -38,7 +41,7 @@ impl InMemorySlashCommandRegistry {
     /// # Errors
     ///
     /// Returns [`SlashCommandRegistryError::InvalidDefinition`] when duplicate
-    /// command names are provided.
+    /// command names are provided or when command schema validation fails.
     pub fn with_commands(
         definitions: impl IntoIterator<Item = SlashCommandDefinition>,
     ) -> SlashCommandRegistryResult<Self> {
@@ -47,14 +50,15 @@ impl InMemorySlashCommandRegistry {
             definition.command = definition.command.to_ascii_lowercase();
             definition
                 .validate_schema()
-                .map_err(|error| SlashCommandRegistryError::InvalidDefinition(error.to_string()))?;
+                .map_err(SlashCommandRegistryError::InvalidDefinition)?;
+            let command_name = definition.command.clone();
 
-            if commands
-                .insert(definition.command.clone(), definition)
-                .is_some()
-            {
+            if commands.insert(command_name.clone(), definition).is_some() {
                 return Err(SlashCommandRegistryError::InvalidDefinition(
-                    "duplicate command definition".to_owned(),
+                    SlashCommandSchemaError::InvalidCommandDefinition {
+                        command: command_name,
+                        reason: "duplicate command definition".to_owned(),
+                    },
                 ));
             }
         }
