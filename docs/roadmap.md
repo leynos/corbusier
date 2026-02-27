@@ -65,13 +65,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.3. Agent backend orchestration
 
-- [ ] 1.3.1 Implement agent backend registration and discovery. See
+- [x] 1.3.1 Implement agent backend registration and discovery. See
   corbusier-design.md §2.2.3.
-  - [ ] Define backend capability metadata and registration flow. See
+  - [x] Define backend capability metadata and registration flow. See
     corbusier-design.md §2.2.3.
-  - [ ] Persist backend registry entries in the persistence layer. See
+  - [x] Persist backend registry entries in the persistence layer. See
     corbusier-design.md §6.2.3.
-  - [ ] Success criteria: at least two backends can be registered and listed
+  - [x] Success criteria: at least two backends can be registered and listed
     via the registry API.
 - [ ] 1.3.2 Orchestrate agent turn execution and sessions. Requires 1.3.1 and
   1.1.1. See corbusier-design.md §2.2.3.

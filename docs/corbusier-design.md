@@ -928,6 +928,22 @@ Corbusier implements this through:
   - Security Requirements: Agent backend authentication and authorization
   - Compliance Requirements: Agent registration audit logging
 
+###### Implementation decisions (2026-02-25) — roadmap 1.3.1
+
+- Backend registrations are persisted in a dedicated `backend_registrations`
+  table with `capabilities` and `backend_info` stored as JSONB columns,
+  enabling schema evolution without migrations.
+- Backend names (`BackendName`) are validated as lowercase alphanumeric
+  identifiers with underscores, limited to 100 characters, and enforced
+  unique via a database index.
+- Deregistration uses soft-delete via a `BackendStatus` enum (`Active` /
+  `Inactive`) rather than hard delete, preserving audit history and
+  allowing re-activation.
+- The `AgentBackend` runtime trait (with `execute_turn` and
+  `translate_tool_schema`) is deferred to roadmap items 1.3.2 and 1.3.3;
+  item 1.3.1 introduces only the registration metadata aggregate and
+  registry repository.
+
 ##### F-003-RQ-002: Turn Execution Orchestration
 
 - **Technical Specifications:**
