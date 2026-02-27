@@ -451,6 +451,7 @@ Define `BackendRegistryServiceError`:
 pub enum BackendRegistryServiceError {
     Domain(#[from] BackendDomainError),
     Repository(#[from] BackendRegistryError),
+    NotFound(BackendId),
 }
 ```
 
