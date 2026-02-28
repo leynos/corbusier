@@ -388,6 +388,8 @@ evidence.
 New dependency expectation:
 
 - `minijinja` added to `Cargo.toml` (caret requirement).
+- `sha2` added to `Cargo.toml` (caret requirement) for SHA-256 hashing of the
+  canonical tool-call payload used to generate deterministic call IDs.
 
 Planned new interfaces (exact names may be finalized during Stage A):
 

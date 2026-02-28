@@ -17,6 +17,57 @@ use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
 
+// Helper functions for assertion reuse across slash command tests
+fn assert_expansion_parameters(
+    message: &Message,
+    expected_command: &str,
+    expected_parameters: &[(&str, &str)],
+) {
+    let expansion = message
+        .metadata()
+        .slash_command_expansion
+        .as_ref()
+        .unwrap_or_else(|| panic!("expected slash command expansion metadata"));
+    assert_eq!(expansion.command, expected_command);
+
+    for (key, expected_value) in expected_parameters {
+        assert_eq!(
+            expansion
+                .parameters
+                .get(*key)
+                .and_then(serde_json::Value::as_str),
+            Some(*expected_value),
+            "expected slash command parameter `{key}` to equal `{expected_value}`"
+        );
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Helper mirrors explicit assertion contract for slash command audit checks"
+)]
+fn assert_tool_call_audit(
+    message: &Message,
+    audit_index: usize,
+    expected_tool_name: &str,
+    expected_status: &ToolCallStatus,
+    expected_call_id_prefix: &str,
+) {
+    let audit = message
+        .metadata()
+        .tool_call_audits
+        .get(audit_index)
+        .unwrap_or_else(|| panic!("expected tool call audit at index {audit_index}"));
+    assert_eq!(audit.tool_name, expected_tool_name);
+    assert_eq!(&audit.status, expected_status);
+    assert!(
+        audit.call_id.starts_with(expected_call_id_prefix),
+        "expected call_id `{}` to start with `{}`",
+        audit.call_id,
+        expected_call_id_prefix
+    );
+}
+
 #[rstest]
 #[expect(
     clippy::panic_in_result_fn,
@@ -52,49 +103,15 @@ fn slash_command_execution_metadata_round_trip_in_memory(
         .cloned()
         .ok_or_else(|| std::io::Error::other("expected persisted message"))?;
 
-    assert_eq!(
-        persisted
-            .metadata()
-            .slash_command_expansion
-            .as_ref()
-            .map(|persisted_expansion| persisted_expansion.command.as_str()),
-        Some("/task")
-    );
-    assert_eq!(
-        persisted
-            .metadata()
-            .slash_command_expansion
-            .as_ref()
-            .and_then(|persisted_expansion| {
-                persisted_expansion
-                    .parameters
-                    .get("action")
-                    .and_then(serde_json::Value::as_str)
-            }),
-        Some("start")
-    );
-    assert_eq!(
-        persisted
-            .metadata()
-            .slash_command_expansion
-            .as_ref()
-            .and_then(|persisted_expansion| {
-                persisted_expansion
-                    .parameters
-                    .get("issue")
-                    .and_then(serde_json::Value::as_str)
-            }),
-        Some("42")
-    );
+    assert_expansion_parameters(&persisted, "/task", &[("action", "start"), ("issue", "42")]);
     assert_eq!(persisted.metadata().tool_call_audits.len(), 1);
-    let first_audit = persisted
-        .metadata()
-        .tool_call_audits
-        .first()
-        .ok_or_else(|| std::io::Error::other("expected tool call audit"))?;
-    assert_eq!(first_audit.tool_name, "task_service");
-    assert_eq!(first_audit.status, ToolCallStatus::Queued);
-    assert!(first_audit.call_id.starts_with("sc-0-"));
+    assert_tool_call_audit(
+        &persisted,
+        0,
+        "task_service",
+        &ToolCallStatus::Queued,
+        "sc-0-",
+    );
     Ok(())
 }
 

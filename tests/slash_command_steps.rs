@@ -45,9 +45,15 @@ fn execute_and_store_success(world: &mut SlashCommandWorld, command: &str) -> Re
 }
 
 fn execute_and_store_error(world: &mut SlashCommandWorld, command: &str) -> Result<()> {
-    world.last_error = get_service(world)?.execute(command).err();
-    world.first_execution = None;
-    Ok(())
+    let result = get_service(world)?.execute(command);
+    match result {
+        Ok(_) => Err(eyre!("command unexpectedly succeeded: {command}")),
+        Err(error) => {
+            world.last_error = Some(error);
+            world.first_execution = None;
+            Ok(())
+        }
+    }
 }
 
 fn execute_twice_and_store(world: &mut SlashCommandWorld, command: &str) -> Result<()> {

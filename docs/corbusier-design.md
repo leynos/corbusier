@@ -1347,6 +1347,7 @@ you to also send your logs for further analysis.
 | chrono      | 0.4.43  | Date/time handling               | crates.io |
 | uuid        | 1.19.0  | UUID generation                  | crates.io |
 | thiserror   | 2.0.17  | Error derive macros              | crates.io |
+| sha2        | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
 | minijinja   | 2.16.0  | Template rendering               | crates.io |
 | async-trait | 0.1.89  | Async trait support              | crates.io |
 | mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
