@@ -432,7 +432,8 @@ Corbusier implements this through:
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management)
   - System Dependencies: Template engine, command parser
-  - External Dependencies: `minijinja`
+  - External Dependencies: `minijinja`, `sha2` (0.10.9, SHA-256 for
+    deterministic call-ID generation per the F-004 implementation decision)
   - Integration Requirements: Task service integration, VCS workflow hooks
 
 ###### Implementation decisions (2026-02-26) — roadmap 1.4.1

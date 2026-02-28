@@ -385,7 +385,7 @@ evidence.
 
 ## Interfaces and dependencies
 
-New dependency expectation:
+New dependencies:
 
 - `minijinja` added to `Cargo.toml` (caret requirement).
 - `sha2` added to `Cargo.toml` (caret requirement) for SHA-256 hashing of the

@@ -1,6 +1,5 @@
 //! In-memory integration tests for slash-command orchestration.
 
-use std::error::Error;
 use std::sync::Arc;
 
 use crate::in_memory::helpers::{clock, conversation_id, repo, runtime};
@@ -18,6 +17,23 @@ use rstest::rstest;
 use tokio::runtime::Runtime;
 
 // Helper functions for assertion reuse across slash command tests
+/// Helper struct for tool call audit assertions
+struct ExpectedAudit<'a> {
+    tool_name: &'a str,
+    status: ToolCallStatus,
+    call_id_prefix: &'a str,
+}
+
+impl<'a> ExpectedAudit<'a> {
+    const fn new(tool_name: &'a str, status: ToolCallStatus, call_id_prefix: &'a str) -> Self {
+        Self {
+            tool_name,
+            status,
+            call_id_prefix,
+        }
+    }
+}
+
 fn assert_expansion_parameters(
     message: &Message,
     expected_command: &str,
@@ -42,47 +58,35 @@ fn assert_expansion_parameters(
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Helper mirrors explicit assertion contract for slash command audit checks"
-)]
-fn assert_tool_call_audit(
-    message: &Message,
-    audit_index: usize,
-    expected_tool_name: &str,
-    expected_status: &ToolCallStatus,
-    expected_call_id_prefix: &str,
-) {
+fn assert_tool_call_audit(message: &Message, audit_index: usize, expected: &ExpectedAudit<'_>) {
     let audit = message
         .metadata()
         .tool_call_audits
         .get(audit_index)
         .unwrap_or_else(|| panic!("expected tool call audit at index {audit_index}"));
-    assert_eq!(audit.tool_name, expected_tool_name);
-    assert_eq!(&audit.status, expected_status);
+    assert_eq!(audit.tool_name, expected.tool_name);
+    assert_eq!(&audit.status, &expected.status);
     assert!(
-        audit.call_id.starts_with(expected_call_id_prefix),
+        audit.call_id.starts_with(expected.call_id_prefix),
         "expected call_id `{}` to start with `{}`",
         audit.call_id,
-        expected_call_id_prefix
+        expected.call_id_prefix
     );
 }
 
 #[rstest]
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Assertions keep integration failure output concise in Result-based tests"
-)]
 fn slash_command_execution_metadata_round_trip_in_memory(
     runtime: std::io::Result<Runtime>,
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let rt = runtime?;
+) {
+    let rt = runtime.expect("runtime fixture should initialize");
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
 
-    let execution = service.execute("/task action=start issue=42")?;
+    let execution = service
+        .execute("/task action=start issue=42")
+        .expect("slash command should execute");
     let (command_expansion, tool_call_audits) = execution.into_expansion_and_audits();
     let metadata = MessageMetadata::empty()
         .with_slash_command_expansion(command_expansion)
@@ -93,26 +97,26 @@ fn slash_command_execution_metadata_round_trip_in_memory(
             "Slash command planned for execution",
         )))
         .with_metadata(metadata)
-        .build(&clock)?;
+        .build(&clock)
+        .expect("message build should succeed");
 
-    rt.block_on(repo.store(&message))?;
+    rt.block_on(repo.store(&message))
+        .expect("storing message should succeed");
 
     let persisted = rt
-        .block_on(repo.find_by_conversation(conversation_id))?
+        .block_on(repo.find_by_conversation(conversation_id))
+        .expect("message lookup should succeed")
         .first()
         .cloned()
-        .ok_or_else(|| std::io::Error::other("expected persisted message"))?;
+        .expect("expected persisted message");
 
     assert_expansion_parameters(&persisted, "/task", &[("action", "start"), ("issue", "42")]);
     assert_eq!(persisted.metadata().tool_call_audits.len(), 1);
     assert_tool_call_audit(
         &persisted,
         0,
-        "task_service",
-        &ToolCallStatus::Queued,
-        "sc-0-",
+        &ExpectedAudit::new("task_service", ToolCallStatus::Queued, "sc-0-"),
     );
-    Ok(())
 }
 
 #[rstest]
