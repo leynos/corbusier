@@ -33,7 +33,7 @@ Observable outcome for operators and developers:
    canonical message/audit structures, and are queryable through existing
    history retrieval paths.
 
-This plan uses the existing message subsystem as the implementation home so
+This plan uses the existing message subsystem as the implementation home, so
 slash-command execution remains close to canonical message and audit metadata
 (`SlashCommandExpansion`, `ToolCallAudit`).
 
@@ -118,7 +118,7 @@ slash-command execution remains close to canonical message and audit metadata
 - The repository already stores slash expansion metadata in
   `MessageMetadata::slash_command_expansion`, so 1.4.1 can remain
   migration-free unless a hard schema gap is discovered during implementation.
-- `minijinja` in this environment did not expose a `tojson` filter in template
+- `minijinja` in this environment, did not expose a `tojson` filter in template
   rendering defaults; built-in command templates were adjusted to emit valid
   JSON without relying on that filter.
 - Clippy guardrails (`cognitive_complexity`, `excessive_nesting`,
@@ -182,7 +182,7 @@ Lessons learned:
 Current relevant code and docs:
 
 - `docs/roadmap.md` marks 1.4.1 as complete.
-- `docs/corbusier-design.md` section 2.1.1 defines F-004 and section 6.1.1
+- `docs/corbusier-design.md` section 2.1.1 defines F-004, and section 6.1.1
   models slash command execution within the conversation component.
 - `src/message/domain/metadata.rs` already includes `SlashCommandExpansion`
   and tool-call audit metadata.
