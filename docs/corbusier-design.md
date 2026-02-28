@@ -432,8 +432,36 @@ Corbusier implements this through:
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management)
   - System Dependencies: Template engine, command parser
-  - External Dependencies: None
+  - External Dependencies: `minijinja`, `sha2` (0.10.9, SHA-256 for
+    deterministic call-ID generation per the F-004 implementation decision)
   - Integration Requirements: Task service integration, VCS workflow hooks
+
+###### Implementation decisions (2026-02-26) — roadmap 1.4.1
+
+- Slash-command parsing uses a constrained grammar:
+  `/<command> key=value key2="quoted value"` with a required leading slash and
+  explicit `key=value` parameter tokens.
+- Command definitions are provided through a dedicated `SlashCommandRegistry`
+  port so the domain/service layer remains adapter-agnostic.
+- Parameter validation is schema-driven and typed (`string`, `number`,
+  `boolean`, `select`) with typed errors for unknown parameters, missing
+  required parameters, and invalid values.
+- Template expansion and tool-argument rendering use `minijinja`.
+- Deterministic tool-call identifiers are generated from a canonical payload
+  string with this exact order and encoding:
+  `command=<value>;index=<value>;tool_name=<value>;parameters=<k=v;...>;arguments=<json>`.
+  Parameter entries are emitted in sorted key order from `BTreeMap`, values use
+  JSON stringification (`serde_json::Value::to_string()`), and the canonical
+  payload is encoded as UTF-8 bytes before hashing.
+- Hash algorithm decision: use SHA-256, take the first 8 digest bytes
+  (big-endian) as a `u64`, and format as `sc-<index>-<16-hex>`.
+- Compatibility note: existing audit records remain immutable. Readers should
+  treat historical call IDs as opaque and accept both legacy and SHA-256-derived
+  ID forms without migration.
+- Execution produces audit metadata via `SlashCommandExpansion` and
+  `ToolCallAudit` records.
+- Implementation is scoped to existing message metadata storage; no new
+  persistence schema changes are required for roadmap 1.4.1.
 
 #### 2.1.2 Tool Orchestration Features
 
@@ -1336,6 +1364,8 @@ you to also send your logs for further analysis.
 | chrono      | 0.4.43  | Date/time handling               | crates.io |
 | uuid        | 1.19.0  | UUID generation                  | crates.io |
 | thiserror   | 2.0.17  | Error derive macros              | crates.io |
+| sha2        | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
+| minijinja   | 2.16.0  | Template rendering               | crates.io |
 | async-trait | 0.1.89  | Async trait support              | crates.io |
 | mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
 | diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |

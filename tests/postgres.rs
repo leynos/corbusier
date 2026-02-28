@@ -24,6 +24,7 @@ mod postgres {
     mod crud_tests;
     mod sequence_tests;
     mod serialization_tests;
+    mod slash_command_tests;
     mod sql_helpers_tests;
     mod task_branch_pr_postgres_tests;
     mod task_lifecycle_tests;

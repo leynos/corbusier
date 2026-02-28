@@ -12,6 +12,7 @@ mod ids;
 mod message;
 mod metadata;
 mod role;
+mod slash_command;
 
 #[cfg(test)]
 mod agent_session_tests;
@@ -34,3 +35,8 @@ pub use ids::{AgentSessionId, ConversationId, HandoffId, MessageId, SequenceNumb
 pub use message::{Message, MessageBuilder, MessageBuilderError};
 pub use metadata::{MessageMetadata, SlashCommandExpansion};
 pub use role::{ParseRoleError, Role};
+pub use slash_command::{
+    CommandParameterSpec, CommandParameterType, PlannedToolCall, SlashCommandDefinition,
+    SlashCommandError, SlashCommandExecution, SlashCommandInvocation,
+    SlashCommandRegistryUnavailableError, SlashCommandSchemaError, ToolCallTemplate,
+};
