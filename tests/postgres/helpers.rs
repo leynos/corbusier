@@ -40,6 +40,9 @@ pub const ADD_BRANCH_PR_INDEXES_SQL: &str =
 /// SQL to add agent backend registrations table for roadmap 1.3.1.
 pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
     include_str!("../../migrations/2026-02-25-000000_add_backend_registrations_table/up.sql");
+/// SQL to add MCP server registry table for roadmap 2.1.1.
+pub const ADD_MCP_SERVERS_SQL: &str =
+    include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
 
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
@@ -83,6 +86,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_MCP_SERVERS_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }

@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 `PLANS.md` is not present in this repository as of 2026-02-27, so this plan is
 the controlling execution document for roadmap item 2.1.1.
@@ -94,8 +94,21 @@ cases.
 - [x] (2026-02-27 00:00Z) Gathered roadmap/design requirements for 2.1.1.
 - [x] (2026-02-27 00:00Z) Mapped existing hexagonal module and test patterns.
 - [x] (2026-02-27 00:00Z) Authored initial ExecPlan draft.
-- [ ] Await user approval before implementation.
-- [ ] Execute stages A-D and keep this section updated at each stopping point.
+- [x] (2026-02-28 00:00Z) Received approval and implemented Stage A scaffolding
+      under `src/tool_registry/` with domain, ports, adapters, and services.
+- [x] (2026-02-28 00:00Z) Added additive migration
+      `migrations/2026-02-28-000000_add_mcp_servers_table/` and wired it into
+      `tests/postgres/helpers.rs`.
+- [x] (2026-02-28 00:00Z) Added unit tests (`rstest`), in-memory integration
+      tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests
+      for lifecycle and tool-query behaviour.
+- [x] (2026-02-28 00:00Z) Implemented lifecycle service operations:
+      `register`, `start`, `stop`, `refresh_health`, `list_all`,
+      `find_by_name`, and `list_tools`.
+- [x] (2026-02-28 00:00Z) Ran core code gates successfully:
+      `make check-fmt`, `make lint`, and `make test`.
+- [x] (2026-02-28 00:00Z) Run documentation gates after final doc updates:
+      `make fmt`, `make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
 
@@ -108,6 +121,12 @@ cases.
   `tests/postgres/helpers.rs` rather than automatic migration discovery.
   Evidence: helper constants and `apply_migrations()` sequence. Impact: the new
   migration must be added to that helper, not only to `migrations/`.
+
+- Observation: BDD structure for this feature worked cleanly as a single
+  `tests/mcp_server_lifecycle_steps.rs` file with `#[scenario(...)]` entries,
+  rather than split `*_steps/` directory + scenario runner file. Evidence:
+  `rstest-bdd` scenarios compile and execute from one file. Impact: this
+  avoided module naming collisions and reduced boilerplate.
 
 ## Decision Log
 
@@ -128,11 +147,38 @@ cases.
   and prevents accidental scope creep into policy/routing concerns.
   Date/Author: 2026-02-27 / plan author
 
+- Decision: persist transport configuration in PostgreSQL as JSONB
+  (`transport_config`) and lifecycle/health fields as scalar columns.
+  Rationale: supports both stdio and HTTP+SSE without frequent schema churn
+  while keeping filterable state and health metadata explicit. Date/Author:
+  2026-02-28 / implementation
+
+- Decision: use `InMemoryMcpServerHost` as the runtime host adapter in test
+  coverage, including PostgreSQL integration tests. Rationale: keeps tests
+  deterministic while validating persistence and service behaviour
+  independently from external process management concerns. Date/Author:
+  2026-02-28 / implementation
+
 ## Outcomes & Retrospective
 
-Initial planning outcome: requirements, architecture boundaries, and test
-strategy for roadmap 2.1.1 are documented in an executable sequence. Final
-outcomes and lessons learned will be added after implementation.
+Implemented outcome:
+
+- Added `tool_registry` bounded context with strict hexagonal separation:
+  domain model, ports, adapters (memory/postgres/runtime host), and service
+  orchestration.
+- Added MCP server lifecycle support for registration, start, stop, health
+  refresh/reporting, and tool listing from running servers.
+- Added persistence via an additive `mcp_servers` migration and PostgreSQL
+  repository adapter.
+- Added test coverage across unit, behavioural, in-memory integration, and
+  PostgreSQL integration layers for happy and unhappy paths.
+
+Lessons learned:
+
+- Keeping runtime lifecycle in a host port and persistence in a repository port
+  prevented adapter leakage into the domain model.
+- Behaviour scenarios remained easier to maintain when colocated with step
+  functions in a single file for this feature.
 
 ## Context and orientation
 
@@ -224,8 +270,7 @@ In-memory integration tests:
 Behaviour tests with `rstest-bdd`:
 
 - Add `tests/features/mcp_server_lifecycle.feature`.
-- Add step module directory `tests/mcp_server_lifecycle_steps/`.
-- Add scenario runner `tests/mcp_server_lifecycle_scenarios.rs`.
+- Add scenario/step runner `tests/mcp_server_lifecycle_steps.rs`.
 - Cover happy and unhappy paths:
   - starting a registered server,
   - duplicate registration rejection,
@@ -378,7 +423,22 @@ Implementation should capture concise evidence in this document during
 execution (for example, key test-pass summaries and final gate command results)
 so a future maintainer can verify completion without rerunning every step.
 
+Validation evidence:
+
+- `/tmp/2-1-1-check-fmt.log`: `make check-fmt` passed.
+- `/tmp/2-1-1-lint.log`: `make lint` passed.
+- `/tmp/2-1-1-test.log`: `make test` passed
+  (`577 tests run: 577 passed, 1 skipped`).
+- `/tmp/2-1-1-doc-fmt.log`: `make fmt` passed after resolving a duplicate
+  heading (`MD024`) in `docs/corbusier-design.md`.
+- `/tmp/2-1-1-markdownlint.log`: `make markdownlint` passed.
+- `/tmp/2-1-1-nixie.log`: `make nixie` passed.
+
 ## Revision note
 
 2026-02-27: Initial draft created from roadmap 2.1.1, design sections 2.2.4 and
-6.1.4, and current repository testing/architecture conventions.
+6.1.4, and current repository testing/architecture conventions. 2026-02-28:
+Implementation completed for roadmap 2.1.1 with module, migration, tests, and
+service delivery. Documentation and roadmap updates applied. 2026-02-28: Full
+gates completed successfully (`make check-fmt`, `make lint`, `make test`,
+`make fmt`, `make markdownlint`, `make nixie`).
