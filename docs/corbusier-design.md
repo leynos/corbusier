@@ -4947,7 +4947,7 @@ erDiagram
         jsonb content
         jsonb metadata
         timestamptz created_at
-        bigserial sequence_number
+        bigint sequence_number "assigned by application logic"
     }
 
     BACKEND_REGISTRATIONS {
@@ -4967,7 +4967,7 @@ erDiagram
         uuid aggregate_id
         varchar aggregate_type
         varchar event_type
-        jsonb payload
+        jsonb event_data
         integer event_version
         timestamptz occurred_at
     }
