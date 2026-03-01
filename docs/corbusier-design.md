@@ -4902,6 +4902,105 @@ CREATE TABLE audit_logs (
 );
 ```
 
+For screen readers: The following entity-relationship diagram shows tenant
+ownership and key foreign-key paths for tasks, conversations, messages,
+backend registrations, domain events, and audit logs.
+
+```mermaid
+erDiagram
+    TENANTS {
+        uuid id PK
+        varchar slug
+        varchar name
+        varchar status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    TASKS {
+        uuid id PK
+        uuid tenant_id FK
+        jsonb origin
+        varchar branch_ref
+        varchar pull_request_ref
+        varchar state
+        uuid workspace_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid task_id FK
+        jsonb context
+        varchar state
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    MESSAGES {
+        uuid id PK
+        uuid tenant_id FK
+        uuid conversation_id FK
+        varchar role
+        jsonb content
+        jsonb metadata
+        timestamptz created_at
+        bigserial sequence_number
+    }
+
+    BACKEND_REGISTRATIONS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar name
+        varchar status
+        jsonb capabilities
+        jsonb backend_info
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DOMAIN_EVENTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid aggregate_id
+        varchar aggregate_type
+        varchar event_type
+        jsonb payload
+        integer event_version
+        timestamptz occurred_at
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar table_name
+        varchar operation
+        uuid row_id
+        jsonb old_values
+        jsonb new_values
+        uuid user_id
+        uuid session_id
+        uuid correlation_id
+        uuid causation_id
+        timestamptz occurred_at
+    }
+
+    TENANTS ||--o{ TASKS : owns
+    TENANTS ||--o{ CONVERSATIONS : owns
+    TENANTS ||--o{ MESSAGES : owns
+    TENANTS ||--o{ BACKEND_REGISTRATIONS : owns
+    TENANTS ||--o{ DOMAIN_EVENTS : owns
+    TENANTS ||--o{ AUDIT_LOGS : owns
+
+    TASKS ||--o{ CONVERSATIONS : has
+    CONVERSATIONS ||--o{ MESSAGES : has
+```
+
+_Figure: Multi-tenant entity-relationship model for tenant-owned persistence
+tables._
+
 #### 6.2.4 Encapsulation and Workspace Management
 
 ##### Podbot Integration
