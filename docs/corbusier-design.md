@@ -1195,7 +1195,7 @@ _Table 2.2.5.1: Tenancy and identity requirement matrix._
 - **Technical Specifications:**
   - Input Parameters: Repository calls with `RequestContext`, PostgreSQL session
     variables
-  - Output/Response: Tenant-isolated query execution with defense-in-depth
+  - Output/Response: Tenant-isolated query execution with defence-in-depth
   - Performance Criteria:
     `set_config('app.tenant_id', <value>, true)` and RLS checks remain within
     transaction latency budgets
