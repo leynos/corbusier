@@ -10,8 +10,11 @@ use crate::tool_registry::{
     },
 };
 use mockable::Clock;
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc};
 use thiserror::Error;
+
+type LifecycleChangeFuture<'a> =
+    Pin<Box<dyn Future<Output = McpServerLifecycleServiceResult<()>> + 'a>>;
 
 /// Request payload for registering an MCP server.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +95,20 @@ where
             .ok_or(McpServerLifecycleServiceError::NotFound(server_id))
     }
 
+    async fn execute_lifecycle_change<F>(
+        &self,
+        server_id: McpServerId,
+        apply_change: F,
+    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    where
+        F: for<'a> FnOnce(&'a mut McpServerRegistration, &'a Self) -> LifecycleChangeFuture<'a>,
+    {
+        let mut server = self.find_server_or_error(server_id).await?;
+        apply_change(&mut server, self).await?;
+        self.repository.update(&server).await?;
+        Ok(server)
+    }
+
     /// Registers a new MCP server.
     ///
     /// # Errors
@@ -119,12 +136,15 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        let mut server = self.find_server_or_error(server_id).await?;
-        self.host.start(&server).await?;
-        let health_snapshot = self.host.health(&server).await?;
-        server.mark_started(health_snapshot, &*self.clock)?;
-        self.repository.update(&server).await?;
-        Ok(server)
+        self.execute_lifecycle_change(server_id, |server, service| {
+            Box::pin(async move {
+                service.host.start(server).await?;
+                let health_snapshot = service.host.health(server).await?;
+                server.mark_started(health_snapshot, &*service.clock)?;
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Stops a registered MCP server.
@@ -138,11 +158,14 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        let mut server = self.find_server_or_error(server_id).await?;
-        self.host.stop(&server).await?;
-        server.mark_stopped(&*self.clock)?;
-        self.repository.update(&server).await?;
-        Ok(server)
+        self.execute_lifecycle_change(server_id, |server, service| {
+            Box::pin(async move {
+                service.host.stop(server).await?;
+                server.mark_stopped(&*service.clock)?;
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Refreshes and persists server health.
@@ -155,11 +178,14 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        let mut server = self.find_server_or_error(server_id).await?;
-        let health_snapshot = self.host.health(&server).await?;
-        server.update_health(health_snapshot, &*self.clock);
-        self.repository.update(&server).await?;
-        Ok(server)
+        self.execute_lifecycle_change(server_id, |server, service| {
+            Box::pin(async move {
+                let health_snapshot = service.host.health(server).await?;
+                server.update_health(health_snapshot, &*service.clock);
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Lists all registered MCP servers.

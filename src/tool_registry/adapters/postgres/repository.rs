@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
+use diesel::result::{DatabaseErrorKind, Error as DieselError, QueryResult};
 
 /// `PostgreSQL` connection pool type for MCP server adapters.
 pub type McpServerPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -45,6 +45,21 @@ impl PostgresMcpServerRegistry {
         })
         .await
         .map_err(McpServerRegistryError::persistence)?
+    }
+
+    /// Executes a find query and converts the result to a server registration.
+    async fn execute_find_query<F>(
+        &self,
+        build_query: F,
+    ) -> McpServerRegistryResult<Option<McpServerRegistration>>
+    where
+        F: FnOnce(&mut PgConnection) -> QueryResult<Option<McpServerRow>> + Send + 'static,
+    {
+        self.run_blocking(move |connection| {
+            let row = build_query(connection).map_err(McpServerRegistryError::persistence)?;
+            row.map(row_to_server).transpose()
+        })
+        .await
     }
 }
 
@@ -107,14 +122,12 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         &self,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
-        self.run_blocking(move |connection| {
-            let row = mcp_servers::table
+        self.execute_find_query(move |connection| {
+            mcp_servers::table
                 .filter(mcp_servers::id.eq(server_id.into_inner()))
                 .select(McpServerRow::as_select())
                 .first::<McpServerRow>(connection)
                 .optional()
-                .map_err(McpServerRegistryError::persistence)?;
-            row.map(row_to_server).transpose()
         })
         .await
     }
@@ -124,14 +137,12 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
         let name = server_name.as_str().to_owned();
-        self.run_blocking(move |connection| {
-            let row = mcp_servers::table
+        self.execute_find_query(move |connection| {
+            mcp_servers::table
                 .filter(mcp_servers::name.eq(&name))
                 .select(McpServerRow::as_select())
                 .first::<McpServerRow>(connection)
                 .optional()
-                .map_err(McpServerRegistryError::persistence)?;
-            row.map(row_to_server).transpose()
         })
         .await
     }
