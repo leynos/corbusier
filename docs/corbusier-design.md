@@ -305,6 +305,7 @@ Corbusier implements this through:
 - Additional agent backend integrations (AutoGPT, LangChain agents)
 - Advanced workflow analytics and machine learning insights
 - Multi-repository orchestration and cross-project coordination
+- Team and organization tenant models beyond the initial user-tenant model
 - Enterprise SSO and advanced authentication mechanisms
 
 ###### Phase 3 Expansions
@@ -331,6 +332,8 @@ Corbusier implements this through:
   other life-critical applications
 - **Compliance-Heavy Industries**: Initial version not designed for SOX, HIPAA,
   or similar regulatory requirements
+- **Multi-User Tenant Membership**: Initial multi-tenancy is one owning user per
+  tenant, with team and organization membership deferred to a later phase
 - **Massive Scale Operations**: Designed for teams of 10-100 developers;
   enterprise-scale (1000+) optimization in future phases
 
@@ -450,14 +453,14 @@ Corbusier implements this through:
 - Deterministic tool-call identifiers are generated from a canonical payload
   string with this exact order and encoding:
   `command=<value>;index=<value>;tool_name=<value>;parameters=<k=v;...>;arguments=<json>`.
-  Parameter entries are emitted in sorted key order from `BTreeMap`, values use
-  JSON stringification (`serde_json::Value::to_string()`), and the canonical
-  payload is encoded as UTF-8 bytes before hashing.
+   Parameter entries are emitted in sorted key order from `BTreeMap`, values
+  use JSON stringification (`serde_json::Value::to_string()`), and the
+  canonical payload is encoded as UTF-8 bytes before hashing.
 - Hash algorithm decision: use SHA-256, take the first 8 digest bytes
   (big-endian) as a `u64`, and format as `sc-<index>-<16-hex>`.
 - Compatibility note: existing audit records remain immutable. Readers should
-  treat historical call IDs as opaque and accept both legacy and SHA-256-derived
-  ID forms without migration.
+  treat historical call IDs as opaque and accept both legacy and
+  SHA-256-derived ID forms without migration.
 - Execution produces audit metadata via `SlashCommandExpansion` and
   `ToolCallAudit` records.
 - Implementation is scoped to existing message metadata storage; no new
@@ -750,6 +753,41 @@ Corbusier implements this through:
   - External Dependencies: None
   - Integration Requirements: Event serialization, client connection management
 
+#### 2.1.5 Tenancy and Identity Features
+
+_Table 2.1.5.1: Tenancy and identity feature catalog._
+
+| Feature ID | Feature Name                          | Category             | Priority | Status   |
+| ---------- | ------------------------------------- | -------------------- | -------- | -------- |
+| F-017      | Tenant Context and Identity Isolation | Security and Tenancy | Critical | Proposed |
+
+##### F-017: Tenant Context and Identity Isolation
+
+- **Description:** Establishes first-class tenant boundaries so every state
+  mutation and lookup executes within a tenant context, with authenticated user
+  principals bound to the owning user of that tenant.
+- **Business Value:**
+  - Prevents cross-tenant data leakage as Corbusier scales
+  - Enables a smooth evolution from user tenants to team and organization
+    tenants
+  - Provides enforceable tenant boundaries in both application and database
+    layers
+- **User Benefits:**
+  - Predictable data isolation per tenant
+  - Clear ownership model for workspaces, tasks, and conversations
+  - Forward-compatible identity model for future collaborative tenants
+- **Technical Context:** Row-level multi-tenancy with `tenant_id` partition keys
+  on tenant-owned tables, Rust request-context scoping, and PostgreSQL
+  row-level security (RLS) with tenant-consistency constraints.
+- **Dependencies:**
+  - Prerequisite Features: F-001 (Conversation Management), F-002 (Task
+    Lifecycle Management), F-003 (Agent Backend Orchestration)
+  - System Dependencies: Diesel repositories, PostgreSQL RLS, audit trigger
+    session variables
+  - External Dependencies: PostgreSQL 14+ row-level security support
+  - Integration Requirements: Authentication middleware, worker/job payload
+    propagation, tracing instrumentation
+
 ### 2.2 Functional Requirements
 
 #### 2.2.1 Conversation Management Requirements
@@ -836,7 +874,7 @@ Corbusier implements this through:
   - Data Requirements: Issue title, description, labels, assignees, milestone
     information
 - **Validation Rules:**
-  - Business Rules: One task per issue, unique task identifiers
+  - Business Rules: One task per issue per tenant, unique task identifiers
   - Data Validation: Issue existence verification, metadata format validation
   - Security Requirements: VCS authentication and authorization verification
   - Compliance Requirements: Task creation audit logging with issue traceability
@@ -847,7 +885,7 @@ Corbusier implements this through:
   `{ type: "issue", issue_ref: {...}, metadata: {...} }`, preserving provider,
   repository, issue number, and metadata snapshot at creation time.
 - Enforce one-task-per-issue with a partial unique index over
-  `origin.issue_ref.provider`, `origin.issue_ref.repository`, and
+  `tenant_id`, `origin.issue_ref.provider`, `origin.issue_ref.repository`, and
   `origin.issue_ref.issue_number` when `origin.type = issue`.
 - Constrain issue numbers to positive values representable by PostgreSQL
   `BIGINT` (`<= i64::MAX`) so issue-reference lookups cannot fail from lossy
@@ -951,7 +989,8 @@ Corbusier implements this through:
   - Data Requirements: Agent capabilities, authentication requirements, tool
     support
 - **Validation Rules:**
-  - Business Rules: Unique agent backend identifiers, capability verification
+  - Business Rules: Unique agent backend identifiers per tenant, capability
+    verification
   - Data Validation: Agent configuration schema compliance
   - Security Requirements: Agent backend authentication and authorization
   - Compliance Requirements: Agent registration audit logging
@@ -962,15 +1001,15 @@ Corbusier implements this through:
   table with `capabilities` and `backend_info` stored as JSONB columns,
   enabling schema evolution without migrations.
 - Backend names (`BackendName`) are validated as lowercase alphanumeric
-  identifiers with underscores, limited to 100 characters, and enforced
-  unique via a database index.
+  identifiers with underscores, limited to 100 characters, and enforced unique
+  per tenant via a composite database index over `(tenant_id, name)`.
 - Deregistration uses soft-delete via a `BackendStatus` enum (`Active` /
-  `Inactive`) rather than hard delete, preserving audit history and
-  allowing re-activation.
+  `Inactive`) rather than hard delete, preserving audit history and allowing
+  re-activation.
 - The `AgentBackend` runtime trait (with `execute_turn` and
-  `translate_tool_schema`) is deferred to roadmap items 1.3.2 and 1.3.3;
-  item 1.3.1 introduces only the registration metadata aggregate and
-  registry repository.
+  `translate_tool_schema`) is deferred to roadmap items 1.3.2 and 1.3.3; item
+  1.3.1 introduces only the registration metadata aggregate and registry
+  repository.
 
 ##### F-003-RQ-002: Turn Execution Orchestration
 
@@ -1086,6 +1125,144 @@ Corbusier implements this through:
   - Security Requirements: File access authorization, change audit logging
   - Compliance Requirements: Complete change history preservation
 
+#### 2.2.5 Tenancy and Identity Requirements
+
+_Table 2.2.5.1: Tenancy and identity requirement matrix._
+
+| Requirement ID | Description                          | Acceptance Criteria                                                           | Priority  | Complexity |
+| -------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------- | ---------- |
+| F-017-RQ-001   | Tenant Domain Primitive              | Tenant identity is modelled separately from user identity                     | Must-Have | Medium     |
+| F-017-RQ-002   | Principal-to-Tenant Binding          | Authenticated principals resolve to an owning user and tenant context         | Must-Have | Medium     |
+| F-017-RQ-003   | Tenant-Scoped Persistence and Lookup | All tenant-owned mutations and reads require tenant context                   | Must-Have | High       |
+| F-017-RQ-004   | Dual-Layer Isolation Enforcement     | Rust signatures and PostgreSQL RLS/constraints both block cross-tenant access | Must-Have | High       |
+| F-017-RQ-005   | Tenant Isolation Verification        | Test scenarios prove same external IDs can coexist across tenants safely      | Must-Have | Medium     |
+
+##### F-017-RQ-001: Tenant Domain Primitive
+
+- **Technical Specifications:**
+  - Input Parameters: Tenant identifier, slug, display name, lifecycle status
+  - Output/Response: Persisted and typed tenant records with stable identity
+  - Performance Criteria: Tenant lookup <20ms under standard load
+  - Data Requirements: `TenantId`, `TenantSlug`, tenant status, audit
+    timestamps
+- **Validation Rules:**
+  - Business Rules: Distinguish user principals from tenant identities even
+    when the initial tenant type is a single owning user
+  - Data Validation: Tenant slugs must be validated identifiers suitable for
+    URLs and config keys
+  - Security Requirements: Tenant records are immutable in identity fields after
+    creation
+  - Compliance Requirements: Tenant lifecycle mutations are auditable
+
+##### F-017-RQ-002: Principal-to-Tenant Binding
+
+- **Technical Specifications:**
+  - Input Parameters: Authentication credentials, principal claims, session
+    metadata
+  - Output/Response: Principal bound to `{ user_id, tenant_id, session_id }`
+  - Performance Criteria: Principal resolution and context creation <50ms
+  - Data Requirements: User principal claims and tenant ownership mapping
+- **Validation Rules:**
+  - Business Rules: Initial release supports one owning user per tenant;
+    collaborative team and organization tenants are deferred
+  - Data Validation: `tenant_id` and `user_id` claims must be present and
+    canonical UUIDs
+  - Security Requirements: Reject requests when principal-to-tenant binding is
+    missing or inconsistent
+  - Compliance Requirements: Authentication context fields propagate to audit
+    and trace records
+
+##### F-017-RQ-003: Tenant-Scoped Persistence and Lookup
+
+- **Technical Specifications:**
+  - Input Parameters: `RequestContext` containing tenant and audit identifiers
+  - Output/Response: Repository operations scoped to tenant-owned data only
+  - Performance Criteria: No measurable regression above 5% for tenant-filtered
+    hot paths
+  - Data Requirements: `tenant_id` columns on tenant-owned tables and
+    tenant-aware indexes
+- **Validation Rules:**
+  - Business Rules: One task per issue is enforced per tenant, and backend
+    registration names are unique per tenant
+  - Data Validation: Tenant IDs on child rows must match referenced parent rows
+  - Security Requirements: Tenant context is mandatory in repository/service
+    signatures
+  - Compliance Requirements: Tenant attribution is present in `domain_events`
+    and `audit_logs`
+
+##### F-017-RQ-004: Dual-Layer Isolation Enforcement
+
+- **Technical Specifications:**
+  - Input Parameters: Repository calls with `RequestContext`, PostgreSQL session
+    variables
+  - Output/Response: Tenant-isolated query execution with defence-in-depth
+  - Performance Criteria:
+    `set_config('app.tenant_id', <value>, true)` and RLS checks remain within
+    transaction latency budgets
+  - Data Requirements: RLS policies keyed by
+    `current_setting('app.tenant_id', true)` and composite foreign keys for
+    tenant consistency
+- **Validation Rules:**
+  - Business Rules: Every tenant-owned mutation and lookup executes inside
+    tenant context
+  - Data Validation: Cross-tenant parent/child references are rejected by
+    composite foreign keys
+  - Security Requirements: PostgreSQL RLS blocks cross-tenant reads/writes even
+    when application query filters are incomplete
+  - Compliance Requirements: Tenant identifier is captured in audit triggers
+
+##### F-017-RQ-005: Tenant Isolation Verification
+
+- **Technical Specifications:**
+  - Input Parameters: Two-tenant test fixtures with overlapping external IDs
+  - Output/Response: Passing isolation tests across adapters and persistence
+    layers
+  - Performance Criteria: Isolation suite executes within standard integration
+    test budgets
+  - Data Requirements: Fixture support for duplicated issue refs and backend
+    names across tenants
+- **Validation Rules:**
+  - Business Rules: Two tenants can create tasks from the same external issue
+    reference without collision
+  - Data Validation: Two tenants can register the same backend name without
+    collision
+  - Security Requirements: Tenant A cannot retrieve tenant B records when using
+    tenant A context
+  - Compliance Requirements: Isolation regressions fail CI as blocking tests
+
+###### Implementation decisions (2026-03-01) — multi-tenancy foundation
+
+- Corbusier uses row-level multi-tenancy with a `tenant_id` partition key on
+  tenant-owned tables and PostgreSQL RLS as a hard guardrail.
+- Initial tenant model: one user principal owns one tenant. Team and
+  organization tenants are explicitly deferred while keeping user and tenant
+  identities distinct from day one.
+- Introduce first-class tenant primitives in Rust under `src/tenant/`:
+  `TenantId`, `TenantSlug`, and `Tenant`.
+- Replace message-only audit context plumbing with a cross-cutting
+  `RequestContext` containing `tenant_id`, `correlation_id`, `causation_id`,
+  `user_id`, and `session_id`, used by repositories, services, tracing, and
+  audit/session-variable wiring.
+- Add `tenants` plus `tenant_id` columns to tenant-owned tables, including
+  conversations, messages, tasks, agent sessions, handoffs, context snapshots,
+  domain events, audit logs, and backend registrations.
+- Scope uniqueness constraints by tenant, including:
+  - task issue-origin uniqueness over `(tenant_id, provider, repository,
+    issue_number)` when origin type is `issue`
+  - backend registration name uniqueness over `(tenant_id, name)`
+- Enforce cross-table tenant consistency with composite keys such as
+  `(conversation_id, tenant_id) -> conversations(id, tenant_id)`.
+- Execute tenant-scoped PostgreSQL operations in explicit transactions and set
+  `set_config('app.tenant_id', <value>, true)` within the same transaction as
+  the protected statements.
+- Sequence delivery to minimize refactor risk:
+  1. Add tenant primitives and `RequestContext`.
+  2. Apply tenant migrations and urgent index fixes.
+  3. Require tenant context in repository ports.
+  4. Update PostgreSQL and in-memory adapters.
+  5. Enable RLS and tenant session-variable plumbing.
+  6. Add two-tenant isolation tests.
+
 ### 2.3 Feature Relationships
 
 #### 2.3.1 Feature Dependencies Map
@@ -1094,6 +1271,7 @@ Corbusier implements this through:
 graph TB
 subgraph "Foundation Layer"
     F001[F-001: Conversation Management]
+    F017[F-017: Tenant Context and Identity Isolation]
     F015[F-015: HTTP API Surface]
 end
 
@@ -1124,6 +1302,9 @@ subgraph "Integration Layer"
 end
 
 F001 --> F002
+F017 --> F001
+F017 --> F002
+F017 --> F003
 F001 --> F003
 F001 --> F004
 F002 --> F013
@@ -1147,6 +1328,7 @@ F012 --> F015
 | ----------------------------- | ------------------- | ---------------------------------------- | ----------------------- |
 | Agent-Tool Interface          | F-003, F-005, F-007 | Tool schema translation, MCP multiplexer | Tool execution context  |
 | Conversation-Task Binding     | F-001, F-002, F-004 | Task context management                  | State synchronization   |
+| Tenant-Identity Enforcement   | F-017, F-001, F-002 | Request context, tenant session settings | RLS policy evaluation   |
 | Governance-Execution Pipeline | F-009, F-010, F-006 | Hook execution engine                    | Policy evaluation       |
 | VCS-Review Integration        | F-013, F-014, F-002 | Comment normalization                    | Review state management |
 
@@ -1158,6 +1340,7 @@ F012 --> F015
 | Workspace Manager | Encapsulated execution environment  | F-006, F-008, F-010        | Workspace lifecycle API          |
 | Policy Engine     | Declarative policy evaluation       | F-009, F-011, F-012        | Policy definition and evaluation |
 | Audit Logger      | Structured audit trail generation   | F-001, F-009, F-012, F-013 | Audit event recording            |
+| Request Context   | Tenant-scoped execution identity    | F-017, F-001, F-002, F-003 | Context propagation contract     |
 
 ### 2.4 Implementation Considerations
 
@@ -1535,6 +1718,8 @@ graph TB
 
 - **Conversation Data**: JSONB storage for flexible message formats
 - **Task Data**: Relational tables for structured workflow state
+- **Tenancy Partitioning**: `tenant_id` on tenant-owned tables with tenant-aware
+  indexes and constraints
 - **Audit Data**: Append-only event tables with immutable records
 - **Configuration Data**: Structured tables for policies and settings
 
@@ -3707,6 +3892,14 @@ appropriate access boundaries while supporting collaborative development
 workflows. The framework integrates with existing enterprise authentication
 systems through adapter patterns.
 
+##### Tenant Isolation Guardrails
+
+Tenant isolation is enforced twice. First, repository and service signatures
+require request context carrying `tenant_id`, preventing unscoped access at the
+Rust boundary. Second, PostgreSQL row-level security policies and tenant
+consistency constraints enforce the same boundary in storage, so query bugs do
+not silently become cross-tenant data leaks.
+
 #### 5.3.6 Architecture Decision Records
 
 ```mermaid
@@ -3754,8 +3947,8 @@ flowchart TD
 Corbusier implements the tracing framework for instrumenting Rust programs to
 collect structured, event-based diagnostic information, with tracing maintained
 by the Tokio project but not requiring the tokio runtime. The system generates
-structured logs with correlation IDs for request tracking across service
-boundaries, enabling comprehensive debugging and performance analysis.
+structured logs with correlation IDs and tenant IDs for request tracking across
+service boundaries, enabling comprehensive debugging and performance analysis.
 
 ##### Distributed Tracing Integration
 
@@ -3826,6 +4019,11 @@ Security policies enforce access control at the workspace level, ensuring users
 can only access tasks, conversations, and tools within their authorized scope.
 This approach supports multi-tenant deployments and project isolation
 requirements.
+
+Tenant context remains explicit even when the initial tenant model is one
+owning user per tenant. This preserves a clean distinction between user and
+tenant identities, enabling later support for team and organization tenants
+without redesigning repository or policy boundaries.
 
 ##### API Authentication
 
@@ -4294,7 +4492,15 @@ pub struct ToolExecutionContext {
     pub conversation_id: ConversationId,
     pub user_permissions: UserPermissions,
     pub resource_limits: ResourceLimits,
-    pub audit_context: AuditContext,
+    pub request_context: RequestContext,
+}
+
+pub struct RequestContext {
+    pub tenant_id: TenantId,
+    pub correlation_id: CorrelationId,
+    pub causation_id: Option<CausationId>,
+    pub user_id: UserId,
+    pub session_id: SessionId,
 }
 ```
 
@@ -4596,42 +4802,82 @@ graph TB
 ##### Schema Design
 
 ```sql
--- Conversations table with JSONB for flexible message storage
-CREATE TABLE conversations (
+-- Tenant root table
+CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id UUID REFERENCES tasks(id),
-    context JSONB NOT NULL,
-    state VARCHAR(50) NOT NULL DEFAULT 'active',
+    slug VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT tenants_status_check CHECK (status IN ('active', 'disabled'))
 );
 
--- Messages with append-only design
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID NOT NULL REFERENCES conversations(id),
-    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'tool', 'system')),
-    content JSONB NOT NULL,
-    metadata JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sequence_number BIGSERIAL
-);
+-- Deterministic default tenant for migration safety and single-tenant dev mode.
+INSERT INTO tenants (id, slug, name, status)
+VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active')
+ON CONFLICT (id) DO NOTHING;
 
--- Tasks with state management
+-- Tasks with tenant scoping
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
     origin JSONB NOT NULL,
     branch_ref VARCHAR(255),
     pull_request_ref VARCHAR(255),
     state VARCHAR(50) NOT NULL DEFAULT 'draft',
     workspace_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
+    UNIQUE (id, tenant_id)
 );
 
--- Event sourcing for audit trails
+-- Conversations table with JSONB context and tenant consistency
+CREATE TABLE conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    task_id UUID,
+    context JSONB NOT NULL,
+    state VARCHAR(50) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (id, tenant_id),
+    FOREIGN KEY (task_id, tenant_id) REFERENCES tasks(id, tenant_id)
+);
+
+-- Messages with append-only design and composite tenant FK
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    conversation_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'tool', 'system')),
+    content JSONB NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Monotonic sequence number scoped to conversation, assigned by application logic.
+    sequence_number BIGINT NOT NULL,
+    FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id),
+    UNIQUE (tenant_id, conversation_id, sequence_number)
+);
+
+-- Backend registrations are unique within a tenant, not globally
+CREATE TABLE backend_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    name VARCHAR(100) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    capabilities JSONB NOT NULL DEFAULT '{}',
+    backend_info JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, name)
+);
+
+-- Event sourcing for audit trails with tenant attribution
 CREATE TABLE domain_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
     aggregate_id UUID NOT NULL,
     aggregate_type VARCHAR(100) NOT NULL,
     event_type VARCHAR(100) NOT NULL,
@@ -4639,7 +4885,121 @@ CREATE TABLE domain_events (
     event_version INTEGER NOT NULL DEFAULT 1,
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    table_name VARCHAR(100) NOT NULL,
+    operation VARCHAR(10) NOT NULL,
+    row_id UUID,
+    old_values JSONB,
+    new_values JSONB,
+    user_id UUID,
+    session_id UUID,
+    correlation_id UUID,
+    causation_id UUID,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 ```
+
+For screen readers: The following entity-relationship diagram shows tenant
+ownership and key foreign-key paths for tasks, conversations, messages,
+backend registrations, domain events, and audit logs.
+
+```mermaid
+erDiagram
+    TENANTS {
+        uuid id PK
+        varchar slug
+        varchar name
+        varchar status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    TASKS {
+        uuid id PK
+        uuid tenant_id FK
+        jsonb origin
+        varchar branch_ref
+        varchar pull_request_ref
+        varchar state
+        uuid workspace_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid task_id FK
+        jsonb context
+        varchar state
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    MESSAGES {
+        uuid id PK
+        uuid tenant_id FK
+        uuid conversation_id FK
+        varchar role
+        jsonb content
+        jsonb metadata
+        timestamptz created_at
+        bigint sequence_number "assigned by application logic"
+    }
+
+    BACKEND_REGISTRATIONS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar name
+        varchar status
+        jsonb capabilities
+        jsonb backend_info
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DOMAIN_EVENTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid aggregate_id
+        varchar aggregate_type
+        varchar event_type
+        jsonb event_data
+        integer event_version
+        timestamptz occurred_at
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar table_name
+        varchar operation
+        uuid row_id
+        jsonb old_values
+        jsonb new_values
+        uuid user_id
+        uuid session_id
+        uuid correlation_id
+        uuid causation_id
+        timestamptz occurred_at
+    }
+
+    TENANTS ||--o{ TASKS : owns
+    TENANTS ||--o{ CONVERSATIONS : owns
+    TENANTS ||--o{ MESSAGES : owns
+    TENANTS ||--o{ BACKEND_REGISTRATIONS : owns
+    TENANTS ||--o{ DOMAIN_EVENTS : owns
+    TENANTS ||--o{ AUDIT_LOGS : owns
+
+    TASKS ||--o{ CONVERSATIONS : has
+    CONVERSATIONS ||--o{ MESSAGES : has
+```
+
+_Figure: Multi-tenant entity-relationship model for tenant-owned persistence
+tables._
 
 #### 6.2.4 Encapsulation and Workspace Management
 
@@ -5251,7 +5611,7 @@ impl SecurityAspect {
             context.user_id,
             tool_name,
             &result,
-            context.audit_context.clone(),
+            context.request_context.clone(),
         ).await?;
         
         Ok(result)
@@ -6072,12 +6432,15 @@ types._
 JSONB provides a wide array of options to index your JSON data. At a high
 level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
 
-| Table         | Index Type | Columns                            | Purpose                             |
-| ------------- | ---------- | ---------------------------------- | ----------------------------------- |
-| messages      | B-tree     | (conversation_id, sequence_number) | Message ordering and pagination     |
-| messages      | GIN        | content                            | Full-text search in message content |
-| conversations | B-tree     | (task_id)                          | Task-conversation lookup            |
-| tasks         | B-tree     | (state, created_at)                | Task filtering and sorting          |
+| Table                 | Index Type | Columns                                       | Purpose                             |
+| --------------------- | ---------- | --------------------------------------------- | ----------------------------------- |
+| messages              | B-tree     | (tenant_id, conversation_id, sequence_number) | Message ordering and pagination     |
+| messages              | GIN        | content                                       | Full-text search in message content |
+| conversations         | B-tree     | (tenant_id, task_id)                          | Task-conversation lookup            |
+| tasks                 | B-tree     | (tenant_id, state, created_at)                | Task filtering and sorting          |
+| tasks                 | B-tree     | (tenant_id, branch_ref)                       | Branch association lookup           |
+| tasks                 | B-tree     | (tenant_id, pull_request_ref)                 | Pull request lookup                 |
+| backend_registrations | B-tree     | (tenant_id, name)                             | Per-tenant backend uniqueness       |
 
 ###### JSONB Indexing Strategy
 
@@ -6094,12 +6457,30 @@ CREATE INDEX idx_tasks_origin_gin ON tasks USING GIN (origin);
 
 -- Expression indexes for frequently queried JSONB fields
 CREATE INDEX idx_messages_agent_backend ON messages USING BTREE ((metadata->>'agent_backend'));
-CREATE INDEX idx_tasks_issue_number ON tasks USING BTREE (((origin->'issue_ref'->>'issue_number')::int));
+CREATE INDEX idx_tasks_issue_number ON tasks USING BTREE (((origin->'issue_ref'->>'issue_number')::bigint));
 CREATE INDEX idx_conversations_agent ON conversations USING BTREE ((context->>'agent_backend'));
 
--- Composite indexes for complex queries
-CREATE INDEX idx_messages_conversation_role ON messages (conversation_id, role, created_at);
-CREATE INDEX idx_domain_events_aggregate ON domain_events (aggregate_type, aggregate_id, occurred_at);
+-- Composite indexes for tenant-aware queries
+CREATE INDEX idx_messages_tenant_conversation_role
+    ON messages (tenant_id, conversation_id, role, created_at);
+CREATE INDEX idx_domain_events_tenant_aggregate
+    ON domain_events (tenant_id, aggregate_type, aggregate_id, occurred_at);
+CREATE INDEX idx_tasks_tenant_branch_ref
+    ON tasks (tenant_id, branch_ref) WHERE branch_ref IS NOT NULL;
+CREATE INDEX idx_tasks_tenant_pull_request_ref
+    ON tasks (tenant_id, pull_request_ref) WHERE pull_request_ref IS NOT NULL;
+
+-- Tenant-scoped uniqueness guards
+CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
+    ON tasks (
+        tenant_id,
+        (origin->'issue_ref'->>'provider'),
+        (origin->'issue_ref'->>'repository'),
+        ((origin->'issue_ref'->>'issue_number')::bigint)
+    )
+    WHERE origin->>'type' = 'issue';
+CREATE UNIQUE INDEX idx_backend_registrations_tenant_name_unique
+    ON backend_registrations (tenant_id, name);
 ```
 
 ###### Performance Optimization Indexes
@@ -6113,8 +6494,12 @@ CREATE INDEX idx_messages_content_path_ops ON messages USING GIN (content jsonb_
 CREATE INDEX idx_tool_executions_params ON tool_executions USING GIN (parameters jsonb_path_ops);
 
 -- Partial indexes for active records
-CREATE INDEX idx_tasks_active ON tasks (created_at) WHERE state IN ('draft', 'in_progress', 'in_review');
-CREATE INDEX idx_conversations_active ON conversations (updated_at) WHERE state = 'active';
+CREATE INDEX idx_tasks_active
+    ON tasks (tenant_id, created_at)
+    WHERE state IN ('draft', 'in_progress', 'in_review');
+CREATE INDEX idx_conversations_active
+    ON conversations (tenant_id, updated_at)
+    WHERE state = 'active';
 ```
 
 ##### 6.2.1.4 Partitioning Approach
@@ -6294,35 +6679,81 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- Conversations table
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY,
+    slug VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT tenants_status_check CHECK (status IN ('active', 'disabled'))
+);
+
+INSERT INTO tenants (id, slug, name, status)
+VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active');
+
+CREATE TABLE tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    origin JSONB NOT NULL,
+    state VARCHAR(50) NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
+    UNIQUE (id, tenant_id)
+);
+
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
     task_id UUID,
     context JSONB NOT NULL DEFAULT '{}',
     state VARCHAR(50) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    CONSTRAINT conversations_state_check CHECK (state IN ('active', 'paused', 'archived'))
+    CONSTRAINT conversations_state_check CHECK (state IN ('active', 'paused', 'archived')),
+    UNIQUE (id, tenant_id),
+    FOREIGN KEY (task_id, tenant_id) REFERENCES tasks(id, tenant_id)
 );
 
--- Messages table with append-only design
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
     conversation_id UUID NOT NULL,
     role VARCHAR(20) NOT NULL,
     content JSONB NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sequence_number BIGSERIAL,
-    
+    -- Monotonic sequence number scoped to conversation, assigned by application logic.
+    sequence_number BIGINT NOT NULL,
     CONSTRAINT messages_role_check CHECK (role IN ('user', 'assistant', 'tool', 'system')),
-    CONSTRAINT fk_messages_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+    CONSTRAINT fk_messages_conversation
+        FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id),
+    UNIQUE (tenant_id, conversation_id, sequence_number)
 );
 
--- Create indexes
-CREATE INDEX idx_conversations_task_id ON conversations(task_id);
-CREATE INDEX idx_messages_conversation_sequence ON messages(conversation_id, sequence_number);
+CREATE TABLE backend_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    name VARCHAR(100) NOT NULL,
+    capabilities JSONB NOT NULL DEFAULT '{}',
+    backend_info JSONB NOT NULL DEFAULT '{}',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, name)
+);
+
+CREATE INDEX idx_conversations_tenant_task ON conversations(tenant_id, task_id);
 CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
+CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
+    ON tasks (
+        tenant_id,
+        (origin->'issue_ref'->>'provider'),
+        (origin->'issue_ref'->>'repository'),
+        ((origin->'issue_ref'->>'issue_number')::bigint)
+    )
+    WHERE origin->>'type' = 'issue';
 
 COMMIT;
 ```
@@ -6476,7 +6907,9 @@ pub fn create_database_pool(database_url: &str) -> Result<PgPool, r2d2::Error> {
 The following illustrative example demonstrates the repository pattern with
 Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
 `row_to_message`, and `RepositoryError` are context-dependent and defined in
-the actual implementation.
+the actual implementation. Tenant scoping is established per operation with
+`set_config('app.tenant_id', <value>, true)` inside the same transaction as
+the protected statements, ensuring connection-pool reuse cannot bypass RLS.
 
 ```rust
 // Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
@@ -6488,11 +6921,19 @@ pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
 #[async_trait]
 pub trait MessageRepository: Send + Sync {
-    async fn store(&self, message: &Message) -> RepositoryResult<()>;
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>>;
-    async fn find_by_conversation(&self, conversation_id: ConversationId) -> RepositoryResult<Vec<Message>>;
-    async fn next_sequence_number(&self, conversation_id: ConversationId) -> RepositoryResult<SequenceNumber>;
-    async fn exists(&self, id: MessageId) -> RepositoryResult<bool>;
+    async fn store(&self, ctx: &RequestContext, message: &Message) -> RepositoryResult<()>;
+    async fn find_by_id(&self, ctx: &RequestContext, id: MessageId) -> RepositoryResult<Option<Message>>;
+    async fn find_by_conversation(
+        &self,
+        ctx: &RequestContext,
+        conversation_id: ConversationId,
+    ) -> RepositoryResult<Vec<Message>>;
+    async fn next_sequence_number(
+        &self,
+        ctx: &RequestContext,
+        conversation_id: ConversationId,
+    ) -> RepositoryResult<SequenceNumber>;
+    async fn exists(&self, ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool>;
 }
 
 #[derive(Debug, Clone)]
@@ -6515,39 +6956,63 @@ impl PostgresMessageRepository {
             .await
             .map_err(|e| RepositoryError::connection(format!("task join error: {e}")))?
     }
+
+    fn run_with_context<T, F>(
+        conn: &mut PgConnection,
+        ctx: &RequestContext,
+        operation: F,
+    ) -> RepositoryResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> RepositoryResult<T>,
+    {
+        conn.transaction(|tx| {
+            diesel::sql_query("SELECT set_config('app.tenant_id', $1, true)")
+                .bind::<diesel::sql_types::Text, _>(ctx.tenant_id.to_string())
+                .execute(tx)
+                .map_err(RepositoryError::database)?;
+            operation(tx)
+        })
+    }
 }
 
 #[async_trait]
 impl MessageRepository for PostgresMessageRepository {
-    async fn store(&self, message: &Message) -> RepositoryResult<()> {
+    async fn store(&self, ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
         let pool = self.pool.clone();
+        let ctx = ctx.clone();
         let new_message = NewMessage::try_from_domain(message)?;
 
         Self::run_blocking(move || {
             let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
-            diesel::insert_into(messages::table)
-                .values(&new_message)
-                .execute(&mut conn)
-                .map_err(RepositoryError::database)?;
-            Ok(())
+            Self::run_with_context(&mut conn, &ctx, move |tx| {
+                diesel::insert_into(messages::table)
+                    .values(&new_message)
+                    .execute(tx)
+                    .map_err(RepositoryError::database)?;
+                Ok(())
+            })
         })
         .await
     }
 
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
+    async fn find_by_id(&self, ctx: &RequestContext, id: MessageId) -> RepositoryResult<Option<Message>> {
         let pool = self.pool.clone();
+        let ctx = ctx.clone();
         let uuid = id.into_inner();
 
         Self::run_blocking(move || {
             let mut conn = pool.get().map_err(|e| RepositoryError::connection(e.to_string()))?;
-            messages::table
-                .filter(messages::id.eq(uuid))
-                .select(MessageRow::as_select())
-                .first::<MessageRow>(&mut conn)
-                .optional()
-                .map_err(RepositoryError::database)?
-                .map(Self::row_to_message)
-                .transpose()
+            Self::run_with_context(&mut conn, &ctx, move |tx| {
+                messages::table
+                    .filter(messages::tenant_id.eq(ctx.tenant_id.into_inner()))
+                    .filter(messages::id.eq(uuid))
+                    .select(MessageRow::as_select())
+                    .first::<MessageRow>(tx)
+                    .optional()
+                    .map_err(RepositoryError::database)?
+                    .map(Self::row_to_message)
+                    .transpose()
+            })
         })
         .await
     }
@@ -6808,6 +7273,7 @@ audit trail proves invaluable for debugging and compliance.
 -- Audit log table for all database operations
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
     table_name VARCHAR(100) NOT NULL,
     operation VARCHAR(10) NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
     row_id UUID,
@@ -6837,6 +7303,7 @@ BEGIN
     audit_row.occurred_at := NOW();
     
     -- Extract user context from application
+    audit_row.tenant_id := current_setting('app.tenant_id', true)::UUID;
     audit_row.user_id := current_setting('app.user_id', true)::UUID;
     audit_row.session_id := current_setting('app.session_id', true)::UUID;
     audit_row.correlation_id := current_setting('app.correlation_id', true)::UUID;
@@ -6879,6 +7346,10 @@ CREATE TRIGGER messages_audit_trigger
 CREATE TRIGGER tasks_audit_trigger
     AFTER INSERT OR UPDATE OR DELETE ON tasks
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+
+CREATE TRIGGER backend_registrations_audit_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON backend_registrations
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 ```
 
 ##### 6.2.3.5 Access Controls
@@ -6890,43 +7361,56 @@ CREATE TRIGGER tasks_audit_trigger
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE backend_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Create security policies
+-- Force RLS so table-owner paths cannot bypass tenant isolation.
+ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
+ALTER TABLE messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
+ALTER TABLE backend_registrations FORCE ROW LEVEL SECURITY;
+ALTER TABLE domain_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+
+-- Tenant isolation policies
 CREATE POLICY conversations_access_policy ON conversations
     FOR ALL TO authenticated_users
-    USING (
-        -- Users can access conversations for their tasks
-        task_id IN (
-            SELECT id FROM tasks 
-            WHERE tasks.metadata->>'user_id' = current_setting('app.user_id', true)
-        )
-        OR
-        -- Admins can access all conversations
-        current_setting('app.user_role', true) = 'admin'
-    );
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY messages_access_policy ON messages
     FOR ALL TO authenticated_users
-    USING (
-        conversation_id IN (
-            SELECT id FROM conversations
-            -- Inherits conversation access policy
-        )
-    );
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
--- Workspace isolation policy
-CREATE POLICY workspace_isolation_policy ON workspaces
+CREATE POLICY tasks_access_policy ON tasks
     FOR ALL TO authenticated_users
-    USING (
-        -- Users can only access their own workspaces
-        configuration->>'user_id' = current_setting('app.user_id', true)
-        OR
-        -- Team members can access shared workspaces
-        configuration->'team_members' ? current_setting('app.user_id', true)
-        OR
-        -- Admins have full access
-        current_setting('app.user_role', true) = 'admin'
-    );
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY backend_registrations_access_policy ON backend_registrations
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY domain_events_access_policy ON domain_events
+    FOR SELECT TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY domain_events_write_policy ON domain_events
+    FOR INSERT TO authenticated_users
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY audit_logs_access_policy ON audit_logs
+    FOR SELECT TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY audit_logs_insert_policy ON audit_logs
+    FOR INSERT TO authenticated_users
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+-- A privileged admin bypass role can be added later with explicit BYPASSRLS.
 ```
 
 #### 6.2.4 Performance Optimization
@@ -7444,6 +7928,12 @@ found in either location:
 | Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration |
 | API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     |
 
+Authentication claims include both user and tenant identifiers so downstream
+services can construct request context consistently:
+`{ sub: user_id, tenant_id, session_id, role, tenant_kind }`. The initial
+release supports `tenant_kind = user`; team and organization tenants are
+deferred.
+
 ###### MCP Authentication Integration
 
 MCP clients are required to implement Resource Indicators as specified in RFC
@@ -7455,12 +7945,12 @@ scoped and only valid for that specific MCP server.
 
 ###### Role-Based Access Control (RBAC) Model
 
-| Role      | Permissions                            | Resource Scope                  | API Access           |
-| --------- | -------------------------------------- | ------------------------------- | -------------------- |
-| Admin     | Full system access                     | All workspaces and tasks        | All endpoints        |
-| Team Lead | Team management, policy configuration  | Team workspaces                 | Management endpoints |
-| Developer | Task creation, conversation management | Own tasks and shared workspaces | Core functionality   |
-| Viewer    | Read-only access                       | Assigned tasks only             | Read endpoints only  |
+| Role      | Permissions                            | Resource Scope                            | API Access           |
+| --------- | -------------------------------------- | ----------------------------------------- | -------------------- |
+| Admin     | Full system access                     | All workspaces and tasks in tenant        | All endpoints        |
+| Team Lead | Team management, policy configuration  | Team workspaces in tenant                 | Management endpoints |
+| Developer | Task creation, conversation management | Own tasks and shared workspaces in tenant | Core functionality   |
+| Viewer    | Read-only access                       | Assigned tasks in tenant                  | Read endpoints only  |
 
 ###### Workspace-Scoped Authorization Rules
 
