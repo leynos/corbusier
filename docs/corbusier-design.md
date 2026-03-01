@@ -7256,6 +7256,14 @@ ALTER TABLE backend_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+-- Force RLS so table-owner paths cannot bypass tenant isolation.
+ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
+ALTER TABLE messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
+ALTER TABLE backend_registrations FORCE ROW LEVEL SECURITY;
+ALTER TABLE domain_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+
 -- Tenant isolation policies
 CREATE POLICY conversations_access_policy ON conversations
     FOR ALL TO authenticated_users
