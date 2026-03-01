@@ -100,6 +100,52 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [x] Success criteria: commands produce deterministic tool call sequences
     with auditable records.
 
+### 1.5. Tenant context and identity isolation
+
+- [ ] 1.5.1 Establish tenant primitives and request context plumbing. See
+  corbusier-design.md §2.1.5 and §2.2.5.
+  - [ ] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
+    corbusier-design.md §2.2.5.
+  - [ ] Model initial tenancy as one owning user per tenant while preserving a
+    separate user-versus-tenant identity model for future team and
+    organization tenants. See corbusier-design.md §2.2.5.
+  - [ ] Replace message-only audit context usage with cross-cutting
+    `RequestContext` carrying tenant, correlation, causation, user, and
+    session identifiers.
+    See corbusier-design.md §2.2.5.
+  - [ ] Success criteria: repository/service signatures require tenant-aware
+    request context for tenant-owned operations.
+- [ ] 1.5.2 Deliver tenant-aware schema and constraints. Requires 1.5.1. See
+  corbusier-design.md §6.2.1 and §6.2.2.
+  - [ ] Create `tenants` and add `tenant_id` to tenant-owned tables. See
+    corbusier-design.md §2.2.5.
+  - [ ] Scope task issue-origin uniqueness and backend registration uniqueness
+    by tenant. See corbusier-design.md §2.2.2 and §2.2.3.
+  - [ ] Enforce parent/child tenant consistency with composite foreign keys.
+    See corbusier-design.md §6.2.1.
+  - [ ] Success criteria: same issue reference and backend name can exist in
+    multiple tenants without collisions.
+- [ ] 1.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
+  1.5.2. See corbusier-design.md §6.2.2 and §6.2.3.
+  - [ ] Update repository ports/adapters so tenant context is mandatory and all
+    lookups are tenant scoped. See corbusier-design.md §2.2.5.
+  - [ ] Set `SET LOCAL app.tenant_id` inside each transaction and enable RLS
+    policies on tenant-owned tables. See corbusier-design.md §6.2.3.5.
+  - [ ] Extend audit trigger/session variable capture to include tenant ID. See
+    corbusier-design.md §6.2.3.4.
+  - [ ] Success criteria: cross-tenant reads/writes are blocked by both Rust
+    signatures and PostgreSQL RLS.
+- [ ] 1.5.4 Prove multi-tenant isolation with two-tenant scenarios. Requires
+  1.5.3. See corbusier-design.md §2.2.5.
+  - [ ] Add tests where two tenants share the same external issue identifiers
+    without violating constraints. See corbusier-design.md §2.2.5.
+  - [ ] Add tests where two tenants register the same backend name without
+    collisions. See corbusier-design.md §2.2.5.
+  - [ ] Add negative tests showing tenant A context cannot retrieve tenant B
+    records. See corbusier-design.md §2.2.5.
+  - [ ] Success criteria: isolation tests fail when tenant scoping is missing
+    and pass when tenant context and RLS are correctly applied.
+
 ## 2. Tool plane and workflow governance
 
 ### 2.1. MCP hosting and tool registry
