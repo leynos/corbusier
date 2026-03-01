@@ -777,8 +777,8 @@ _Table 2.1.5.1: Tenancy and identity feature catalog._
   - Clear ownership model for workspaces, tasks, and conversations
   - Forward-compatible identity model for future collaborative tenants
 - **Technical Context:** Row-level multi-tenancy with `tenant_id` partition keys
-  on tenant-owned tables, Rust request-context scoping, and PostgreSQL RLS with
-  tenant-consistency constraints.
+  on tenant-owned tables, Rust request-context scoping, and PostgreSQL
+  row-level security (RLS) with tenant-consistency constraints.
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-002 (Task
     Lifecycle Management), F-003 (Agent Backend Orchestration)
@@ -5512,7 +5512,7 @@ impl SecurityAspect {
             context.user_id,
             tool_name,
             &result,
-            context.audit_context.clone(),
+            context.request_context.clone(),
         ).await?;
         
         Ok(result)
@@ -6362,8 +6362,6 @@ CREATE INDEX idx_tasks_issue_number ON tasks USING BTREE (((origin->'issue_ref'-
 CREATE INDEX idx_conversations_agent ON conversations USING BTREE ((context->>'agent_backend'));
 
 -- Composite indexes for tenant-aware queries
-CREATE UNIQUE INDEX idx_messages_tenant_conversation_sequence_unique
-    ON messages (tenant_id, conversation_id, sequence_number);
 CREATE INDEX idx_messages_tenant_conversation_role
     ON messages (tenant_id, conversation_id, role, created_at);
 CREATE INDEX idx_domain_events_tenant_aggregate
@@ -6648,8 +6646,6 @@ CREATE TABLE backend_registrations (
 );
 
 CREATE INDEX idx_conversations_tenant_task ON conversations(tenant_id, task_id);
-CREATE UNIQUE INDEX idx_messages_tenant_conversation_sequence_unique
-    ON messages(tenant_id, conversation_id, sequence_number);
 CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
 CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
     ON tasks (
