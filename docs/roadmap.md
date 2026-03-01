@@ -151,13 +151,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 2.1. MCP hosting and tool registry
 
-- [ ] 2.1.1 Implement MCP server lifecycle management. Requires 1.3.1. See
+- [x] 2.1.1 Implement MCP server lifecycle management. Requires 1.3.1. See
   corbusier-design.md §2.2.4 and §6.1.4.
-  - [ ] Support MCP server start, stop, and health reporting. See
+  - [x] Support MCP server start, stop, and health reporting. See
     corbusier-design.md §2.2.4.
-  - [ ] Register MCP servers in the tool registry. See
+  - [x] Register MCP servers in the tool registry. See
     corbusier-design.md §2.2.4.
-  - [ ] Success criteria: MCP servers can be started, listed, and queried for
+  - [x] Success criteria: MCP servers can be started, listed, and queried for
     available tools.
 - [ ] 2.1.2 Deliver tool discovery and routing. Requires 2.1.1. See
   corbusier-design.md §2.2.4 and §6.1.4.

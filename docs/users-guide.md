@@ -346,3 +346,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## MCP server lifecycle management
+
+The `tool_registry` module can register MCP servers, start and stop them,
+refresh health status, and list tools exposed by running servers. Tool queries
+are only allowed when a server is in the `running` lifecycle state.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::tool_registry::{
+    adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
+    domain::{McpServerName, McpToolDefinition, McpTransport},
+    services::{McpServerLifecycleService, RegisterMcpServerRequest},
+};
+use mockable::DefaultClock;
+use serde_json::json;
+
+async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
+    let host = Arc::new(InMemoryMcpServerHost::new());
+    host.set_tool_catalog(
+        McpServerName::new("workspace_tools")?,
+        vec![McpToolDefinition::new(
+            "search_code",
+            "Searches the workspace source tree",
+            json!({"type": "object", "properties": {"query": {"type": "string"}}}),
+        )?],
+    )?;
+
+    let service = McpServerLifecycleService::new(
+        Arc::new(InMemoryMcpServerRegistry::new()),
+        host,
+        Arc::new(DefaultClock),
+    );
+
+    let request = RegisterMcpServerRequest::new(
+        "workspace_tools",
+        McpTransport::stdio("mcp-server")?,
+    );
+    let registered = service.register(request).await?;
+    let started = service.start(registered.id()).await?;
+    assert_eq!(started.lifecycle_state().as_str(), "running");
+
+    let servers = service.list_all().await?;
+    assert_eq!(servers.len(), 1);
+
+    let tools = service.list_tools(started.id()).await?;
+    assert_eq!(tools.len(), 1);
+
+    let stopped = service.stop(started.id()).await?;
+    assert_eq!(stopped.lifecycle_state().as_str(), "stopped");
+
+    let after_stop = service.list_tools(stopped.id()).await;
+    assert!(after_stop.is_err());
+
+    Ok(())
+}
+```

@@ -1078,6 +1078,27 @@ _Table 2.1.5.1: Tenancy and identity feature catalog._
     token security
   - Compliance Requirements: MCP server lifecycle audit logging
 
+###### Implementation decisions (2026-02-28) — roadmap 2.1.1
+
+- MCP lifecycle management is implemented as a dedicated `tool_registry`
+  bounded context (`src/tool_registry/`) rather than extending `agent_backend`.
+  This keeps MCP hosting concerns isolated from agent backend registration
+  concerns.
+- Lifecycle orchestration is split behind two ports:
+  `McpServerRegistryRepository` for persistence and `McpServerHost` for runtime
+  start/stop/health/tool-list operations.
+- The `McpServerRegistration` aggregate enforces lifecycle transitions:
+  `registered -> running -> stopped`, with restart support
+  (`stopped -> running`) and no transition back to `registered`.
+- Server registration names (`McpServerName`) are normalized to lowercase
+  identifiers (`[a-z0-9_]`) and constrained to 100 characters, aligned with
+  database uniqueness constraints.
+- Health state is persisted as timestamped snapshots
+  (`unknown | healthy | unhealthy`) so listing servers includes latest
+  observability data even after process restarts.
+- Scope is intentionally limited to `tools/list` discovery in 2.1.1; tool call
+  routing/execution remains deferred to roadmap item 2.1.2.
+
 ##### F-005-RQ-002: Tool Discovery and Registration
 
 - **Technical Specifications:**
@@ -4460,6 +4481,25 @@ graph TB
     MCP_HOST --> VCS_TOOL
     MCP_HOST --> TEST_RUNNER
 ```
+
+##### Implementation decisions (2026-02-28) — roadmap 2.1.1 (§6.1.4)
+
+- The initial implementation provides `InMemoryMcpServerHost` as the host
+  adapter for deterministic lifecycle behaviour in tests and local execution
+  flows without external process orchestration.
+- Registry persistence is implemented in both in-memory and PostgreSQL adapters
+  (`InMemoryMcpServerRegistry`, `PostgresMcpServerRegistry`) behind a shared
+  repository port to preserve hexagonal boundaries.
+- PostgreSQL persistence uses an additive `mcp_servers` table and stores
+  transport configuration as JSONB so stdio and HTTP+SSE variants can evolve
+  without frequent schema churn.
+- Service-level operations are exposed through
+  `McpServerLifecycleService` (`register`, `start`, `stop`, `refresh_health`,
+  `list_all`, `find_by_name`, `list_tools`) with typed error propagation from
+  domain, repository, and host layers.
+- Behaviour and integration coverage was added for happy and unhappy paths via
+  `rstest` and `rstest-bdd`, including duplicate registration rejection and
+  tool-query rejection when the server is not running.
 
 ##### Tool Registration and Discovery
 

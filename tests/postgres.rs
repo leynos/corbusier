@@ -11,6 +11,7 @@
 //! - `task_branch_pr_postgres_tests`: Branch and PR association tests
 //! - `task_lifecycle_tests`: Issue-to-task creation and lookup
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
+//! - `mcp_server_lifecycle_tests`: MCP server lifecycle persistence
 
 mod test_helpers;
 mod worker_locator;
@@ -22,6 +23,7 @@ mod postgres {
     mod audit_tests;
     mod backend_registry_tests;
     mod crud_tests;
+    mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod serialization_tests;
     mod slash_command_tests;
