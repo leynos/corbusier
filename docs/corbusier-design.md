@@ -755,6 +755,8 @@ Corbusier implements this through:
 
 #### 2.1.5 Tenancy and Identity Features
 
+_Table 2.1.5.1: Tenancy and identity feature catalog._
+
 | Feature ID | Feature Name                          | Category             | Priority | Status   |
 | ---------- | ------------------------------------- | -------------------- | -------- | -------- |
 | F-017      | Tenant Context and Identity Isolation | Security and Tenancy | Critical | Proposed |
@@ -1125,6 +1127,8 @@ Corbusier implements this through:
 
 #### 2.2.5 Tenancy and Identity Requirements
 
+_Table 2.2.5.1: Tenancy and identity requirement matrix._
+
 | Requirement ID | Description                          | Acceptance Criteria                                                           | Priority  | Complexity |
 | -------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------- | ---------- |
 | F-017-RQ-001   | Tenant Domain Primitive              | Tenant identity is modelled separately from user identity                     | Must-Have | Medium     |
@@ -1191,11 +1195,13 @@ Corbusier implements this through:
 - **Technical Specifications:**
   - Input Parameters: Repository calls with `RequestContext`, PostgreSQL session
     variables
-  - Output/Response: Tenant-isolated query execution with defence-in-depth
-  - Performance Criteria: `SET LOCAL app.tenant_id` and RLS checks remain within
+  - Output/Response: Tenant-isolated query execution with defense-in-depth
+  - Performance Criteria:
+    `set_config('app.tenant_id', <value>, true)` and RLS checks remain within
     transaction latency budgets
-  - Data Requirements: RLS policies keyed by `current_setting('app.tenant_id')`
-    and composite foreign keys for tenant consistency
+  - Data Requirements: RLS policies keyed by
+    `current_setting('app.tenant_id', true)` and composite foreign keys for
+    tenant consistency
 - **Validation Rules:**
   - Business Rules: Every tenant-owned mutation and lookup executes inside
     tenant context
@@ -1247,9 +1253,9 @@ Corbusier implements this through:
 - Enforce cross-table tenant consistency with composite keys such as
   `(conversation_id, tenant_id) -> conversations(id, tenant_id)`.
 - Execute tenant-scoped PostgreSQL operations in explicit transactions and set
-  `SET LOCAL app.tenant_id` within the same transaction as the protected
-  statements.
-- Sequence delivery to minimise refactor risk:
+  `set_config('app.tenant_id', <value>, true)` within the same transaction as
+  the protected statements.
+- Sequence delivery to minimize refactor risk:
   1. Add tenant primitives and `RequestContext`.
   2. Apply tenant migrations and urgent index fixes.
   3. Require tenant context in repository ports.
@@ -4823,6 +4829,7 @@ CREATE TABLE tasks (
     workspace_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
     UNIQUE (id, tenant_id)
 );
 
@@ -4848,8 +4855,10 @@ CREATE TABLE messages (
     content JSONB NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sequence_number BIGSERIAL,
-    FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id)
+    -- Monotonic sequence number scoped to conversation, assigned by application logic.
+    sequence_number BIGINT NOT NULL,
+    FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id),
+    UNIQUE (tenant_id, conversation_id, sequence_number)
 );
 
 -- Backend registrations are unique within a tenant, not globally
@@ -6353,6 +6362,8 @@ CREATE INDEX idx_tasks_issue_number ON tasks USING BTREE (((origin->'issue_ref'-
 CREATE INDEX idx_conversations_agent ON conversations USING BTREE ((context->>'agent_backend'));
 
 -- Composite indexes for tenant-aware queries
+CREATE UNIQUE INDEX idx_messages_tenant_conversation_sequence_unique
+    ON messages (tenant_id, conversation_id, sequence_number);
 CREATE INDEX idx_messages_tenant_conversation_role
     ON messages (tenant_id, conversation_id, role, created_at);
 CREATE INDEX idx_domain_events_tenant_aggregate
@@ -6591,6 +6602,7 @@ CREATE TABLE tasks (
     state VARCHAR(50) NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
     UNIQUE (id, tenant_id)
 );
 
@@ -6615,10 +6627,12 @@ CREATE TABLE messages (
     content JSONB NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    sequence_number BIGSERIAL,
+    -- Monotonic sequence number scoped to conversation, assigned by application logic.
+    sequence_number BIGINT NOT NULL,
     CONSTRAINT messages_role_check CHECK (role IN ('user', 'assistant', 'tool', 'system')),
     CONSTRAINT fk_messages_conversation
-        FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id)
+        FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id),
+    UNIQUE (tenant_id, conversation_id, sequence_number)
 );
 
 CREATE TABLE backend_registrations (
@@ -6634,7 +6648,7 @@ CREATE TABLE backend_registrations (
 );
 
 CREATE INDEX idx_conversations_tenant_task ON conversations(tenant_id, task_id);
-CREATE INDEX idx_messages_tenant_conversation_sequence
+CREATE UNIQUE INDEX idx_messages_tenant_conversation_sequence_unique
     ON messages(tenant_id, conversation_id, sequence_number);
 CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
 CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
@@ -6799,8 +6813,8 @@ The following illustrative example demonstrates the repository pattern with
 Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
 `row_to_message`, and `RepositoryError` are context-dependent and defined in
 the actual implementation. Tenant scoping is established per operation with
-`SET LOCAL app.tenant_id` inside the same transaction as the protected
-statements, ensuring connection-pool reuse cannot bypass RLS.
+`set_config('app.tenant_id', <value>, true)` inside the same transaction as
+the protected statements, ensuring connection-pool reuse cannot bypass RLS.
 
 ```rust
 // Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
@@ -6857,7 +6871,7 @@ impl PostgresMessageRepository {
         F: FnOnce(&mut PgConnection) -> RepositoryResult<T>,
     {
         conn.transaction(|tx| {
-            diesel::sql_query("SET LOCAL app.tenant_id = $1")
+            diesel::sql_query("SELECT set_config('app.tenant_id', $1, true)")
                 .bind::<diesel::sql_types::Text, _>(ctx.tenant_id.to_string())
                 .execute(tx)
                 .map_err(RepositoryError::database)?;
@@ -7267,31 +7281,39 @@ ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 -- Tenant isolation policies
 CREATE POLICY conversations_access_policy ON conversations
     FOR ALL TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID)
-    WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY messages_access_policy ON messages
     FOR ALL TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID)
-    WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY tasks_access_policy ON tasks
     FOR ALL TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID)
-    WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY backend_registrations_access_policy ON backend_registrations
     FOR ALL TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID)
-    WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY domain_events_access_policy ON domain_events
     FOR SELECT TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY domain_events_write_policy ON domain_events
+    FOR INSERT TO authenticated_users
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY audit_logs_access_policy ON audit_logs
     FOR SELECT TO authenticated_users
-    USING (tenant_id = current_setting('app.tenant_id')::UUID);
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY audit_logs_insert_policy ON audit_logs
+    FOR INSERT TO authenticated_users
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 -- A privileged admin bypass role can be added later with explicit BYPASSRLS.
 ```

@@ -106,7 +106,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   corbusier-design.md §2.1.5 and §2.2.5.
   - [ ] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
     corbusier-design.md §2.2.5.
-  - [ ] Model initial tenancy as one owning user per tenant while preserving a
+  - [ ] Model initial tenancy as one owning user per tenant, while preserving a
     separate user-versus-tenant identity model for future team and
     organization tenants. See corbusier-design.md §2.2.5.
   - [ ] Replace message-only audit context usage with cross-cutting
@@ -129,8 +129,9 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   1.5.2. See corbusier-design.md §6.2.2 and §6.2.3.
   - [ ] Update repository ports/adapters so tenant context is mandatory and all
     lookups are tenant scoped. See corbusier-design.md §2.2.5.
-  - [ ] Set `SET LOCAL app.tenant_id` inside each transaction and enable RLS
-    policies on tenant-owned tables. See corbusier-design.md §6.2.3.5.
+  - [ ] Set `set_config('app.tenant_id', <value>, true)` inside each
+    transaction, and enable RLS policies on tenant-owned tables. See
+    corbusier-design.md §6.2.3.5.
   - [ ] Extend audit trigger/session variable capture to include tenant ID. See
     corbusier-design.md §6.2.3.4.
   - [ ] Success criteria: cross-tenant reads/writes are blocked by both Rust
