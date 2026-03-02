@@ -31,13 +31,13 @@ jobs:
         run: make lint
       - name: Cache pg_worker binary
         id: cache-pg-worker
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: ~/.cargo/bin/pg_worker
           key: pg-worker-0.4.0-${{ runner.os }}
       - name: Cache PostgreSQL binaries
         id: cache-pg-binaries
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: |
             ~/.cache/postgresql_embedded
