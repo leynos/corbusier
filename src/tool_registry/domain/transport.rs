@@ -37,7 +37,7 @@ impl StdioTransportConfig {
     /// Appends command-line arguments.
     #[must_use]
     pub fn with_args(mut self, values: impl IntoIterator<Item = String>) -> Self {
-        self.args = values.into_iter().collect();
+        self.args.extend(values);
         self
     }
 

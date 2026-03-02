@@ -338,6 +338,71 @@ mod tests {
     }
 
     #[test]
+    fn mark_stopped_updates_state_and_resets_health() {
+        let clock = DefaultClock;
+        let mut registration = build_registration(&clock);
+        let health = McpServerHealthSnapshot::healthy(Utc::now());
+        registration
+            .mark_started(health, &clock)
+            .expect("start transition should succeed");
+
+        registration
+            .mark_stopped(&clock)
+            .expect("stop transition should succeed");
+
+        assert_eq!(
+            registration.lifecycle_state(),
+            McpServerLifecycleState::Stopped
+        );
+        assert_eq!(
+            registration
+                .last_health()
+                .expect("health snapshot should exist")
+                .status(),
+            McpServerHealthStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn update_health_modifies_health_without_changing_state() {
+        let clock = DefaultClock;
+        let mut registration = build_registration(&clock);
+        registration
+            .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
+            .expect("start transition should succeed");
+        let lifecycle_state = registration.lifecycle_state();
+
+        registration.update_health(
+            McpServerHealthSnapshot::unhealthy(Utc::now(), "probe timeout"),
+            &clock,
+        );
+
+        assert_eq!(registration.lifecycle_state(), lifecycle_state);
+        let health = registration
+            .last_health()
+            .expect("health snapshot should exist");
+        assert_eq!(health.status(), McpServerHealthStatus::Unhealthy);
+        assert_eq!(health.message(), Some("probe timeout"));
+    }
+
+    #[test]
+    fn invalid_transition_attempts_return_error() {
+        let clock = DefaultClock;
+        let mut registration = build_registration(&clock);
+        registration
+            .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
+            .expect("start transition should succeed");
+
+        let result = registration.transition_to(McpServerLifecycleState::Registered);
+
+        assert!(matches!(
+            result,
+            Err(ToolRegistryDomainError::InvalidLifecycleTransition { from, to })
+            if from == "running" && to == "registered"
+        ));
+    }
+
+    #[test]
     fn ensure_can_query_tools_requires_running_state() {
         let clock = DefaultClock;
         let registration = build_registration(&clock);

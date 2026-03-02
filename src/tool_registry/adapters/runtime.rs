@@ -10,7 +10,7 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// In-memory MCP server host adapter.
 ///
@@ -36,6 +36,18 @@ impl InMemoryMcpServerHost {
         Self::default()
     }
 
+    fn read_state(&self) -> McpServerHostResult<RwLockReadGuard<'_, InMemoryHostState>> {
+        self.state
+            .read()
+            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))
+    }
+
+    fn write_state(&self) -> McpServerHostResult<RwLockWriteGuard<'_, InMemoryHostState>> {
+        self.state
+            .write()
+            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))
+    }
+
     /// Associates a tool catalog with a server name.
     ///
     /// Existing catalog entries are replaced.
@@ -48,10 +60,7 @@ impl InMemoryMcpServerHost {
         server_name: McpServerName,
         tools: Vec<McpToolDefinition>,
     ) -> McpServerHostResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let mut state = self.write_state()?;
         state.tool_catalogs.insert(server_name, tools);
         Ok(())
     }
@@ -66,10 +75,7 @@ impl InMemoryMcpServerHost {
         server_id: McpServerId,
         message: impl Into<String>,
     ) -> McpServerHostResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let mut state = self.write_state()?;
         state
             .unhealthy_servers
             .insert(server_id, message.into().trim().to_owned());
@@ -80,20 +86,14 @@ impl InMemoryMcpServerHost {
 #[async_trait]
 impl McpServerHost for InMemoryMcpServerHost {
     async fn start(&self, server: &McpServerRegistration) -> McpServerHostResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let mut state = self.write_state()?;
         state.running_servers.insert(server.id());
         state.unhealthy_servers.remove(&server.id());
         Ok(())
     }
 
     async fn stop(&self, server: &McpServerRegistration) -> McpServerHostResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let mut state = self.write_state()?;
         state.running_servers.remove(&server.id());
         state.unhealthy_servers.remove(&server.id());
         Ok(())
@@ -103,10 +103,7 @@ impl McpServerHost for InMemoryMcpServerHost {
         &self,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<McpServerHealthSnapshot> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let state = self.read_state()?;
 
         let checked_at = Utc::now();
         if !state.running_servers.contains(&server.id()) {
@@ -127,10 +124,7 @@ impl McpServerHost for InMemoryMcpServerHost {
         &self,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<Vec<McpToolDefinition>> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))?;
+        let state = self.read_state()?;
 
         if !state.running_servers.contains(&server.id()) {
             return Err(McpServerHostError::NotRunning(server.id()));

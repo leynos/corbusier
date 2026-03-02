@@ -156,8 +156,7 @@ fn stop_server(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
     Ok(())
 }
 
-#[then(r"listing all servers returns {count:usize} entries")]
-fn list_servers_returns_count(
+fn list_servers_returns_count_impl(
     world: &mut McpLifecycleWorld,
     count: usize,
 ) -> Result<(), eyre::Report> {
@@ -167,6 +166,22 @@ fn list_servers_returns_count(
         return Err(eyre!("expected {count} servers, got {}", servers.len()));
     }
     Ok(())
+}
+
+#[then(r"listing all servers returns {count:usize} entry")]
+fn list_servers_returns_count_entry(
+    world: &mut McpLifecycleWorld,
+    count: usize,
+) -> Result<(), eyre::Report> {
+    list_servers_returns_count_impl(world, count)
+}
+
+#[then(r"listing all servers returns {count:usize} entries")]
+fn list_servers_returns_count_entries(
+    world: &mut McpLifecycleWorld,
+    count: usize,
+) -> Result<(), eyre::Report> {
+    list_servers_returns_count_impl(world, count)
 }
 
 #[then(r#"the server lifecycle state is "{state}""#)]
@@ -184,8 +199,7 @@ fn server_lifecycle_state(world: &McpLifecycleWorld, state: String) -> Result<()
     Ok(())
 }
 
-#[then(r"querying tools returns {count:usize} entries")]
-fn query_tools_returns_count(
+fn query_tools_returns_count_impl(
     world: &mut McpLifecycleWorld,
     count: usize,
 ) -> Result<(), eyre::Report> {
@@ -201,6 +215,22 @@ fn query_tools_returns_count(
         return Err(eyre!("expected {count} tools, got {}", tools.len()));
     }
     Ok(())
+}
+
+#[then(r"querying tools returns {count:usize} entry")]
+fn query_tools_returns_count_entry(
+    world: &mut McpLifecycleWorld,
+    count: usize,
+) -> Result<(), eyre::Report> {
+    query_tools_returns_count_impl(world, count)
+}
+
+#[then(r"querying tools returns {count:usize} entries")]
+fn query_tools_returns_count_entries(
+    world: &mut McpLifecycleWorld,
+    count: usize,
+) -> Result<(), eyre::Report> {
+    query_tools_returns_count_impl(world, count)
 }
 
 #[then("registration fails with a duplicate server name error")]

@@ -156,7 +156,7 @@ cases.
 - Decision: use `InMemoryMcpServerHost` as the runtime host adapter in test
   coverage, including PostgreSQL integration tests. Rationale: keeps tests
   deterministic while validating persistence and service behaviour
-  independently from external process management concerns. Date/Author:
+  independently of external process management concerns. Date/Author:
   2026-02-28 / implementation
 
 ## Outcomes & Retrospective
@@ -437,8 +437,10 @@ Validation evidence:
 ## Revision note
 
 2026-02-27: Initial draft created from roadmap 2.1.1, design sections 2.2.4 and
-6.1.4, and current repository testing/architecture conventions. 2026-02-28:
-Implementation completed for roadmap 2.1.1 with module, migration, tests, and
-service delivery. Documentation and roadmap updates applied. 2026-02-28: Full
-gates completed successfully (`make check-fmt`, `make lint`, `make test`,
-`make fmt`, `make markdownlint`, `make nixie`).
+6.1.4, and current repository testing/architecture conventions.
+
+2026-02-28: Implementation completed for roadmap 2.1.1 with module, migration,
+tests, and service delivery. Documentation and roadmap updates applied.
+
+2026-02-28: Full gates completed successfully (`make check-fmt`, `make lint`,
+`make test`, `make fmt`, `make markdownlint`, `make nixie`).

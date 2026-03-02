@@ -16,6 +16,10 @@ CREATE TABLE mcp_servers (
     ),
     CONSTRAINT mcp_servers_health_status_check CHECK (
         health_status IN ('unknown', 'healthy', 'unhealthy')
+    ),
+    CONSTRAINT mcp_servers_health_checked_when_status_known CHECK (
+        health_status NOT IN ('healthy', 'unhealthy')
+        OR health_checked_at IS NOT NULL
     )
 );
 
