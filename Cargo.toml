@@ -28,7 +28,7 @@ async-trait = "0.1.89"
 mockable = { version = "3.0.0", default-features = false, features = ["clock"] }
 
 # Database (Diesel ORM for PostgreSQL)
-diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
+diesel = { version = "2.3.6", features = ["postgres", "uuid", "chrono", "serde_json", "r2d2"] }
 
 # Capability-based filesystem access
 cap-std = { version = "4.0.0", features = ["fs_utf8"] }
