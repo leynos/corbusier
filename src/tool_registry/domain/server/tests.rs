@@ -6,12 +6,18 @@ use crate::tool_registry::domain::{
 };
 use chrono::Utc;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
-fn build_registration(clock: &DefaultClock) -> McpServerRegistration {
+#[fixture]
+fn clock() -> DefaultClock {
+    DefaultClock
+}
+
+#[fixture]
+fn registration(clock: DefaultClock) -> McpServerRegistration {
     let name = McpServerName::new("workspace_tools").expect("valid server name");
     let transport = McpTransport::stdio("mcp-server").expect("valid transport");
-    McpServerRegistration::new(name, transport, clock)
+    McpServerRegistration::new(name, transport, &clock)
 }
 
 /// Helper to assert lifecycle state and health status in one call.
@@ -30,19 +36,13 @@ fn assert_state_and_health(
     );
 }
 
-#[test]
-fn registration_starts_in_registered_state() {
-    let clock = DefaultClock;
-    let registration = build_registration(&clock);
-
-    assert_eq!(
-        registration.lifecycle_state(),
-        McpServerLifecycleState::Registered
+#[rstest]
+fn registration_starts_in_registered_state(registration: McpServerRegistration) {
+    assert_state_and_health(
+        &registration,
+        McpServerLifecycleState::Registered,
+        McpServerHealthStatus::Unknown,
     );
-    let health_snapshot = registration
-        .last_health()
-        .expect("health snapshot should exist");
-    assert_eq!(health_snapshot.status(), McpServerHealthStatus::Unknown);
 }
 
 #[rstest]
@@ -54,7 +54,7 @@ fn registration_starts_in_registered_state() {
 #[case(
     McpServerLifecycleState::Registered,
     McpServerLifecycleState::Stopped,
-    true
+    false
 )]
 #[case(
     McpServerLifecycleState::Running,
@@ -84,10 +84,11 @@ fn lifecycle_transition_matrix(
     assert_eq!(current.can_transition_to(target), expected);
 }
 
-#[test]
-fn mark_started_updates_state_and_health() {
-    let clock = DefaultClock;
-    let mut registration = build_registration(&clock);
+#[rstest]
+fn mark_started_updates_state_and_health(
+    mut registration: McpServerRegistration,
+    clock: DefaultClock,
+) {
     let health = McpServerHealthSnapshot::healthy(Utc::now());
     registration
         .mark_started(health, &clock)
@@ -100,10 +101,11 @@ fn mark_started_updates_state_and_health() {
     );
 }
 
-#[test]
-fn mark_stopped_updates_state_and_resets_health() {
-    let clock = DefaultClock;
-    let mut registration = build_registration(&clock);
+#[rstest]
+fn mark_stopped_updates_state_and_resets_health(
+    mut registration: McpServerRegistration,
+    clock: DefaultClock,
+) {
     let health = McpServerHealthSnapshot::healthy(Utc::now());
     registration
         .mark_started(health, &clock)
@@ -120,10 +122,11 @@ fn mark_stopped_updates_state_and_resets_health() {
     );
 }
 
-#[test]
-fn update_health_modifies_health_without_changing_state() {
-    let clock = DefaultClock;
-    let mut registration = build_registration(&clock);
+#[rstest]
+fn update_health_modifies_health_without_changing_state(
+    mut registration: McpServerRegistration,
+    clock: DefaultClock,
+) {
     registration
         .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
         .expect("start transition should succeed");
@@ -142,10 +145,11 @@ fn update_health_modifies_health_without_changing_state() {
     assert_eq!(health.message(), Some("probe timeout"));
 }
 
-#[test]
-fn invalid_transition_attempts_return_error() {
-    let clock = DefaultClock;
-    let mut registration = build_registration(&clock);
+#[rstest]
+fn invalid_transition_attempts_return_error(
+    mut registration: McpServerRegistration,
+    clock: DefaultClock,
+) {
     registration
         .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
         .expect("start transition should succeed");
@@ -159,11 +163,8 @@ fn invalid_transition_attempts_return_error() {
     ));
 }
 
-#[test]
-fn ensure_can_query_tools_requires_running_state() {
-    let clock = DefaultClock;
-    let registration = build_registration(&clock);
-
+#[rstest]
+fn ensure_can_query_tools_requires_running_state(registration: McpServerRegistration) {
     let result = registration.ensure_can_query_tools();
     assert!(matches!(
         result,

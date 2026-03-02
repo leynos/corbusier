@@ -11,14 +11,15 @@ use crate::tool_registry::{
 };
 use async_trait::async_trait;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use serde_json::json;
 use std::{io::Error, sync::Arc};
 
 type TestService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
 
-fn build_service() -> (Arc<InMemoryMcpServerHost>, TestService) {
+#[fixture]
+fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {
     let host = Arc::new(InMemoryMcpServerHost::new());
     let service = McpServerLifecycleService::new(
         Arc::new(InMemoryMcpServerRegistry::new()),
@@ -28,20 +29,53 @@ fn build_service() -> (Arc<InMemoryMcpServerHost>, TestService) {
     (host, service)
 }
 
-fn stdio_request(name: &str) -> RegisterMcpServerRequest {
-    RegisterMcpServerRequest::new(
-        name,
-        McpTransport::stdio("mcp-server").expect("valid stdio transport"),
+fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
+    let transport = McpTransport::stdio("mcp-server")?;
+    Ok(RegisterMcpServerRequest::new(name, transport))
+}
+
+/// Creates a standard `read_file` tool definition.
+fn create_read_file_tool() -> McpToolDefinition {
+    McpToolDefinition::new(
+        "read_file",
+        "Reads a file from the workspace",
+        json!({"type": "object", "properties": {"path": {"type": "string"}}}),
     )
+    .expect("tool definition should be valid")
+}
+
+/// Sets up a tool catalog for the given server on the host.
+fn setup_tool_catalog(
+    host: &Arc<InMemoryMcpServerHost>,
+    server_name: &str,
+    tools: Vec<McpToolDefinition>,
+) {
+    host.set_tool_catalog(McpServerName::new(server_name).expect("valid name"), tools)
+        .expect("catalog update should succeed");
+}
+
+/// Registers and starts a server, returning the started registration.
+async fn register_and_start(
+    service: &TestService,
+    name: &str,
+) -> crate::tool_registry::domain::McpServerRegistration {
+    let registered = service
+        .register(stdio_request(name).expect("valid stdio transport"))
+        .await
+        .expect("registration should succeed");
+    service
+        .start(registered.id())
+        .await
+        .expect("start should succeed")
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn register_and_find_by_name() {
-    let (_, service) = build_service();
+async fn register_and_find_by_name(service_bundle: (Arc<InMemoryMcpServerHost>, TestService)) {
+    let (_, service) = service_bundle;
 
     let registered = service
-        .register(stdio_request("workspace_tools"))
+        .register(stdio_request("workspace_tools").expect("valid stdio transport"))
         .await
         .expect("registration should succeed");
 
@@ -56,8 +90,10 @@ async fn register_and_find_by_name() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_unknown_server_returns_not_found() {
-    let (_, service) = build_service();
+async fn start_unknown_server_returns_not_found(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) {
+    let (_, service) = service_bundle;
 
     let result = service.start(McpServerId::new()).await;
 
@@ -69,10 +105,12 @@ async fn start_unknown_server_returns_not_found() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_tools_requires_running_server() {
-    let (_, service) = build_service();
+async fn list_tools_requires_running_server(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) {
+    let (_, service) = service_bundle;
     let registered = service
-        .register(stdio_request("workspace_tools"))
+        .register(stdio_request("workspace_tools").expect("valid stdio transport"))
         .await
         .expect("registration should succeed");
 
@@ -88,33 +126,15 @@ async fn list_tools_requires_running_server() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_and_list_tools() {
-    let (host, service) = build_service();
+async fn start_and_list_tools(service_bundle: (Arc<InMemoryMcpServerHost>, TestService)) {
+    let (host, service) = service_bundle;
+    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
 
-    let tool = McpToolDefinition::new(
-        "read_file",
-        "Reads a file from the workspace",
-        json!({"type": "object", "properties": {"path": {"type": "string"}}}),
-    )
-    .expect("tool definition should be valid");
-
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools").expect("valid name"),
-        vec![tool],
-    )
-    .expect("catalog update should succeed");
-
-    let registered = service
-        .register(stdio_request("workspace_tools"))
-        .await
-        .expect("registration should succeed");
-    service
-        .start(registered.id())
-        .await
-        .expect("start should succeed");
+    let started = register_and_start(&service, "workspace_tools").await;
+    assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
 
     let tools = service
-        .list_tools(registered.id())
+        .list_tools(started.id())
         .await
         .expect("tool listing should succeed");
 
@@ -125,39 +145,22 @@ async fn start_and_list_tools() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn stop_transitions_to_stopped_and_blocks_tool_queries() {
-    let (host, service) = build_service();
-    let tool = McpToolDefinition::new(
-        "read_file",
-        "Reads a file from the workspace",
-        json!({"type": "object", "properties": {"path": {"type": "string"}}}),
-    )
-    .expect("tool definition should be valid");
+async fn stop_transitions_to_stopped_and_blocks_tool_queries(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) {
+    let (host, service) = service_bundle;
+    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools").expect("valid name"),
-        vec![tool],
-    )
-    .expect("catalog update should succeed");
-
-    let registered = service
-        .register(stdio_request("workspace_tools"))
-        .await
-        .expect("registration should succeed");
-    let started = service
-        .start(registered.id())
-        .await
-        .expect("start should succeed");
+    let started = register_and_start(&service, "workspace_tools").await;
     assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
 
     let stopped = service
-        .stop(registered.id())
+        .stop(started.id())
         .await
         .expect("stop should succeed");
-
     assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
     assert!(matches!(
-        service.list_tools(registered.id()).await,
+        service.list_tools(started.id()).await,
         Err(McpServerLifecycleServiceError::Domain(
             ToolRegistryDomainError::ToolQueryRequiresRunning { .. }
         ))
@@ -166,23 +169,20 @@ async fn stop_transitions_to_stopped_and_blocks_tool_queries() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn refresh_health_updates_snapshot_without_changing_state() {
-    let (host, service) = build_service();
-    let registered = service
-        .register(stdio_request("workspace_tools"))
-        .await
-        .expect("registration should succeed");
-    let started = service
-        .start(registered.id())
-        .await
-        .expect("start should succeed");
+async fn refresh_health_updates_snapshot_without_state_change(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) {
+    let (host, service) = service_bundle;
+    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
+
+    let started = register_and_start(&service, "workspace_tools").await;
     assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
 
-    host.set_unhealthy(registered.id(), "probe timeout")
+    host.set_unhealthy(started.id(), "probe timeout")
         .expect("marking unhealthy should succeed");
 
     let refreshed = service
-        .refresh_health(registered.id())
+        .refresh_health(started.id())
         .await
         .expect("health refresh should succeed");
 
@@ -199,39 +199,23 @@ async fn refresh_health_updates_snapshot_without_changing_state() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_stop_start_restart_cycle_returns_to_running() {
-    let (host, service) = build_service();
-    let tool = McpToolDefinition::new(
-        "read_file",
-        "Reads a file from the workspace",
-        json!({"type": "object", "properties": {"path": {"type": "string"}}}),
-    )
-    .expect("tool definition should be valid");
+async fn start_stop_start_restart_cycle_returns_to_running(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) {
+    let (host, service) = service_bundle;
+    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools").expect("valid name"),
-        vec![tool],
-    )
-    .expect("catalog update should succeed");
-
-    let registered = service
-        .register(stdio_request("workspace_tools"))
-        .await
-        .expect("registration should succeed");
-    let started = service
-        .start(registered.id())
-        .await
-        .expect("first start should succeed");
+    let started = register_and_start(&service, "workspace_tools").await;
     assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
 
     let stopped = service
-        .stop(registered.id())
+        .stop(started.id())
         .await
         .expect("stop should succeed");
     assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
 
     let restarted = service
-        .start(registered.id())
+        .start(started.id())
         .await
         .expect("restart should succeed");
     assert_eq!(
@@ -240,7 +224,7 @@ async fn start_stop_start_restart_cycle_returns_to_running() {
     );
     assert_eq!(
         service
-            .list_tools(registered.id())
+            .list_tools(started.id())
             .await
             .expect("tool listing should succeed after restart")
             .len(),
@@ -313,7 +297,7 @@ async fn start_persists_running_state_when_health_probe_fails() {
     );
 
     let registered = service
-        .register(stdio_request("workspace_tools"))
+        .register(stdio_request("workspace_tools").expect("valid stdio transport"))
         .await
         .expect("registration should succeed");
     let start_result = service.start(registered.id()).await;

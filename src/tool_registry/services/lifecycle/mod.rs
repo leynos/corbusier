@@ -138,7 +138,11 @@ where
         let change = apply_change(&server, self).await?;
         if let Err(repository_error) = self.repository.update(&change.updated_server).await {
             if let Some(compensation_error) = self
-                .apply_compensation_if_needed(change.compensation, &server, &repository_error)
+                .apply_compensation_if_needed(
+                    change.compensation,
+                    &change.updated_server,
+                    &repository_error,
+                )
                 .await
             {
                 return Err(compensation_error);
@@ -165,6 +169,42 @@ where
             ));
             McpServerLifecycleServiceError::Host(McpServerHostError::runtime(combined_error))
         })
+    }
+
+    /// Helper for lifecycle transitions with compensation.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "The helper captures the complete transition contract in one place."
+    )]
+    async fn execute_transition_with_compensation<HostOp, DomainMut>(
+        &self,
+        server_id: McpServerId,
+        host_operation: HostOp,
+        domain_mutation: DomainMut,
+        compensation: LifecycleCompensationAction,
+    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    where
+        HostOp: for<'a> FnOnce(
+                &'a McpServerRegistration,
+                &'a H,
+            )
+                -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + 'a>>
+            + 'static,
+        DomainMut:
+            FnOnce(&mut McpServerRegistration, &C) -> Result<(), ToolRegistryDomainError> + 'static,
+    {
+        self.execute_lifecycle_change(server_id, |server, service| {
+            Box::pin(async move {
+                host_operation(server, &*service.host).await?;
+                let mut updated_server = server.clone();
+                domain_mutation(&mut updated_server, &*service.clock)?;
+                Ok(LifecycleChange::with_compensation(
+                    updated_server,
+                    compensation,
+                ))
+            })
+        })
+        .await
     }
 
     /// Registers a new MCP server.
@@ -194,20 +234,14 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_lifecycle_change(server_id, |server, service| {
-            Box::pin(async move {
-                service.host.start(server).await?;
-                let mut started_server = server.clone();
-                started_server.mark_started(
-                    McpServerHealthSnapshot::unknown(service.clock.utc()),
-                    &*service.clock,
-                )?;
-                Ok(LifecycleChange::with_compensation(
-                    started_server,
-                    LifecycleCompensationAction::Stop,
-                ))
-            })
-        })
+        self.execute_transition_with_compensation(
+            server_id,
+            |server, host| Box::pin(host.start(server)),
+            |server, clock| {
+                server.mark_started(McpServerHealthSnapshot::unknown(clock.utc()), clock)
+            },
+            LifecycleCompensationAction::Stop,
+        )
         .await?;
         self.refresh_health(server_id).await
     }
@@ -219,21 +253,20 @@ where
     /// Returns [`McpServerLifecycleServiceError::NotFound`] when no server has
     /// the given ID, domain errors for invalid lifecycle transitions, or host
     /// and persistence errors.
+    #[expect(
+        clippy::redundant_closure_for_method_calls,
+        reason = "Using an explicit closure avoids lifetime constraints from method pointers."
+    )]
     pub async fn stop(
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_lifecycle_change(server_id, |server, service| {
-            Box::pin(async move {
-                service.host.stop(server).await?;
-                let mut stopped_server = server.clone();
-                stopped_server.mark_stopped(&*service.clock)?;
-                Ok(LifecycleChange::with_compensation(
-                    stopped_server,
-                    LifecycleCompensationAction::Start,
-                ))
-            })
-        })
+        self.execute_transition_with_compensation(
+            server_id,
+            |server, host| Box::pin(host.stop(server)),
+            |server, clock| server.mark_stopped(clock),
+            LifecycleCompensationAction::Start,
+        )
         .await
     }
 

@@ -107,7 +107,7 @@ cases.
       `find_by_name`, and `list_tools`.
 - [x] (2026-02-28 00:00Z) Ran core code gates successfully:
       `make check-fmt`, `make lint`, and `make test`.
-- [x] (2026-02-28 00:00Z) Run documentation gates after final doc updates:
+- [x] (2026-02-28 00:00Z) Ran documentation gates after final doc updates:
       `make fmt`, `make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
@@ -200,18 +200,19 @@ PostgreSQL harness expectations:
 - Use `pg-embed-setup-unpriv` through `tests/postgres/cluster/` fixtures.
 - Ensure template database migrations in `tests/postgres/helpers.rs`.
 
-Reference documents for this feature:
+Reference documents for this feature cover scope, architecture, testing, and
+tooling guidance.[^1][^2][^3][^4][^5][^6][^7][^8][^9]
 
-- `docs/roadmap.md` (2.1.1 scope and success criteria).
-- `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
+[^1]: `docs/roadmap.md` (2.1.1 scope and success criteria).
+[^2]: `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
   registry architecture).
-- `docs/rust-testing-with-rstest-fixtures.md`.
-- `docs/reliable-testing-in-rust-via-dependency-injection.md`.
-- `docs/rust-doctest-dry-guide.md`.
-- `docs/complexity-antipatterns-and-refactoring-strategies.md`.
-- `docs/pg-embed-setup-unpriv-users-guide.md`.
-- `docs/ortho-config-users-guide.md`.
-- `docs/rstest-bdd-users-guide.md`.
+[^3]: `docs/rust-testing-with-rstest-fixtures.md`.
+[^4]: `docs/reliable-testing-in-rust-via-dependency-injection.md`.
+[^5]: `docs/rust-doctest-dry-guide.md`.
+[^6]: `docs/complexity-antipatterns-and-refactoring-strategies.md`.
+[^7]: `docs/pg-embed-setup-unpriv-users-guide.md`.
+[^8]: `docs/ortho-config-users-guide.md`.
+[^9]: `docs/rstest-bdd-users-guide.md`.
 
 ## Plan of work
 

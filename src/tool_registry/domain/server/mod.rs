@@ -43,10 +43,8 @@ impl McpServerLifecycleState {
     pub const fn can_transition_to(self, target: Self) -> bool {
         matches!(
             (self, target),
-            (
-                Self::Registered,
-                Self::Registered | Self::Running | Self::Stopped
-            ) | (Self::Running | Self::Stopped, Self::Running | Self::Stopped)
+            (Self::Registered, Self::Registered | Self::Running)
+                | (Self::Running | Self::Stopped, Self::Running | Self::Stopped)
         )
     }
 }
