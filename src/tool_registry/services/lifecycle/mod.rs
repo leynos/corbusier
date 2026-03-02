@@ -195,9 +195,9 @@ where
     {
         self.execute_lifecycle_change(server_id, |server, service| {
             Box::pin(async move {
-                host_operation(server, &*service.host).await?;
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
+                host_operation(server, &*service.host).await?;
                 Ok(LifecycleChange::with_compensation(
                     updated_server,
                     compensation,

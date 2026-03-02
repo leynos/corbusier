@@ -18,6 +18,14 @@ use std::{io::Error, sync::Arc};
 type TestService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
 
+#[derive(Debug, Clone, Copy)]
+enum LifecycleScenario {
+    StartAndList,
+    StopBlocksQueries,
+    RefreshHealth,
+    StartStopStart,
+}
+
 #[fixture]
 fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {
     let host = Arc::new(InMemoryMcpServerHost::new());
@@ -125,111 +133,87 @@ async fn list_tools_requires_running_server(
 }
 
 #[rstest]
+#[case::start_and_list(LifecycleScenario::StartAndList)]
+#[case::stop_blocks_queries(LifecycleScenario::StopBlocksQueries)]
+#[case::refresh_health(LifecycleScenario::RefreshHealth)]
+#[case::start_stop_start(LifecycleScenario::StartStopStart)]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_and_list_tools(service_bundle: (Arc<InMemoryMcpServerHost>, TestService)) {
-    let (host, service) = service_bundle;
-    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
-
-    let started = register_and_start(&service, "workspace_tools").await;
-    assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
-
-    let tools = service
-        .list_tools(started.id())
-        .await
-        .expect("tool listing should succeed");
-
-    assert_eq!(tools.len(), 1);
-    let first = tools.first().expect("tool should exist");
-    assert_eq!(first.name(), "read_file");
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn stop_transitions_to_stopped_and_blocks_tool_queries(
+async fn lifecycle_scenarios(
     service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+    #[case] scenario: LifecycleScenario,
 ) {
     let (host, service) = service_bundle;
     setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
 
     let started = register_and_start(&service, "workspace_tools").await;
     assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
+    match scenario {
+        LifecycleScenario::StartAndList => {
+            let tools = service
+                .list_tools(started.id())
+                .await
+                .expect("tool listing should succeed");
+            assert_eq!(tools.len(), 1);
+            let first = tools.first().expect("tool should exist");
+            assert_eq!(first.name(), "read_file");
+        }
+        LifecycleScenario::StopBlocksQueries => {
+            let stopped = service
+                .stop(started.id())
+                .await
+                .expect("stop should succeed");
+            assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
+            assert!(matches!(
+                service.list_tools(started.id()).await,
+                Err(McpServerLifecycleServiceError::Domain(
+                    ToolRegistryDomainError::ToolQueryRequiresRunning { .. }
+                ))
+            ));
+        }
+        LifecycleScenario::RefreshHealth => {
+            host.set_unhealthy(started.id(), "probe timeout")
+                .expect("marking unhealthy should succeed");
 
-    let stopped = service
-        .stop(started.id())
-        .await
-        .expect("stop should succeed");
-    assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
-    assert!(matches!(
-        service.list_tools(started.id()).await,
-        Err(McpServerLifecycleServiceError::Domain(
-            ToolRegistryDomainError::ToolQueryRequiresRunning { .. }
-        ))
-    ));
-}
+            let refreshed = service
+                .refresh_health(started.id())
+                .await
+                .expect("health refresh should succeed");
 
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn refresh_health_updates_snapshot_without_state_change(
-    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
-) {
-    let (host, service) = service_bundle;
-    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
+            assert_eq!(
+                refreshed.lifecycle_state(),
+                McpServerLifecycleState::Running
+            );
+            let health = refreshed
+                .last_health()
+                .expect("health snapshot should exist");
+            assert_eq!(health.status(), McpServerHealthStatus::Unhealthy);
+            assert_eq!(health.message(), Some("probe timeout"));
+        }
+        LifecycleScenario::StartStopStart => {
+            let stopped = service
+                .stop(started.id())
+                .await
+                .expect("stop should succeed");
+            assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
 
-    let started = register_and_start(&service, "workspace_tools").await;
-    assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
-
-    host.set_unhealthy(started.id(), "probe timeout")
-        .expect("marking unhealthy should succeed");
-
-    let refreshed = service
-        .refresh_health(started.id())
-        .await
-        .expect("health refresh should succeed");
-
-    assert_eq!(
-        refreshed.lifecycle_state(),
-        McpServerLifecycleState::Running
-    );
-    let health = refreshed
-        .last_health()
-        .expect("health snapshot should exist");
-    assert_eq!(health.status(), McpServerHealthStatus::Unhealthy);
-    assert_eq!(health.message(), Some("probe timeout"));
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn start_stop_start_restart_cycle_returns_to_running(
-    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
-) {
-    let (host, service) = service_bundle;
-    setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()]);
-
-    let started = register_and_start(&service, "workspace_tools").await;
-    assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
-
-    let stopped = service
-        .stop(started.id())
-        .await
-        .expect("stop should succeed");
-    assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
-
-    let restarted = service
-        .start(started.id())
-        .await
-        .expect("restart should succeed");
-    assert_eq!(
-        restarted.lifecycle_state(),
-        McpServerLifecycleState::Running
-    );
-    assert_eq!(
-        service
-            .list_tools(started.id())
-            .await
-            .expect("tool listing should succeed after restart")
-            .len(),
-        1
-    );
+            let restarted = service
+                .start(started.id())
+                .await
+                .expect("restart should succeed");
+            assert_eq!(
+                restarted.lifecycle_state(),
+                McpServerLifecycleState::Running
+            );
+            assert_eq!(
+                service
+                    .list_tools(started.id())
+                    .await
+                    .expect("tool listing should succeed after restart")
+                    .len(),
+                1
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
