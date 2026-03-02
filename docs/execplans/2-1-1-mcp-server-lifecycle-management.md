@@ -134,30 +134,30 @@ cases.
   `src/tool_registry/` rather than extending `agent_backend`. Rationale: MCP
   server lifecycle and tool registry concerns are distinct from agent backend
   identity/capability registration and map directly to roadmap section 2.1.
-  Date/Author: 2026-02-27 / plan author
+  Date/Author: 2026-02-27 / plan author.
 
 - Decision: model lifecycle orchestration through two ports:
   `McpServerRegistryRepository` (persistence) and `McpServerHost` (runtime
   transport/process control). Rationale: this preserves hexagonal separation
   and keeps runtime concerns out of domain and persistence adapters.
-  Date/Author: 2026-02-27 / plan author
+  Date/Author: 2026-02-27 / plan author.
 
 - Decision: scope 2.1.1 to `tools/list` querying only, with `tools/call`
   execution routing deferred to 2.1.2. Rationale: matches roadmap sequencing
   and prevents accidental scope creep into policy/routing concerns.
-  Date/Author: 2026-02-27 / plan author
+  Date/Author: 2026-02-27 / plan author.
 
 - Decision: persist transport configuration in PostgreSQL as JSONB
   (`transport_config`) and lifecycle/health fields as scalar columns.
   Rationale: supports both stdio and HTTP+SSE without frequent schema churn
   while keeping filterable state and health metadata explicit. Date/Author:
-  2026-02-28 / implementation
+  2026-02-28 / implementation.
 
 - Decision: use `InMemoryMcpServerHost` as the runtime host adapter in test
   coverage, including PostgreSQL integration tests. Rationale: keeps tests
   deterministic while validating persistence and service behaviour
   independently of external process management concerns. Date/Author:
-  2026-02-28 / implementation
+  2026-02-28 / implementation.
 
 ## Outcomes & Retrospective
 
@@ -436,11 +436,12 @@ Validation evidence:
 
 ## Revision note
 
-2026-02-27: Initial draft created from roadmap 2.1.1, design sections 2.2.4 and
-6.1.4, and current repository testing/architecture conventions.
+- 2026-02-27: Initial draft created from roadmap 2.1.1, design sections 2.2.4
+  and 6.1.4, and current repository testing/architecture conventions.
 
-2026-02-28: Implementation completed for roadmap 2.1.1 with module, migration,
-tests, and service delivery. Documentation and roadmap updates applied.
+- 2026-02-28: Implementation completed for roadmap 2.1.1 with module,
+  migration, tests, and service delivery. Documentation and roadmap updates
+  applied.
 
-2026-02-28: Full gates completed successfully (`make check-fmt`, `make lint`,
-`make test`, `make fmt`, `make markdownlint`, `make nixie`).
+- 2026-02-28: Full gates completed successfully (`make check-fmt`, `make
+  lint`, `make test`, `make fmt`, `make markdownlint`, `make nixie`).

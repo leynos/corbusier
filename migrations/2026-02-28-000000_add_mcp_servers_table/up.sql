@@ -23,5 +23,18 @@ CREATE TABLE mcp_servers (
     )
 );
 
+CREATE FUNCTION update_mcp_servers_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_mcp_servers_updated_at
+    BEFORE UPDATE ON mcp_servers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_mcp_servers_updated_at();
+
 CREATE UNIQUE INDEX idx_mcp_servers_name
     ON mcp_servers (name);
