@@ -261,6 +261,22 @@ mod tests {
         McpServerRegistration::new(name, transport, clock)
     }
 
+    /// Helper to assert lifecycle state and health status in one call.
+    fn assert_state_and_health(
+        registration: &McpServerRegistration,
+        expected_state: McpServerLifecycleState,
+        expected_health_status: McpServerHealthStatus,
+    ) {
+        assert_eq!(registration.lifecycle_state(), expected_state);
+        assert_eq!(
+            registration
+                .last_health()
+                .expect("health snapshot should exist")
+                .status(),
+            expected_health_status
+        );
+    }
+
     #[test]
     fn registration_starts_in_registered_state() {
         let clock = DefaultClock;
@@ -324,16 +340,10 @@ mod tests {
             .mark_started(health, &clock)
             .expect("start transition should succeed");
 
-        assert_eq!(
-            registration.lifecycle_state(),
-            McpServerLifecycleState::Running
-        );
-        assert_eq!(
-            registration
-                .last_health()
-                .expect("health snapshot should exist")
-                .status(),
-            McpServerHealthStatus::Healthy
+        assert_state_and_health(
+            &registration,
+            McpServerLifecycleState::Running,
+            McpServerHealthStatus::Healthy,
         );
     }
 
@@ -350,16 +360,10 @@ mod tests {
             .mark_stopped(&clock)
             .expect("stop transition should succeed");
 
-        assert_eq!(
-            registration.lifecycle_state(),
-            McpServerLifecycleState::Stopped
-        );
-        assert_eq!(
-            registration
-                .last_health()
-                .expect("health snapshot should exist")
-                .status(),
-            McpServerHealthStatus::Unknown
+        assert_state_and_health(
+            &registration,
+            McpServerLifecycleState::Stopped,
+            McpServerHealthStatus::Unknown,
         );
     }
 
