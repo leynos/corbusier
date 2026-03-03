@@ -138,6 +138,10 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     Ok(())
 }
 
+/// SQL to add agent turn sessions table for roadmap 1.3.2.
+pub const ADD_AGENT_TURN_SESSIONS_SQL: &str =
+    include_str!("../../migrations/2026-03-03-000000_add_agent_turn_sessions_table/up.sql");
+
 /// Builds a Diesel `r2d2` connection pool for the given database URL.
 ///
 /// # Errors

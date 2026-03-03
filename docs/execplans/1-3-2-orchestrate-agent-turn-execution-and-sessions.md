@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This plan covers roadmap item 1.3.2 in [docs/roadmap.md](docs/roadmap.md):
 
@@ -96,15 +96,21 @@ Observable outcomes:
 
 - [x] (2026-02-28 13:09Z) Reviewed roadmap/design/testing docs and existing
       1.3.1 implementation to draft this ExecPlan.
-- [ ] Stage A: Finalize 1.3.2 domain model and port contracts.
-- [ ] Stage B: Add failing unit and behavioural tests (red phase).
-- [ ] Stage C: Implement orchestration service and in-memory adapters.
-- [ ] Stage D: Implement Postgres adapter updates and migration updates if
-      needed.
-- [ ] Stage E: Add Postgres integration coverage with
+- [x] (2026-03-03 09:44Z) Execution phase approved and implementation started.
+- [x] (2026-03-03 11:58Z) Stage A: Finalize 1.3.2 domain model and port
+      contracts.
+- [x] (2026-03-03 12:06Z) Stage B: Add failing unit and behavioural tests (red
+      phase).
+- [x] (2026-03-03 12:20Z) Stage C: Implement orchestration service and
+      in-memory adapters.
+- [x] (2026-03-03 12:31Z) Stage D: Implement Postgres adapter updates and
+      migration updates if needed.
+- [x] (2026-03-03 12:38Z) Stage E: Add Postgres integration coverage with
       `pg-embedded-setup-unpriv` fixtures.
-- [ ] Stage F: Update user/design docs and mark roadmap item done.
-- [ ] Stage G: Run full quality gates and capture evidence logs.
+- [x] (2026-03-03 12:47Z) Stage F: Update user/design docs and mark roadmap
+      item done.
+- [x] (2026-03-03 12:58Z) Stage G: Run full quality gates and capture evidence
+      logs.
 
 ## Surprises & discoveries
 
@@ -114,6 +120,9 @@ Observable outcomes:
 - `docs/corbusier-design.md` defines the `AgentBackend` runtime trait and turn
   flow at conceptual level, but concrete Rust module/file mapping is not yet
   implemented; this plan provides that mapping.
+- `ensure_template` does not rebuild an existing Postgres template database, so
+  adding a migration requires either dropping the old template DB or bumping
+  `TEMPLATE_DB` to force recreation.
 
 ## Decision log
 
@@ -129,16 +138,50 @@ Observable outcomes:
   and explicit behaviour for rotation, continuation, and cleanup paths.
   Date/Author: 2026-02-28 / plan author.
 
+- Decision: Persist 1.3.2 session continuity in a dedicated
+  `agent_turn_sessions` table rather than reusing `message::agent_sessions`.
+  Rationale: avoids crossing bounded-context concerns and keeps orchestration
+  ownership in `agent_backend`. Date/Author: 2026-03-03 / implementation author.
+
+- Decision: Introduce `AgentTurnOrchestratorPorts` as an explicit dependency
+  bundle for the orchestrator service. Rationale: keeps constructor signatures
+  within lint constraints while making port boundaries explicit and test wiring
+  straightforward. Date/Author: 2026-03-03 / implementation author.
+
+- Decision: Bump `TEMPLATE_DB` name in Postgres test helpers when adding the
+  new migration. Rationale: shared template creation is idempotent and would
+  otherwise skip applying the new `agent_turn_sessions` schema in existing
+  local environments. Date/Author: 2026-03-03 / implementation author.
+
 ## Outcomes & retrospective
 
-Pending implementation.
+Delivered behaviour against 1.3.2 success criteria:
 
-Completion checklist for this section:
+- Turn execution is coordinated end-to-end through
+  `AgentTurnOrchestratorService`, including runtime turn calls, deterministic
+  tool routing, and canonical response/audit aggregation.
+- Session continuity is preserved per `(backend_id, conversation_id)`, with
+  automatic session rotation when expiry is crossed and persisted lifecycle
+  updates (`active` to `expired`) in `agent_turn_sessions`.
+- Tool routing uses a single adapter port path and deterministic call IDs,
+  giving consistent routing metadata across repeated identical inputs.
 
-- Summarize delivered behaviour against each 1.3.2 success criterion.
-- Record final test counts for unit, behavioural, in-memory integration, and
-  Postgres integration suites.
-- Capture any deferred work and why it was deferred.
+Validation evidence:
+
+- Unit tests (`rstest`): 5 new orchestrator unit tests in
+  `src/agent_backend/tests/turn_orchestration_tests.rs`.
+- Behaviour tests (`rstest-bdd`): 4 new scenarios in
+  `tests/features/agent_turn_orchestration.feature`.
+- In-memory integration tests: 3 new tests in
+  `tests/in_memory/agent_turn_orchestration_tests.rs`.
+- Postgres integration tests (`pg-embedded-setup-unpriv`): 3 new tests in
+  `tests/postgres/agent_turn_orchestration_tests.rs`.
+- Full suite status: `make test` passed with `597` tests passed, `1` skipped.
+
+Deferred work:
+
+- None within roadmap 1.3.2 scope. Tool schema translation remains in roadmap
+  1.3.3 by design.
 
 ## Context and orientation
 
@@ -257,8 +300,8 @@ Persist orchestration session continuity and expiry state in Postgres.
 Planned edits:
 
 - Add/extend Postgres adapter modules under
-  `src/agent_backend/adapters/postgres/`
-  for orchestration session persistence and turn execution metadata.
+  `src/agent_backend/adapters/postgres/` for orchestration session persistence
+  and turn execution metadata.
 - If expiry fields are missing, add one additive migration under `migrations/`
   and wire it into `tests/postgres/helpers.rs` template migration list.
 - Update Diesel schema/model files corresponding to new/changed tables.

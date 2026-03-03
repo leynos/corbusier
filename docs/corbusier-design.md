@@ -1028,6 +1028,18 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   - Security Requirements: Agent isolation, secure tool execution
   - Compliance Requirements: Complete turn execution audit trails
 
+###### Implementation decisions (2026-03-03) — roadmap 1.3.2 turn execution
+
+- Turn execution is implemented by `AgentTurnOrchestratorService`, which
+  coordinates four explicit ports: backend registry lookup, runtime execution,
+  tool routing, and turn-session persistence.
+- Tool routing order is deterministic: tool calls are processed in emitted
+  sequence order, and each call ID is generated from
+  `sha256(index + tool_name + canonical_parameters_json)`.
+- Tool routing failures are surfaced as typed
+  `AgentTurnOrchestrationError::ToolRouting` values and stop turn completion
+  before turn-count persistence is incremented.
+
 ##### F-003-RQ-003: Tool Schema Translation
 
 - **Technical Specifications:**
@@ -1053,6 +1065,18 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   - Data Validation: Session state consistency, resource usage monitoring
   - Security Requirements: Session authentication, resource access control
   - Compliance Requirements: Session lifecycle audit trails
+
+###### Implementation decisions (2026-03-03) — roadmap 1.3.2 session management
+
+- Session continuity is persisted in a dedicated `agent_turn_sessions` table,
+  keyed by `backend_id` and `conversation_id`, with a partial unique index that
+  enforces at most one active session for each pair.
+- Session expiry is managed as a sliding TTL policy: successful turns extend
+  `expires_at`, and sessions that are expired at turn start are marked
+  `expired` before a new runtime session is created.
+- Session lifecycle handling is part of the orchestration service, while
+  persistence and runtime concerns remain adapter responsibilities to preserve
+  hexagonal boundaries.
 
 #### 2.2.4 Tool Orchestration Requirements
 

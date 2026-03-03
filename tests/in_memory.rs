@@ -10,10 +10,12 @@
 //! - `mcp_server_lifecycle_tests`: MCP server registration and lifecycle
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and call routing
 //! - `hook_engine_tests`: Hook execution and persistence
+//! - `agent_turn_orchestration_tests`: Turn execution and session continuity
 
 mod in_memory {
     pub mod helpers;
 
+    mod agent_turn_orchestration_tests;
     mod backend_registry_tests;
     mod constraint_tests;
     mod conversation_flow_tests;

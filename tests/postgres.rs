@@ -5,6 +5,7 @@
 //! - `agent_session_tests`: Agent session persistence and active-session uniqueness
 //! - `audit_tests`: Audit context capture and verification
 //! - `backend_registry_tests`: Agent backend registration and discovery
+//! - `agent_turn_orchestration_tests`: Turn execution and session continuity
 //! - `crud_tests`: Basic CRUD operations
 //! - `mcp_server_lifecycle_tests`: MCP server lifecycle persistence
 //! - `sequence_tests`: Sequence number management
@@ -27,6 +28,7 @@ mod postgres {
     pub mod helpers;
 
     mod agent_session_tests;
+    mod agent_turn_orchestration_tests;
     mod audit_tests;
     mod backend_registry_tests;
     mod crud_tests;
