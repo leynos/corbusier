@@ -3,8 +3,8 @@
 use super::models::{HookExecutionRow, NewHookExecutionRow};
 use super::schema::hook_executions;
 use crate::hook_engine::domain::{
-    ActionResult, HookExecutionId, HookExecutionPersisted, HookExecutionResult,
-    HookExecutionStatus, HookId, HookTriggerType, TriggerContextId,
+    ActionResult, HookExecutionId, HookExecutionResult, HookExecutionStatus, HookId,
+    HookTriggerType, TriggerContextId,
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
@@ -39,11 +39,13 @@ impl PostgresHookExecutionLogRepository {
     {
         let pool = self.pool.clone();
         tokio::task::spawn_blocking(move || {
-            let mut connection = pool.get().map_err(HookExecutionLogError::persistence)?;
+            let mut connection = pool
+                .get()
+                .map_err(HookExecutionLogError::persistence_failed)?;
             f(&mut connection)
         })
         .await
-        .map_err(HookExecutionLogError::persistence)?
+        .map_err(HookExecutionLogError::persistence_failed)?
     }
 }
 
@@ -51,7 +53,7 @@ impl PostgresHookExecutionLogRepository {
 impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
     async fn store(&self, result: &HookExecutionResult) -> HookExecutionLogResult<()> {
         let action_results = serde_json::to_value(result.action_results())
-            .map_err(HookExecutionLogError::persistence)?;
+            .map_err(HookExecutionLogError::persistence_failed)?;
         let new_row = NewHookExecutionRow {
             id: result.execution_id().into_inner(),
             trigger_context_id: result.trigger_context_id().into_inner(),
@@ -67,7 +69,7 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
             diesel::insert_into(hook_executions::table)
                 .values(&new_row)
                 .execute(connection)
-                .map_err(HookExecutionLogError::persistence)?;
+                .map_err(HookExecutionLogError::persistence_failed)?;
             Ok(())
         })
         .await
@@ -87,7 +89,7 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
                 ))
                 .select(HookExecutionRow::as_select())
                 .load::<HookExecutionRow>(connection)
-                .map_err(HookExecutionLogError::persistence)?;
+                .map_err(HookExecutionLogError::persistence_failed)?;
             rows.into_iter().map(row_to_execution).collect()
         })
         .await
@@ -105,15 +107,13 @@ fn row_to_execution(row: HookExecutionRow) -> HookExecutionLogResult<HookExecuti
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;
 
     Ok(HookExecutionResult::from_persisted(
-        HookExecutionPersisted {
-            execution_id: HookExecutionId::from_uuid(row.id),
-            hook_id,
-            trigger_context_id: TriggerContextId::from_uuid(row.trigger_context_id),
-            trigger_type,
-            predicate_data: row.predicate_data,
-            action_results,
-            status,
-            executed_at: row.executed_at,
-        },
+        HookExecutionId::from_uuid(row.id),
+        hook_id,
+        TriggerContextId::from_uuid(row.trigger_context_id),
+        trigger_type,
+        row.predicate_data,
+        action_results,
+        status,
+        row.executed_at,
     ))
 }

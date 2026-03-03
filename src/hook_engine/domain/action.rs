@@ -74,3 +74,19 @@ pub enum HookActionType {
     /// Runs remediation steps.
     Remediation,
 }
+
+impl HookActionType {
+    /// Returns the stable string representation for persistence and logs.
+    ///
+    /// Example: `HookActionType::QualityGate.as_str()` returns `"quality_gate"`.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::QualityGate => "quality_gate",
+            Self::PolicyCheck => "policy_check",
+            Self::Notification => "notification",
+            Self::BlockAction => "block_action",
+            Self::Remediation => "remediation",
+        }
+    }
+}

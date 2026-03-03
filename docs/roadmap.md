@@ -195,7 +195,8 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 - [x] 2.3.1 Implement hook engine execution. Requires 1.2.3 and 2.1.2. See
   corbusier-design.md §2.1.3 and §6.3.3.
   - [x] Define hook triggers for turn start/end, tool use before/after, and
-    pre/post commit, merge, pull, push, and deploy events. See
+    pre- and post-commit, pre- and post-merge, pre- and post-pull, pre- and
+    post-push, and pre- and post-deploy events. See
     corbusier-design.md §2.1.3.
   - [x] Execute hooks with structured outcomes and logs. See
     corbusier-design.md §6.3.3.

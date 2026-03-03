@@ -4,6 +4,7 @@ use super::world::HookWorld;
 use corbusier::hook_engine::domain::{
     ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };
+use eyre::WrapErr;
 use rstest_bdd_macros::given;
 
 struct HookSetup {
@@ -14,19 +15,21 @@ struct HookSetup {
 }
 
 fn configure_hook(world: &mut HookWorld, setup: HookSetup) -> Result<HookActionId, eyre::Report> {
-    let hook_id = HookId::new(setup.hook_id).map_err(|err| eyre::eyre!(err))?;
-    let action_id = HookActionId::new(setup.action_id).map_err(|err| eyre::eyre!(err))?;
+    let hook_id =
+        HookId::new(setup.hook_id).wrap_err("build hook identifier for scenario setup")?;
+    let action_id = HookActionId::new(setup.action_id)
+        .wrap_err("build hook action identifier for scenario setup")?;
     let definition = HookDefinition::new(
         hook_id,
         format!("Hook {action_id}"),
         setup.trigger,
         vec![HookAction::new(action_id.clone(), setup.action_type)],
     )
-    .map_err(|err| eyre::eyre!(err))?;
+    .wrap_err("build hook definition for scenario setup")?;
     world
         .definition_repo
         .insert(definition)
-        .map_err(|err| eyre::eyre!(err))?;
+        .wrap_err("insert hook definition into in-memory scenario repository")?;
     Ok(action_id)
 }
 
@@ -58,6 +61,6 @@ fn post_deploy_hook_configured_to_fail(world: &mut HookWorld) -> Result<(), eyre
     world
         .action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
-        .map_err(|err| eyre::eyre!(err))?;
+        .wrap_err("configure failing action outcome for scenario hook")?;
     Ok(())
 }

@@ -1,8 +1,7 @@
 //! Hook engine orchestration service.
 
 use crate::hook_engine::domain::{
-    ActionResult, HookDefinition, HookExecutionInput, HookExecutionResult, HookTriggerContext,
-    HookTriggerType,
+    ActionResult, HookDefinition, HookExecutionResult, HookTriggerContext, HookTriggerType,
 };
 use crate::hook_engine::ports::{
     HookActionExecutor, HookDefinitionRepository, HookEngine, HookEngineResult,
@@ -60,6 +59,11 @@ where
         });
     }
 
+    /// Executes actions in definition order and fails fast on the first
+    /// execution error.
+    ///
+    /// This behavior is intentional to preserve deterministic failure semantics
+    /// for policy hooks.
     async fn execute_actions(
         &self,
         definition: &HookDefinition,
@@ -94,15 +98,17 @@ where
 
         let mut results = Vec::with_capacity(definitions.len());
         for definition in definitions {
+            // A hook result is persisted only after all of its actions execute
+            // successfully.
             let action_results = self.execute_actions(&definition, &context).await?;
-            let result = HookExecutionResult::new(HookExecutionInput {
-                hook_id: definition.id().clone(),
-                trigger_context_id: context.id(),
-                trigger_type: context.trigger_type(),
-                predicate_data: definition.predicate().data().clone(),
+            let result = HookExecutionResult::new(
+                definition.id().clone(),
+                context.id(),
+                context.trigger_type(),
+                definition.predicate().data().clone(),
                 action_results,
-                executed_at: self.clock.utc(),
-            });
+                self.clock.utc(),
+            );
             self.execution_log.store(&result).await?;
             results.push(result);
         }

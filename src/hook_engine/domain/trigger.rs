@@ -9,6 +9,7 @@ use thiserror::Error;
 
 /// Canonical hook trigger types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HookTriggerType {
     /// A new conversation turn is starting.
     TurnStart,

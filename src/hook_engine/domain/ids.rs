@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 /// Unique identifier for a hook definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-#[serde(transparent)]
+#[serde(try_from = "String", into = "String")]
 pub struct HookId(String);
 
 impl HookId {
@@ -58,6 +58,20 @@ impl TryFrom<&str> for HookId {
     }
 }
 
+impl TryFrom<String> for HookId {
+    type Error = HookDomainError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<HookId> for String {
+    fn from(value: HookId) -> Self {
+        value.into_inner()
+    }
+}
+
 impl fmt::Display for HookId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -66,7 +80,7 @@ impl fmt::Display for HookId {
 
 /// Unique identifier for an action within a hook definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-#[serde(transparent)]
+#[serde(try_from = "String", into = "String")]
 pub struct HookActionId(String);
 
 impl HookActionId {
@@ -114,6 +128,20 @@ impl TryFrom<&str> for HookActionId {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl TryFrom<String> for HookActionId {
+    type Error = HookDomainError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<HookActionId> for String {
+    fn from(value: HookActionId) -> Self {
+        value.into_inner()
     }
 }
 

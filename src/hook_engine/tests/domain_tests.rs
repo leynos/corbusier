@@ -36,7 +36,7 @@ fn hook_definition_requires_actions() {
 )]
 #[case(
     vec![ActionStatus::Failed, ActionStatus::Skipped],
-    HookExecutionStatus::PartialFailure
+    HookExecutionStatus::Failed
 )]
 fn hook_execution_status_aggregates(
     #[case] statuses: Vec<ActionStatus>,

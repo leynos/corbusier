@@ -5,7 +5,8 @@ use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
 };
 use async_trait::async_trait;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Thread-safe in-memory hook execution log repository.
 #[derive(Debug, Clone, Default)]
@@ -28,10 +29,12 @@ impl InMemoryHookExecutionLogRepository {
     ///
     /// # Errors
     ///
-    /// Returns [`HookExecutionLogError`] if the lock is poisoned.
+    /// Returns [`HookExecutionLogError`] if the lock cannot be acquired.
     pub fn all(&self) -> HookExecutionLogResult<Vec<HookExecutionResult>> {
-        let executions = self.executions.read().map_err(|err| {
-            HookExecutionLogError::persistence(std::io::Error::other(err.to_string()))
+        let executions = self.executions.try_read().map_err(|err| {
+            HookExecutionLogError::persistence_failed(std::io::Error::other(format!(
+                "hook execution log lock unavailable: {err}"
+            )))
         })?;
         Ok(executions.clone())
     }
@@ -40,9 +43,7 @@ impl InMemoryHookExecutionLogRepository {
 #[async_trait]
 impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
     async fn store(&self, result: &HookExecutionResult) -> HookExecutionLogResult<()> {
-        let mut executions = self.executions.write().map_err(|err| {
-            HookExecutionLogError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut executions = self.executions.write().await;
         executions.push(result.clone());
         Ok(())
     }
@@ -51,13 +52,17 @@ impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
         &self,
         trigger_context_id: TriggerContextId,
     ) -> HookExecutionLogResult<Vec<HookExecutionResult>> {
-        let executions = self.executions.read().map_err(|err| {
-            HookExecutionLogError::persistence(std::io::Error::other(err.to_string()))
-        })?;
-        Ok(executions
+        let executions = self.executions.read().await;
+        let mut filtered: Vec<_> = executions
             .iter()
             .filter(|result| result.trigger_context_id() == trigger_context_id)
             .cloned()
-            .collect())
+            .collect();
+        filtered.sort_by(|left, right| {
+            left.executed_at()
+                .cmp(&right.executed_at())
+                .then_with(|| left.hook_id().cmp(right.hook_id()))
+        });
+        Ok(filtered)
     }
 }

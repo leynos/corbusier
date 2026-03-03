@@ -589,8 +589,8 @@ Corbusier implements this through:
 - **Technical Context:** Event-driven architecture with declarative hook
   definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
   PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
-  PrePush, PostPush, PreDeploy, PostDeploy) and actions (gates, annotations,
-  remediation).
+  PrePush, PostPush, PreDeploy, PostDeploy) and actions (quality gates, policy
+  checks, notification, block actions, and remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -2729,10 +2729,19 @@ flowchart TD
 flowchart TD
     subgraph "Hook Triggers"
         TURN_START[Turn Start]
-        TOOL_CALL[Tool Call]
-        FILE_CHANGE[File Change]
         TURN_END[Turn End]
+        PRE_TOOL_USE[Pre Tool Use]
+        POST_TOOL_USE[Post Tool Use]
         PRE_COMMIT[Pre Commit]
+        POST_COMMIT[Post Commit]
+        PRE_MERGE[Pre Merge]
+        POST_MERGE[Post Merge]
+        PRE_PULL[Pre Pull]
+        POST_PULL[Post Pull]
+        PRE_PUSH[Pre Push]
+        POST_PUSH[Post Push]
+        PRE_DEPLOY[Pre Deploy]
+        POST_DEPLOY[Post Deploy]
     end
     
     subgraph "Hook Engine"
@@ -2751,10 +2760,19 @@ flowchart TD
     end
     
     TURN_START --> TRIGGER_MATCH
-    TOOL_CALL --> TRIGGER_MATCH
-    FILE_CHANGE --> TRIGGER_MATCH
     TURN_END --> TRIGGER_MATCH
+    PRE_TOOL_USE --> TRIGGER_MATCH
+    POST_TOOL_USE --> TRIGGER_MATCH
     PRE_COMMIT --> TRIGGER_MATCH
+    POST_COMMIT --> TRIGGER_MATCH
+    PRE_MERGE --> TRIGGER_MATCH
+    POST_MERGE --> TRIGGER_MATCH
+    PRE_PULL --> TRIGGER_MATCH
+    POST_PULL --> TRIGGER_MATCH
+    PRE_PUSH --> TRIGGER_MATCH
+    POST_PUSH --> TRIGGER_MATCH
+    PRE_DEPLOY --> TRIGGER_MATCH
+    POST_DEPLOY --> TRIGGER_MATCH
     
     TRIGGER_MATCH --> PREDICATE_EVAL
     PREDICATE_EVAL --> ACTION_EXEC
@@ -5710,12 +5728,12 @@ pub enum HookAction {
 
 pub struct HookExecutionResult {
     pub hook_id: HookId,
-    pub execution_id: ExecutionId,
+    pub execution_id: HookExecutionId,
     pub trigger_context_id: TriggerContextId,
     pub trigger_type: HookTriggerType,
     pub predicate_data: Value,
     pub action_results: Vec<ActionResult>,
-    pub overall_status: ExecutionStatus,
+    pub overall_status: HookExecutionStatus,
     pub executed_at: DateTime<Utc>,
 }
 ```

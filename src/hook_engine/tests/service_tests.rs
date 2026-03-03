@@ -13,21 +13,23 @@ use crate::hook_engine::services::HookEngineService;
 use mockable::DefaultClock;
 use std::sync::Arc;
 
-fn build_action(id: &str) -> HookAction {
-    let action_id = HookActionId::new(id).expect("valid action id");
-    HookAction::new(action_id, HookActionType::QualityGate)
+fn build_action(id: &str) -> Result<HookAction, crate::hook_engine::domain::HookDomainError> {
+    let action_id = HookActionId::new(id)?;
+    Ok(HookAction::new(action_id, HookActionType::QualityGate))
 }
 
-fn build_definition(id: &str, priority: u16) -> HookDefinition {
-    let hook_id = HookId::new(id).expect("valid hook id");
+fn build_definition(
+    id: &str,
+    priority: u16,
+) -> Result<HookDefinition, crate::hook_engine::domain::HookDomainError> {
+    let hook_id = HookId::new(id)?;
     HookDefinition::new(
         hook_id,
         format!("Hook {id}"),
         HookTriggerType::PreCommit,
-        vec![build_action(&format!("action-{id}"))],
+        vec![build_action(&format!("action-{id}"))?],
     )
-    .expect("definition should be valid")
-    .with_priority(HookPriority::new(priority))
+    .map(|definition| definition.with_priority(HookPriority::new(priority)))
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -43,17 +45,20 @@ async fn execute_orders_hooks_by_priority_then_id() {
     );
 
     definition_repo
-        .insert(build_definition("hook-b", 10))
-        .expect("insert succeeds");
+        .insert(build_definition("hook-b", 10).expect("hook-b definition should be valid for test"))
+        .expect("insert hook-b definition should succeed");
     definition_repo
-        .insert(build_definition("hook-a", 5))
-        .expect("insert succeeds");
+        .insert(build_definition("hook-a", 5).expect("hook-a definition should be valid for test"))
+        .expect("insert hook-a definition should succeed");
     definition_repo
-        .insert(build_definition("hook-c", 5))
-        .expect("insert succeeds");
+        .insert(build_definition("hook-c", 5).expect("hook-c definition should be valid for test"))
+        .expect("insert hook-c definition should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
-    let results = service.execute(context).await.expect("execution succeeds");
+    let results = service
+        .execute(context)
+        .await
+        .expect("pre-commit hook execution should succeed");
 
     let hook_ids: Vec<&str> = results
         .iter()
@@ -74,8 +79,8 @@ async fn execute_persists_results_and_failure_status() {
         Arc::new(DefaultClock),
     );
 
-    let action_id = HookActionId::new("failing-action").expect("valid action id");
-    let hook_id = HookId::new("hook-fail").expect("valid hook id");
+    let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");
+    let hook_id = HookId::new("hook-fail").expect("failing hook id should be valid");
     let definition = HookDefinition::new(
         hook_id,
         "Failing hook",
@@ -85,24 +90,33 @@ async fn execute_persists_results_and_failure_status() {
             HookActionType::PolicyCheck,
         )],
     )
-    .expect("definition should be valid")
+    .expect("failing hook definition should be valid for test")
     .with_priority(HookPriority::new(1));
 
-    definition_repo.insert(definition).expect("insert succeeds");
+    definition_repo
+        .insert(definition)
+        .expect("insert failing definition should succeed");
     action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
-        .expect("status set");
+        .expect("configuring failing action outcome should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
-    let results = service.execute(context).await.expect("execution succeeds");
+    let results = service
+        .execute(context)
+        .await
+        .expect("post-deploy hook execution should succeed");
 
-    let result = results.first().expect("one result");
+    let result = results.first().expect("expected one execution result");
     assert_eq!(result.status(), HookExecutionStatus::Failed);
 
     let stored = execution_log
         .find_by_trigger_context(trigger_context_id)
         .await
-        .expect("lookup succeeds");
+        .expect("querying stored execution results should succeed");
     assert_eq!(stored.len(), 1);
+    let stored_result = stored
+        .first()
+        .expect("expected one stored execution result");
+    assert_eq!(stored_result.status(), HookExecutionStatus::Failed);
 }

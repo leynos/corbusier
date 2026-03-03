@@ -5,11 +5,13 @@ use super::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::fmt;
 use thiserror::Error;
 
 /// Action-level execution status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ActionStatus {
     /// The action completed successfully.
     Succeeded,
@@ -57,6 +59,7 @@ impl TryFrom<&str> for ActionStatus {
 
 /// Hook execution status aggregated across actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HookExecutionStatus {
     /// All actions succeeded or were skipped.
     Succeeded,
@@ -78,20 +81,25 @@ impl HookExecutionStatus {
     }
 
     /// Aggregates the overall status from action statuses.
-    /// Example: `from_action_statuses(&[Succeeded, Failed])` returns `HookExecutionStatus::PartialFailure`.
+    /// Example: `from_action_statuses([Succeeded, Failed])` returns `HookExecutionStatus::PartialFailure`.
     #[must_use]
-    pub fn from_action_statuses(statuses: &[ActionStatus]) -> Self {
+    pub fn from_action_statuses<I>(statuses: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Borrow<ActionStatus>,
+    {
         let mut saw_success = false;
         let mut saw_failure = false;
 
         for status in statuses {
-            match status {
-                ActionStatus::Succeeded | ActionStatus::Skipped => {
+            match *status.borrow() {
+                ActionStatus::Succeeded => {
                     saw_success = true;
                 }
                 ActionStatus::Failed => {
                     saw_failure = true;
                 }
+                ActionStatus::Skipped => {}
             }
         }
 
@@ -129,6 +137,7 @@ impl TryFrom<&str> for HookExecutionStatus {
 
 /// Log severity level for hook execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HookLogLevel {
     /// Informational log entry.
     Info,
@@ -177,21 +186,6 @@ impl HookLogEntry {
     }
 }
 
-/// Fields used to build an action result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ActionResultDetails {
-    /// Identifier of the executed action.
-    pub action_id: HookActionId,
-    /// Action type executed.
-    pub action_type: HookActionType,
-    /// Result status of the action.
-    pub status: ActionStatus,
-    /// Structured output payload.
-    pub output: serde_json::Value,
-    /// Log entries emitted during execution.
-    pub log_entries: Vec<HookLogEntry>,
-}
-
 /// Result of executing a single hook action.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionResult {
@@ -204,15 +198,25 @@ pub struct ActionResult {
 
 impl ActionResult {
     /// Creates a new action result.
-    /// Example: `ActionResult::new(ActionResultDetails { .. })` builds a result from the details.
+    /// Example: `ActionResult::new(action_id, action_type, status, output, logs)` builds a result.
     #[must_use]
-    pub fn new(details: ActionResultDetails) -> Self {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "constructor maps persisted/action executor fields without transient wrappers"
+    )]
+    pub const fn new(
+        action_id: HookActionId,
+        action_type: HookActionType,
+        status: ActionStatus,
+        output: serde_json::Value,
+        log_entries: Vec<HookLogEntry>,
+    ) -> Self {
         Self {
-            action_id: details.action_id,
-            action_type: details.action_type,
-            status: details.status,
-            output: details.output,
-            log_entries: details.log_entries,
+            action_id,
+            action_type,
+            status,
+            output,
+            log_entries,
         }
     }
 
@@ -253,44 +257,6 @@ impl ActionResult {
 
 /// Result of executing an entire hook definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HookExecutionInput {
-    /// Identifier of the hook definition.
-    pub hook_id: HookId,
-    /// Trigger context identifier.
-    pub trigger_context_id: TriggerContextId,
-    /// Trigger type for the execution.
-    pub trigger_type: HookTriggerType,
-    /// Predicate data used to evaluate the hook.
-    pub predicate_data: serde_json::Value,
-    /// Action results produced by execution.
-    pub action_results: Vec<ActionResult>,
-    /// Timestamp when execution completed.
-    pub executed_at: DateTime<Utc>,
-}
-
-/// Fields used to rebuild a persisted hook execution result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HookExecutionPersisted {
-    /// Stored execution identifier.
-    pub execution_id: HookExecutionId,
-    /// Identifier of the hook definition.
-    pub hook_id: HookId,
-    /// Trigger context identifier.
-    pub trigger_context_id: TriggerContextId,
-    /// Trigger type for the execution.
-    pub trigger_type: HookTriggerType,
-    /// Predicate data used to evaluate the hook.
-    pub predicate_data: serde_json::Value,
-    /// Action results produced by execution.
-    pub action_results: Vec<ActionResult>,
-    /// Stored execution status.
-    pub status: HookExecutionStatus,
-    /// Timestamp when execution completed.
-    pub executed_at: DateTime<Utc>,
-}
-
-/// Result of executing an entire hook definition.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HookExecutionResult {
     execution_id: HookExecutionId,
     hook_id: HookId,
@@ -304,40 +270,61 @@ pub struct HookExecutionResult {
 
 impl HookExecutionResult {
     /// Creates a new hook execution result.
-    /// Example: `HookExecutionResult::new(HookExecutionInput { .. })` computes the status.
+    /// Example: `HookExecutionResult::new(hook_id, context_id, trigger_type, predicate_data, action_results, executed_at)` computes the status.
     #[must_use]
-    pub fn new(input: HookExecutionInput) -> Self {
-        let statuses: Vec<ActionStatus> = input
-            .action_results
-            .iter()
-            .map(ActionResult::status)
-            .collect();
-        let status = HookExecutionStatus::from_action_statuses(&statuses);
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "constructor keeps domain mapping explicit after removing wrapper input structs"
+    )]
+    pub fn new(
+        hook_id: HookId,
+        trigger_context_id: TriggerContextId,
+        trigger_type: HookTriggerType,
+        predicate_data: serde_json::Value,
+        action_results: Vec<ActionResult>,
+        executed_at: DateTime<Utc>,
+    ) -> Self {
+        let status = HookExecutionStatus::from_action_statuses(
+            action_results.iter().map(ActionResult::status),
+        );
         Self {
             execution_id: HookExecutionId::new(),
-            hook_id: input.hook_id,
-            trigger_context_id: input.trigger_context_id,
-            trigger_type: input.trigger_type,
-            predicate_data: input.predicate_data,
-            action_results: input.action_results,
+            hook_id,
+            trigger_context_id,
+            trigger_type,
+            predicate_data,
+            action_results,
             status,
-            executed_at: input.executed_at,
+            executed_at,
         }
     }
 
     /// Creates a hook execution result from persisted fields.
-    /// Example: `from_persisted(HookExecutionPersisted { .. })` restores stored records.
+    /// Example: `from_persisted(execution_id, hook_id, context_id, trigger_type, predicate_data, action_results, status, executed_at)` restores stored records.
     #[must_use]
-    pub fn from_persisted(persisted: HookExecutionPersisted) -> Self {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "constructor keeps persisted field mapping explicit after removing wrapper structs"
+    )]
+    pub const fn from_persisted(
+        execution_id: HookExecutionId,
+        hook_id: HookId,
+        trigger_context_id: TriggerContextId,
+        trigger_type: HookTriggerType,
+        predicate_data: serde_json::Value,
+        action_results: Vec<ActionResult>,
+        status: HookExecutionStatus,
+        executed_at: DateTime<Utc>,
+    ) -> Self {
         Self {
-            execution_id: persisted.execution_id,
-            hook_id: persisted.hook_id,
-            trigger_context_id: persisted.trigger_context_id,
-            trigger_type: persisted.trigger_type,
-            predicate_data: persisted.predicate_data,
-            action_results: persisted.action_results,
-            status: persisted.status,
-            executed_at: persisted.executed_at,
+            execution_id,
+            hook_id,
+            trigger_context_id,
+            trigger_type,
+            predicate_data,
+            action_results,
+            status,
+            executed_at,
         }
     }
 

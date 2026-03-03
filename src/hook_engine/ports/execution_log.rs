@@ -2,7 +2,6 @@
 
 use crate::hook_engine::domain::{HookExecutionResult, TriggerContextId};
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for hook execution log operations.
@@ -37,19 +36,25 @@ pub trait HookExecutionLogRepository: Send + Sync {
 #[derive(Debug, Clone, Error)]
 pub enum HookExecutionLogError {
     /// Persistence-layer failure.
-    #[error("persistence error: {0}")]
-    Persistence(Arc<dyn std::error::Error + Send + Sync>),
+    #[error("persistence operation failed: {reason}")]
+    PersistenceFailed {
+        /// Human-readable reason from the failing persistence dependency.
+        reason: String,
+    },
     /// Persisted data failed validation.
     #[error("invalid persisted hook execution data: {0}")]
     InvalidPersistedData(String),
 }
 
 impl HookExecutionLogError {
-    /// Wraps a persistence error.
+    /// Creates a persistence failure from an infrastructure error.
     ///
-    /// Example: `HookExecutionLogError::persistence(err)` wraps `err`.
-    pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Persistence(Arc::new(err))
+    /// Example: `HookExecutionLogError::persistence_failed(err)` stores the
+    /// dependency error reason.
+    pub fn persistence_failed(err: impl std::error::Error) -> Self {
+        Self::PersistenceFailed {
+            reason: err.to_string(),
+        }
     }
 
     /// Creates an invalid persisted data error.

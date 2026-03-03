@@ -5,7 +5,8 @@ use crate::hook_engine::ports::{
     HookDefinitionRepository, HookDefinitionRepositoryError, HookDefinitionRepositoryResult,
 };
 use async_trait::async_trait;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Thread-safe in-memory hook definition repository.
 #[derive(Debug, Clone, Default)]
@@ -28,10 +29,12 @@ impl InMemoryHookDefinitionRepository {
     ///
     /// # Errors
     ///
-    /// Returns [`HookDefinitionRepositoryError`] if the lock is poisoned.
+    /// Returns [`HookDefinitionRepositoryError`] if the lock cannot be acquired.
     pub fn insert(&self, definition: HookDefinition) -> HookDefinitionRepositoryResult<()> {
-        let mut definitions = self.definitions.write().map_err(|err| {
-            HookDefinitionRepositoryError::persistence(std::io::Error::other(err.to_string()))
+        let mut definitions = self.definitions.try_write().map_err(|err| {
+            HookDefinitionRepositoryError::persistence(std::io::Error::other(format!(
+                "hook definition lock unavailable: {err}"
+            )))
         })?;
         definitions.push(definition);
         Ok(())
@@ -44,9 +47,7 @@ impl HookDefinitionRepository for InMemoryHookDefinitionRepository {
         &self,
         trigger: HookTriggerType,
     ) -> HookDefinitionRepositoryResult<Vec<HookDefinition>> {
-        let definitions = self.definitions.read().map_err(|err| {
-            HookDefinitionRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let definitions = self.definitions.read().await;
         Ok(definitions
             .iter()
             .filter(|definition| definition.is_enabled() && definition.trigger() == trigger)

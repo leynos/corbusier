@@ -1,8 +1,7 @@
 //! In-memory hook action executor for tests and local runs.
 
 use crate::hook_engine::domain::{
-    ActionResult, ActionResultDetails, ActionStatus, HookAction, HookLogEntry, HookLogLevel,
-    HookTriggerContext,
+    ActionResult, ActionStatus, HookAction, HookLogEntry, HookLogLevel, HookTriggerContext,
 };
 use crate::hook_engine::ports::{
     HookActionExecutionError, HookActionExecutionResult, HookActionExecutor,
@@ -40,7 +39,7 @@ impl InMemoryHookActionExecutor {
         status: ActionStatus,
     ) -> HookActionExecutionResult<()> {
         let mut outcomes = self.outcomes.write().map_err(|err| {
-            HookActionExecutionError::execution(std::io::Error::other(err.to_string()))
+            HookActionExecutionError::dependency_failure(std::io::Error::other(err.to_string()))
         })?;
         outcomes.insert(action_id.into(), status);
         Ok(())
@@ -48,7 +47,7 @@ impl InMemoryHookActionExecutor {
 
     fn resolve_status(&self, action_id: &str) -> HookActionExecutionResult<ActionStatus> {
         let outcomes = self.outcomes.read().map_err(|err| {
-            HookActionExecutionError::execution(std::io::Error::other(err.to_string()))
+            HookActionExecutionError::dependency_failure(std::io::Error::other(err.to_string()))
         })?;
         Ok(outcomes
             .get(action_id)
@@ -74,12 +73,12 @@ impl HookActionExecutor for InMemoryHookActionExecutor {
             "status": status.as_str(),
             "trigger": context.trigger_type().as_str(),
         });
-        Ok(ActionResult::new(ActionResultDetails {
-            action_id: action.id().clone(),
-            action_type: action.action_type().clone(),
+        Ok(ActionResult::new(
+            action.id().clone(),
+            action.action_type().clone(),
             status,
             output,
-            log_entries: vec![log_entry],
-        }))
+            vec![log_entry],
+        ))
     }
 }

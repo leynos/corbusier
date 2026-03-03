@@ -51,7 +51,7 @@ Observable operator outcome:
 - Use `rstest` for unit/integration test fixtures and parameterized cases.
 - Use `rstest-bdd` for behavioural scenarios where user-observable workflow
   behaviour is exercised.
-- Use `pg-embedded-setup-unpriv` fixtures for postgres-backed tests.
+- Use `pg-embed-setup-unpriv` fixtures for postgres-backed tests.
 - Keep files below 400 lines by splitting domain, port, adapter, and test code
   into focused modules.
 - Documentation deliverables are mandatory before roadmap completion:
@@ -71,8 +71,8 @@ Observable operator outcome:
 - Iteration tolerance: stop and escalate if the same failure persists after
   three focused fix attempts.
 - Ambiguity tolerance: stop and escalate if merge/deploy event ownership
-  between tool-routing and VCS integration remains ambiguous after reviewing
-  section 2.1.3 and section 6.3.3 of the design doc.
+  between tool-routing and version control system (VCS) integration remains
+  ambiguous after reviewing section 2.1.3 and section 6.3.3 of the design doc.
 
 ## Risks
 
@@ -294,7 +294,7 @@ Integrate with the post-2.1.2 execution path:
   downstream policy and reporting.
 
 Go/no-go: proceed only when integration tests prove trigger mapping and result
-persistence for all three trigger types.
+persistence for all required trigger families.
 
 ### Stage E: Test coverage
 
@@ -468,5 +468,6 @@ Dependencies:
 
 ## Revision note
 
-- 2026-02-28: Initial draft created for roadmap 2.3.1 planning. No execution
-  work performed yet.
+- 2026-02-28: Initial draft created for roadmap 2.3.1 planning.
+- 2026-03-03: Execution completed; implementation, tests, and documentation
+  updates landed.

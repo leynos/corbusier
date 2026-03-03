@@ -3,6 +3,7 @@
 use super::world::{HookWorld, run_async};
 use corbusier::hook_engine::domain::HookExecutionStatus;
 use corbusier::hook_engine::ports::HookExecutionLogRepository;
+use eyre::WrapErr;
 use rstest_bdd_macros::then;
 
 fn assert_execution_status(
@@ -28,11 +29,20 @@ fn assert_execution_status(
         .as_ref()
         .ok_or_else(|| eyre::eyre!("no trigger context captured"))?;
     let stored = run_async(world.execution_log.find_by_trigger_context(context.id()))
-        .map_err(|err| eyre::eyre!("execution log lookup failed: {err}"))?;
+        .wrap_err("execution log lookup failed")?;
     if stored.len() != 1 {
         return Err(eyre::eyre!(
             "expected 1 stored execution, got {}",
             stored.len()
+        ));
+    }
+    let stored_result = stored
+        .first()
+        .ok_or_else(|| eyre::eyre!("expected one stored execution result"))?;
+    if stored_result.status() != expected {
+        return Err(eyre::eyre!(
+            "expected stored status {expected}, got {}",
+            stored_result.status()
         ));
     }
     Ok(())

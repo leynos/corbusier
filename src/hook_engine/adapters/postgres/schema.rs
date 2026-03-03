@@ -8,8 +8,7 @@ diesel::table! {
         /// Trigger context correlation identifier.
         trigger_context_id -> Uuid,
         /// Hook definition identifier.
-        #[max_length = 255]
-        hook_id -> Varchar,
+        hook_id -> Text,
         /// Trigger type identifier.
         #[max_length = 64]
         trigger_type -> Varchar,

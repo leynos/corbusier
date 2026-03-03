@@ -2,7 +2,6 @@
 
 use crate::hook_engine::domain::{ActionResult, HookAction, HookTriggerContext};
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for hook action execution.
@@ -31,16 +30,22 @@ pub enum HookActionExecutionError {
     /// The action could not be executed.
     #[error("action execution failed: {0}")]
     ExecutionFailed(String),
-    /// Execution dependency failure.
-    #[error("execution error: {0}")]
-    Execution(Arc<dyn std::error::Error + Send + Sync>),
+    /// Dependency failure while executing an action.
+    #[error("action executor dependency failure: {reason}")]
+    DependencyFailure {
+        /// Human-readable reason from the failing dependency.
+        reason: String,
+    },
 }
 
 impl HookActionExecutionError {
-    /// Wraps an execution dependency error.
+    /// Creates a dependency failure from an infrastructure error.
     ///
-    /// Example: `HookActionExecutionError::execution(err)` wraps `err`.
-    pub fn execution(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Execution(Arc::new(err))
+    /// Example: `HookActionExecutionError::dependency_failure(err)` records the
+    /// dependency error reason.
+    pub fn dependency_failure(err: impl std::error::Error) -> Self {
+        Self::DependencyFailure {
+            reason: err.to_string(),
+        }
     }
 }
