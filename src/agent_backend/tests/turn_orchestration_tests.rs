@@ -230,7 +230,7 @@ async fn execute_turn_propagates_tool_routing_failure(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn execute_turn_reuses_active_session_and_rotates_expired_session(
+async fn execute_turn_reuses_active_session(
     context: OrchestrationContext,
 ) -> Result<(), eyre::Report> {
     let backend_id = register_backend(&context, "claude_code_sdk").await?;
@@ -267,7 +267,16 @@ async fn execute_turn_reuses_active_session_and_rotates_expired_session(
         reused_response.runtime_session_id(),
         "existing-runtime-session"
     );
+    Ok(())
+}
 
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_turn_rotates_expired_session(
+    context: OrchestrationContext,
+) -> Result<(), eyre::Report> {
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
+    let now = Utc::now();
     let expired_conversation = Uuid::new_v4();
     let expired_session = TurnSession::from_persisted(PersistedTurnSessionData {
         id: crate::agent_backend::domain::TurnSessionId::new(),
