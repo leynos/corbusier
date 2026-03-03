@@ -1,7 +1,9 @@
 //! In-memory runtime adapter for orchestrated agent turns.
 
 use crate::agent_backend::{
-    domain::{AgentBackendRegistration, TurnExecutionRequest, TurnExecutionResult},
+    domain::{
+        AgentBackendRegistration, RuntimeSessionId, TurnExecutionRequest, TurnExecutionResult,
+    },
     ports::{AgentRuntimeError, AgentRuntimePort, AgentRuntimeResult},
 };
 use async_trait::async_trait;
@@ -26,7 +28,7 @@ struct InMemoryRuntimeState {
     fail_session_creation_for: HashSet<crate::agent_backend::domain::BackendId>,
     queued_results: VecDeque<TurnExecutionResult>,
     next_execute_failure: Option<String>,
-    created_session_ids: Vec<String>,
+    created_session_ids: Vec<RuntimeSessionId>,
     execution_records: Vec<RuntimeExecutionRecord>,
 }
 
@@ -98,7 +100,11 @@ impl InMemoryAgentRuntime {
         let state = self.state.read().map_err(|err| {
             AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
-        Ok(state.created_session_ids.clone())
+        Ok(state
+            .created_session_ids
+            .iter()
+            .map(|session_id| session_id.as_str().to_owned())
+            .collect())
     }
 
     /// Returns recorded runtime execution requests.
@@ -121,7 +127,7 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
         &self,
         backend: &AgentBackendRegistration,
         _conversation_id: Uuid,
-    ) -> AgentRuntimeResult<String> {
+    ) -> AgentRuntimeResult<RuntimeSessionId> {
         let mut state = self.state.write().map_err(|err| {
             AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
@@ -139,20 +145,18 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
             backend.name().as_str(),
             state.next_session_ordinal
         );
-        state.created_session_ids.push(session_id.clone());
-        Ok(session_id)
+        let parsed_session_id = RuntimeSessionId::new(session_id)
+            .map_err(|_| AgentRuntimeError::InvalidRuntimeSessionId)?;
+        state.created_session_ids.push(parsed_session_id.clone());
+        Ok(parsed_session_id)
     }
 
     async fn execute_turn(
         &self,
         backend: &AgentBackendRegistration,
-        runtime_session_id: &str,
+        runtime_session_id: &RuntimeSessionId,
         request: &TurnExecutionRequest,
     ) -> AgentRuntimeResult<TurnExecutionResult> {
-        if runtime_session_id.trim().is_empty() {
-            return Err(AgentRuntimeError::InvalidRuntimeSessionId);
-        }
-
         let mut state = self.state.write().map_err(|err| {
             AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
@@ -168,7 +172,7 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
 
         state.execution_records.push(RuntimeExecutionRecord {
             backend_id: backend.id(),
-            runtime_session_id: runtime_session_id.to_owned(),
+            runtime_session_id: runtime_session_id.as_str().to_owned(),
             request: request.clone(),
         });
 

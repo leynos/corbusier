@@ -6,12 +6,16 @@ use super::{
     schema::agent_turn_sessions,
 };
 use crate::agent_backend::{
-    domain::{BackendId, PersistedTurnSessionData, TurnSession, TurnSessionId, TurnSessionStatus},
+    domain::{
+        BackendId, PersistedTurnSessionData, RuntimeSessionId, TurnSession, TurnSessionId,
+        TurnSessionStatus,
+    },
     ports::{TurnSessionRepository, TurnSessionRepositoryError, TurnSessionRepositoryResult},
 };
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 
 /// `PostgreSQL`-backed turn-session repository.
 #[derive(Debug, Clone)]
@@ -68,6 +72,8 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 
     async fn upsert_session(&self, session: &TurnSession) -> TurnSessionRepositoryResult<()> {
         let new_row = to_new_row(session)?;
+        let backend_id = new_row.backend_id;
+        let conversation_id = new_row.conversation_id;
 
         self.run_blocking(move |connection| {
             diesel::insert_into(agent_turn_sessions::table)
@@ -84,7 +90,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     agent_turn_sessions::turn_count.eq(new_row.turn_count),
                 ))
                 .execute(connection)
-                .map_err(TurnSessionRepositoryError::persistence)?;
+                .map_err(|error| map_upsert_error(error, backend_id, conversation_id))?;
             Ok(())
         })
         .await
@@ -97,7 +103,7 @@ fn to_new_row(session: &TurnSession) -> TurnSessionRepositoryResult<NewAgentTurn
             .turn_count()
             .try_into()
             .map_err(|err: std::num::TryFromIntError| {
-                TurnSessionRepositoryError::invalid_persisted_data(std::io::Error::other(
+                TurnSessionRepositoryError::invalid_domain_data(std::io::Error::other(
                     err.to_string(),
                 ))
             })?;
@@ -106,7 +112,7 @@ fn to_new_row(session: &TurnSession) -> TurnSessionRepositoryResult<NewAgentTurn
         id: session.id().into_inner(),
         backend_id: session.backend_id().into_inner(),
         conversation_id: session.conversation_id(),
-        runtime_session_id: session.runtime_session_id().to_owned(),
+        runtime_session_id: session.runtime_session_handle().as_str().to_owned(),
         status: session.status().as_str().to_owned(),
         ttl_seconds: session.ttl_seconds(),
         started_at: session.started_at(),
@@ -134,6 +140,8 @@ fn row_to_turn_session(row: AgentTurnSessionRow) -> TurnSessionRepositoryResult<
 
     let parsed_status = TurnSessionStatus::try_from(status.as_str())
         .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
+    let parsed_runtime_session_id = RuntimeSessionId::new(runtime_session_id)
+        .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
 
     let parsed_turn_count: u64 =
         turn_count
@@ -148,7 +156,7 @@ fn row_to_turn_session(row: AgentTurnSessionRow) -> TurnSessionRepositoryResult<
         id: TurnSessionId::from_uuid(id),
         backend_id: BackendId::from_uuid(backend_id),
         conversation_id,
-        runtime_session_id,
+        runtime_session_id: parsed_runtime_session_id,
         status: parsed_status,
         ttl_seconds,
         started_at,
@@ -157,4 +165,26 @@ fn row_to_turn_session(row: AgentTurnSessionRow) -> TurnSessionRepositoryResult<
         ended_at,
         turn_count: parsed_turn_count,
     }))
+}
+
+fn map_upsert_error(
+    error: DieselError,
+    backend_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
+) -> TurnSessionRepositoryError {
+    let is_active_session_conflict = matches!(
+        &error,
+        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, db_error)
+            if db_error
+                .constraint_name()
+                .is_some_and(|name| name == "idx_agent_turn_sessions_backend_conversation_active")
+    );
+    if is_active_session_conflict {
+        TurnSessionRepositoryError::active_session_conflict(
+            BackendId::from_uuid(backend_id),
+            conversation_id,
+        )
+    } else {
+        TurnSessionRepositoryError::persistence(error)
+    }
 }

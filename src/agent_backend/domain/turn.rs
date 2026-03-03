@@ -232,46 +232,54 @@ impl TurnExecutionResult {
 /// Computes a deterministic call identifier for `tool_call` at `index`.
 #[must_use]
 pub fn deterministic_tool_call_id(tool_call: &ToolCallRequest, index: usize) -> String {
-    let canonical_parameters = canonical_json(tool_call.parameters());
-    let payload = format!(
-        "index={index};tool_name={};parameters={canonical_parameters}",
-        tool_call.tool_name()
-    );
+    let payload = Value::Object(Map::from_iter([
+        ("index".to_owned(), Value::from(index)),
+        (
+            "tool_name".to_owned(),
+            Value::from(tool_call.tool_name().to_owned()),
+        ),
+        (
+            "parameters".to_owned(),
+            canonical_json_value(tool_call.parameters()),
+        ),
+    ]))
+    .to_string();
     let mut hasher = Sha256::new();
     hasher.update(payload.as_bytes());
     format!("call-{:x}", hasher.finalize())
 }
 
-fn canonical_json(value: &Value) -> String {
-    match value {
-        Value::Object(map) => canonical_object(map),
-        Value::Array(values) => {
-            let joined = values
-                .iter()
-                .map(canonical_json)
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("[{joined}]")
-        }
-        _ => value.to_string(),
-    }
+fn canonical_json_value(value: &Value) -> Value {
+    as_json_object(value).map_or_else(
+        || as_json_array(value).map_or_else(|| value.clone(), canonical_array_value),
+        canonical_object_value,
+    )
 }
 
-fn canonical_object(map: &Map<String, Value>) -> String {
-    let mut keys: Vec<&str> = map.keys().map(String::as_str).collect();
+fn canonical_object_value(map: &Map<String, Value>) -> Value {
+    let mut keys = map.keys().collect::<Vec<_>>();
     keys.sort_unstable();
-
-    let joined = keys
-        .iter()
+    let canonical_map = keys
+        .into_iter()
         .map(|key| {
-            let key_json = Value::String((*key).to_owned()).to_string();
-            let value_json = map
-                .get(*key)
-                .map_or_else(|| "null".to_owned(), canonical_json);
-            format!("{key_json}:{value_json}")
+            (
+                key.to_owned(),
+                map.get(key)
+                    .map_or_else(|| Value::Null, canonical_json_value),
+            )
         })
-        .collect::<Vec<_>>()
-        .join(",");
+        .collect::<Map<String, Value>>();
+    Value::Object(canonical_map)
+}
 
-    format!("{{{joined}}}")
+fn canonical_array_value(values: &[Value]) -> Value {
+    Value::Array(values.iter().map(canonical_json_value).collect())
+}
+
+fn as_json_object(value: &Value) -> Option<&Map<String, Value>> {
+    value.as_object()
+}
+
+fn as_json_array(value: &Value) -> Option<&[Value]> {
+    value.as_array().map(Vec::as_slice)
 }

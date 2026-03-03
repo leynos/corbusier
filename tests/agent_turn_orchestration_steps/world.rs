@@ -86,13 +86,10 @@ impl AgentTurnWorld {
     /// Returns a stable per-scenario conversation ID for a label.
     #[must_use]
     pub fn conversation_id(&mut self, label: &str) -> Uuid {
-        if let Some(id) = self.conversations.get(label) {
-            *id
-        } else {
-            let conversation_id = Uuid::new_v4();
-            self.conversations.insert(label.to_owned(), conversation_id);
-            conversation_id
-        }
+        *self
+            .conversations
+            .entry(label.to_owned())
+            .or_insert_with(Uuid::new_v4)
     }
 }
 

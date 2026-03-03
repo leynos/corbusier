@@ -9,8 +9,8 @@ use corbusier::agent_backend::{
         postgres::{BackendPgPool, PostgresBackendRegistry, PostgresTurnSessionRepository},
     },
     domain::{
-        PersistedTurnSessionData, ToolCallRequest, TurnExecutionRequest, TurnExecutionResult,
-        TurnSession, TurnSessionStatus,
+        PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
+        TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
     ports::TurnSessionRepository,
     services::{
@@ -180,7 +180,8 @@ async fn postgres_rotates_expired_session(
         id: corbusier::agent_backend::domain::TurnSessionId::new(),
         backend_id,
         conversation_id,
-        runtime_session_id: "expired-runtime".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("expired-runtime")
+            .map_err(|err| Box::new(err) as BoxError)?,
         status: TurnSessionStatus::Active,
         ttl_seconds: 45,
         started_at: now - Duration::seconds(90),

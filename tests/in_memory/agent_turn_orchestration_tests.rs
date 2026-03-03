@@ -9,8 +9,8 @@ use corbusier::agent_backend::{
         InMemoryTurnSessionRepository,
     },
     domain::{
-        PersistedTurnSessionData, ToolCallRequest, TurnExecutionRequest, TurnExecutionResult,
-        TurnSession, TurnSessionStatus,
+        PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
+        TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
     ports::TurnSessionRepository,
     services::{
@@ -125,7 +125,7 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
     assert!(!first.reused_session());
     assert!(second.reused_session());
     assert_eq!(first.session_id(), second.session_id());
-    assert_eq!(second.tool_results().len(), 0);
+    assert!(second.tool_results().is_empty());
     Ok(())
 }
 
@@ -144,7 +144,7 @@ async fn rotates_expired_session_and_marks_prior_session_expired(
         id: corbusier::agent_backend::domain::TurnSessionId::new(),
         backend_id,
         conversation_id,
-        runtime_session_id: "expired-session-id".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("expired-session-id")?,
         status: TurnSessionStatus::Active,
         ttl_seconds: 30,
         started_at: now - Duration::seconds(90),

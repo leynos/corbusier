@@ -1034,8 +1034,9 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   coordinates four explicit ports: backend registry lookup, runtime execution,
   tool routing, and turn-session persistence.
 - Tool routing order is deterministic: tool calls are processed in emitted
-  sequence order, and each call ID is generated from
-  `sha256(index + tool_name + canonical_parameters_json)`.
+  sequence order, and each call ID is generated from a delimiter-safe canonical
+  payload encoded as UTF-8 bytes before hashing:
+  `sha256({"index":<usize>,"tool_name":"<name>","parameters":<canonical-json>})`.
 - Tool routing failures are surfaced as typed
   `AgentTurnOrchestrationError::ToolRouting` values and stop turn completion
   before turn-count persistence is incremented.
@@ -1069,11 +1070,12 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
 ###### Implementation decisions (2026-03-03) — roadmap 1.3.2 session management
 
 - Session continuity is persisted in a dedicated `agent_turn_sessions` table,
-  keyed by `backend_id` and `conversation_id`, with a partial unique index that
-  enforces at most one active session for each pair.
-- Session expiry is managed as a sliding TTL policy: successful turns extend
-  `expires_at`, and sessions that are expired at turn start are marked
-  `expired` before a new runtime session is created.
+  keyed by `backend_id` and `conversation_id` (tenant-scoped via
+  `backend_id -> backend_registrations(tenant_id)`), with a partial unique
+  index that enforces at most one active session for each pair.
+- Session expiry is managed as a sliding time-to-live (TTL) policy: successful
+  turns extend `expires_at`, and sessions that are expired at turn start are
+  marked `expired` before a new runtime session is created.
 - Session lifecycle handling is part of the orchestration service, while
   persistence and runtime concerns remain adapter responsibilities to preserve
   hexagonal boundaries.

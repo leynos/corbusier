@@ -1,7 +1,7 @@
 //! Runtime port for agent turn execution.
 
 use crate::agent_backend::domain::{
-    AgentBackendRegistration, TurnExecutionRequest, TurnExecutionResult,
+    AgentBackendRegistration, RuntimeSessionId, TurnExecutionRequest, TurnExecutionResult,
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ pub trait AgentRuntimePort: Send + Sync {
         &self,
         backend: &AgentBackendRegistration,
         conversation_id: Uuid,
-    ) -> AgentRuntimeResult<String>;
+    ) -> AgentRuntimeResult<RuntimeSessionId>;
 
     /// Executes one turn against the provided backend session.
     ///
@@ -33,7 +33,7 @@ pub trait AgentRuntimePort: Send + Sync {
     async fn execute_turn(
         &self,
         backend: &AgentBackendRegistration,
-        runtime_session_id: &str,
+        runtime_session_id: &RuntimeSessionId,
         request: &TurnExecutionRequest,
     ) -> AgentRuntimeResult<TurnExecutionResult>;
 }

@@ -72,12 +72,8 @@ impl TryFrom<&str> for TurnSessionStatus {
     type Error = ParseTurnSessionStatusError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let normalized = value.trim().to_ascii_lowercase();
-        match normalized.as_str() {
-            "active" => Ok(Self::Active),
-            "expired" => Ok(Self::Expired),
-            _ => Err(ParseTurnSessionStatusError(value.to_owned())),
-        }
+        parse_turn_session_status(value)
+            .ok_or_else(|| ParseTurnSessionStatusError(value.to_owned()))
     }
 }
 
@@ -93,6 +89,59 @@ pub enum TurnSessionDomainError {
     InvalidSessionTtl(i64),
 }
 
+/// Backend-native runtime session identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RuntimeSessionId(String);
+
+impl RuntimeSessionId {
+    /// Creates a validated runtime session identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TurnSessionDomainError::EmptyRuntimeSessionId`] when the
+    /// identifier is empty after trimming.
+    pub fn new(value: impl Into<String>) -> Result<Self, TurnSessionDomainError> {
+        let raw_value = value.into();
+        if raw_value.trim().is_empty() {
+            return Err(TurnSessionDomainError::EmptyRuntimeSessionId);
+        }
+        Ok(Self(raw_value))
+    }
+
+    /// Returns the runtime session identifier as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Returns the wrapped identifier as an owned string.
+    #[must_use]
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+impl AsRef<str> for RuntimeSessionId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl TryFrom<String> for RuntimeSessionId {
+    type Error = TurnSessionDomainError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<RuntimeSessionId> for String {
+    fn from(value: RuntimeSessionId) -> Self {
+        value.into_inner()
+    }
+}
+
 /// Persisted data used to reconstruct [`TurnSession`] aggregates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersistedTurnSessionData {
@@ -103,7 +152,7 @@ pub struct PersistedTurnSessionData {
     /// Conversation identifier.
     pub conversation_id: Uuid,
     /// Backend-native session identifier.
-    pub runtime_session_id: String,
+    pub runtime_session_id: RuntimeSessionId,
     /// Lifecycle status.
     pub status: TurnSessionStatus,
     /// TTL in seconds used for sliding expiry.
@@ -128,7 +177,7 @@ pub struct TurnSessionCreateParams {
     /// Conversation identifier.
     pub conversation_id: Uuid,
     /// Backend-native runtime session identifier.
-    pub runtime_session_id: String,
+    pub runtime_session_id: RuntimeSessionId,
     /// Sliding session TTL.
     pub ttl: Duration,
     /// Current timestamp used for initial session times.
@@ -141,7 +190,7 @@ pub struct TurnSession {
     id: TurnSessionId,
     backend_id: BackendId,
     conversation_id: Uuid,
-    runtime_session_id: String,
+    runtime_session_id: RuntimeSessionId,
     status: TurnSessionStatus,
     ttl_seconds: i64,
     started_at: DateTime<Utc>,
@@ -159,11 +208,6 @@ impl TurnSession {
     /// Returns [`TurnSessionDomainError`] when the runtime session identifier
     /// is empty or the provided TTL is not positive.
     pub fn new(params: TurnSessionCreateParams) -> Result<Self, TurnSessionDomainError> {
-        let runtime_id = params.runtime_session_id;
-        if runtime_id.trim().is_empty() {
-            return Err(TurnSessionDomainError::EmptyRuntimeSessionId);
-        }
-
         let ttl_seconds = params.ttl.num_seconds();
         if ttl_seconds <= 0 {
             return Err(TurnSessionDomainError::InvalidSessionTtl(ttl_seconds));
@@ -173,7 +217,7 @@ impl TurnSession {
             id: TurnSessionId::new(),
             backend_id: params.backend_id,
             conversation_id: params.conversation_id,
-            runtime_session_id: runtime_id,
+            runtime_session_id: params.runtime_session_id,
             status: TurnSessionStatus::Active,
             ttl_seconds,
             started_at: params.now,
@@ -223,6 +267,12 @@ impl TurnSession {
     /// Returns the backend-native runtime session identifier.
     #[must_use]
     pub fn runtime_session_id(&self) -> &str {
+        self.runtime_session_id.as_str()
+    }
+
+    /// Returns the backend-native runtime session identifier wrapper.
+    #[must_use]
+    pub const fn runtime_session_handle(&self) -> &RuntimeSessionId {
         &self.runtime_session_id
     }
 
@@ -291,6 +341,16 @@ impl TurnSession {
     pub const fn mark_expired(&mut self, now: DateTime<Utc>) {
         self.status = TurnSessionStatus::Expired;
         self.ended_at = Some(now);
-        self.last_used_at = now;
+    }
+}
+
+fn parse_turn_session_status(value: &str) -> Option<TurnSessionStatus> {
+    let normalized = value.trim().to_ascii_lowercase();
+    if normalized == "active" {
+        Some(TurnSessionStatus::Active)
+    } else if normalized == "expired" {
+        Some(TurnSessionStatus::Expired)
+    } else {
+        None
     }
 }

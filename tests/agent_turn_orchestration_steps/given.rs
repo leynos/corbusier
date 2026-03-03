@@ -5,8 +5,8 @@ use chrono::{Duration, Utc};
 use corbusier::agent_backend::{
     domain::{
         AgentBackendRegistration, AgentCapabilities, BackendInfo, BackendName,
-        PersistedTurnSessionData, ToolCallRequest, TurnExecutionResult, TurnSession,
-        TurnSessionCreateParams, TurnSessionStatus,
+        PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionResult,
+        TurnSession, TurnSessionCreateParams, TurnSessionStatus,
     },
     ports::{BackendRegistryRepository, TurnSessionRepository},
 };
@@ -62,7 +62,7 @@ fn existing_active_session(
     let session = TurnSession::new(TurnSessionCreateParams {
         backend_id,
         conversation_id,
-        runtime_session_id: "existing-runtime-session".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("existing-runtime-session")?,
         ttl: Duration::minutes(5),
         now: Utc::now(),
     })?;
@@ -86,7 +86,7 @@ fn expired_active_session(
         id: corbusier::agent_backend::domain::TurnSessionId::new(),
         backend_id,
         conversation_id,
-        runtime_session_id: "expired-runtime-session".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("expired-runtime-session")?,
         status: TurnSessionStatus::Active,
         ttl_seconds: 30,
         started_at: now - Duration::seconds(90),

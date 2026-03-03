@@ -9,9 +9,9 @@ use crate::agent_backend::{
     },
     domain::{
         AgentBackendRegistration, AgentCapabilities, BackendId, BackendInfo, BackendName,
-        PersistedTurnSessionData, ToolCallAuditStatus, ToolCallRequest, TurnExecutionRequest,
-        TurnExecutionResult, TurnSession, TurnSessionCreateParams, TurnSessionStatus,
-        deterministic_tool_call_id,
+        PersistedTurnSessionData, RuntimeSessionId, ToolCallAuditStatus, ToolCallRequest,
+        TurnExecutionRequest, TurnExecutionResult, TurnSession, TurnSessionCreateParams,
+        TurnSessionStatus, deterministic_tool_call_id,
     },
     ports::{BackendRegistryRepository, TurnSessionRepository},
     services::{
@@ -184,6 +184,32 @@ async fn execute_turn_propagates_runtime_failure(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
+async fn execute_turn_propagates_session_creation_failure(
+    context: OrchestrationContext,
+) -> Result<(), eyre::Report> {
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
+    context.runtime.fail_session_creation_for(backend_id)?;
+
+    let result = context
+        .service
+        .execute_turn(ExecuteAgentTurnRequest::new(
+            backend_id,
+            TurnExecutionRequest::new(Uuid::new_v4(), "Fail create session", Vec::new()),
+        ))
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(AgentTurnOrchestrationError::Runtime(_))
+    ));
+
+    let sessions = context.session_repository.all_sessions()?;
+    assert_eq!(sessions.len(), 0);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
 async fn execute_turn_propagates_tool_routing_failure(
     context: OrchestrationContext,
 ) -> Result<(), eyre::Report> {
@@ -241,7 +267,7 @@ async fn execute_turn_reuses_active_session(
     let active_session = TurnSession::new(TurnSessionCreateParams {
         backend_id,
         conversation_id: active_conversation,
-        runtime_session_id: "existing-runtime-session".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("existing-runtime-session")?,
         ttl: Duration::seconds(300),
         now,
     })?;
@@ -282,7 +308,7 @@ async fn execute_turn_rotates_expired_session(
         id: crate::agent_backend::domain::TurnSessionId::new(),
         backend_id,
         conversation_id: expired_conversation,
-        runtime_session_id: "expired-runtime-session".to_owned(),
+        runtime_session_id: RuntimeSessionId::new("expired-runtime-session")?,
         status: TurnSessionStatus::Active,
         ttl_seconds: 60,
         started_at: now - Duration::seconds(120),

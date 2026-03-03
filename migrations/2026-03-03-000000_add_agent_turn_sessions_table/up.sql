@@ -4,7 +4,7 @@
 CREATE TABLE agent_turn_sessions (
     id UUID PRIMARY KEY,
     backend_id UUID NOT NULL REFERENCES backend_registrations(id) ON DELETE CASCADE,
-    conversation_id UUID NOT NULL,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     runtime_session_id VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     ttl_seconds BIGINT NOT NULL,

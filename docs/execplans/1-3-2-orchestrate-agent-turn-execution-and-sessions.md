@@ -1,7 +1,7 @@
 # Orchestrate agent turn execution and sessions (roadmap 1.3.2)
 
 This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
@@ -88,9 +88,9 @@ Observable outcomes:
   `mockable::Clock` in orchestration services and verify boundaries with
   deterministic clock-controlled tests.
 
-- Risk: BDD steps for quoted tool payloads are brittle.
-  Severity: low Likelihood: medium Mitigation: use simple, unambiguous step
-  text patterns and scenario files that avoid escaped quote complexity.
+- Risk: Behaviour-Driven Development (BDD) steps for quoted tool payloads are
+  brittle. Severity: low Likelihood: medium Mitigation: use simple, unambiguous
+  step text patterns and scenario files that avoid escaped quote complexity.
 
 ## Progress
 
@@ -405,8 +405,8 @@ Behavioural acceptance criteria:
 - Tool calls are routed via one orchestration path with deterministic ordering
   across identical runs.
 - Session continuity is preserved across turns in one conversation until expiry.
-- When session expiry threshold is crossed, next turn rotates to a new active
-  session and continues execution.
+- When the session expiry threshold is crossed, the next turn rotates to a new
+  active session and continues execution.
 - Failure paths return typed errors without corrupting session state.
 
 Quality criteria:
@@ -424,7 +424,7 @@ Quality criteria:
   rerun `make markdownlint`.
 - If transient Postgres shutdown errors occur during `make test`, rerun once;
   persistent failures require investigation and should be logged in
-  `Surprises & Discoveries`.
+  `Surprises & discoveries`.
 - Migration changes must be additive; do not alter historical migration files.
 
 ## Artifacts and notes

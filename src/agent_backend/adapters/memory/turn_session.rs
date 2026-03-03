@@ -69,16 +69,32 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
         })?;
 
         let key = (session.backend_id(), session.conversation_id());
-        state.sessions.insert(session.id(), session.clone());
-
         if session.status() == TurnSessionStatus::Active {
+            if let Some(existing_id) = state.active_index.get(&key) {
+                let has_competing_active = *existing_id != session.id()
+                    && state
+                        .sessions
+                        .get(existing_id)
+                        .is_some_and(|stored| stored.status() == TurnSessionStatus::Active);
+                if has_competing_active {
+                    return Err(TurnSessionRepositoryError::active_session_conflict(
+                        session.backend_id(),
+                        session.conversation_id(),
+                    ));
+                }
+            }
+
+            state.sessions.insert(session.id(), session.clone());
             state.active_index.insert(key, session.id());
         } else if state
             .active_index
             .get(&key)
             .is_some_and(|id| *id == session.id())
         {
+            state.sessions.insert(session.id(), session.clone());
             state.active_index.remove(&key);
+        } else {
+            state.sessions.insert(session.id(), session.clone());
         }
 
         Ok(())

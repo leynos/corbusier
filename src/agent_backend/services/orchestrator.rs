@@ -3,8 +3,8 @@
 use crate::agent_backend::{
     domain::{
         AgentBackendRegistration, BackendId, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
-        ToolCallRequest, ToolCallResult, TurnSession, TurnSessionDomainError,
-        deterministic_tool_call_id,
+        ToolCallRequest, ToolCallResult, TurnExecutionRequest, TurnSession,
+        TurnSessionCreateParams, TurnSessionDomainError, TurnSessionId, deterministic_tool_call_id,
     },
     ports::{
         AgentRuntimeError, AgentRuntimePort, BackendRegistryError, BackendRegistryRepository,
@@ -17,8 +17,6 @@ use mockable::Clock;
 use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
-
-use crate::agent_backend::domain::TurnExecutionRequest;
 
 /// Configuration for turn orchestration behaviour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +31,11 @@ impl AgentTurnOrchestratorConfig {
     ///
     /// Returns [`AgentTurnOrchestrationError::InvalidSessionTtl`] when the
     /// duration is not strictly positive.
-    pub const fn new(session_ttl: Duration) -> Result<Self, AgentTurnOrchestrationError> {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Constructor intentionally remains non-const to avoid committing to const API semantics."
+    )]
+    pub fn new(session_ttl: Duration) -> Result<Self, AgentTurnOrchestrationError> {
         let ttl_seconds = session_ttl.num_seconds();
         if ttl_seconds <= 0 {
             return Err(AgentTurnOrchestrationError::InvalidSessionTtl(ttl_seconds));
@@ -76,7 +78,7 @@ impl ExecuteAgentTurnRequest {
 /// Orchestrated turn response with routed tool details and session metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteAgentTurnResponse {
-    session_id: crate::agent_backend::domain::TurnSessionId,
+    session_id: TurnSessionId,
     runtime_session_id: String,
     assistant_response: String,
     tool_results: Vec<ToolCallResult>,
@@ -88,7 +90,7 @@ pub struct ExecuteAgentTurnResponse {
 impl ExecuteAgentTurnResponse {
     /// Returns orchestration session ID.
     #[must_use]
-    pub const fn session_id(&self) -> crate::agent_backend::domain::TurnSessionId {
+    pub const fn session_id(&self) -> TurnSessionId {
         self.session_id
     }
 
@@ -268,21 +270,23 @@ where
         }
 
         let conversation_id = request.turn.conversation_id();
-        let now = self.clock.utc();
+        let session_resolution_now = self.clock.utc();
 
-        let (mut session, reused_session, rotated_session) =
-            self.resolve_session(&backend, conversation_id, now).await?;
+        let (mut session, reused_session, rotated_session) = self
+            .resolve_session(&backend, conversation_id, session_resolution_now)
+            .await?;
 
         let runtime_result = self
             .runtime
-            .execute_turn(&backend, session.runtime_session_id(), &request.turn)
+            .execute_turn(&backend, session.runtime_session_handle(), &request.turn)
             .await?;
 
         let (tool_results, tool_call_audits) = self
             .route_tool_calls(&session, runtime_result.tool_calls())
             .await?;
 
-        session.record_turn(now);
+        let completion_time = self.clock.utc();
+        session.record_turn(completion_time);
         self.turn_sessions.upsert_session(&session).await?;
 
         Ok(ExecuteAgentTurnResponse {
@@ -310,14 +314,18 @@ where
             if existing.is_expired_at(now) {
                 existing.mark_expired(now);
                 self.turn_sessions.upsert_session(&existing).await?;
-                let created = self.create_session(backend, conversation_id, now).await?;
-                return Ok((created, false, true));
+                let (rotated_session, reused_due_to_conflict) = self
+                    .create_or_reuse_session(backend, conversation_id, now)
+                    .await?;
+                return Ok((rotated_session, reused_due_to_conflict, true));
             }
             return Ok((existing, true, false));
         }
 
-        let created = self.create_session(backend, conversation_id, now).await?;
-        Ok((created, false, false))
+        let (created_session, reused_due_to_conflict) = self
+            .create_or_reuse_session(backend, conversation_id, now)
+            .await?;
+        Ok((created_session, reused_due_to_conflict, false))
     }
 
     async fn create_session(
@@ -331,7 +339,7 @@ where
             .create_session(backend, conversation_id)
             .await?;
 
-        let session = TurnSession::new(crate::agent_backend::domain::TurnSessionCreateParams {
+        let session = TurnSession::new(TurnSessionCreateParams {
             backend_id: backend.id(),
             conversation_id,
             runtime_session_id,
@@ -341,6 +349,39 @@ where
 
         self.turn_sessions.upsert_session(&session).await?;
         Ok(session)
+    }
+
+    async fn create_or_reuse_session(
+        &self,
+        backend: &AgentBackendRegistration,
+        conversation_id: Uuid,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> AgentTurnOrchestrationResult<(TurnSession, bool)> {
+        match self.create_session(backend, conversation_id, now).await {
+            Ok(created) => Ok((created, false)),
+            Err(AgentTurnOrchestrationError::SessionRepository(
+                TurnSessionRepositoryError::ActiveSessionConflict { .. },
+            )) => {
+                let active = self
+                    .require_active_session_after_conflict(backend.id(), conversation_id)
+                    .await?;
+                Ok((active, true))
+            }
+            Err(other) => Err(other),
+        }
+    }
+
+    async fn require_active_session_after_conflict(
+        &self,
+        backend_id: BackendId,
+        conversation_id: Uuid,
+    ) -> AgentTurnOrchestrationResult<TurnSession> {
+        self.turn_sessions
+            .find_active_session(backend_id, conversation_id)
+            .await?
+            .ok_or(AgentTurnOrchestrationError::SessionRepository(
+                TurnSessionRepositoryError::active_session_conflict(backend_id, conversation_id),
+            ))
     }
 
     async fn route_tool_calls(
