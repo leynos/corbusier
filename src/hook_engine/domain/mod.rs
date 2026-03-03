@@ -11,8 +11,8 @@ pub use action::{HookAction, HookActionType};
 pub use definition::{HookDefinition, HookPredicate, HookPriority};
 pub use error::HookDomainError;
 pub use execution::{
-    ActionResult, ActionStatus, HookExecutionResult, HookExecutionStatus, HookLogEntry,
-    HookLogLevel,
+    ActionResult, ActionResultDetails, ActionStatus, HookExecutionInput, HookExecutionPersisted,
+    HookExecutionResult, HookExecutionStatus, HookLogEntry, HookLogLevel,
 };
 pub use ids::{HookActionId, HookExecutionId, HookId, TriggerContextId};
 pub use trigger::{HookTriggerContext, HookTriggerType, ParseHookTriggerTypeError};

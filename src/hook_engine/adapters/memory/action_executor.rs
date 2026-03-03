@@ -1,14 +1,16 @@
 //! In-memory hook action executor for tests and local runs.
 
 use crate::hook_engine::domain::{
-    ActionResult, ActionStatus, HookAction, HookLogEntry, HookLogLevel, HookTriggerContext,
+    ActionResult, ActionResultDetails, ActionStatus, HookAction, HookLogEntry, HookLogLevel,
+    HookTriggerContext,
 };
 use crate::hook_engine::ports::{
     HookActionExecutionError, HookActionExecutionResult, HookActionExecutor,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// In-memory hook action executor with configurable outcomes.
 #[derive(Debug, Clone, Default)]
@@ -32,27 +34,27 @@ impl InMemoryHookActionExecutor {
     ///
     /// # Errors
     ///
-    /// Returns [`HookActionExecutionError`] if the lock is poisoned.
+    /// Returns [`HookActionExecutionError`] if the outcome lock is unavailable.
     pub fn set_outcome(
         &self,
         action_id: impl Into<String>,
         status: ActionStatus,
     ) -> HookActionExecutionResult<()> {
-        let mut outcomes = self.outcomes.write().map_err(|err| {
-            HookActionExecutionError::dependency_failure(std::io::Error::other(err.to_string()))
+        let mut outcomes = self.outcomes.try_write().map_err(|err| {
+            HookActionExecutionError::dependency_failure(std::io::Error::other(format!(
+                "failed to acquire action outcome write lock: {err}"
+            )))
         })?;
         outcomes.insert(action_id.into(), status);
         Ok(())
     }
 
-    fn resolve_status(&self, action_id: &str) -> HookActionExecutionResult<ActionStatus> {
-        let outcomes = self.outcomes.read().map_err(|err| {
-            HookActionExecutionError::dependency_failure(std::io::Error::other(err.to_string()))
-        })?;
-        Ok(outcomes
+    async fn resolve_status(&self, action_id: &str) -> ActionStatus {
+        let outcomes = self.outcomes.read().await;
+        outcomes
             .get(action_id)
             .copied()
-            .unwrap_or(ActionStatus::Succeeded))
+            .unwrap_or(ActionStatus::Succeeded)
     }
 }
 
@@ -63,7 +65,7 @@ impl HookActionExecutor for InMemoryHookActionExecutor {
         action: &HookAction,
         context: &HookTriggerContext,
     ) -> HookActionExecutionResult<ActionResult> {
-        let status = self.resolve_status(action.id().as_str())?;
+        let status = self.resolve_status(action.id().as_str()).await;
         let log_entry = HookLogEntry::new(
             HookLogLevel::Info,
             format!("action {} executed with status {}", action.id(), status),
@@ -73,12 +75,12 @@ impl HookActionExecutor for InMemoryHookActionExecutor {
             "status": status.as_str(),
             "trigger": context.trigger_type().as_str(),
         });
-        Ok(ActionResult::new(
-            action.id().clone(),
-            action.action_type().clone(),
+        Ok(ActionResult::new(ActionResultDetails {
+            action_id: action.id().clone(),
+            action_type: action.action_type().clone(),
             status,
             output,
-            vec![log_entry],
-        ))
+            log_entries: vec![log_entry],
+        }))
     }
 }

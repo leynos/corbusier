@@ -3,8 +3,8 @@
 use super::models::{HookExecutionRow, NewHookExecutionRow};
 use super::schema::hook_executions;
 use crate::hook_engine::domain::{
-    ActionResult, HookExecutionId, HookExecutionResult, HookExecutionStatus, HookId,
-    HookTriggerType, TriggerContextId,
+    ActionResult, HookExecutionId, HookExecutionPersisted, HookExecutionResult,
+    HookExecutionStatus, HookId, HookTriggerType, TriggerContextId,
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
@@ -107,13 +107,15 @@ fn row_to_execution(row: HookExecutionRow) -> HookExecutionLogResult<HookExecuti
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;
 
     Ok(HookExecutionResult::from_persisted(
-        HookExecutionId::from_uuid(row.id),
-        hook_id,
-        TriggerContextId::from_uuid(row.trigger_context_id),
-        trigger_type,
-        row.predicate_data,
-        action_results,
-        status,
-        row.executed_at,
+        HookExecutionPersisted {
+            execution_id: HookExecutionId::from_uuid(row.id),
+            hook_id,
+            trigger_context_id: TriggerContextId::from_uuid(row.trigger_context_id),
+            trigger_type,
+            predicate_data: row.predicate_data,
+            action_results,
+            status,
+            executed_at: row.executed_at,
+        },
     ))
 }
