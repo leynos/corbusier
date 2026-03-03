@@ -55,6 +55,10 @@ pub const ADD_TOOL_CATALOG_SQL: &str =
 pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
     include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
 
+/// SQL to add hook execution log table for roadmap 2.3.1.
+pub const ADD_HOOK_EXECUTIONS_SQL: &str =
+    include_str!("../../migrations/2026-03-03-000000_add_hook_executions_table/up.sql");
+
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
@@ -117,6 +121,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;

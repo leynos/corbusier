@@ -5,23 +5,24 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document plans roadmap item 2.3.1 in `docs/roadmap.md`:
 
-- Define hook triggers for commit, merge, and deploy events.
+- Define hook triggers for turn start/end, tool use before/after, and pre/post
+  commit, merge, pull, push, and deploy events.
 - Execute hooks with structured outcomes and logs.
 - Record execution results for every configured trigger.
 
-Execution phase has not started. Implementation begins only after explicit
-approval of this plan.
+Execution phase completed on 2026-03-03.
 
 ## Purpose / big picture
 
-After this change, Corbusier will run governance hooks whenever commit, merge,
-or deploy events occur, and will persist structured execution results for audit
-and policy follow-up. This delivers roadmap 2.3.1 and creates the execution
-substrate required for roadmap 2.3.2 policy enforcement.
+After this change, Corbusier will run governance hooks whenever turn start/end,
+tool use before/after, or pre/post commit, merge, pull, push, and deploy events
+occur, and will persist structured execution results for audit and policy
+follow-up. This delivers roadmap 2.3.1 and creates the execution substrate
+required for roadmap 2.3.2 policy enforcement.
 
 Observable operator outcome:
 
@@ -42,8 +43,9 @@ Observable operator outcome:
 - Respect roadmap dependency ordering:
   - 1.2.3 (task transition enforcement) and 2.1.2 (tool discovery and routing)
     must be complete before wiring trigger producers.
-- Implement trigger coverage for exactly these roadmap-required event families
-  in this milestone: commit, merge, deploy.
+- Implement trigger coverage for these roadmap-required event families in this
+  milestone: turn start/end, tool use before/after, and pre/post commit, merge,
+  pull, push, and deploy.
 - Model execution output per `docs/corbusier-design.md` section 6.3.3
   (`HookExecutionResult` style structured outcomes and logs).
 - Use `rstest` for unit/integration test fixtures and parameterized cases.
@@ -98,20 +100,26 @@ Observable operator outcome:
 
 - [x] (2026-02-28 13:05Z) Gathered roadmap/design/testing constraints and
       drafted this ExecPlan.
-- [ ] Stage A: Finalize hook execution domain model and port contracts.
-- [ ] Stage B: Implement hook engine service orchestration and trigger mapping.
-- [ ] Stage C: Implement in-memory and postgres adapters (including migration).
-- [ ] Stage D: Add unit, integration, and behavioural tests.
-- [ ] Stage E: Update design and user docs; mark roadmap 2.3.1 done.
-- [ ] Stage F: Run full quality gates and capture validation evidence.
+- [x] (2026-03-03) Stage A: Finalize hook execution domain model and port
+      contracts.
+- [x] (2026-03-03) Stage B: Implement hook engine service orchestration and
+      trigger mapping.
+- [x] (2026-03-03) Stage C: Implement in-memory and postgres adapters
+      (including migration).
+- [x] (2026-03-03) Stage D: Add unit, integration, and behavioural tests.
+- [x] (2026-03-03) Stage E: Update design and user docs; mark roadmap 2.3.1
+      done.
+- [x] (2026-03-03) Stage F: Run full quality gates and capture validation
+      evidence.
 
 ## Surprises & discoveries
 
 - The design schema in section 6.3.3 lists `PreCommit`, `PostCommit`, and pull
-  request triggers, while roadmap 2.3.1 explicitly asks for commit, merge, and
-  deploy trigger families. This plan resolves the mismatch by introducing a
-  domain trigger enum centred on roadmap semantics while allowing adapter-level
-  mapping from concrete event sources.
+  request triggers, while roadmap 2.3.1 now requires turn start/end, tool use
+  before/after, and pre/post commit, merge, pull, push, and deploy trigger
+  families. This plan resolves the mismatch by introducing a domain trigger
+  enum centred on roadmap semantics while allowing adapter-level mapping from
+  concrete event sources.
 - Current source tree has no hook-engine module yet; this work introduces a new
   top-level subsystem with the same hexagonal shape as `task` and
   `agent_backend`.
@@ -123,18 +131,33 @@ Observable operator outcome:
   governance work cohesive and avoids leaking hook logic into message/task/tool
   adapters. Date/Author: 2026-02-28 / plan author.
 
-- Decision: treat commit/merge/deploy as canonical domain trigger types,
-  independent of upstream event producers. Rationale: aligns directly with
-  roadmap success criteria and allows adapter mapping from tool-router/VCS
-  events without reworking core logic. Date/Author: 2026-02-28 / plan author.
+- Decision: treat turn start/end, tool use before/after, and pre/post
+  commit/merge/pull/push/deploy as canonical domain trigger types, independent
+  of upstream event producers. Rationale: aligns directly with roadmap success
+  criteria and allows adapter mapping from tool-router/VCS events without
+  reworking core logic. Date/Author: 2026-02-28 / plan author.
 
 ## Outcomes & retrospective
 
-Implementation not started. This section will be updated during execution with:
+Implementation completed with the following deliverables:
 
-- what shipped;
-- whether acceptance criteria were met;
-- any residual gaps, risks, or follow-up work.
+- Added the `hook_engine` hexagonal subsystem with domain types, ports,
+  services, and adapters (memory + PostgreSQL).
+- Implemented trigger coverage for turn start/end, tool use before/after, and
+  pre/post commit, merge, pull, push, and deploy events.
+- Added `hook_executions` migration and persistence adapters, plus unit,
+  integration, and behavioural tests.
+- Updated `docs/corbusier-design.md` and `docs/roadmap.md` to reflect the
+  implementation.
+
+Acceptance criteria met:
+
+- Trigger coverage: turn start/end, tool use before/after, and pre/post commit,
+  merge, pull, push, and deploy events map to hook execution.
+- Structured outcomes and logs recorded with each execution.
+- Execution results persisted for every configured trigger in tests.
+
+Residual gaps: none identified. Follow-up work continues in roadmap 2.3.2.
 
 ## Context and orientation
 
@@ -194,7 +217,9 @@ src/hook_engine/
 
 Create core domain types and contracts without wiring to infrastructure:
 
-- Define `HookTriggerType` with `Commit`, `Merge`, and `Deploy`.
+- Define `HookTriggerType` with `TurnStart`, `TurnEnd`, `PreToolUse`,
+  `PostToolUse`, `PreCommit`, `PostCommit`, `PreMerge`, `PostMerge`, `PrePull`,
+  `PostPull`, `PrePush`, `PostPush`, `PreDeploy`, and `PostDeploy`.
 - Define `HookTriggerContext` carrying trigger metadata required for audit
   correlation (task/conversation refs, source event ID, timestamp, optional
   actor).
@@ -252,14 +277,18 @@ Expected migration shape:
 Go/no-go: proceed only when postgres adapter tests pass against embedded
 postgres.
 
-### Stage D: Trigger producer wiring (commit, merge, deploy)
+### Stage D: Trigger producer wiring (turn/tool and VCS pre/post)
 
 Integrate with the post-2.1.2 execution path:
 
 - Add adapter mapping from upstream workflow events to domain triggers:
-  - commit event -> `HookTriggerType::Commit`;
-  - merge event -> `HookTriggerType::Merge`;
-  - deploy event -> `HookTriggerType::Deploy`.
+  - turn start/end events -> `HookTriggerType::TurnStart`/`TurnEnd`;
+  - tool execution before/after -> `HookTriggerType::PreToolUse`/`PostToolUse`;
+  - commit pre/post -> `HookTriggerType::PreCommit`/`PostCommit`;
+  - merge pre/post -> `HookTriggerType::PreMerge`/`PostMerge`;
+  - pull pre/post -> `HookTriggerType::PrePull`/`PostPull`;
+  - push pre/post -> `HookTriggerType::PrePush`/`PostPush`;
+  - deploy pre/post -> `HookTriggerType::PreDeploy`/`PostDeploy`.
 - Ensure every configured trigger invocation calls hook engine once per event.
 - Ensure returned execution results are attached to audit/event pipeline for
   downstream policy and reporting.
@@ -349,7 +378,8 @@ Acceptance criteria for roadmap 2.3.1 are met when all of the following are
 true:
 
 - Trigger coverage:
-  - commit, merge, and deploy events each map to hook execution.
+  - turn start/end, tool use before/after, and pre/post commit, merge, pull,
+    push, and deploy events each map to hook execution.
 - Structured outcome coverage:
   - each executed hook produces a stored result with hook ID, trigger type,
     status, action results, and logs.
@@ -391,9 +421,20 @@ remain):
 
 ```rust
 pub enum HookTriggerType {
-    Commit,
-    Merge,
-    Deploy,
+    TurnStart,
+    TurnEnd,
+    PreToolUse,
+    PostToolUse,
+    PreCommit,
+    PostCommit,
+    PreMerge,
+    PostMerge,
+    PrePull,
+    PostPull,
+    PrePush,
+    PostPush,
+    PreDeploy,
+    PostDeploy,
 }
 
 pub trait HookDefinitionRepository: Send + Sync {

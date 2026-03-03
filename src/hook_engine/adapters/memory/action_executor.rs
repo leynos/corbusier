@@ -1,0 +1,85 @@
+//! In-memory hook action executor for tests and local runs.
+
+use crate::hook_engine::domain::{
+    ActionResult, ActionResultDetails, ActionStatus, HookAction, HookLogEntry, HookLogLevel,
+    HookTriggerContext,
+};
+use crate::hook_engine::ports::{
+    HookActionExecutionError, HookActionExecutionResult, HookActionExecutor,
+};
+use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
+/// In-memory hook action executor with configurable outcomes.
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryHookActionExecutor {
+    outcomes: Arc<RwLock<HashMap<String, ActionStatus>>>,
+}
+
+impl InMemoryHookActionExecutor {
+    /// Creates a new in-memory executor with no predefined outcomes.
+    ///
+    /// Example: `InMemoryHookActionExecutor::new()` creates a default executor.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the outcome for a specific action identifier.
+    ///
+    /// Example: `executor.set_outcome("action-1", ActionStatus::Failed)`
+    /// configures a failure for that action.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookActionExecutionError`] if the lock is poisoned.
+    pub fn set_outcome(
+        &self,
+        action_id: impl Into<String>,
+        status: ActionStatus,
+    ) -> HookActionExecutionResult<()> {
+        let mut outcomes = self.outcomes.write().map_err(|err| {
+            HookActionExecutionError::execution(std::io::Error::other(err.to_string()))
+        })?;
+        outcomes.insert(action_id.into(), status);
+        Ok(())
+    }
+
+    fn resolve_status(&self, action_id: &str) -> HookActionExecutionResult<ActionStatus> {
+        let outcomes = self.outcomes.read().map_err(|err| {
+            HookActionExecutionError::execution(std::io::Error::other(err.to_string()))
+        })?;
+        Ok(outcomes
+            .get(action_id)
+            .copied()
+            .unwrap_or(ActionStatus::Succeeded))
+    }
+}
+
+#[async_trait]
+impl HookActionExecutor for InMemoryHookActionExecutor {
+    async fn execute(
+        &self,
+        action: &HookAction,
+        context: &HookTriggerContext,
+    ) -> HookActionExecutionResult<ActionResult> {
+        let status = self.resolve_status(action.id().as_str())?;
+        let log_entry = HookLogEntry::new(
+            HookLogLevel::Info,
+            format!("action {} executed with status {}", action.id(), status),
+            context.occurred_at(),
+        );
+        let output = serde_json::json!({
+            "status": status.as_str(),
+            "trigger": context.trigger_type().as_str(),
+        });
+        Ok(ActionResult::new(ActionResultDetails {
+            action_id: action.id().clone(),
+            action_type: action.action_type().clone(),
+            status,
+            output,
+            log_entries: vec![log_entry],
+        }))
+    }
+}

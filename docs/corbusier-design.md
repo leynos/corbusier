@@ -587,8 +587,10 @@ Corbusier implements this through:
   - Consistent workflow behavior across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
-  definitions supporting multiple triggers (TurnStart, ToolCall, PreCommit,
-  etc.) and actions (gates, annotations, remediation).
+  definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
+  PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
+  PrePush, PostPush, PreDeploy, PostDeploy) and actions (gates, annotations,
+  remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -5645,24 +5647,36 @@ pub struct HookDefinition {
     pub id: HookId,
     pub name: String,
     pub description: String,
-    pub trigger: HookTrigger,
+    pub trigger: HookTriggerType,
     pub predicate: HookPredicate,
     pub actions: Vec<HookAction>,
     pub priority: HookPriority,
     pub enabled: bool,
-    pub configuration: HookConfiguration,
 }
 
 #[derive(Debug, Clone)]
-pub enum HookTrigger {
-    TurnStart { conversation_id: ConversationId },
-    ToolCall { tool_name: String, parameters: Value },
-    FileChange { file_patterns: Vec<String> },
-    TurnEnd { conversation_id: ConversationId },
-    PreCommit { changeset: ChangeSet },
-    PostCommit { commit_ref: CommitRef },
-    PrePullRequest { pr_request: CreatePullRequestRequest },
-    PostPullRequest { pr_ref: PullRequestRef },
+pub enum HookTriggerType {
+    TurnStart,
+    TurnEnd,
+    PreToolUse,
+    PostToolUse,
+    PreCommit,
+    PostCommit,
+    PreMerge,
+    PostMerge,
+    PrePull,
+    PostPull,
+    PrePush,
+    PostPush,
+    PreDeploy,
+    PostDeploy,
+}
+
+pub struct HookTriggerContext {
+    pub id: TriggerContextId,
+    pub trigger_type: HookTriggerType,
+    pub metadata: Value,
+    pub occurred_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -5697,12 +5711,12 @@ pub enum HookAction {
 pub struct HookExecutionResult {
     pub hook_id: HookId,
     pub execution_id: ExecutionId,
-    pub trigger_context: TriggerContext,
-    pub results: Vec<ActionResult>,
+    pub trigger_context_id: TriggerContextId,
+    pub trigger_type: HookTriggerType,
+    pub predicate_data: Value,
+    pub action_results: Vec<ActionResult>,
     pub overall_status: ExecutionStatus,
-    pub execution_time: Duration,
-    pub artifacts: Vec<ExecutionArtifact>,
-    pub next_actions: Vec<NextAction>,
+    pub executed_at: DateTime<Utc>,
 }
 ```
 

@@ -9,6 +9,7 @@
 //! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `mcp_server_lifecycle_tests`: MCP server registration and lifecycle
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and call routing
+//! - `hook_engine_tests`: Hook execution and persistence
 
 mod in_memory {
     pub mod helpers;
@@ -18,6 +19,7 @@ mod in_memory {
     mod conversation_flow_tests;
     mod handoff_tests;
     mod mcp_server_lifecycle_tests;
+    mod hook_engine_tests;
     mod sequence_tests;
     mod slash_command_tests;
     mod task_lifecycle_tests;
