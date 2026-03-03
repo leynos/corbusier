@@ -355,39 +355,39 @@ Run all commands from `/home/user/project`.
 
 1. Baseline and red-green setup:
 
-```bash
-set -o pipefail
-cargo test --all-targets --all-features hook_engine 2>&1 | tee /tmp/2-3-1-pre.log
-```
+   ```bash
+   set -o pipefail
+   cargo test --all-targets --all-features hook_engine 2>&1 | tee /tmp/2-3-1-pre.log
+   ```
 
-Expected: failures due to missing hook engine module/tests before
-implementation.
+   Expected: failures due to missing hook engine module/tests before
+   implementation.
 
 2. Implement stages A-D, then run formatting and lint/test gates:
 
-```bash
-set -o pipefail
-make check-fmt 2>&1 | tee /tmp/2-3-1-check-fmt.log
-set -o pipefail
-make lint 2>&1 | tee /tmp/2-3-1-lint.log
-set -o pipefail
-make test 2>&1 | tee /tmp/2-3-1-test.log
-```
+   ```bash
+   set -o pipefail
+   make check-fmt 2>&1 | tee /tmp/2-3-1-check-fmt.log
+   set -o pipefail
+   make lint 2>&1 | tee /tmp/2-3-1-lint.log
+   set -o pipefail
+   make test 2>&1 | tee /tmp/2-3-1-test.log
+   ```
 
-Expected: all commands exit 0.
+   Expected: all commands exit 0.
 
 3. Validate documentation updates:
 
-```bash
-set -o pipefail
-make fmt 2>&1 | tee /tmp/2-3-1-fmt.log
-set -o pipefail
-PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-3-1-markdownlint.log
-set -o pipefail
-make nixie 2>&1 | tee /tmp/2-3-1-nixie.log
-```
+   ```bash
+   set -o pipefail
+   make fmt 2>&1 | tee /tmp/2-3-1-fmt.log
+   set -o pipefail
+   PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-3-1-markdownlint.log
+   set -o pipefail
+   make nixie 2>&1 | tee /tmp/2-3-1-nixie.log
+   ```
 
-Expected: all commands exit 0; only intended files remain modified.
+   Expected: all commands exit 0; only intended files remain modified.
 
 ## Validation and acceptance
 

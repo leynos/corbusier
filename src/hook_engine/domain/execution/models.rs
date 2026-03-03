@@ -1,190 +1,11 @@
-//! Hook execution results and log entries.
+//! Hook execution model types and constructors.
 
-use super::{
-    HookActionId, HookActionType, HookExecutionId, HookId, HookTriggerType, TriggerContextId,
-};
+use super::super::action::HookActionType;
+use super::super::ids::{HookActionId, HookExecutionId, HookId, TriggerContextId};
+use super::super::trigger::HookTriggerType;
+use super::{ActionStatus, HookExecutionStatus, HookLogEntry};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::fmt;
-use thiserror::Error;
-
-/// Action-level execution status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ActionStatus {
-    /// The action completed successfully.
-    Succeeded,
-    /// The action failed.
-    Failed,
-    /// The action was skipped.
-    Skipped,
-}
-
-impl ActionStatus {
-    /// Returns the stable string representation. Example: `ActionStatus::Succeeded.as_str()` returns `"succeeded"`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Succeeded => "succeeded",
-            Self::Failed => "failed",
-            Self::Skipped => "skipped",
-        }
-    }
-}
-
-impl fmt::Display for ActionStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-/// Error returned when parsing an action status fails.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-#[error("unknown action status: {0}")]
-pub struct ParseActionStatusError(pub String);
-
-impl TryFrom<&str> for ActionStatus {
-    type Error = ParseActionStatusError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "succeeded" => Ok(Self::Succeeded),
-            "failed" => Ok(Self::Failed),
-            "skipped" => Ok(Self::Skipped),
-            other => Err(ParseActionStatusError(other.to_owned())),
-        }
-    }
-}
-
-/// Hook execution status aggregated across actions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HookExecutionStatus {
-    /// All actions succeeded or were skipped.
-    Succeeded,
-    /// All actions failed.
-    Failed,
-    /// A mix of successes and failures.
-    PartialFailure,
-}
-
-impl HookExecutionStatus {
-    /// Returns the stable string representation. Example: `HookExecutionStatus::Failed.as_str()` returns `"failed"`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Succeeded => "succeeded",
-            Self::Failed => "failed",
-            Self::PartialFailure => "partial_failure",
-        }
-    }
-
-    /// Aggregates the overall status from action statuses.
-    /// Example: `from_action_statuses([Succeeded, Failed])` returns `HookExecutionStatus::PartialFailure`.
-    #[must_use]
-    pub fn from_action_statuses<I>(statuses: I) -> Self
-    where
-        I: IntoIterator,
-        I::Item: Borrow<ActionStatus>,
-    {
-        let mut saw_success = false;
-        let mut saw_failure = false;
-
-        for status in statuses {
-            match *status.borrow() {
-                ActionStatus::Succeeded => {
-                    saw_success = true;
-                }
-                ActionStatus::Failed => {
-                    saw_failure = true;
-                }
-                ActionStatus::Skipped => {}
-            }
-        }
-
-        match (saw_success, saw_failure) {
-            (true, true) => Self::PartialFailure,
-            (false, true) => Self::Failed,
-            _ => Self::Succeeded,
-        }
-    }
-}
-
-impl fmt::Display for HookExecutionStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-/// Error returned when parsing a hook execution status fails.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-#[error("unknown hook execution status: {0}")]
-pub struct ParseHookExecutionStatusError(pub String);
-
-impl TryFrom<&str> for HookExecutionStatus {
-    type Error = ParseHookExecutionStatusError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "succeeded" => Ok(Self::Succeeded),
-            "failed" => Ok(Self::Failed),
-            "partial_failure" => Ok(Self::PartialFailure),
-            other => Err(ParseHookExecutionStatusError(other.to_owned())),
-        }
-    }
-}
-
-/// Log severity level for hook execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HookLogLevel {
-    /// Informational log entry.
-    Info,
-    /// Warning log entry.
-    Warning,
-    /// Error log entry.
-    Error,
-}
-
-/// Structured log entry emitted during hook execution.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HookLogEntry {
-    level: HookLogLevel,
-    message: String,
-    timestamp: DateTime<Utc>,
-}
-
-impl HookLogEntry {
-    /// Creates a new log entry.
-    /// Example: `HookLogEntry::new(HookLogLevel::Info, "ok", timestamp)` creates an info log entry.
-    #[must_use]
-    pub fn new(level: HookLogLevel, message: impl Into<String>, timestamp: DateTime<Utc>) -> Self {
-        Self {
-            level,
-            message: message.into(),
-            timestamp,
-        }
-    }
-
-    /// Returns the log level. Example: `entry.level()` returns `HookLogLevel::Info`.
-    #[must_use]
-    pub const fn level(&self) -> HookLogLevel {
-        self.level
-    }
-
-    /// Returns the log message. Example: `entry.message()` returns the log text.
-    #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    /// Returns the log timestamp. Example: `entry.timestamp()` returns the timestamp value.
-    #[must_use]
-    pub const fn timestamp(&self) -> DateTime<Utc> {
-        self.timestamp
-    }
-}
 
 /// Result of executing a single hook action.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -225,7 +46,8 @@ impl ActionResult {
         }
     }
 
-    /// Returns the action identifier. Example: `result.action_id()` returns the action identifier.
+    /// Returns the action identifier.
+    /// Example: `result.action_id()` returns the action identifier.
     #[must_use]
     pub const fn action_id(&self) -> &HookActionId {
         &self.action_id
