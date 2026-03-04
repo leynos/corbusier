@@ -19,7 +19,7 @@ thiserror = "2.0.17"
 sha2 = "0.10.9"
 
 # Template rendering
-minijinja = "2.16.0"
+minijinja = "2.17.0"
 
 # Async trait support
 async-trait = "0.1.89"
