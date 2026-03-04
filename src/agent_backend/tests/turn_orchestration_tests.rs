@@ -298,6 +298,62 @@ async fn execute_turn_reuses_active_session(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
+async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
+    context: OrchestrationContext,
+) -> Result<(), eyre::Report> {
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
+    let conversation_id = Uuid::new_v4();
+
+    context
+        .runtime
+        .queue_turn_result(TurnExecutionResult::new("first", Vec::new()))?;
+    context
+        .runtime
+        .queue_turn_result(TurnExecutionResult::new("second", Vec::new()))?;
+
+    let first_request = ExecuteAgentTurnRequest::new(
+        backend_id,
+        TurnExecutionRequest::new(conversation_id, "1", Vec::new()),
+    );
+    let second_request = ExecuteAgentTurnRequest::new(
+        backend_id,
+        TurnExecutionRequest::new(conversation_id, "2", Vec::new()),
+    );
+
+    let (first_result, second_result) = tokio::join!(
+        context.service.execute_turn(first_request),
+        context.service.execute_turn(second_request)
+    );
+
+    let first_response = first_result?;
+    let second_response = second_result?;
+    assert_eq!(first_response.session_id(), second_response.session_id());
+    let reused_count = [
+        first_response.reused_session(),
+        second_response.reused_session(),
+    ]
+    .into_iter()
+    .filter(|is_reused| *is_reused)
+    .count();
+    assert_eq!(
+        reused_count, 1,
+        "expected exactly one concurrent call to reuse the created session"
+    );
+
+    let created_sessions = context.runtime.created_session_ids()?;
+    assert_eq!(created_sessions.len(), 1);
+
+    let sessions = context.session_repository.all_sessions()?;
+    let active = sessions
+        .iter()
+        .find(|session| session.status() == TurnSessionStatus::Active)
+        .ok_or_else(|| eyre::eyre!("expected an active session"))?;
+    assert_eq!(active.turn_count(), 2);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
 async fn execute_turn_rotates_expired_session(
     context: OrchestrationContext,
 ) -> Result<(), eyre::Report> {

@@ -14,9 +14,42 @@ use crate::agent_backend::{
 };
 use chrono::Duration;
 use mockable::Clock;
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::{Mutex, OwnedMutexGuard};
 use uuid::Uuid;
+
+type SessionKey = (BackendId, Uuid);
+type SessionLock = Arc<Mutex<()>>;
+
+#[derive(Debug)]
+struct SessionExecutionLocks {
+    locks: std::sync::Mutex<HashMap<SessionKey, SessionLock>>,
+}
+
+impl SessionExecutionLocks {
+    fn new() -> Self {
+        Self {
+            locks: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn lock_for(&self, backend_id: BackendId, conversation_id: Uuid) -> SessionLock {
+        let key = (backend_id, conversation_id);
+        let mut locks = match self.locks.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        Arc::clone(locks.entry(key).or_insert_with(|| Arc::new(Mutex::new(()))))
+    }
+
+    async fn lock(&self, backend_id: BackendId, conversation_id: Uuid) -> OwnedMutexGuard<()> {
+        self.lock_for(backend_id, conversation_id)
+            .lock_owned()
+            .await
+    }
+}
 
 /// Configuration for turn orchestration behaviour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,6 +247,7 @@ where
     tool_router: Arc<TR>,
     clock: Arc<C>,
     config: AgentTurnOrchestratorConfig,
+    execution_locks: Arc<SessionExecutionLocks>,
 }
 
 impl<R, S, RT, TR, C> AgentTurnOrchestratorService<R, S, RT, TR, C>
@@ -237,6 +271,7 @@ where
             tool_router: ports.tool_router,
             clock: ports.clock,
             config,
+            execution_locks: Arc::new(SessionExecutionLocks::new()),
         }
     }
 
@@ -257,6 +292,12 @@ where
         &self,
         request: ExecuteAgentTurnRequest,
     ) -> AgentTurnOrchestrationResult<ExecuteAgentTurnResponse> {
+        let conversation_id = request.turn.conversation_id();
+        let _execution_guard = self
+            .execution_locks
+            .lock(request.backend_id, conversation_id)
+            .await;
+
         let backend = self
             .backend_registry
             .find_by_id(request.backend_id)
@@ -269,7 +310,6 @@ where
             return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
         }
 
-        let conversation_id = request.turn.conversation_id();
         let session_resolution_now = self.clock.utc();
 
         let (mut session, reused_session, rotated_session) = self

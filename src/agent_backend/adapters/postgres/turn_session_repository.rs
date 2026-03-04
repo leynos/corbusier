@@ -16,6 +16,8 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
+use diesel::sql_types::{BigInt, Nullable, Timestamptz};
+use diesel::upsert::excluded;
 
 /// `PostgreSQL`-backed turn-session repository.
 #[derive(Debug, Clone)]
@@ -81,13 +83,26 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                 .on_conflict(agent_turn_sessions::id)
                 .do_update()
                 .set((
-                    agent_turn_sessions::status.eq(&new_row.status),
-                    agent_turn_sessions::runtime_session_id.eq(&new_row.runtime_session_id),
-                    agent_turn_sessions::ttl_seconds.eq(new_row.ttl_seconds),
-                    agent_turn_sessions::last_used_at.eq(new_row.last_used_at),
-                    agent_turn_sessions::expires_at.eq(new_row.expires_at),
-                    agent_turn_sessions::ended_at.eq(new_row.ended_at),
-                    agent_turn_sessions::turn_count.eq(new_row.turn_count),
+                    agent_turn_sessions::status.eq(excluded(agent_turn_sessions::status)),
+                    agent_turn_sessions::runtime_session_id
+                        .eq(excluded(agent_turn_sessions::runtime_session_id)),
+                    agent_turn_sessions::ttl_seconds.eq(excluded(agent_turn_sessions::ttl_seconds)),
+                    agent_turn_sessions::last_used_at.eq(diesel::dsl::sql::<Timestamptz>(
+                        "GREATEST(agent_turn_sessions.last_used_at, excluded.last_used_at)",
+                    )),
+                    agent_turn_sessions::expires_at.eq(diesel::dsl::sql::<Timestamptz>(
+                        "GREATEST(agent_turn_sessions.expires_at, excluded.expires_at)",
+                    )),
+                    agent_turn_sessions::ended_at.eq(diesel::dsl::sql::<Nullable<Timestamptz>>(
+                        "COALESCE(agent_turn_sessions.ended_at, excluded.ended_at)",
+                    )),
+                    agent_turn_sessions::turn_count.eq(diesel::dsl::sql::<BigInt>(
+                        "CASE \
+                            WHEN agent_turn_sessions.status = 'active' AND excluded.status = 'active' \
+                            THEN agent_turn_sessions.turn_count + 1 \
+                            ELSE GREATEST(agent_turn_sessions.turn_count, excluded.turn_count) \
+                        END",
+                    )),
                 ))
                 .execute(connection)
                 .map_err(|error| map_upsert_error(error, backend_id, conversation_id))?;
