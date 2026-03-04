@@ -100,10 +100,31 @@ where
     clock: Arc<C>,
 }
 
+/// Encapsulates the components of a lifecycle transition with compensation.
+struct LifecycleTransition<HostOp, DomainMut> {
+    host_operation: HostOp,
+    domain_mutation: DomainMut,
+    compensation: LifecycleCompensationAction,
+}
+
+impl<HostOp, DomainMut> LifecycleTransition<HostOp, DomainMut> {
+    const fn new(
+        host_operation: HostOp,
+        domain_mutation: DomainMut,
+        compensation: LifecycleCompensationAction,
+    ) -> Self {
+        Self {
+            host_operation,
+            domain_mutation,
+            compensation,
+        }
+    }
+}
+
 impl<R, H, C> McpServerLifecycleService<R, H, C>
 where
     R: McpServerRegistryRepository,
-    H: McpServerHost,
+    H: McpServerHost + 'static,
     C: Clock + Send + Sync,
 {
     /// Creates a new lifecycle service.
@@ -172,32 +193,31 @@ where
     }
 
     /// Helper for lifecycle transitions with compensation.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "The helper captures the complete transition contract in one place."
-    )]
     async fn execute_transition_with_compensation<HostOp, DomainMut>(
         &self,
         server_id: McpServerId,
-        host_operation: HostOp,
-        domain_mutation: DomainMut,
-        compensation: LifecycleCompensationAction,
+        transition: LifecycleTransition<HostOp, DomainMut>,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration>
     where
-        HostOp: for<'a> FnOnce(
-                &'a McpServerRegistration,
-                &'a H,
+        HostOp: FnOnce(
+                McpServerRegistration,
+                Arc<H>,
             )
-                -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + 'a>>
+                -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>>
             + 'static,
         DomainMut:
             FnOnce(&mut McpServerRegistration, &C) -> Result<(), ToolRegistryDomainError> + 'static,
     {
-        self.execute_lifecycle_change(server_id, |server, service| {
+        let LifecycleTransition {
+            host_operation,
+            domain_mutation,
+            compensation,
+        } = transition;
+        self.execute_lifecycle_change(server_id, move |server, service| {
             Box::pin(async move {
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
-                host_operation(server, &*service.host).await?;
+                host_operation(server.clone(), Arc::clone(&service.host)).await?;
                 Ok(LifecycleChange::with_compensation(
                     updated_server,
                     compensation,
@@ -234,15 +254,19 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_transition_with_compensation(
-            server_id,
-            |server, host| Box::pin(host.start(server)),
-            |server, clock| {
+        let transition = LifecycleTransition::new(
+            |server: McpServerRegistration,
+             host: Arc<H>|
+             -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>> {
+                Box::pin(async move { host.start(&server).await })
+            },
+            |server: &mut McpServerRegistration, clock: &C| {
                 server.mark_started(McpServerHealthSnapshot::unknown(clock.utc()), clock)
             },
             LifecycleCompensationAction::Stop,
-        )
-        .await?;
+        );
+        self.execute_transition_with_compensation(server_id, transition)
+            .await?;
         self.refresh_health(server_id).await
     }
 
@@ -253,21 +277,21 @@ where
     /// Returns [`McpServerLifecycleServiceError::NotFound`] when no server has
     /// the given ID, domain errors for invalid lifecycle transitions, or host
     /// and persistence errors.
-    #[expect(
-        clippy::redundant_closure_for_method_calls,
-        reason = "Using an explicit closure avoids lifetime constraints from method pointers."
-    )]
     pub async fn stop(
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_transition_with_compensation(
-            server_id,
-            |server, host| Box::pin(host.stop(server)),
-            |server, clock| server.mark_stopped(clock),
+        let transition = LifecycleTransition::new(
+            |server: McpServerRegistration,
+             host: Arc<H>|
+             -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>> {
+                Box::pin(async move { host.stop(&server).await })
+            },
+            |server: &mut McpServerRegistration, clock: &C| server.mark_stopped(clock),
             LifecycleCompensationAction::Start,
-        )
-        .await
+        );
+        self.execute_transition_with_compensation(server_id, transition)
+            .await
     }
 
     /// Refreshes and persists server health.

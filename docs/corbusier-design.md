@@ -1099,6 +1099,61 @@ _Table 2.1.5.1: Tenancy and identity feature catalog._
 - Scope is intentionally limited to `tools/list` discovery in 2.1.1; tool call
   routing/execution remains deferred to roadmap item 2.1.2.
 
+For screen readers: The following sequence diagram shows how starting an MCP
+server and querying tools flows through the lifecycle service, host adapter,
+and persistence port.
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant ToolRegistryService
+    participant RegistryRepo as McpServerRegistryRepository
+    participant Host as McpServerHost
+    participant Postgres as PostgresDB
+    participant McpProcess as MCPServer
+
+    Operator->>ToolRegistryService: start_server(McpServerId)
+    ToolRegistryService->>RegistryRepo: find_by_id(McpServerId)
+    RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
+    Postgres-->>RegistryRepo: McpServerRegistration
+    RegistryRepo-->>ToolRegistryService: McpServerRegistration
+
+    ToolRegistryService->>Host: start(McpServerRegistration)
+    Host->>McpProcess: spawn process with transport config
+    McpProcess-->>Host: started
+    Host-->>ToolRegistryService: Result ok
+
+    ToolRegistryService->>Host: health(McpServerRegistration)
+    Host->>McpProcess: ping/health
+    McpProcess-->>Host: health snapshot
+    Host-->>ToolRegistryService: ServerHealthSnapshot
+
+    ToolRegistryService->>RegistryRepo: update(McpServerRegistration with running state and health)
+    RegistryRepo->>Postgres: UPDATE mcp_servers SET state, health = ...
+    Postgres-->>RegistryRepo: ok
+    RegistryRepo-->>ToolRegistryService: ok
+    ToolRegistryService-->>Operator: started registration
+
+    Operator->>ToolRegistryService: query_tools(McpServerId)
+    ToolRegistryService->>RegistryRepo: find_by_id(McpServerId)
+    RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
+    Postgres-->>RegistryRepo: McpServerRegistration
+    RegistryRepo-->>ToolRegistryService: McpServerRegistration
+
+    ToolRegistryService->>Host: list_tools(McpServerRegistration)
+    Host->>McpProcess: tools/list
+    McpProcess-->>Host: List ToolDefinition
+    Host-->>ToolRegistryService: List ToolDefinition
+
+    ToolRegistryService->>RegistryRepo: update(McpServerRegistration with tools snapshot)
+    RegistryRepo->>Postgres: UPDATE mcp_servers SET tools_snapshot = ...
+    Postgres-->>RegistryRepo: ok
+    RegistryRepo-->>ToolRegistryService: ok
+    ToolRegistryService-->>Operator: List ToolDefinition
+```
+
+_Figure: MCP server start and `tools/list` lifecycle interaction sequence._
+
 ##### F-005-RQ-002: Tool Discovery and Registration
 
 - **Technical Specifications:**
@@ -4943,8 +4998,8 @@ CREATE TABLE audit_logs (
 ```
 
 For screen readers: The following entity-relationship diagram shows tenant
-ownership and key foreign-key paths for tasks, conversations, messages,
-backend registrations, domain events, and audit logs.
+ownership and key foreign-key paths for tasks, conversations, messages, backend
+registrations, domain events, and audit logs.
 
 ```mermaid
 erDiagram
@@ -6948,8 +7003,8 @@ The following illustrative example demonstrates the repository pattern with
 Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
 `row_to_message`, and `RepositoryError` are context-dependent and defined in
 the actual implementation. Tenant scoping is established per operation with
-`set_config('app.tenant_id', <value>, true)` inside the same transaction as
-the protected statements, ensuring connection-pool reuse cannot bypass RLS.
+`set_config('app.tenant_id', <value>, true)` inside the same transaction as the
+protected statements, ensuring connection-pool reuse cannot bypass RLS.
 
 ```rust
 // Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
