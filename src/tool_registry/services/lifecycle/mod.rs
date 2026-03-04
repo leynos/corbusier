@@ -100,23 +100,33 @@ where
     clock: Arc<C>,
 }
 
-/// Encapsulates the components of a lifecycle transition with compensation.
-struct LifecycleTransition<HostOp, DomainMut> {
-    host_operation: HostOp,
-    domain_mutation: DomainMut,
-    compensation: LifecycleCompensationAction,
+/// Identifies which host operation to invoke for a lifecycle transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LifecycleHostAction {
+    Start,
+    Stop,
 }
 
-impl<HostOp, DomainMut> LifecycleTransition<HostOp, DomainMut> {
-    const fn new(
-        host_operation: HostOp,
-        domain_mutation: DomainMut,
-        compensation: LifecycleCompensationAction,
-    ) -> Self {
+impl LifecycleHostAction {
+    /// Returns the compensation action for this host action.
+    const fn compensation(self) -> LifecycleCompensationAction {
+        match self {
+            Self::Start => LifecycleCompensationAction::Stop,
+            Self::Stop => LifecycleCompensationAction::Start,
+        }
+    }
+}
+
+struct LifecycleTransition<DomainMut> {
+    host_action: LifecycleHostAction,
+    domain_mutation: DomainMut,
+}
+
+impl<DomainMut> LifecycleTransition<DomainMut> {
+    const fn new(host_action: LifecycleHostAction, domain_mutation: DomainMut) -> Self {
         Self {
-            host_operation,
+            host_action,
             domain_mutation,
-            compensation,
         }
     }
 }
@@ -193,31 +203,28 @@ where
     }
 
     /// Helper for lifecycle transitions with compensation.
-    async fn execute_transition_with_compensation<HostOp, DomainMut>(
+    async fn execute_transition_with_compensation<DomainMut>(
         &self,
         server_id: McpServerId,
-        transition: LifecycleTransition<HostOp, DomainMut>,
+        transition: LifecycleTransition<DomainMut>,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration>
     where
-        HostOp: FnOnce(
-                McpServerRegistration,
-                Arc<H>,
-            )
-                -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>>
-            + 'static,
         DomainMut:
             FnOnce(&mut McpServerRegistration, &C) -> Result<(), ToolRegistryDomainError> + 'static,
     {
         let LifecycleTransition {
-            host_operation,
+            host_action,
             domain_mutation,
-            compensation,
         } = transition;
+        let compensation = host_action.compensation();
         self.execute_lifecycle_change(server_id, move |server, service| {
             Box::pin(async move {
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
-                host_operation(server.clone(), Arc::clone(&service.host)).await?;
+                match host_action {
+                    LifecycleHostAction::Start => service.host.start(server).await?,
+                    LifecycleHostAction::Stop => service.host.stop(server).await?,
+                }
                 Ok(LifecycleChange::with_compensation(
                     updated_server,
                     compensation,
@@ -255,15 +262,10 @@ where
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
         let transition = LifecycleTransition::new(
-            |server: McpServerRegistration,
-             host: Arc<H>|
-             -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>> {
-                Box::pin(async move { host.start(&server).await })
-            },
+            LifecycleHostAction::Start,
             |server: &mut McpServerRegistration, clock: &C| {
                 server.mark_started(McpServerHealthSnapshot::unknown(clock.utc()), clock)
             },
-            LifecycleCompensationAction::Stop,
         );
         self.execute_transition_with_compensation(server_id, transition)
             .await?;
@@ -282,13 +284,8 @@ where
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
         let transition = LifecycleTransition::new(
-            |server: McpServerRegistration,
-             host: Arc<H>|
-             -> Pin<Box<dyn Future<Output = Result<(), McpServerHostError>> + Send>> {
-                Box::pin(async move { host.stop(&server).await })
-            },
+            LifecycleHostAction::Stop,
             |server: &mut McpServerRegistration, clock: &C| server.mark_stopped(clock),
-            LifecycleCompensationAction::Start,
         );
         self.execute_transition_with_compensation(server_id, transition)
             .await
