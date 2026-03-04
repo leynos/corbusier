@@ -1,6 +1,7 @@
 //! Context snapshot tests for in-memory handoff flows.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{AgentSession, ConversationId, SequenceNumber, TurnId};
 use corbusier::message::ports::{
     agent_session::AgentSessionRepository, context_snapshot::ContextSnapshotPort,
@@ -14,6 +15,7 @@ use tokio::runtime::Runtime;
 fn handoff_captures_context_snapshot(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) {
     let runtime_handle = runtime.expect("runtime");
@@ -29,7 +31,7 @@ fn handoff_captures_context_snapshot(
 
         harness
             .session_repo
-            .store(&source_session)
+            .store(&ctx, &source_session)
             .await
             .expect("store");
 
@@ -41,13 +43,13 @@ fn handoff_captures_context_snapshot(
         );
         let _handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("initiate");
 
         let snapshots = harness
             .snapshot_adapter
-            .find_snapshots_for_session(source_session.session_id)
+            .find_snapshots_for_session(&ctx, source_session.session_id)
             .await
             .expect("find snapshots");
 

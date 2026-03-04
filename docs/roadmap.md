@@ -102,18 +102,18 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.5. Tenant context and identity isolation
 
-- [ ] 1.5.1 Establish tenant primitives and request context plumbing. See
+- [x] 1.5.1 Establish tenant primitives and request context plumbing. See
   corbusier-design.md §2.1.5 and §2.2.5.
-  - [ ] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
+  - [x] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
     corbusier-design.md §2.2.5.
-  - [ ] Model initial tenancy as one owning user per tenant, while preserving a
+  - [x] Model initial tenancy as one owning user per tenant, while preserving a
     separate user-versus-tenant identity model for future team and
     organization tenants. See corbusier-design.md §2.2.5.
-  - [ ] Replace message-only audit context usage with cross-cutting
+  - [x] Replace message-only audit context usage with cross-cutting
     `RequestContext` carrying tenant, correlation, causation, user, and
     session identifiers.
     See corbusier-design.md §2.2.5.
-  - [ ] Success criteria: repository/service signatures require tenant-aware
+  - [x] Success criteria: repository/service signatures require tenant-aware
     request context for tenant-owned operations.
 - [ ] 1.5.2 Deliver tenant-aware schema and constraints. Requires 1.5.1. See
   corbusier-design.md §6.2.1 and §6.2.2.

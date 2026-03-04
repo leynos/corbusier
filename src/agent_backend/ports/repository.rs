@@ -1,6 +1,7 @@
 //! Repository port for agent backend registration persistence and discovery.
 
 use crate::agent_backend::domain::{AgentBackendRegistration, BackendId, BackendName};
+use crate::context::RequestContext;
 use async_trait::async_trait;
 use std::sync::Arc;
 use thiserror::Error;
@@ -18,7 +19,11 @@ pub trait BackendRegistryRepository: Send + Sync {
     /// Returns [`BackendRegistryError::DuplicateBackend`] when the backend ID
     /// already exists or [`BackendRegistryError::DuplicateBackendName`] when
     /// the name is already registered.
-    async fn register(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()>;
+    async fn register(
+        &self,
+        ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()>;
 
     /// Persists changes to an existing backend registration (status,
     /// capabilities, timestamps).
@@ -27,13 +32,18 @@ pub trait BackendRegistryRepository: Send + Sync {
     ///
     /// Returns [`BackendRegistryError::NotFound`] when the backend does not
     /// exist.
-    async fn update(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()>;
+    async fn update(
+        &self,
+        ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()>;
 
     /// Finds a backend registration by internal identifier.
     ///
     /// Returns `None` when the backend does not exist.
     async fn find_by_id(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>>;
 
@@ -42,14 +52,21 @@ pub trait BackendRegistryRepository: Send + Sync {
     /// Returns `None` when no backend has the given name.
     async fn find_by_name(
         &self,
+        ctx: &RequestContext,
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>>;
 
     /// Returns all backend registrations with `Active` status.
-    async fn list_active(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>>;
+    async fn list_active(
+        &self,
+        ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>>;
 
     /// Returns all backend registrations regardless of status.
-    async fn list_all(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>>;
+    async fn list_all(
+        &self,
+        ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>>;
 }
 
 /// Errors returned by backend registry repository implementations.

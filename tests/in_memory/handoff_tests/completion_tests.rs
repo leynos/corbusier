@@ -1,6 +1,7 @@
 //! Handoff completion tests for in-memory adapters.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, HandoffStatus, SequenceNumber, TurnId,
 };
@@ -15,6 +16,7 @@ fn complete_handoff_links_target_session(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
     clock: DefaultClock,
+    ctx: RequestContext,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
@@ -29,7 +31,7 @@ fn complete_handoff_links_target_session(
 
         harness
             .session_repo
-            .store(&source_session)
+            .store(&ctx, &source_session)
             .await
             .expect("store");
 
@@ -41,7 +43,7 @@ fn complete_handoff_links_target_session(
         );
         let handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("initiate");
 
@@ -53,13 +55,14 @@ fn complete_handoff_links_target_session(
         );
         let target_session = harness
             .service
-            .create_target_session(params)
+            .create_target_session(&ctx, params)
             .await
             .expect("create target");
 
         let completed = harness
             .service
             .complete(
+                &ctx,
                 handoff.handoff_id,
                 target_session.session_id,
                 SequenceNumber::new(6),

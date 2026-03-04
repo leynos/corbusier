@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{
@@ -23,6 +24,16 @@ fn service() -> TestService {
     TaskLifecycleService::new(
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
+    )
+}
+
+#[fixture]
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
     )
 }
 
@@ -50,7 +61,7 @@ fn assert_single_task_found(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_and_lookup_by_external_issue_reference(service: TestService) {
+async fn create_and_lookup_by_external_issue_reference(service: TestService, ctx: RequestContext) {
     let request = CreateTaskFromIssueRequest::new(
         "github",
         "corbusier/core",
@@ -60,13 +71,13 @@ async fn create_and_lookup_by_external_issue_reference(service: TestService) {
     .with_labels(vec!["feature".to_owned(), "task-lifecycle".to_owned()]);
 
     let created = service
-        .create_from_issue(request)
+        .create_from_issue(&ctx, request)
         .await
         .expect("task creation should succeed");
     let issue_ref =
         IssueRef::from_parts("github", "corbusier/core", 211).expect("valid issue reference");
     let found = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
 
@@ -75,24 +86,20 @@ async fn create_and_lookup_by_external_issue_reference(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn duplicate_issue_reference_is_rejected(service: TestService) {
+async fn duplicate_issue_reference_is_rejected(service: TestService, ctx: RequestContext) {
     service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "gitlab",
-            "corbusier/core",
-            99,
-            "First task",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("gitlab", "corbusier/core", 99, "First task"),
+        )
         .await
         .expect("first task creation should succeed");
 
     let duplicate_result = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "gitlab",
-            "corbusier/core",
-            99,
-            "Duplicate task",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("gitlab", "corbusier/core", 99, "Duplicate task"),
+        )
         .await;
 
     assert!(matches!(
@@ -105,11 +112,11 @@ async fn duplicate_issue_reference_is_rejected(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn lookup_returns_none_for_missing_reference(service: TestService) {
+async fn lookup_returns_none_for_missing_reference(service: TestService, ctx: RequestContext) {
     let issue_ref =
         IssueRef::from_parts("github", "corbusier/core", 404).expect("valid issue reference");
     let found = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
     assert!(found.is_none());
@@ -119,23 +126,32 @@ async fn lookup_returns_none_for_missing_reference(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_and_retrieve_by_ref(service: TestService) -> Result<(), eyre::Report> {
+async fn associate_branch_and_retrieve_by_ref(
+    service: TestService,
+    ctx: RequestContext,
+) -> Result<(), eyre::Report> {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            300,
-            "Branch association test",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                300,
+                "Branch association test",
+            ),
+        )
         .await
         .expect("task creation should succeed");
     let updated = service
-        .associate_branch(AssociateBranchRequest::new(
-            task.id(),
-            "github",
-            "corbusier/core",
-            "feature/branch-integ",
-        ))
+        .associate_branch(
+            &ctx,
+            AssociateBranchRequest::new(
+                task.id(),
+                "github",
+                "corbusier/core",
+                "feature/branch-integ",
+            ),
+        )
         .await
         .expect("branch association should succeed");
     assert!(updated.branch_ref().is_some());
@@ -143,7 +159,7 @@ async fn associate_branch_and_retrieve_by_ref(service: TestService) -> Result<()
     let branch_ref = BranchRef::from_parts("github", "corbusier/core", "feature/branch-integ")
         .expect("valid branch ref");
     let found = service
-        .find_by_branch_ref(&branch_ref)
+        .find_by_branch_ref(&ctx, &branch_ref)
         .await
         .expect("lookup should succeed");
     assert_single_task_found(&found, task.id())?;
@@ -154,23 +170,20 @@ async fn associate_branch_and_retrieve_by_ref(service: TestService) -> Result<()
 #[tokio::test(flavor = "multi_thread")]
 async fn associate_pr_and_verify_state_transition(
     service: TestService,
+    ctx: RequestContext,
 ) -> Result<(), eyre::Report> {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            301,
-            "PR association test",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "corbusier/core", 301, "PR association test"),
+        )
         .await
         .expect("task creation should succeed");
     let updated = service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task.id(),
-            "github",
-            "corbusier/core",
-            55,
-        ))
+        .associate_pull_request(
+            &ctx,
+            AssociatePullRequestRequest::new(task.id(), "github", "corbusier/core", 55),
+        )
         .await
         .expect("PR association should succeed");
     assert!(updated.pull_request_ref().is_some());
@@ -178,7 +191,7 @@ async fn associate_pr_and_verify_state_transition(
 
     let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 55).expect("valid PR ref");
     let found = service
-        .find_by_pull_request_ref(&pr_ref)
+        .find_by_pull_request_ref(&ctx, &pr_ref)
         .await
         .expect("lookup should succeed");
     assert_single_task_found(&found, task.id())?;
@@ -187,49 +200,51 @@ async fn associate_pr_and_verify_state_transition(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
+async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: RequestContext) {
     let task1 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            302,
-            "Task 1",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "corbusier/core", 302, "Task 1"),
+        )
         .await
         .expect("first task creation should succeed");
     let task2 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            303,
-            "Task 2",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "corbusier/core", 303, "Task 2"),
+        )
         .await
         .expect("second task creation should succeed");
 
     service
-        .associate_branch(AssociateBranchRequest::new(
-            task1.id(),
-            "github",
-            "corbusier/core",
-            "shared/integration-branch",
-        ))
+        .associate_branch(
+            &ctx,
+            AssociateBranchRequest::new(
+                task1.id(),
+                "github",
+                "corbusier/core",
+                "shared/integration-branch",
+            ),
+        )
         .await
         .expect("first task branch association should succeed");
     service
-        .associate_branch(AssociateBranchRequest::new(
-            task2.id(),
-            "github",
-            "corbusier/core",
-            "shared/integration-branch",
-        ))
+        .associate_branch(
+            &ctx,
+            AssociateBranchRequest::new(
+                task2.id(),
+                "github",
+                "corbusier/core",
+                "shared/integration-branch",
+            ),
+        )
         .await
         .expect("second task branch association should succeed");
 
     let branch_ref = BranchRef::from_parts("github", "corbusier/core", "shared/integration-branch")
         .expect("valid branch ref");
     let found = service
-        .find_by_branch_ref(&branch_ref)
+        .find_by_branch_ref(&ctx, &branch_ref)
         .await
         .expect("lookup should succeed");
     assert_eq!(found.len(), 2);
@@ -243,48 +258,43 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) {
+async fn multiple_tasks_sharing_pull_request_all_returned(
+    service: TestService,
+    ctx: RequestContext,
+) {
     let task1 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            304,
-            "PR share 1",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "corbusier/core", 304, "PR share 1"),
+        )
         .await
         .expect("first task creation should succeed");
     let task2 = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            305,
-            "PR share 2",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "corbusier/core", 305, "PR share 2"),
+        )
         .await
         .expect("second task creation should succeed");
 
     service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task1.id(),
-            "github",
-            "corbusier/core",
-            77,
-        ))
+        .associate_pull_request(
+            &ctx,
+            AssociatePullRequestRequest::new(task1.id(), "github", "corbusier/core", 77),
+        )
         .await
         .expect("first task PR association should succeed");
     service
-        .associate_pull_request(AssociatePullRequestRequest::new(
-            task2.id(),
-            "github",
-            "corbusier/core",
-            77,
-        ))
+        .associate_pull_request(
+            &ctx,
+            AssociatePullRequestRequest::new(task2.id(), "github", "corbusier/core", 77),
+        )
         .await
         .expect("second task PR association should succeed");
 
     let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 77).expect("valid PR ref");
     let found = service
-        .find_by_pull_request_ref(&pr_ref)
+        .find_by_pull_request_ref(&ctx, &pr_ref)
         .await
         .expect("lookup should succeed");
     assert_eq!(found.len(), 2);
@@ -298,10 +308,13 @@ async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) 
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn find_by_pull_request_ref_returns_empty_when_none_match(service: TestService) {
+async fn find_by_pull_request_ref_returns_empty_when_none_match(
+    service: TestService,
+    ctx: RequestContext,
+) {
     let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 999).expect("valid PR ref");
     let found = service
-        .find_by_pull_request_ref(&pr_ref)
+        .find_by_pull_request_ref(&ctx, &pr_ref)
         .await
         .expect("lookup should succeed");
     assert!(
@@ -312,18 +325,21 @@ async fn find_by_pull_request_ref_returns_empty_when_none_match(service: TestSer
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn transition_task_from_draft_to_in_progress(service: TestService) {
+async fn transition_task_from_draft_to_in_progress(service: TestService, ctx: RequestContext) {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            306,
-            "Transition happy path",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                306,
+                "Transition happy path",
+            ),
+        )
         .await
         .expect("task creation should succeed");
     let transitioned = service
-        .transition_task(TransitionTaskRequest::new(task.id(), "in_progress"))
+        .transition_task(&ctx, TransitionTaskRequest::new(task.id(), "in_progress"))
         .await
         .expect("transition should succeed");
     assert_eq!(transitioned.state(), TaskState::InProgress);
@@ -331,18 +347,21 @@ async fn transition_task_from_draft_to_in_progress(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn transition_rejects_invalid_state_change(service: TestService) {
+async fn transition_rejects_invalid_state_change(service: TestService, ctx: RequestContext) {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            307,
-            "Transition invalid path",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                307,
+                "Transition invalid path",
+            ),
+        )
         .await
         .expect("task creation should succeed");
     let result = service
-        .transition_task(TransitionTaskRequest::new(task.id(), "done"))
+        .transition_task(&ctx, TransitionTaskRequest::new(task.id(), "done"))
         .await;
     assert!(matches!(
         result,
@@ -357,18 +376,24 @@ async fn transition_rejects_invalid_state_change(service: TestService) {
 }
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn transition_rejects_unknown_state_string(service: TestService) {
+async fn transition_rejects_unknown_state_string(service: TestService, ctx: RequestContext) {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            308,
-            "Transition parse failure",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                308,
+                "Transition parse failure",
+            ),
+        )
         .await
         .expect("task creation should succeed");
     let result = service
-        .transition_task(TransitionTaskRequest::new(task.id(), "nonexistent_state"))
+        .transition_task(
+            &ctx,
+            TransitionTaskRequest::new(task.id(), "nonexistent_state"),
+        )
         .await;
     assert!(matches!(
         result,

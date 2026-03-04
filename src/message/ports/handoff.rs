@@ -3,6 +3,7 @@
 //! Defines the abstract interface for initiating and completing handoffs
 //! between agent backends while preserving context.
 
+use crate::context::RequestContext;
 use crate::message::domain::{
     AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffStatus, TurnId,
 };
@@ -67,6 +68,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff could not be initiated.
     async fn initiate_handoff(
         &self,
+        ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata>;
 
@@ -80,6 +82,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff cannot be completed or persisted.
     async fn complete_handoff(
         &self,
+        ctx: &RequestContext,
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata>;
@@ -91,6 +94,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff cannot be cancelled or persisted.
     async fn cancel_handoff(
         &self,
+        ctx: &RequestContext,
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()>;
@@ -100,7 +104,11 @@ pub trait AgentHandoffPort: Send + Sync {
     /// # Errors
     ///
     /// Returns `HandoffError` if lookup fails.
-    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>>;
+    async fn find_handoff(
+        &self,
+        ctx: &RequestContext,
+        handoff_id: HandoffId,
+    ) -> HandoffResult<Option<HandoffMetadata>>;
 
     /// Lists all handoffs for a conversation.
     ///
@@ -109,6 +117,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the list cannot be retrieved.
     async fn list_handoffs_for_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>>;
 }

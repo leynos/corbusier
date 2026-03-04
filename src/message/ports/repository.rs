@@ -3,6 +3,7 @@
 //! Defines the abstract interface for storing and retrieving messages,
 //! allowing different persistence implementations (`PostgreSQL`, in-memory, etc.).
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
     error::RepositoryError,
@@ -34,7 +35,7 @@ pub trait MessageRepository: Send + Sync {
     /// - A message with the same ID already exists
     /// - The database connection fails
     /// - Serialisation fails
-    async fn store(&self, message: &Message) -> RepositoryResult<()>;
+    async fn store(&self, ctx: &RequestContext, message: &Message) -> RepositoryResult<()>;
 
     /// Retrieves a message by its ID.
     ///
@@ -43,7 +44,11 @@ pub trait MessageRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns `RepositoryError` if the query fails.
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>>;
+    async fn find_by_id(
+        &self,
+        ctx: &RequestContext,
+        id: MessageId,
+    ) -> RepositoryResult<Option<Message>>;
 
     /// Retrieves all messages for a conversation, ordered by sequence number.
     ///
@@ -54,6 +59,7 @@ pub trait MessageRepository: Send + Sync {
     /// Returns `RepositoryError` if the query fails.
     async fn find_by_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>>;
 
@@ -66,6 +72,7 @@ pub trait MessageRepository: Send + Sync {
     /// Returns `RepositoryError` if the query fails.
     async fn next_sequence_number(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber>;
 
@@ -74,5 +81,5 @@ pub trait MessageRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns `RepositoryError` if the query fails.
-    async fn exists(&self, id: MessageId) -> RepositoryResult<bool>;
+    async fn exists(&self, ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool>;
 }

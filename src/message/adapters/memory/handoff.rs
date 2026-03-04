@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use mockable::Clock;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffParams},
     ports::handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
@@ -95,6 +96,7 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
 impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
     async fn initiate_handoff(
         &self,
+        _ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         let handoff_params = HandoffParams::new(
@@ -124,6 +126,7 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
 
     async fn complete_handoff(
         &self,
+        _ctx: &RequestContext,
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
@@ -137,6 +140,7 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
 
     async fn cancel_handoff(
         &self,
+        _ctx: &RequestContext,
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()> {
@@ -148,7 +152,11 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
         Ok(())
     }
 
-    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>> {
+    async fn find_handoff(
+        &self,
+        _ctx: &RequestContext,
+        handoff_id: HandoffId,
+    ) -> HandoffResult<Option<HandoffMetadata>> {
         let guard = self
             .store
             .read()
@@ -159,6 +167,7 @@ impl<C: Clock + Send + Sync> AgentHandoffPort for InMemoryHandoffAdapter<C> {
 
     async fn list_handoffs_for_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>> {
         let guard = self

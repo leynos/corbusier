@@ -8,6 +8,7 @@ use crate::agent_backend::{
     domain::{AgentBackendRegistration, BackendId, BackendName, BackendStatus},
     ports::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult},
 };
+use crate::context::RequestContext;
 
 /// Thread-safe in-memory backend registry repository.
 #[derive(Debug, Clone, Default)]
@@ -31,7 +32,11 @@ impl InMemoryBackendRegistry {
 
 #[async_trait]
 impl BackendRegistryRepository for InMemoryBackendRegistry {
-    async fn register(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()> {
+    async fn register(
+        &self,
+        _ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -55,7 +60,11 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         Ok(())
     }
 
-    async fn update(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()> {
+    async fn update(
+        &self,
+        _ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -89,6 +98,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
 
     async fn find_by_id(
         &self,
+        _ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let state = self.state.read().map_err(|err| {
@@ -99,6 +109,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
 
     async fn find_by_name(
         &self,
+        _ctx: &RequestContext,
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let state = self.state.read().map_err(|err| {
@@ -112,7 +123,10 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         Ok(backend)
     }
 
-    async fn list_active(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
+    async fn list_active(
+        &self,
+        _ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let state = self.state.read().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -125,7 +139,10 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         Ok(active)
     }
 
-    async fn list_all(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
+    async fn list_all(
+        &self,
+        _ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let state = self.state.read().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;

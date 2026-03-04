@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{AgentSession, AgentSessionId, AgentSessionState, ConversationId},
     ports::agent_session::{AgentSessionRepository, SessionError, SessionResult},
@@ -58,7 +59,7 @@ impl InMemoryAgentSessionRepository {
 
 #[async_trait]
 impl AgentSessionRepository for InMemoryAgentSessionRepository {
-    async fn store(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
         self.upsert_with_check(session, |sessions| {
             if sessions.contains_key(&session_id) {
@@ -69,7 +70,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
         })
     }
 
-    async fn update(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
         self.upsert_with_check(session, |sessions| {
             if !sessions.contains_key(&session_id) {
@@ -80,7 +81,11 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
         })
     }
 
-    async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: AgentSessionId,
+    ) -> SessionResult<Option<AgentSession>> {
         let guard = self
             .sessions
             .read()
@@ -91,6 +96,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
 
     async fn find_active_for_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
         let guard = self
@@ -106,6 +112,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
         let guard = self

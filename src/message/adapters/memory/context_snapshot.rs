@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{AgentSessionId, ContextWindowSnapshot, ConversationId},
     ports::context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult},
@@ -52,7 +53,11 @@ impl InMemoryContextSnapshotAdapter {
 
 #[async_trait]
 impl ContextSnapshotPort for InMemoryContextSnapshotAdapter {
-    async fn store_snapshot(&self, snapshot: &ContextWindowSnapshot) -> SnapshotResult<()> {
+    async fn store_snapshot(
+        &self,
+        _ctx: &RequestContext,
+        snapshot: &ContextWindowSnapshot,
+    ) -> SnapshotResult<()> {
         let mut guard = self
             .snapshots
             .write()
@@ -66,7 +71,11 @@ impl ContextSnapshotPort for InMemoryContextSnapshotAdapter {
         Ok(())
     }
 
-    async fn find_by_id(&self, snapshot_id: Uuid) -> SnapshotResult<Option<ContextWindowSnapshot>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        snapshot_id: Uuid,
+    ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         let guard = self
             .snapshots
             .read()
@@ -77,6 +86,7 @@ impl ContextSnapshotPort for InMemoryContextSnapshotAdapter {
 
     async fn find_snapshots_for_session(
         &self,
+        _ctx: &RequestContext,
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>> {
         let guard = self
@@ -96,6 +106,7 @@ impl ContextSnapshotPort for InMemoryContextSnapshotAdapter {
 
     async fn find_latest_snapshot(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         let guard = self

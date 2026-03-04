@@ -1,5 +1,7 @@
-//! Unit tests for `AuditContext` builder and `is_empty` semantics.
+//! Unit tests for `AuditContext` builder, `is_empty` semantics, and
+//! `From<&RequestContext>` conversion.
 
+use crate::context::{CausationId, CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::message::adapters::audit_context::AuditContext;
 use rstest::rstest;
 use uuid::Uuid;
@@ -178,4 +180,43 @@ fn audit_context_debug_output() {
 
     assert!(debug.contains("AuditContext"));
     assert!(debug.contains("correlation_id"));
+}
+
+// ============================================================================
+// From<&RequestContext> conversion tests
+// ============================================================================
+
+#[test]
+fn audit_context_from_request_context_maps_all_fields() {
+    let correlation_id = CorrelationId::new();
+    let causation_id = CausationId::new();
+    let user_id = UserId::new();
+    let session_id = SessionId::new();
+
+    let ctx = RequestContext::new(TenantId::new(), correlation_id, user_id, session_id)
+        .with_causation_id(causation_id);
+
+    let audit = AuditContext::from(&ctx);
+
+    assert_eq!(audit.correlation_id, Some(correlation_id.into_inner()));
+    assert_eq!(audit.causation_id, Some(causation_id.into_inner()));
+    assert_eq!(audit.user_id, Some(user_id.into_inner()));
+    assert_eq!(audit.session_id, Some(session_id.into_inner()));
+}
+
+#[test]
+fn audit_context_from_request_context_without_causation() {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+
+    let audit = AuditContext::from(&ctx);
+
+    assert!(audit.correlation_id.is_some());
+    assert!(audit.causation_id.is_none());
+    assert!(audit.user_id.is_some());
+    assert!(audit.session_id.is_some());
 }

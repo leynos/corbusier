@@ -1,6 +1,7 @@
 //! Given steps for backend registration BDD scenarios.
 
 use super::world::{BackendWorld, PendingBackend, build_request, run_async};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
 
@@ -17,8 +18,14 @@ fn backend_already_registered(world: &mut BackendWorld) -> Result<(), eyre::Repo
         .pending_backends
         .last()
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let request = build_request(&pending.name, &pending.provider);
-    let created = run_async(world.service.register(request))
+    let created = run_async(world.service.register(&ctx, request))
         .wrap_err("register existing backend for duplicate scenario")?;
     world.last_registered = Some(created.clone());
     world.registered_backends.push(created);
@@ -31,9 +38,15 @@ fn registered_backend_named(
     name: String,
     provider: String,
 ) -> Result<(), eyre::Report> {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let request = build_request(&name, &provider);
-    let created =
-        run_async(world.service.register(request)).wrap_err("register backend for scenario")?;
+    let created = run_async(world.service.register(&ctx, request))
+        .wrap_err("register backend for scenario")?;
     world.last_registered = Some(created.clone());
     world.registered_backends.push(created);
     Ok(())

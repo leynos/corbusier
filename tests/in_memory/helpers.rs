@@ -1,5 +1,6 @@
 //! Shared test helpers for in-memory repository integration tests.
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::memory::InMemoryMessageRepository,
     domain::{
@@ -38,6 +39,17 @@ pub fn clock() -> DefaultClock {
     DefaultClock
 }
 
+/// Provides a default request context for tests.
+#[fixture]
+pub fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
 /// Provides a conversation ID for tests.
 #[fixture]
 pub fn conversation_id() -> ConversationId {
@@ -49,11 +61,16 @@ pub fn conversation_id() -> ConversationId {
 /// # Errors
 ///
 /// Returns an error if any message creation or store operation fails.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper needs runtime, repo, clock, conversation_id, and ctx"
+)]
 pub fn store_conversation_messages(
     rt: &Runtime,
     repo: &InMemoryMessageRepository,
     clock: &DefaultClock,
     conversation_id: ConversationId,
+    ctx: &RequestContext,
 ) -> Result<Vec<Message>, Box<dyn std::error::Error + Send + Sync>> {
     let user_message = Message::new(
         conversation_id,
@@ -63,7 +80,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&user_message))?;
+    rt.block_on(repo.store(ctx, &user_message))?;
 
     let assistant_message = Message::new(
         conversation_id,
@@ -80,7 +97,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&assistant_message))?;
+    rt.block_on(repo.store(ctx, &assistant_message))?;
 
     let tool_message = Message::new(
         conversation_id,
@@ -93,7 +110,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&tool_message))?;
+    rt.block_on(repo.store(ctx, &tool_message))?;
 
     let final_message = Message::new(
         conversation_id,
@@ -105,7 +122,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&final_message))?;
+    rt.block_on(repo.store(ctx, &final_message))?;
 
     Ok(vec![
         user_message,

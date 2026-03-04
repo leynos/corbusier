@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use crate::context::RequestContext;
 use crate::task::{
     domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskId},
     ports::{TaskRepository, TaskRepositoryError, TaskRepositoryResult},
@@ -77,7 +78,7 @@ fn find_by_index(
 
 #[async_trait]
 impl TaskRepository for InMemoryTaskRepository {
-    async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
+    async fn store(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -97,7 +98,7 @@ impl TaskRepository for InMemoryTaskRepository {
         Ok(())
     }
 
-    async fn update(&self, task: &Task) -> TaskRepositoryResult<()> {
+    async fn update(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -126,14 +127,22 @@ impl TaskRepository for InMemoryTaskRepository {
         Ok(())
     }
 
-    async fn find_by_id(&self, id: TaskId) -> TaskRepositoryResult<Option<Task>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: TaskId,
+    ) -> TaskRepositoryResult<Option<Task>> {
         let state = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
         Ok(state.tasks.get(&id).cloned())
     }
 
-    async fn find_by_issue_ref(&self, issue_ref: &IssueRef) -> TaskRepositoryResult<Option<Task>> {
+    async fn find_by_issue_ref(
+        &self,
+        _ctx: &RequestContext,
+        issue_ref: &IssueRef,
+    ) -> TaskRepositoryResult<Option<Task>> {
         let state = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -145,7 +154,11 @@ impl TaskRepository for InMemoryTaskRepository {
         Ok(task)
     }
 
-    async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>> {
+    async fn find_by_branch_ref(
+        &self,
+        _ctx: &RequestContext,
+        branch_ref: &BranchRef,
+    ) -> TaskRepositoryResult<Vec<Task>> {
         let state = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -155,6 +168,7 @@ impl TaskRepository for InMemoryTaskRepository {
 
     async fn find_by_pull_request_ref(
         &self,
+        _ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
         let state = self.state.read().map_err(|err| {

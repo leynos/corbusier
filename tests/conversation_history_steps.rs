@@ -1,5 +1,6 @@
 //! BDD steps for conversation history persistence with audit metadata.
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::memory::InMemoryMessageRepository,
     domain::{
@@ -76,13 +77,25 @@ fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) -> Result<(), 
     .build(&clock)
     .wrap_err("message should build")?;
 
-    run_async(world.repo.store(&message)).wrap_err("store should succeed")?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    run_async(world.repo.store(&ctx, &message)).wrap_err("store should succeed")?;
     Ok(())
 }
 
 #[then("the conversation history includes audit metadata")]
 fn history_includes_audit_metadata(world: &HistoryWorld) -> Result<(), eyre::Report> {
-    let history = run_async(world.repo.find_by_conversation(world.conversation_id))
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    let history = run_async(world.repo.find_by_conversation(&ctx, world.conversation_id))
         .wrap_err("history fetch should succeed")?;
 
     let message = history

@@ -6,6 +6,7 @@ use crate::postgres::helpers::{
     BoxError, PostgresCluster, RoleResult, clock, ensure_template, insert_conversation,
     postgres_cluster, setup_repository,
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     domain::{
         AgentResponseAudit, AgentResponseStatus, AttachmentPart, ContentPart, ConversationId,
@@ -49,7 +50,13 @@ async fn role_round_trip_through_persistence(
         &clock,
     )?;
 
-    repo.store(&message).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &message).await?;
 
     let url = cluster.connection().database_url(temp_db.name());
     let mut conn = PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
@@ -63,7 +70,7 @@ async fn role_round_trip_through_persistence(
     drop(conn);
 
     let retrieved = repo
-        .find_by_id(message.id())
+        .find_by_id(&ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -106,10 +113,16 @@ async fn content_jsonb_round_trip_with_multiple_parts(
         &clock,
     )?;
 
-    repo.store(&message).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &message).await?;
 
     let retrieved = repo
-        .find_by_id(message.id())
+        .find_by_id(&ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -172,10 +185,16 @@ async fn tool_result_jsonb_round_trip(
         &clock,
     )?;
 
-    repo.store(&message).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &message).await?;
 
     let retrieved = repo
-        .find_by_id(message.id())
+        .find_by_id(&ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -236,10 +255,16 @@ async fn metadata_jsonb_round_trip(
         .with_metadata(metadata)
         .build(&clock)?;
 
-    repo.store(&message).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &message).await?;
 
     let retrieved = repo
-        .find_by_id(message.id())
+        .find_by_id(&ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -291,10 +316,16 @@ async fn from_persisted_preserves_all_domain_invariants(
         &clock,
     )?;
 
-    repo.store(&original).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &original).await?;
 
     let retrieved = repo
-        .find_by_id(original.id())
+        .find_by_id(&ctx, original.id())
         .await?
         .expect("message should exist");
 
@@ -349,10 +380,16 @@ async fn uuid_round_trip_preserves_values(
         .with_content(ContentPart::Text(TextPart::new("UUID test")))
         .build(&clock)?;
 
-    repo.store(&message).await?;
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    repo.store(&ctx, &message).await?;
 
     let retrieved = repo
-        .find_by_id(specific_msg_id)
+        .find_by_id(&ctx, specific_msg_id)
         .await?
         .expect("message should exist");
 

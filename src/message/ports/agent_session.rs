@@ -3,6 +3,7 @@
 //! Defines the abstract interface for storing and retrieving agent sessions,
 //! enabling different persistence implementations.
 
+use crate::context::RequestContext;
 use crate::message::domain::{AgentSession, AgentSessionId, ConversationId};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -32,25 +33,30 @@ pub trait AgentSessionRepository: Send + Sync {
     /// Returns `SessionError` if:
     /// - A session with the same ID already exists
     /// - The database connection fails
-    async fn store(&self, session: &AgentSession) -> SessionResult<()>;
+    async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Updates an existing session.
     ///
     /// # Errors
     ///
     /// Returns `SessionError::NotFound` if the session does not exist.
-    async fn update(&self, session: &AgentSession) -> SessionResult<()>;
+    async fn update(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Retrieves a session by its ID.
     ///
     /// Returns `None` if the session does not exist.
-    async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>>;
+    async fn find_by_id(
+        &self,
+        ctx: &RequestContext,
+        id: AgentSessionId,
+    ) -> SessionResult<Option<AgentSession>>;
 
     /// Finds the active session for a conversation.
     ///
     /// Returns `None` if no active session exists.
     async fn find_active_for_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>>;
 
@@ -59,6 +65,7 @@ pub trait AgentSessionRepository: Send + Sync {
     /// Returns an empty vector if no sessions exist.
     async fn find_by_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>>;
 }

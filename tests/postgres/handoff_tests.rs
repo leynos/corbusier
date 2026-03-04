@@ -2,6 +2,7 @@
 
 use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{PreparedRepo, insert_conversation, prepared_repo};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::postgres::{PostgresAgentSessionRepository, PostgresHandoffAdapter},
     domain::{AgentSession, ConversationId, SequenceNumber, TurnId},
@@ -36,14 +37,20 @@ async fn initiate_and_list_handoffs_for_conversation(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = prepared_repo.await?;
-    let pool = build_pool(ctx.temp_db.url())?;
+    let prep = prepared_repo.await?;
+    let pool = build_pool(prep.temp_db.url())?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
 
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let conversation_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
 
     let source_session = AgentSession::new(
         conversation_id,
@@ -51,7 +58,7 @@ async fn initiate_and_list_handoffs_for_conversation(
         SequenceNumber::new(1),
         &clock,
     );
-    session_repo.store(&source_session).await?;
+    session_repo.store(&ctx, &source_session).await?;
 
     let params = InitiateHandoffParams::new(
         conversation_id,
@@ -60,10 +67,10 @@ async fn initiate_and_list_handoffs_for_conversation(
         TurnId::new(),
     )
     .with_reason("escalation");
-    let handoff = handoff_adapter.initiate_handoff(params).await?;
+    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
 
     let handoffs = handoff_adapter
-        .list_handoffs_for_conversation(conversation_id)
+        .list_handoffs_for_conversation(&ctx, conversation_id)
         .await?;
 
     assert_eq!(handoffs.len(), 1);
@@ -80,14 +87,20 @@ async fn complete_handoff_updates_target_and_status(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = prepared_repo.await?;
-    let pool = build_pool(ctx.temp_db.url())?;
+    let prep = prepared_repo.await?;
+    let pool = build_pool(prep.temp_db.url())?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
 
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let conversation_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
 
     let source_session = AgentSession::new(
         conversation_id,
@@ -95,11 +108,11 @@ async fn complete_handoff_updates_target_and_status(
         SequenceNumber::new(1),
         &clock,
     );
-    session_repo.store(&source_session).await?;
+    session_repo.store(&ctx, &source_session).await?;
 
     let params =
         InitiateHandoffParams::new(conversation_id, &source_session, "agent-b", TurnId::new());
-    let handoff = handoff_adapter.initiate_handoff(params).await?;
+    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
 
     let target_session = AgentSession::new(
         conversation_id,
@@ -107,10 +120,10 @@ async fn complete_handoff_updates_target_and_status(
         SequenceNumber::new(10),
         &clock,
     );
-    session_repo.store(&target_session).await?;
+    session_repo.store(&ctx, &target_session).await?;
 
     let completed = handoff_adapter
-        .complete_handoff(handoff.handoff_id, target_session.session_id)
+        .complete_handoff(&ctx, handoff.handoff_id, target_session.session_id)
         .await?;
 
     assert_eq!(completed.target_session_id, Some(target_session.session_id));
@@ -124,14 +137,20 @@ async fn cancel_handoff_persists_reason(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = prepared_repo.await?;
-    let pool = build_pool(ctx.temp_db.url())?;
+    let prep = prepared_repo.await?;
+    let pool = build_pool(prep.temp_db.url())?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
 
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let conversation_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
 
     let source_session = AgentSession::new(
         conversation_id,
@@ -139,18 +158,18 @@ async fn cancel_handoff_persists_reason(
         SequenceNumber::new(1),
         &clock,
     );
-    session_repo.store(&source_session).await?;
+    session_repo.store(&ctx, &source_session).await?;
 
     let params =
         InitiateHandoffParams::new(conversation_id, &source_session, "agent-b", TurnId::new());
-    let handoff = handoff_adapter.initiate_handoff(params).await?;
+    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
 
     handoff_adapter
-        .cancel_handoff(handoff.handoff_id, Some("target unavailable"))
+        .cancel_handoff(&ctx, handoff.handoff_id, Some("target unavailable"))
         .await?;
 
     let found = handoff_adapter
-        .find_handoff(handoff.handoff_id)
+        .find_handoff(&ctx, handoff.handoff_id)
         .await?
         .ok_or_else(missing_handoff_error)?;
 

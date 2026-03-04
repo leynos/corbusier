@@ -6,6 +6,7 @@ use corbusier::agent_backend::{
     ports::BackendRegistryError,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use mockable::DefaultClock;
@@ -68,16 +69,22 @@ fn codex_request() -> RegisterBackendRequest {
 async fn postgres_register_and_retrieve_by_id(
     #[future] context: Result<BackendTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let created = ctx
+    let bctx = context.await?;
+    let req_ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    let created = bctx
         .service
-        .register(claude_request())
+        .register(&req_ctx, claude_request())
         .await
         .expect("registration should succeed");
 
-    let found = ctx
+    let found = bctx
         .service
-        .find_by_id(created.id())
+        .find_by_id(&req_ctx, created.id())
         .await
         .expect("lookup should succeed")
         .expect("backend should exist");
@@ -95,16 +102,22 @@ async fn postgres_register_and_retrieve_by_id(
 async fn postgres_register_and_retrieve_by_name(
     #[future] context: Result<BackendTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let created = ctx
+    let bctx = context.await?;
+    let req_ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    let created = bctx
         .service
-        .register(claude_request())
+        .register(&req_ctx, claude_request())
         .await
         .expect("registration should succeed");
 
-    let found = ctx
+    let found = bctx
         .service
-        .find_by_name("claude_code_sdk")
+        .find_by_name(&req_ctx, "claude_code_sdk")
         .await
         .expect("lookup should succeed")
         .expect("backend should exist");
@@ -119,13 +132,19 @@ async fn postgres_register_and_retrieve_by_name(
 async fn postgres_duplicate_name_is_rejected(
     #[future] context: Result<BackendTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    ctx.service
-        .register(claude_request())
+    let bctx = context.await?;
+    let req_ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    bctx.service
+        .register(&req_ctx, claude_request())
         .await
         .expect("first registration should succeed");
 
-    let result = ctx.service.register(claude_request()).await;
+    let result = bctx.service.register(&req_ctx, claude_request()).await;
 
     assert!(matches!(
         result,
@@ -141,25 +160,31 @@ async fn postgres_duplicate_name_is_rejected(
 async fn postgres_list_active_excludes_inactive(
     #[future] context: Result<BackendTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let claude = ctx
+    let bctx = context.await?;
+    let req_ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    let claude = bctx
         .service
-        .register(claude_request())
+        .register(&req_ctx, claude_request())
         .await
         .expect("first registration should succeed");
-    ctx.service
-        .register(codex_request())
+    bctx.service
+        .register(&req_ctx, codex_request())
         .await
         .expect("second registration should succeed");
 
-    ctx.service
-        .deactivate(claude.id())
+    bctx.service
+        .deactivate(&req_ctx, claude.id())
         .await
         .expect("deactivation should succeed");
 
-    let active = ctx
+    let active = bctx
         .service
-        .list_active()
+        .list_active(&req_ctx)
         .await
         .expect("listing should succeed");
     assert_eq!(active.len(), 1);
@@ -174,25 +199,31 @@ async fn postgres_list_active_excludes_inactive(
 async fn postgres_list_all_includes_inactive(
     #[future] context: Result<BackendTestContext, BoxError>,
 ) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let claude = ctx
+    let bctx = context.await?;
+    let req_ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+    let claude = bctx
         .service
-        .register(claude_request())
+        .register(&req_ctx, claude_request())
         .await
         .expect("first registration should succeed");
-    ctx.service
-        .register(codex_request())
+    bctx.service
+        .register(&req_ctx, codex_request())
         .await
         .expect("second registration should succeed");
 
-    ctx.service
-        .deactivate(claude.id())
+    bctx.service
+        .deactivate(&req_ctx, claude.id())
         .await
         .expect("deactivation should succeed");
 
-    let all = ctx
+    let all = bctx
         .service
-        .list_all()
+        .list_all(&req_ctx)
         .await
         .expect("listing should succeed");
     assert_eq!(all.len(), 2);

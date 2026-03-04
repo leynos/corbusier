@@ -1,6 +1,7 @@
 //! Then steps for task lifecycle BDD scenarios.
 
 use super::world::{TaskWorld, run_async};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::{
     domain::{IssueRef, IssueSnapshot, Task, TaskOrigin, TaskState},
     ports::TaskRepositoryError,
@@ -104,11 +105,17 @@ fn task_created_with_lifecycle_data(world: &TaskWorld) -> Result<(), eyre::Repor
 
 #[then("the task can be retrieved by the external issue reference")]
 fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre::Report> {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let issue_ref = world
         .pending_lookup
         .clone()
         .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
-    let lookup_result = run_async(world.service.find_by_issue_ref(&issue_ref));
+    let lookup_result = run_async(world.service.find_by_issue_ref(&ctx, &issue_ref));
     let found = match lookup_result {
         Ok(found) => {
             world.last_lookup_result = Some(Ok(found.clone()));

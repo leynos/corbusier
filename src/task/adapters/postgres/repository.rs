@@ -4,6 +4,7 @@ use super::{
     models::{NewTaskRow, TaskRow},
     schema::tasks,
 };
+use crate::context::RequestContext;
 use crate::task::{
     domain::{
         BranchRef, IssueRef, PersistedTaskData, PullRequestRef, Task, TaskId, TaskOrigin, TaskState,
@@ -67,7 +68,7 @@ macro_rules! find_tasks_by_ref_column {
 
 #[async_trait]
 impl TaskRepository for PostgresTaskRepository {
-    async fn store(&self, task: &Task) -> TaskRepositoryResult<()> {
+    async fn store(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
         let task_id = task.id();
         let issue_ref = task.origin().issue_ref().clone();
         let new_row = to_new_row(task)?;
@@ -100,7 +101,7 @@ impl TaskRepository for PostgresTaskRepository {
         .await
     }
 
-    async fn update(&self, task: &Task) -> TaskRepositoryResult<()> {
+    async fn update(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
         let task_id = task.id().into_inner();
         let branch_val = task.branch_ref().map(ToString::to_string);
         let pr_val = task.pull_request_ref().map(ToString::to_string);
@@ -126,7 +127,11 @@ impl TaskRepository for PostgresTaskRepository {
         .await
     }
 
-    async fn find_by_id(&self, id: TaskId) -> TaskRepositoryResult<Option<Task>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: TaskId,
+    ) -> TaskRepositoryResult<Option<Task>> {
         self.run_blocking(move |connection| {
             let row = tasks::table
                 .filter(tasks::id.eq(id.into_inner()))
@@ -139,7 +144,11 @@ impl TaskRepository for PostgresTaskRepository {
         .await
     }
 
-    async fn find_by_issue_ref(&self, issue_ref: &IssueRef) -> TaskRepositoryResult<Option<Task>> {
+    async fn find_by_issue_ref(
+        &self,
+        _ctx: &RequestContext,
+        issue_ref: &IssueRef,
+    ) -> TaskRepositoryResult<Option<Task>> {
         let lookup_issue_ref = issue_ref.clone();
         self.run_blocking(move |connection| {
             let row = find_task_by_issue_ref(connection, &lookup_issue_ref)?;
@@ -148,13 +157,18 @@ impl TaskRepository for PostgresTaskRepository {
         .await
     }
 
-    async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>> {
+    async fn find_by_branch_ref(
+        &self,
+        _ctx: &RequestContext,
+        branch_ref: &BranchRef,
+    ) -> TaskRepositoryResult<Vec<Task>> {
         let ref_str = branch_ref.to_string();
         find_tasks_by_ref_column!(self, ref_str, tasks::branch_ref)
     }
 
     async fn find_by_pull_request_ref(
         &self,
+        _ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
         let ref_str = pr_ref.to_string();

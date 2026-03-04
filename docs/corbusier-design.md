@@ -1339,6 +1339,34 @@ _Table 2.2.5.1: Tenancy and identity requirement matrix._
   5. Enable RLS and tenant session-variable plumbing.
   6. Add two-tenant isolation tests.
 
+###### Implementation decisions (2026-03-04) — tenant primitives and request context (1.5.1)
+
+- `RequestContext` lives in a new top-level `src/context/` module, not under
+  `src/tenant/`. Rationale: `RequestContext` is cross-cutting — every bounded
+  context depends on it. Placing it under `src/tenant/` would create a circular
+  or undesirable dependency from every other module on the tenant module.
+  Instead `src/context/` depends on nothing domain-specific (it defines the ID
+  newtypes itself, including `TenantId`), and every other module depends on
+  `src/context/`.
+- `AuditContext` is retained as an internal adapter type in
+  `src/message/adapters/audit_context.rs` with a `From<&RequestContext>`
+  conversion. Rationale: `AuditContext` encapsulates the specific fields that
+  map to PostgreSQL session variables for audit triggers. Keeping it avoids
+  coupling the Postgres adapter's `set_audit_context()` SQL helper directly to
+  the domain-level `RequestContext`. The conversion is mechanical and tested.
+- `TenantSlug` uses lowercase alphanumeric plus hyphens (not underscores),
+  max 63 characters (DNS label convention). Hyphens are the standard word
+  separator in URLs and DNS labels. The 63-character limit matches DNS label
+  constraints. Leading/trailing hyphens and consecutive hyphens are rejected.
+  Input is trimmed and lowercased automatically.
+- `&RequestContext` is added to all port trait methods (reads and writes), not
+  just writes. Rationale: the design states "every state mutation and lookup
+  executes within a tenant context." Future steps (1.5.3) will add tenant
+  filtering to reads. Adding the parameter now avoids a second cross-cutting
+  signature change.
+- `SlashCommandRegistry` is excluded from `RequestContext` plumbing because it
+  loads static command definitions, not tenant-owned data.
+
 ### 2.3 Feature Relationships
 
 #### 2.3.1 Feature Dependencies Map

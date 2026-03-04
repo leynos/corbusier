@@ -8,6 +8,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use mockable::DefaultClock;
 
+use crate::context::RequestContext;
 use crate::message::{
     adapters::models::{HandoffRow, NewHandoff},
     adapters::schema::handoffs,
@@ -58,6 +59,7 @@ impl PostgresHandoffAdapter {
 impl AgentHandoffPort for PostgresHandoffAdapter {
     async fn initiate_handoff(
         &self,
+        _ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         let pool = self.pool.clone();
@@ -99,6 +101,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
     async fn complete_handoff(
         &self,
+        _ctx: &RequestContext,
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
@@ -151,6 +154,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
     async fn cancel_handoff(
         &self,
+        _ctx: &RequestContext,
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()> {
@@ -196,7 +200,11 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         .await
     }
 
-    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>> {
+    async fn find_handoff(
+        &self,
+        _ctx: &RequestContext,
+        handoff_id: HandoffId,
+    ) -> HandoffResult<Option<HandoffMetadata>> {
         let uuid = handoff_id.into_inner();
 
         self.execute_query(move |conn| {
@@ -214,6 +222,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
     async fn list_handoffs_for_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>> {
         let uuid = conversation_id.into_inner();

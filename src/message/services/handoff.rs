@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use mockable::Clock;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{
         AgentSession, AgentSessionId, ContextWindowSnapshot, ConversationId, HandoffId,
@@ -151,12 +152,13 @@ where
     /// - Source session update fails
     pub async fn initiate(
         &self,
+        ctx: &RequestContext,
         params: ServiceInitiateParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         // Find and validate source session
         let mut source_session = self
             .session_repo
-            .find_by_id(params.source_session_id)
+            .find_by_id(ctx, params.source_session_id)
             .await
             .map_err(|_| HandoffError::SessionNotFound(params.source_session_id))?
             .ok_or(HandoffError::SessionNotFound(params.source_session_id))?;
@@ -180,7 +182,7 @@ where
             snapshot_type: SnapshotType::HandoffInitiated,
         });
         self.snapshot_adapter
-            .store_snapshot(&snapshot)
+            .store_snapshot(ctx, &snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
@@ -196,7 +198,7 @@ where
         }
         let handoff = self
             .handoff_adapter
-            .initiate_handoff(handoff_params)
+            .initiate_handoff(ctx, handoff_params)
             .await?;
 
         // Update source session state
@@ -207,7 +209,7 @@ where
         );
 
         self.session_repo
-            .update(&source_session)
+            .update(ctx, &source_session)
             .await
             .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
 
@@ -233,8 +235,13 @@ where
     /// - Handoff not found
     /// - Handoff is not in `Initiated` or `Accepted` state
     /// - Target session not found
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "completion requires handoff, session, sequence, and context parameters"
+    )]
     pub async fn complete(
         &self,
+        ctx: &RequestContext,
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
         start_sequence: SequenceNumber,
@@ -242,14 +249,14 @@ where
         // Verify the handoff exists and is in valid state
         let _handoff = self
             .handoff_adapter
-            .find_handoff(handoff_id)
+            .find_handoff(ctx, handoff_id)
             .await?
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
         // Find the target session to get conversation_id
         let target_session = self
             .session_repo
-            .find_by_id(target_session_id)
+            .find_by_id(ctx, target_session_id)
             .await
             .map_err(|_| HandoffError::SessionNotFound(target_session_id))?
             .ok_or(HandoffError::SessionNotFound(target_session_id))?;
@@ -263,14 +270,14 @@ where
             snapshot_type: SnapshotType::SessionStart,
         });
         self.snapshot_adapter
-            .store_snapshot(&snapshot)
+            .store_snapshot(ctx, &snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
         // Complete the handoff
         let completed = self
             .handoff_adapter
-            .complete_handoff(handoff_id, target_session_id)
+            .complete_handoff(ctx, handoff_id, target_session_id)
             .await?;
 
         Ok(completed)
@@ -291,18 +298,23 @@ where
     /// - Handoff not found
     /// - Handoff is already in a terminal state
     /// - Source session update fails
-    pub async fn cancel(&self, handoff_id: HandoffId, reason: Option<&str>) -> HandoffResult<()> {
+    pub async fn cancel(
+        &self,
+        ctx: &RequestContext,
+        handoff_id: HandoffId,
+        reason: Option<&str>,
+    ) -> HandoffResult<()> {
         // Find the handoff
         let handoff = self
             .handoff_adapter
-            .find_handoff(handoff_id)
+            .find_handoff(ctx, handoff_id)
             .await?
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
         // Revert source session if needed
         if let Some(mut source_session) = self
             .session_repo
-            .find_by_id(handoff.source_session_id)
+            .find_by_id(ctx, handoff.source_session_id)
             .await
             .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?
             && source_session.terminated_by_handoff == Some(handoff_id)
@@ -314,14 +326,14 @@ where
             source_session.ended_at = None;
 
             self.session_repo
-                .update(&source_session)
+                .update(ctx, &source_session)
                 .await
                 .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
         }
 
         // Cancel the handoff
         self.handoff_adapter
-            .cancel_handoff(handoff_id, reason)
+            .cancel_handoff(ctx, handoff_id, reason)
             .await
     }
 
@@ -345,11 +357,12 @@ where
     /// Returns `SessionError` if the session could not be stored.
     pub async fn create_target_session(
         &self,
+        ctx: &RequestContext,
         params: HandoffSessionParams,
     ) -> SessionResult<AgentSession> {
         let session = AgentSession::from_handoff(params, self.clock.as_ref());
 
-        self.session_repo.store(&session).await?;
+        self.session_repo.store(ctx, &session).await?;
 
         Ok(session)
     }
@@ -361,11 +374,12 @@ where
     /// Returns `HandoffError` if the handoff list could not be retrieved.
     pub async fn get_pending_handoff(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Option<HandoffMetadata>> {
         let handoffs = self
             .handoff_adapter
-            .list_handoffs_for_conversation(conversation_id)
+            .list_handoffs_for_conversation(ctx, conversation_id)
             .await?;
 
         // Find a non-terminal handoff

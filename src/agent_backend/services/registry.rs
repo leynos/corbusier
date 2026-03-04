@@ -10,6 +10,7 @@ use crate::agent_backend::{
     },
     ports::{BackendRegistryError, BackendRegistryRepository},
 };
+use crate::context::RequestContext;
 use mockable::Clock;
 use std::sync::Arc;
 use thiserror::Error;
@@ -130,6 +131,7 @@ where
     /// the repository rejects persistence.
     pub async fn register(
         &self,
+        ctx: &RequestContext,
         request: RegisterBackendRequest,
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
         let RegisterBackendRequest {
@@ -153,7 +155,7 @@ where
 
         let registration =
             AgentBackendRegistration::new(backend_name, capabilities, backend_info, &*self.clock);
-        self.repository.register(&registration).await?;
+        self.repository.register(ctx, &registration).await?;
         Ok(registration)
     }
 
@@ -167,9 +169,10 @@ where
     /// lookup fails.
     pub async fn find_by_id(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryServiceResult<Option<AgentBackendRegistration>> {
-        Ok(self.repository.find_by_id(id).await?)
+        Ok(self.repository.find_by_id(ctx, id).await?)
     }
 
     /// Finds a backend registration by unique name.
@@ -183,10 +186,11 @@ where
     /// persistence lookup fails.
     pub async fn find_by_name(
         &self,
+        ctx: &RequestContext,
         name: &str,
     ) -> BackendRegistryServiceResult<Option<AgentBackendRegistration>> {
         let backend_name = BackendName::new(name)?;
-        Ok(self.repository.find_by_name(&backend_name).await?)
+        Ok(self.repository.find_by_name(ctx, &backend_name).await?)
     }
 
     /// Returns all backend registrations with `Active` status.
@@ -195,8 +199,11 @@ where
     ///
     /// Returns [`BackendRegistryServiceError::Repository`] when persistence
     /// lookup fails.
-    pub async fn list_active(&self) -> BackendRegistryServiceResult<Vec<AgentBackendRegistration>> {
-        Ok(self.repository.list_active().await?)
+    pub async fn list_active(
+        &self,
+        ctx: &RequestContext,
+    ) -> BackendRegistryServiceResult<Vec<AgentBackendRegistration>> {
+        Ok(self.repository.list_active(ctx).await?)
     }
 
     /// Returns all backend registrations regardless of status.
@@ -205,8 +212,11 @@ where
     ///
     /// Returns [`BackendRegistryServiceError::Repository`] when persistence
     /// lookup fails.
-    pub async fn list_all(&self) -> BackendRegistryServiceResult<Vec<AgentBackendRegistration>> {
-        Ok(self.repository.list_all().await?)
+    pub async fn list_all(
+        &self,
+        ctx: &RequestContext,
+    ) -> BackendRegistryServiceResult<Vec<AgentBackendRegistration>> {
+        Ok(self.repository.list_all(ctx).await?)
     }
 
     /// Deactivates a backend, setting its status to `Inactive`.
@@ -218,9 +228,10 @@ where
     /// persistence fails.
     pub async fn deactivate(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
-        self.update_status(id, AgentBackendRegistration::deactivate)
+        self.update_status(ctx, id, AgentBackendRegistration::deactivate)
             .await
     }
 
@@ -233,24 +244,26 @@ where
     /// persistence fails.
     pub async fn activate(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
-        self.update_status(id, AgentBackendRegistration::activate)
+        self.update_status(ctx, id, AgentBackendRegistration::activate)
             .await
     }
 
     async fn update_status<F>(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
         mutate: F,
     ) -> BackendRegistryServiceResult<AgentBackendRegistration>
     where
         F: FnOnce(&mut AgentBackendRegistration, &C),
     {
-        let mut registration = self.find_by_id_or_error(id).await?;
+        let mut registration = self.find_by_id_or_error(ctx, id).await?;
         mutate(&mut registration, &*self.clock);
         self.repository
-            .update(&registration)
+            .update(ctx, &registration)
             .await
             .map_err(|err| match err {
                 BackendRegistryError::NotFound(_) => BackendRegistryServiceError::NotFound(id),
@@ -261,10 +274,11 @@ where
 
     async fn find_by_id_or_error(
         &self,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryServiceResult<AgentBackendRegistration> {
         self.repository
-            .find_by_id(id)
+            .find_by_id(ctx, id)
             .await?
             .ok_or(BackendRegistryServiceError::NotFound(id))
     }

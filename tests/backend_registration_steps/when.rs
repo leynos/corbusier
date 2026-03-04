@@ -1,13 +1,20 @@
 //! When steps for backend registration BDD scenarios.
 
 use super::world::{BackendWorld, build_request, run_async};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use rstest_bdd_macros::when;
 
 #[when("both backends are registered")]
 fn register_both_backends(world: &mut BackendWorld) -> Result<(), eyre::Report> {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     for pending in &world.pending_backends {
         let request = build_request(&pending.name, &pending.provider);
-        let result = run_async(world.service.register(request));
+        let result = run_async(world.service.register(&ctx, request));
         match result {
             Ok(registration) => {
                 world.registered_backends.push(registration);
@@ -22,22 +29,34 @@ fn register_both_backends(world: &mut BackendWorld) -> Result<(), eyre::Report> 
 
 #[when("a second backend with the same name is registered")]
 fn register_duplicate_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let pending = world
         .pending_backends
         .last()
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
     let request = build_request(&pending.name, &pending.provider);
-    world.last_register_result = Some(run_async(world.service.register(request)));
+    world.last_register_result = Some(run_async(world.service.register(&ctx, request)));
     Ok(())
 }
 
 #[when("the backend is deactivated")]
 fn deactivate_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
     let registration = world
         .last_registered
         .as_ref()
         .ok_or_else(|| eyre::eyre!("no registered backend to deactivate"))?;
-    run_async(world.service.deactivate(registration.id()))
+    run_async(world.service.deactivate(&ctx, registration.id()))
         .map_err(|err| eyre::eyre!("deactivation failed: {err}"))?;
     Ok(())
 }

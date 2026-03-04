@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
     error::RepositoryError,
@@ -58,7 +59,7 @@ impl InMemoryMessageRepository {
 
 #[async_trait]
 impl MessageRepository for InMemoryMessageRepository {
-    async fn store(&self, message: &Message) -> RepositoryResult<()> {
+    async fn store(&self, _ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
         let mut guard = self
             .messages
             .write()
@@ -86,7 +87,11 @@ impl MessageRepository for InMemoryMessageRepository {
         Ok(())
     }
 
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: MessageId,
+    ) -> RepositoryResult<Option<Message>> {
         let guard = self
             .messages
             .read()
@@ -97,6 +102,7 @@ impl MessageRepository for InMemoryMessageRepository {
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>> {
         let guard = self
@@ -118,6 +124,7 @@ impl MessageRepository for InMemoryMessageRepository {
 
     async fn next_sequence_number(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber> {
         let guard = self
@@ -135,7 +142,7 @@ impl MessageRepository for InMemoryMessageRepository {
         Ok(SequenceNumber::new(max_seq.saturating_add(1)))
     }
 
-    async fn exists(&self, id: MessageId) -> RepositoryResult<bool> {
+    async fn exists(&self, _ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool> {
         let guard = self
             .messages
             .read()

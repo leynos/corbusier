@@ -21,6 +21,7 @@ use diesel::prelude::*;
 use super::audit_context::AuditContext;
 use super::models::{MessageRow, NewMessage};
 use super::schema::messages;
+use crate::context::RequestContext;
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
     error::RepositoryError,
@@ -80,12 +81,12 @@ impl PostgresMessageRepository {
     /// Returns `RepositoryError` if the database operation fails.
     pub async fn store_with_audit(
         &self,
+        ctx: &RequestContext,
         message: &Message,
-        audit: &AuditContext,
     ) -> RepositoryResult<()> {
         let pool = self.pool.clone();
         let new_message = NewMessage::try_from_domain(message)?;
-        let audit_ctx = audit.clone();
+        let audit_ctx = AuditContext::from(ctx);
         let msg_id = message.id();
         let conv_id = message.conversation_id();
         let seq_num = message.sequence_number();
@@ -110,7 +111,7 @@ impl PostgresMessageRepository {
 
 #[async_trait]
 impl MessageRepository for PostgresMessageRepository {
-    async fn store(&self, message: &Message) -> RepositoryResult<()> {
+    async fn store(&self, _ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
         let pool = self.pool.clone();
         let new_message = NewMessage::try_from_domain(message)?;
         let msg_id = message.id();
@@ -159,7 +160,11 @@ impl MessageRepository for PostgresMessageRepository {
         .await
     }
 
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: MessageId,
+    ) -> RepositoryResult<Option<Message>> {
         let pool = self.pool.clone();
         let uuid = id.into_inner();
 
@@ -180,6 +185,7 @@ impl MessageRepository for PostgresMessageRepository {
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>> {
         let pool = self.pool.clone();
@@ -202,6 +208,7 @@ impl MessageRepository for PostgresMessageRepository {
 
     async fn next_sequence_number(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber> {
         let pool = self.pool.clone();
@@ -227,7 +234,7 @@ impl MessageRepository for PostgresMessageRepository {
         .await
     }
 
-    async fn exists(&self, id: MessageId) -> RepositoryResult<bool> {
+    async fn exists(&self, _ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool> {
         let pool = self.pool.clone();
         let uuid = id.into_inner();
 

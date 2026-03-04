@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use crate::in_memory::helpers::{clock, conversation_id, repo, runtime};
+use crate::in_memory::helpers::{clock, conversation_id, ctx, repo, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     adapters::memory::{InMemoryMessageRepository, InMemorySlashCommandRegistry},
     domain::{
@@ -75,11 +76,16 @@ fn assert_tool_call_audit(message: &Message, audit_index: usize, expected: &Expe
 }
 
 #[rstest]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "rstest fixture injection requires individual parameters"
+)]
 fn slash_command_execution_metadata_round_trip_in_memory(
     runtime: std::io::Result<Runtime>,
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     conversation_id: ConversationId,
+    ctx: RequestContext,
 ) {
     let rt = runtime.expect("runtime fixture should initialize");
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
@@ -100,11 +106,11 @@ fn slash_command_execution_metadata_round_trip_in_memory(
         .build(&clock)
         .expect("message build should succeed");
 
-    rt.block_on(repo.store(&message))
+    rt.block_on(repo.store(&ctx, &message))
         .expect("storing message should succeed");
 
     let persisted = rt
-        .block_on(repo.find_by_conversation(conversation_id))
+        .block_on(repo.find_by_conversation(&ctx, conversation_id))
         .expect("message lookup should succeed")
         .first()
         .cloned()

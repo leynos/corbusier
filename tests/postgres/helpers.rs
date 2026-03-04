@@ -3,7 +3,6 @@
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
@@ -168,35 +167,6 @@ pub fn create_test_message(
         clock,
     )
     .map_err(|e| Box::new(e) as BoxError)
-}
-
-/// Expected audit context values for parameterized tests.
-pub struct ExpectedAuditContext {
-    pub correlation: Option<Uuid>,
-    pub causation: Option<Uuid>,
-    pub user: Option<Uuid>,
-    pub session: Option<Uuid>,
-}
-
-impl ExpectedAuditContext {
-    /// Creates an [`AuditContext`] from expected values.
-    #[must_use]
-    pub const fn to_audit_context(&self) -> AuditContext {
-        let mut audit = AuditContext::empty();
-        if let Some(id) = self.correlation {
-            audit = audit.with_correlation_id(id);
-        }
-        if let Some(id) = self.causation {
-            audit = audit.with_causation_id(id);
-        }
-        if let Some(id) = self.user {
-            audit = audit.with_user_id(id);
-        }
-        if let Some(id) = self.session {
-            audit = audit.with_session_id(id);
-        }
-        audit
-    }
 }
 
 /// Helper struct for querying role from database.

@@ -1,6 +1,7 @@
 //! Handoff initiation tests for in-memory adapters.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, AgentSessionState, ConversationId, HandoffStatus, SequenceNumber, TurnId,
 };
@@ -14,6 +15,7 @@ use tokio::runtime::Runtime;
 fn initiate_handoff_requires_active_session(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
@@ -26,7 +28,7 @@ fn initiate_handoff_requires_active_session(
             SequenceNumber::new(5),
         )
         .with_reason("task too complex");
-        let result = harness.service.initiate(params).await;
+        let result = harness.service.initiate(&ctx, params).await;
 
         assert!(result.is_err());
     });
@@ -37,6 +39,7 @@ fn initiate_handoff_succeeds_with_active_session(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
     clock: DefaultClock,
+    ctx: RequestContext,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
@@ -49,7 +52,11 @@ fn initiate_handoff_succeeds_with_active_session(
             &clock,
         );
 
-        harness.session_repo.store(&session).await.expect("store");
+        harness
+            .session_repo
+            .store(&ctx, &session)
+            .await
+            .expect("store");
 
         let initiate_params = ServiceInitiateParams::new(
             session.session_id,
@@ -60,7 +67,7 @@ fn initiate_handoff_succeeds_with_active_session(
         .with_reason("task requires specialist");
         let handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("should initiate");
 
@@ -72,7 +79,7 @@ fn initiate_handoff_succeeds_with_active_session(
 
         let updated = harness
             .session_repo
-            .find_by_id(session.session_id)
+            .find_by_id(&ctx, session.session_id)
             .await
             .expect("find")
             .expect("exists");

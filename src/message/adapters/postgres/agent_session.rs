@@ -10,6 +10,7 @@ use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use serde::Serialize;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
+use crate::context::RequestContext;
 use crate::message::{
     adapters::models::{AgentSessionRow, NewAgentSession},
     adapters::schema::agent_sessions,
@@ -85,7 +86,7 @@ impl PostgresAgentSessionRepository {
 
 #[async_trait]
 impl AgentSessionRepository for PostgresAgentSessionRepository {
-    async fn store(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
         let new_session = session_to_new_row(session)?;
         let session_id = session.session_id;
@@ -111,7 +112,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         .await
     }
 
-    async fn update(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
         let session_id = session.session_id;
         let updated = session_to_update_values(session)?;
@@ -138,7 +139,11 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         .await
     }
 
-    async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: AgentSessionId,
+    ) -> SessionResult<Option<AgentSession>> {
         let uuid = id.into_inner();
 
         self.find_one(move |table| table.filter(agent_sessions::id.eq(uuid)).into_boxed())
@@ -147,6 +152,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
     async fn find_active_for_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
         let uuid = conversation_id.into_inner();
@@ -162,6 +168,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
         let uuid = conversation_id.into_inner();
