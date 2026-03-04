@@ -1,0 +1,40 @@
+-- Add MCP server registry table for roadmap item 2.1.1.
+-- Follows corbusier-design.md §2.2.4 and §6.1.4.
+
+CREATE TABLE mcp_servers (
+    id UUID PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    transport JSONB NOT NULL,
+    lifecycle_state VARCHAR(50) NOT NULL DEFAULT 'registered',
+    health_status VARCHAR(50) NOT NULL DEFAULT 'unknown',
+    health_message TEXT,
+    health_checked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT mcp_servers_lifecycle_state_check CHECK (
+        lifecycle_state IN ('registered', 'running', 'stopped')
+    ),
+    CONSTRAINT mcp_servers_health_status_check CHECK (
+        health_status IN ('unknown', 'healthy', 'unhealthy')
+    ),
+    CONSTRAINT mcp_servers_health_checked_when_status_known CHECK (
+        health_status NOT IN ('healthy', 'unhealthy')
+        OR health_checked_at IS NOT NULL
+    )
+);
+
+CREATE FUNCTION update_mcp_servers_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_mcp_servers_updated_at
+    BEFORE UPDATE ON mcp_servers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_mcp_servers_updated_at();
+
+CREATE UNIQUE INDEX idx_mcp_servers_name
+    ON mcp_servers (name);

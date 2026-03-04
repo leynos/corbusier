@@ -7,6 +7,7 @@
 //! - `handoff_tests`: Agent handoff workflow
 //! - `task_lifecycle_tests`: Issue-to-task creation and tracking
 //! - `backend_registry_tests`: Agent backend registration and discovery
+//! - `mcp_server_lifecycle_tests`: MCP server registration and lifecycle
 
 mod in_memory {
     pub mod helpers;
@@ -15,6 +16,7 @@ mod in_memory {
     mod constraint_tests;
     mod conversation_flow_tests;
     mod handoff_tests;
+    mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod slash_command_tests;
     mod task_lifecycle_tests;

@@ -17,8 +17,10 @@
 //! - [`agent_backend`]: Agent backend registration and discovery
 //! - [`message`]: Canonical message format and validation
 //! - [`task`]: Issue-to-task creation and lifecycle tracking
+//! - [`tool_registry`]: MCP server lifecycle management and tool discovery
 
 pub mod agent_backend;
 pub mod message;
 pub mod task;
+pub mod tool_registry;
 pub mod worker;

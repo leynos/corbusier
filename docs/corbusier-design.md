@@ -1078,6 +1078,82 @@ _Table 2.1.5.1: Tenancy and identity feature catalog._
     token security
   - Compliance Requirements: MCP server lifecycle audit logging
 
+###### Implementation decisions (2026-02-28) — roadmap 2.1.1
+
+- MCP lifecycle management is implemented as a dedicated `tool_registry`
+  bounded context (`src/tool_registry/`) rather than extending `agent_backend`.
+  This keeps MCP hosting concerns isolated from agent backend registration
+  concerns.
+- Lifecycle orchestration is split behind two ports:
+  `McpServerRegistryRepository` for persistence and `McpServerHost` for runtime
+  start/stop/health/tool-list operations.
+- The `McpServerRegistration` aggregate enforces lifecycle transitions:
+  `registered -> running -> stopped`, with restart support
+  (`stopped -> running`) and no transition back to `registered`.
+- Server registration names (`McpServerName`) are normalized to lowercase
+  identifiers (`[a-z0-9_]`) and constrained to 100 characters, aligned with
+  database uniqueness constraints.
+- Health state is persisted as timestamped snapshots
+  (`unknown | healthy | unhealthy`) so listing servers includes latest
+  observability data even after process restarts.
+- Scope is intentionally limited to `tools/list` discovery in 2.1.1; tool call
+  routing/execution remains deferred to roadmap item 2.1.2.
+
+For screen readers: The following sequence diagram shows how starting an MCP
+server and querying tools flows through the lifecycle service, host adapter,
+and persistence port.
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant McpServerLifecycleService
+    participant RegistryRepo as McpServerRegistryRepository
+    participant Host as McpServerHost
+    participant Postgres as PostgresDB
+    participant McpProcess as MCPServer
+
+    Operator->>McpServerLifecycleService: start(McpServerId)
+    McpServerLifecycleService->>RegistryRepo: find_by_id(McpServerId)
+    RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
+    Postgres-->>RegistryRepo: McpServerRegistration
+    RegistryRepo-->>McpServerLifecycleService: McpServerRegistration
+
+    McpServerLifecycleService->>Host: start(McpServerRegistration)
+    Host->>McpProcess: spawn process with transport config
+    McpProcess-->>Host: started
+    Host-->>McpServerLifecycleService: Result ok
+
+    McpServerLifecycleService->>Host: health(McpServerRegistration)
+    Host->>McpProcess: ping/health
+    McpProcess-->>Host: health snapshot
+    Host-->>McpServerLifecycleService: ServerHealthSnapshot
+
+    McpServerLifecycleService->>RegistryRepo: update(McpServerRegistration with running state and health)
+    RegistryRepo->>Postgres: UPDATE mcp_servers SET state, health = ...
+    Postgres-->>RegistryRepo: ok
+    RegistryRepo-->>McpServerLifecycleService: ok
+    McpServerLifecycleService-->>Operator: started registration
+
+    Operator->>McpServerLifecycleService: list_tools(McpServerId)
+    McpServerLifecycleService->>RegistryRepo: find_by_id(McpServerId)
+    RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
+    Postgres-->>RegistryRepo: McpServerRegistration
+    RegistryRepo-->>McpServerLifecycleService: McpServerRegistration
+
+    McpServerLifecycleService->>Host: list_tools(McpServerRegistration)
+    Host->>McpProcess: tools/list
+    McpProcess-->>Host: List ToolDefinition
+    Host-->>McpServerLifecycleService: List ToolDefinition
+
+    McpServerLifecycleService->>RegistryRepo: update(McpServerRegistration with tools snapshot)
+    RegistryRepo->>Postgres: UPDATE mcp_servers SET tools_snapshot = ...
+    Postgres-->>RegistryRepo: ok
+    RegistryRepo-->>McpServerLifecycleService: ok
+    McpServerLifecycleService-->>Operator: List ToolDefinition
+```
+
+_Figure: MCP server start and `tools/list` lifecycle interaction sequence._
+
 ##### F-005-RQ-002: Tool Discovery and Registration
 
 - **Technical Specifications:**
@@ -4461,6 +4537,25 @@ graph TB
     MCP_HOST --> TEST_RUNNER
 ```
 
+##### Implementation decisions (2026-02-28) — roadmap 2.1.1 (§6.1.4)
+
+- The initial implementation provides `InMemoryMcpServerHost` as the host
+  adapter for deterministic lifecycle behaviour in tests and local execution
+  flows without external process orchestration.
+- Registry persistence is implemented in both in-memory and PostgreSQL adapters
+  (`InMemoryMcpServerRegistry`, `PostgresMcpServerRegistry`) behind a shared
+  repository port to preserve hexagonal boundaries.
+- PostgreSQL persistence uses an additive `mcp_servers` table and stores
+  transport configuration as JSONB so stdio and HTTP+SSE variants can evolve
+  without frequent schema churn.
+- Service-level operations are exposed through
+  `McpServerLifecycleService` (`register`, `start`, `stop`, `refresh_health`,
+  `list_all`, `find_by_name`, `list_tools`) with typed error propagation from
+  domain, repository, and host layers.
+- Behaviour and integration coverage was added for happy and unhappy paths via
+  `rstest` and `rstest-bdd`, including duplicate registration rejection and
+  tool-query rejection when the server is not running.
+
 ##### Tool Registration and Discovery
 
 This specification defines the authoritative protocol requirements, based on
@@ -4903,8 +4998,8 @@ CREATE TABLE audit_logs (
 ```
 
 For screen readers: The following entity-relationship diagram shows tenant
-ownership and key foreign-key paths for tasks, conversations, messages,
-backend registrations, domain events, and audit logs.
+ownership and key foreign-key paths for tasks, conversations, messages, backend
+registrations, domain events, and audit logs.
 
 ```mermaid
 erDiagram
@@ -6908,8 +7003,8 @@ The following illustrative example demonstrates the repository pattern with
 Diesel and `spawn_blocking`. Identifiers such as `NewMessage`, `MessageRow`,
 `row_to_message`, and `RepositoryError` are context-dependent and defined in
 the actual implementation. Tenant scoping is established per operation with
-`set_config('app.tenant_id', <value>, true)` inside the same transaction as
-the protected statements, ensuring connection-pool reuse cannot bypass RLS.
+`set_config('app.tenant_id', <value>, true)` inside the same transaction as the
+protected statements, ensuring connection-pool reuse cannot bypass RLS.
 
 ```rust
 // Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
