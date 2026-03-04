@@ -1106,50 +1106,50 @@ and persistence port.
 ```mermaid
 sequenceDiagram
     actor Operator
-    participant ToolRegistryService
+    participant McpServerLifecycleService
     participant RegistryRepo as McpServerRegistryRepository
     participant Host as McpServerHost
     participant Postgres as PostgresDB
     participant McpProcess as MCPServer
 
-    Operator->>ToolRegistryService: start_server(McpServerId)
-    ToolRegistryService->>RegistryRepo: find_by_id(McpServerId)
+    Operator->>McpServerLifecycleService: start(McpServerId)
+    McpServerLifecycleService->>RegistryRepo: find_by_id(McpServerId)
     RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
     Postgres-->>RegistryRepo: McpServerRegistration
-    RegistryRepo-->>ToolRegistryService: McpServerRegistration
+    RegistryRepo-->>McpServerLifecycleService: McpServerRegistration
 
-    ToolRegistryService->>Host: start(McpServerRegistration)
+    McpServerLifecycleService->>Host: start(McpServerRegistration)
     Host->>McpProcess: spawn process with transport config
     McpProcess-->>Host: started
-    Host-->>ToolRegistryService: Result ok
+    Host-->>McpServerLifecycleService: Result ok
 
-    ToolRegistryService->>Host: health(McpServerRegistration)
+    McpServerLifecycleService->>Host: health(McpServerRegistration)
     Host->>McpProcess: ping/health
     McpProcess-->>Host: health snapshot
-    Host-->>ToolRegistryService: ServerHealthSnapshot
+    Host-->>McpServerLifecycleService: ServerHealthSnapshot
 
-    ToolRegistryService->>RegistryRepo: update(McpServerRegistration with running state and health)
+    McpServerLifecycleService->>RegistryRepo: update(McpServerRegistration with running state and health)
     RegistryRepo->>Postgres: UPDATE mcp_servers SET state, health = ...
     Postgres-->>RegistryRepo: ok
-    RegistryRepo-->>ToolRegistryService: ok
-    ToolRegistryService-->>Operator: started registration
+    RegistryRepo-->>McpServerLifecycleService: ok
+    McpServerLifecycleService-->>Operator: started registration
 
-    Operator->>ToolRegistryService: query_tools(McpServerId)
-    ToolRegistryService->>RegistryRepo: find_by_id(McpServerId)
+    Operator->>McpServerLifecycleService: list_tools(McpServerId)
+    McpServerLifecycleService->>RegistryRepo: find_by_id(McpServerId)
     RegistryRepo->>Postgres: SELECT * FROM mcp_servers WHERE id = ?
     Postgres-->>RegistryRepo: McpServerRegistration
-    RegistryRepo-->>ToolRegistryService: McpServerRegistration
+    RegistryRepo-->>McpServerLifecycleService: McpServerRegistration
 
-    ToolRegistryService->>Host: list_tools(McpServerRegistration)
+    McpServerLifecycleService->>Host: list_tools(McpServerRegistration)
     Host->>McpProcess: tools/list
     McpProcess-->>Host: List ToolDefinition
-    Host-->>ToolRegistryService: List ToolDefinition
+    Host-->>McpServerLifecycleService: List ToolDefinition
 
-    ToolRegistryService->>RegistryRepo: update(McpServerRegistration with tools snapshot)
+    McpServerLifecycleService->>RegistryRepo: update(McpServerRegistration with tools snapshot)
     RegistryRepo->>Postgres: UPDATE mcp_servers SET tools_snapshot = ...
     Postgres-->>RegistryRepo: ok
-    RegistryRepo-->>ToolRegistryService: ok
-    ToolRegistryService-->>Operator: List ToolDefinition
+    RegistryRepo-->>McpServerLifecycleService: ok
+    McpServerLifecycleService-->>Operator: List ToolDefinition
 ```
 
 _Figure: MCP server start and `tools/list` lifecycle interaction sequence._
