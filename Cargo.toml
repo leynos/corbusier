@@ -33,6 +33,12 @@ diesel = { version = "2.3.6", features = ["postgres", "uuid", "chrono", "serde_j
 # Capability-based filesystem access
 cap-std = { version = "4.0.0", features = ["fs_utf8"] }
 
+# Byte buffer types (used in port APIs for log capture)
+bytes = "1.10.1"
+
+# Object storage for tool stderr log capture
+object_store = "^0.12.0"
+
 # Async runtime
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 

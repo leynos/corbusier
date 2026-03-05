@@ -1,8 +1,13 @@
-//! Adapter implementations for MCP server lifecycle and registry ports.
+//! Adapter implementations for MCP server lifecycle, registry, and tool
+//! catalog ports.
+
+mod log_store;
+mod policy;
+mod runtime;
 
 pub mod memory;
 pub mod postgres;
 
-mod runtime;
-
+pub use log_store::ObjectStoreLogAdapter;
+pub use policy::{AllowAllPolicy, DenyAllPolicy};
 pub use runtime::InMemoryMcpServerHost;

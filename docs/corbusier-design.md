@@ -1186,6 +1186,43 @@ _Figure: MCP server start and `tools/list` lifecycle interaction sequence._
   - Security Requirements: Tool execution isolation, resource limit enforcement
   - Compliance Requirements: Complete tool execution audit trails
 
+##### Implementation decisions for F-005-RQ-002 and F-005-RQ-003
+
+_Recorded 2026-03-05 during roadmap 2.1.2 implementation._
+
+- **`ToolDiscoveryRoutingService`** is a sibling service to
+  `McpServerLifecycleService` rather than an extension of it. The lifecycle
+  service manages server state transitions; the discovery/routing service
+  manages the tool catalog and call routing. Composition at the call site keeps
+  each service focused and testable.
+- **Composition-based integration**: when a server starts, the caller
+  invokes `discover_and_persist_tools()`; when it stops, the caller invokes
+  `mark_tools_unavailable()`. The services share port instances but do not
+  reference each other.
+- **Lightweight schema validation**: a domain `validate_parameters()` function
+  checks required fields and object type without a dedicated JSON Schema crate.
+  This covers the common MCP case (flat object schemas) and can be replaced
+  with a crate-backed implementation later.
+- **`AllowAllPolicy` default**: the `ToolPolicyEnforcer` port is an
+  extensibility point. The default adapter permits all calls; real
+  authorisation will be implemented when the workspace and permission systems
+  exist.
+- **Unique tool names**: a database unique index on `tool_name` enforces
+  unambiguous routing. If two servers advertise the same tool name, the second
+  discovery attempt replaces the first server's entry via `sync_server_tools`.
+- **Audit trail**: every tool call (success or failure) produces a
+  `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
+  duration, parameters, outcome, and optional stderr log path.
+- **Stderr log capture** via a `ToolLogStore` port backed by the Rust
+  `object_store` crate. Startup stderr and per-tool-call stderr are stored as
+  opaque blobs with structured path keys
+  (`tool_logs/{server_id}/{kind}/{log_entry_id}.stderr`). References are
+  recorded in audit records. The `tool_log_metadata` table indexes stored blobs
+  for retention sweeps.
+- **Log retention policy**: 7-day default retention, 10 MiB per-log cap
+  (truncated with a marker), 100 logs per server maximum. Retention sweeps run
+  during `store_startup_stderr` and can be triggered explicitly.
+
 ##### F-006-RQ-001: Weaver Change Tracking
 
 - **Technical Specifications:**

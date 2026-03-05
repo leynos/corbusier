@@ -7,7 +7,9 @@ use crate::tool_registry::{
         McpServerHealthSnapshot, McpServerHealthStatus, McpServerId, McpServerLifecycleState,
         McpServerName, McpToolDefinition, McpTransport, ToolRegistryDomainError,
     },
-    ports::{McpServerHost, McpServerHostError, McpServerHostResult},
+    ports::{
+        McpServerHost, McpServerHostError, McpServerHostResult, StartHostResult, ToolCallHostResult,
+    },
 };
 use async_trait::async_trait;
 use eyre::Result;
@@ -209,10 +211,11 @@ impl McpServerHost for HealthProbeFailureHost {
     async fn start(
         &self,
         server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<()> {
+    ) -> McpServerHostResult<StartHostResult> {
         self.with_started_lock(|started| {
             started.insert(server.id());
-        })
+        })?;
+        Ok(StartHostResult::default())
     }
 
     async fn stop(
@@ -244,6 +247,15 @@ impl McpServerHost for HealthProbeFailureHost {
                 Err(McpServerHostError::NotRunning(server.id()))
             }
         })?
+    }
+
+    async fn call_tool(
+        &self,
+        server: &crate::tool_registry::domain::McpServerRegistration,
+        _tool_name: &str,
+        _parameters: serde_json::Value,
+    ) -> McpServerHostResult<ToolCallHostResult> {
+        Err(McpServerHostError::NotRunning(server.id()))
     }
 }
 

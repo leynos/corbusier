@@ -191,7 +191,7 @@ where
     ) -> Option<McpServerLifecycleServiceError> {
         let compensation_action = compensation?;
         let compensation_result = match compensation_action {
-            LifecycleCompensationAction::Start => self.host.start(server).await,
+            LifecycleCompensationAction::Start => self.host.start(server).await.map(|_| ()),
             LifecycleCompensationAction::Stop => self.host.stop(server).await,
         };
         compensation_result.err().map(|host_error| {
@@ -222,7 +222,7 @@ where
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
                 match host_action {
-                    LifecycleHostAction::Start => service.host.start(server).await?,
+                    LifecycleHostAction::Start => drop(service.host.start(server).await?),
                     LifecycleHostAction::Stop => service.host.stop(server).await?,
                 }
                 Ok(LifecycleChange::with_compensation(

@@ -111,6 +111,10 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     Ok(())
 }
 
+/// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
+pub const ADD_TOOL_CATALOG_SQL: &str =
+    include_str!("../../migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql");
+
 /// Builds a Diesel `r2d2` connection pool for the given database URL.
 ///
 /// # Errors

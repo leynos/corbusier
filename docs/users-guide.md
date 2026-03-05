@@ -496,3 +496,140 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Tool discovery and call routing
+
+After starting an MCP server via the lifecycle service, use
+`ToolDiscoveryRoutingService` to discover its tools, persist them in a durable
+catalog, and route tool calls by name. The service validates parameters against
+the tool's input schema, enforces a pluggable policy check, routes the call to
+the correct hosting server, and records a complete audit trail.
+
+### Discovering tools
+
+Call `discover_and_persist_tools()` after starting a server. This queries the
+running server for its tool definitions and persists them in the catalog.
+Rediscovery is idempotent -- calling it again replaces the existing entries.
+
+### Querying the catalog
+
+Call `list_catalog()` to see all tools across all registered servers, including
+their schemas and availability status.
+
+### Calling a tool
+
+Call `call_tool()` with a `ToolCallRequest` containing the tool name and
+parameters. The service:
+
+1. Resolves the tool name to a catalog entry.
+2. Checks that the tool is available (its hosting server is running).
+3. Validates parameters against the tool's declared input schema.
+4. Enforces the configured policy (default: `AllowAllPolicy` permits all).
+5. Routes the call to the correct MCP server.
+6. Records an audit trail entry with outcome, duration, and any stderr.
+
+### Tool availability lifecycle
+
+When a server is stopped, call `mark_tools_unavailable()` to flag all its tools
+as unavailable. Subsequent `call_tool()` requests for those tools are rejected
+with `ToolUnavailable`. When the server is restarted and tools are
+rediscovered, they become available again.
+
+### Stderr log capture
+
+Startup stderr (from `McpServerHost::start`) and per-tool-call stderr are
+automatically captured and stored via the `ToolLogStore` port. The default
+adapter uses the Rust `object_store` crate with a configurable backend (local
+filesystem or in-memory for tests). Log references are recorded in the audit
+trail's `stderr_log_path` field.
+
+The `LogRetentionPolicy` controls log rotation:
+
+- `max_bytes_per_log`: 10 MiB default; logs exceeding this are truncated.
+- `max_logs_per_server`: 100 default; oldest logs are deleted first.
+- `retention_period`: 7 days default; expired logs are swept on startup
+  and on demand via `sweep_expired_logs()`.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::tool_registry::{
+    adapters::{
+        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
+    },
+    domain::{
+        LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport,
+        ToolCallRequest,
+    },
+    services::{
+        McpServerLifecycleService, RegisterMcpServerRequest,
+        ToolDiscoveryRoutingService,
+    },
+};
+use mockable::DefaultClock;
+use serde_json::json;
+
+async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Arc::new(InMemoryMcpServerRegistry::new());
+    let host = Arc::new(InMemoryMcpServerHost::new());
+    let catalog = Arc::new(InMemoryToolCatalog::new());
+    let clock = Arc::new(DefaultClock);
+
+    // Configure the test host with a tool and its call result.
+    host.set_tool_catalog(
+        McpServerName::new("workspace_tools")?,
+        vec![McpToolDefinition::new(
+            "read_file",
+            "Reads a file from the workspace",
+            json!({"type": "object", "required": ["path"],
+                   "properties": {"path": {"type": "string"}}}),
+        )?],
+    )?;
+    host.set_tool_call_result(
+        McpServerName::new("workspace_tools")?,
+        "read_file",
+        json!({"content": "hello world"}),
+    )?;
+
+    // Create the lifecycle and discovery services.
+    let lifecycle = McpServerLifecycleService::new(
+        registry.clone(), host.clone(), clock.clone(),
+    );
+    let discovery = ToolDiscoveryRoutingService::new(
+        catalog, registry, host, Arc::new(AllowAllPolicy),
+        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        LogRetentionPolicy::default(), clock,
+    );
+
+    // Register, start, and discover tools.
+    let request = RegisterMcpServerRequest::new(
+        "workspace_tools", McpTransport::stdio("mcp-server")?,
+    );
+    let registered = lifecycle.register(request).await?;
+    lifecycle.start(registered.id()).await?;
+    let entries = discovery
+        .discover_and_persist_tools(registered.id())
+        .await?;
+    assert_eq!(entries.len(), 1);
+
+    // Call a tool by name -- routing resolves the hosting server.
+    let call = ToolCallRequest::new(
+        "read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock,
+    );
+    let result = discovery.call_tool(&call).await?;
+    assert!(result.outcome().is_success());
+
+    // Stop the server and mark tools unavailable.
+    lifecycle.stop(registered.id()).await?;
+    discovery.mark_tools_unavailable(registered.id()).await?;
+
+    // Subsequent calls are rejected.
+    let retry = ToolCallRequest::new(
+        "read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock,
+    );
+    assert!(discovery.call_tool(&retry).await.is_err());
+
+    Ok(())
+}
+```

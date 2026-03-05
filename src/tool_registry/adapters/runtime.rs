@@ -5,10 +5,13 @@ use crate::tool_registry::{
         McpServerHealthSnapshot, McpServerId, McpServerName, McpServerRegistration,
         McpToolDefinition,
     },
-    ports::{McpServerHost, McpServerHostError, McpServerHostResult},
+    ports::{
+        McpServerHost, McpServerHostError, McpServerHostResult, StartHostResult, ToolCallHostResult,
+    },
 };
 use async_trait::async_trait;
 use chrono::Utc;
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -27,6 +30,9 @@ struct InMemoryHostState {
     running_servers: HashSet<McpServerId>,
     unhealthy_servers: HashMap<McpServerId, String>,
     tool_catalogs: HashMap<McpServerName, Vec<McpToolDefinition>>,
+    tool_call_results: HashMap<(McpServerName, String), Value>,
+    tool_call_stderr: HashMap<(McpServerName, String), bytes::Bytes>,
+    startup_stderr: HashMap<McpServerName, bytes::Bytes>,
 }
 
 impl InMemoryMcpServerHost {
@@ -81,15 +87,70 @@ impl InMemoryMcpServerHost {
             .insert(server_id, message.into().trim().to_owned());
         Ok(())
     }
+
+    /// Configures the result that `call_tool` will return for a given
+    /// server and tool name combination.
+    ///
+    /// # Errors
+    ///
+    /// Returns host runtime errors when lock acquisition fails.
+    pub fn set_tool_call_result(
+        &self,
+        server_name: McpServerName,
+        tool_name: impl Into<String>,
+        result: Value,
+    ) -> McpServerHostResult<()> {
+        let mut state = self.write_state()?;
+        state
+            .tool_call_results
+            .insert((server_name, tool_name.into()), result);
+        Ok(())
+    }
+
+    /// Configures stderr output that `call_tool` will include for a
+    /// given server and tool name combination.
+    ///
+    /// # Errors
+    ///
+    /// Returns host runtime errors when lock acquisition fails.
+    pub fn set_tool_call_stderr(
+        &self,
+        server_name: McpServerName,
+        tool_name: impl Into<String>,
+        stderr: bytes::Bytes,
+    ) -> McpServerHostResult<()> {
+        let mut state = self.write_state()?;
+        state
+            .tool_call_stderr
+            .insert((server_name, tool_name.into()), stderr);
+        Ok(())
+    }
+
+    /// Configures stderr output that `start` will return for a given
+    /// server name.
+    ///
+    /// # Errors
+    ///
+    /// Returns host runtime errors when lock acquisition fails.
+    pub fn set_startup_stderr(
+        &self,
+        server_name: McpServerName,
+        stderr: bytes::Bytes,
+    ) -> McpServerHostResult<()> {
+        let mut state = self.write_state()?;
+        state.startup_stderr.insert(server_name, stderr);
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl McpServerHost for InMemoryMcpServerHost {
-    async fn start(&self, server: &McpServerRegistration) -> McpServerHostResult<()> {
+    async fn start(&self, server: &McpServerRegistration) -> McpServerHostResult<StartHostResult> {
         let mut state = self.write_state()?;
         state.running_servers.insert(server.id());
         state.unhealthy_servers.remove(&server.id());
-        Ok(())
+        let stderr_output = state.startup_stderr.get(server.name()).cloned();
+        Ok(StartHostResult { stderr_output })
     }
 
     async fn stop(&self, server: &McpServerRegistration) -> McpServerHostResult<()> {
@@ -135,5 +196,33 @@ impl McpServerHost for InMemoryMcpServerHost {
             .get(server.name())
             .cloned()
             .unwrap_or_default())
+    }
+
+    async fn call_tool(
+        &self,
+        server: &McpServerRegistration,
+        tool_name: &str,
+        _parameters: Value,
+    ) -> McpServerHostResult<ToolCallHostResult> {
+        let state = self.read_state()?;
+
+        if !state.running_servers.contains(&server.id()) {
+            return Err(McpServerHostError::NotRunning(server.id()));
+        }
+
+        let key = (server.name().clone(), tool_name.to_owned());
+        let content = state.tool_call_results.get(&key).cloned().ok_or_else(|| {
+            McpServerHostError::ToolCallFailed {
+                server_id: server.id(),
+                tool_name: tool_name.to_owned(),
+                reason: "no result configured for this tool".to_owned(),
+            }
+        })?;
+        let stderr_output = state.tool_call_stderr.get(&key).cloned();
+
+        Ok(ToolCallHostResult {
+            content,
+            stderr_output,
+        })
     }
 }
