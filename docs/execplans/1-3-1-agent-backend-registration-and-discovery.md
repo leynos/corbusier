@@ -26,8 +26,8 @@ After this change, a caller can:
 
 Observable success: `make all` passes, including new unit tests, in-memory
 integration tests, Behaviour-Driven Development (BDD) feature tests, and
-Postgres integration tests that
-exercise the full registration-and-discovery lifecycle.
+Postgres integration tests that exercise the full registration-and-discovery
+lifecycle.
 
 ## Constraints
 
@@ -62,30 +62,23 @@ exercise the full registration-and-discovery lifecycle.
 ## Risks
 
 - Risk: The design document does not define concrete `AgentCapabilities` or
-  `BackendInfo` struct fields — they must be inferred from the trait signature and
-  the table of known backends (Claude Code SDK, Codex CLI).
-  Severity: low
-  Likelihood: high
-  Mitigation: Define minimal, extensible structs with JSONB-backed flexible
-  fields. The capabilities struct captures booleans for known features
-  (streaming, tool calls) plus a max context window size. The info struct
-  captures name, version, and provider. Both serialize to JSONB, so adding
-  fields later is non-breaking.
+  `BackendInfo` struct fields — they must be inferred from the trait signature
+  and the table of known backends (Claude Code SDK, Codex CLI). Severity: low
+  Likelihood: high Mitigation: Define minimal, extensible structs with
+  JSONB-backed flexible fields. The capabilities struct captures booleans for
+  known features (streaming, tool calls) plus a max context window size. The
+  info struct captures name, version, and provider. Both serialize to JSONB, so
+  adding fields later is non-breaking.
 
 - Risk: The Diesel schema macro for the new table must coexist with the
   existing `tasks` schema defined in `src/task/adapters/postgres/schema.rs`
-  without conflicts.
-  Severity: low
-  Likelihood: low
-  Mitigation: Each subsystem defines its own `diesel::table!` in its own
-  `schema.rs` file, scoped to the subsystem's adapter module. This is the
-  established pattern.
+  without conflicts. Severity: low Likelihood: low Mitigation: Each subsystem
+  defines its own `diesel::table!` in its own `schema.rs` file, scoped to the
+  subsystem's adapter module. This is the established pattern.
 
 - Risk: BDD test step definitions may collide with existing step names.
-  Severity: low
-  Likelihood: low
-  Mitigation: Use backend-specific vocabulary in step definitions (e.g.
-  "a backend named" rather than generic "a resource").
+  Severity: low Likelihood: low Mitigation: Use backend-specific vocabulary in
+  step definitions (e.g. "a backend named" rather than generic "a resource").
 
 ## Progress
 
@@ -99,7 +92,8 @@ exercise the full registration-and-discovery lifecycle.
 - [x] Stage H: Database migration
 - [x] Stage I: Postgres adapter (schema, models, repository)
 - [x] Stage J: Postgres integration tests — 5 tests passed
-- [x] Stage K: Documentation updates (users-guide, roadmap, design doc decisions)
+- [x] Stage K: Documentation updates (users-guide, roadmap, design doc
+      decisions)
 - [x] Stage L: Final validation (make all, review)
 
 ## Surprises & discoveries
@@ -110,32 +104,29 @@ exercise the full registration-and-discovery lifecycle.
   entry point `backend_registration_scenarios.rs` instead of
   `backend_registration_steps.rs`.
 - Stages A-I were implemented in a single pass, with only one compilation
-  error (forgetting to read `lib.rs` before editing it). The patterns from
-  the `task` subsystem transferred cleanly to `agent_backend`.
+  error (forgetting to read `lib.rs` before editing it). The patterns from the
+  `task` subsystem transferred cleanly to `agent_backend`.
 
 ## Decision log
 
 - Decision: Scope 1.3.1 to registration metadata only, not the full
-  `AgentBackend` trait from the design doc.
-  Rationale: The design doc's `AgentBackend` trait includes `execute_turn` and
-  `translate_tool_schema`, which are roadmap items 1.3.2 and 1.3.3. Item 1.3.1
-  focuses on "registration and discovery" — the registry of backend metadata,
-  not the runtime dispatch interface. The `AgentBackend` trait will be
-  introduced in 1.3.2.
-  Date/Author: 2026-02-25
+  `AgentBackend` trait from the design doc. Rationale: The design doc's
+  `AgentBackend` trait includes `execute_turn` and `translate_tool_schema`,
+  which are roadmap items 1.3.2 and 1.3.3. Item 1.3.1 focuses on "registration
+  and discovery" — the registry of backend metadata, not the runtime dispatch
+  interface. The `AgentBackend` trait will be introduced in 1.3.2. Date/Author:
+  2026-02-25
 
 - Decision: Use `BackendStatus` enum with `Active` / `Inactive` states rather
-  than hard-deleting backends on deregistration.
-  Rationale: Soft-delete via status preserves audit history and allows
-  re-activation. The design doc requires audit logging for registration events.
-  Hard delete would lose the registration record.
-  Date/Author: 2026-02-25
+  than hard-deleting backends on deregistration. Rationale: Soft-delete via
+  status preserves audit history and allows re-activation. The design doc
+  requires audit logging for registration events. Hard delete would lose the
+  registration record. Date/Author: 2026-02-25
 
 - Decision: Store `capabilities` and `backend_info` as JSONB columns.
   Rationale: Matches the existing pattern (task `origin` is JSONB). Allows
   capability schema evolution without migrations. Both structs derive
-  `Serialize`/`Deserialize`.
-  Date/Author: 2026-02-25
+  `Serialize`/`Deserialize`. Date/Author: 2026-02-25
 
 ## Outcomes & retrospective
 
@@ -255,14 +246,14 @@ Create `src/agent_backend/domain/` with the following files:
 validated, non-empty, ASCII-alphanumeric-plus-underscores identifier (like a
 slug). Validation: trim, reject empty, reject names with characters outside
 `[a-z0-9_]` (lowercase), reject names exceeding 100 chars (matching the
-`VARCHAR(100)` column). Include `new()` returning `Result<Self, BackendDomainError>`,
-`as_str()`, `Display`, `Serialize`, `Deserialize`, `Clone`, `PartialEq`, `Eq`,
-`Hash`.
+`VARCHAR(100)` column). Include `new()` returning
+`Result<Self, BackendDomainError>`, `as_str()`, `Display`, `Serialize`,
+`Deserialize`, `Clone`, `PartialEq`, `Eq`, `Hash`.
 
 **`src/agent_backend/domain/status.rs`** — Define `BackendStatus` enum with
-variants `Active` and `Inactive`. Include `as_str()`, `Display`, `TryFrom<&str>`
-(returning `ParseBackendStatusError`), `Serialize`, `Deserialize`. Follow the
-`TaskState` pattern.
+variants `Active` and `Inactive`. Include `as_str()`, `Display`,
+`TryFrom<&str>` (returning `ParseBackendStatusError`), `Serialize`,
+`Deserialize`. Follow the `TaskState` pattern.
 
 **`src/agent_backend/domain/capabilities.rs`** — Define `AgentCapabilities`
 struct:
@@ -391,7 +382,8 @@ pub enum BackendRegistryError {
 **`src/agent_backend/adapters/memory/backend_registry.rs`** — Implement
 `InMemoryBackendRegistry` following the `InMemoryTaskRepository` pattern:
 
-- `Arc<RwLock<InMemoryRegistryState>>` with `HashMap<BackendId, AgentBackendRegistration>`
+- `Arc<RwLock<InMemoryRegistryState>>` with
+  `HashMap<BackendId, AgentBackendRegistration>`
   and a `name_index: HashMap<BackendName, BackendId>`.
 - Implement all `BackendRegistryRepository` methods.
 - Enforce uniqueness on both `id` and `name` during `register`.
@@ -417,8 +409,8 @@ pub struct RegisterBackendRequest {
 }
 ```
 
-Include `new()` and builder-style `with_*` methods for optional fields
-(content types, max context window).
+Include `new()` and builder-style `with_*` methods for optional fields (content
+types, max context window).
 
 ```rust
 pub struct BackendRegistryService<R, C>
@@ -716,8 +708,7 @@ All commands run from `/home/user/project`.
    set -o pipefail; cargo nextest run --test postgres 2>&1 | tee /tmp/pg-tests.log
    ```
 
-   Expected: all Postgres tests pass, including new backend
-   registry tests.
+   Expected: all Postgres tests pass, including new backend registry tests.
 
 10. Update documentation (Stage K).
 

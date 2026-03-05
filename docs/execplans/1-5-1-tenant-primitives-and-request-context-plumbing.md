@@ -78,37 +78,29 @@ domain primitives and plumbing signatures.
 
 - Risk: Adding `&RequestContext` to every port method is a wide cross-cutting
   change that touches every adapter implementation and every test call-site.
-  Severity: medium
-  Likelihood: high
-  Mitigation: Stage the work carefully — update one port trait at a time,
-  fix all adapters and tests for that port, then move to the next. Keep
-  commits atomic per port. This also ensures the build stays green between
-  stages.
+  Severity: medium Likelihood: high Mitigation: Stage the work carefully —
+  update one port trait at a time, fix all adapters and tests for that port,
+  then move to the next. Keep commits atomic per port. This also ensures the
+  build stays green between stages.
 
 - Risk: Existing Postgres adapter's `store_with_audit()` method on
-  `PostgresMessageRepository` takes `&AuditContext` directly. Replacing
-  this may break the public interface contract of the adapter.
-  Severity: low
-  Likelihood: high
-  Mitigation: `store_with_audit()` is an adapter-only method (not on the
-  port trait). Change its signature to accept `&RequestContext` and
-  convert internally. Keep the `AuditContext` struct as an internal
-  adapter helper with `From<&RequestContext>`.
+  `PostgresMessageRepository` takes `&AuditContext` directly. Replacing this
+  may break the public interface contract of the adapter. Severity: low
+  Likelihood: high Mitigation: `store_with_audit()` is an adapter-only method
+  (not on the port trait). Change its signature to accept `&RequestContext` and
+  convert internally. Keep the `AuditContext` struct as an internal adapter
+  helper with `From<&RequestContext>`.
 
 - Risk: The `TenantSlug` validation rules are not fully specified in the design
-  doc beyond "suitable for URLs and config keys."
-  Severity: low
-  Likelihood: high
-  Mitigation: Use the same validation pattern as `BackendName` (lowercase
+  doc beyond "suitable for URLs and config keys." Severity: low Likelihood:
+  high Mitigation: Use the same validation pattern as `BackendName` (lowercase
   alphanumeric plus hyphens, max 63 characters to match DNS label rules).
-  Hyphens (not underscores) are more URL-conventional. Document the choice
-  in the decision log.
+  Hyphens (not underscores) are more URL-conventional. Document the choice in
+  the decision log.
 
 - Risk: BDD test step definitions may collide with existing step names from
-  other subsystems.
-  Severity: low
-  Likelihood: low
-  Mitigation: Use tenant-specific vocabulary in step definitions.
+  other subsystems. Severity: low Likelihood: low Mitigation: Use
+  tenant-specific vocabulary in step definitions.
 
 ## Progress
 
@@ -126,9 +118,9 @@ domain primitives and plumbing signatures.
 ## Surprises & discoveries
 
 - The project enforces `clippy::allow_attributes` and
-  `clippy::allow_attributes_without_reason`, requiring `#[expect(clippy::...,
-  reason = "...")]` instead of `#[allow(clippy::...)]`. This affected several
-  locations where `too_many_arguments` was suppressed.
+  `clippy::allow_attributes_without_reason`, requiring
+  `#[expect(clippy::..., reason = "...")]` instead of `#[allow(clippy::...)]`.
+  This affected several locations where `too_many_arguments` was suppressed.
 - Adding `&RequestContext` to rstest fixture-injected test functions pushed many
   over the 4-argument Clippy limit. These were handled with `#[expect]`
   annotations since rstest requires individual parameters.
@@ -143,44 +135,40 @@ domain primitives and plumbing signatures.
 ## Decision log
 
 - Decision: Place `RequestContext` in a new top-level `src/context/` module
-  rather than under `src/tenant/`.
-  Rationale: `RequestContext` is cross-cutting — it carries correlation,
-  causation, user, session, and tenant identifiers and is used by every
-  bounded context. Placing it under `src/tenant/` would create a dependency
-  from every other module on the tenant module. A separate `src/context/`
-  module keeps dependencies clean: `context` depends on `tenant` (for
-  `TenantId`), and every other module depends on `context`.
-  Date: 2026-03-03
+  rather than under `src/tenant/`. Rationale: `RequestContext` is cross-cutting
+  — it carries correlation, causation, user, session, and tenant identifiers
+  and is used by every bounded context. Placing it under `src/tenant/` would
+  create a dependency from every other module on the tenant module. A separate
+  `src/context/` module keeps dependencies clean: `context` depends on `tenant`
+  (for `TenantId`), and every other module depends on `context`. Date:
+  2026-03-03
 
 - Decision: Keep `AuditContext` as an internal adapter type with
-  `From<&RequestContext>`, rather than deleting it entirely.
-  Rationale: `AuditContext` encapsulates the specific fields that map to
-  PostgreSQL session variables for audit triggers. It serves as an
-  adapter-internal concern. Keeping it avoids coupling the Postgres
-  adapter's `set_audit_context()` SQL helper directly to the domain-level
-  `RequestContext`. The conversion is mechanical and tested.
-  Date: 2026-03-03
+  `From<&RequestContext>`, rather than deleting it entirely. Rationale:
+  `AuditContext` encapsulates the specific fields that map to PostgreSQL
+  session variables for audit triggers. It serves as an adapter-internal
+  concern. Keeping it avoids coupling the Postgres adapter's
+  `set_audit_context()` SQL helper directly to the domain-level
+  `RequestContext`. The conversion is mechanical and tested. Date: 2026-03-03
 
 - Decision: Use lowercase alphanumeric plus hyphens for `TenantSlug`, max 63
   characters (DNS label convention), rather than underscores like
-  `BackendName`.
-  Rationale: Slugs are URL-facing identifiers. Hyphens are the standard word
-  separator in URLs and DNS labels. The 63-character limit matches DNS label
-  constraints and is sufficient for tenant identifiers.
-  Date: 2026-03-03
+  `BackendName`. Rationale: Slugs are URL-facing identifiers. Hyphens are the
+  standard word separator in URLs and DNS labels. The 63-character limit
+  matches DNS label constraints and is sufficient for tenant identifiers. Date:
+  2026-03-03
 
 - Decision: Add `&RequestContext` to all port methods (reads and writes), not
-  just writes.
-  Rationale: The design doc states "every state mutation and lookup executes
-  within a tenant context." Future steps (1.5.3) will add tenant filtering
-  to reads. Adding the parameter now avoids a second cross-cutting signature
-  change later. The read path can initially ignore the tenant_id but having
-  it in the signature is the contract that callers must provide context.
-  Date: 2026-03-03
+  just writes. Rationale: The design doc states "every state mutation and
+  lookup executes within a tenant context." Future steps (1.5.3) will add
+  tenant filtering to reads. Adding the parameter now avoids a second
+  cross-cutting signature change later. The read path can initially ignore the
+  tenant_id but having it in the signature is the contract that callers must
+  provide context. Date: 2026-03-03
 
 - Decision: `SlashCommandRegistry` is excluded from `RequestContext` plumbing.
-  Rationale: It loads static command definitions, not tenant-owned data.
-  Date: 2026-03-03
+  Rationale: It loads static command definitions, not tenant-owned data. Date:
+  2026-03-03
 
 ## Outcomes & retrospective
 
@@ -236,8 +224,9 @@ Key files for this plan:
 
 Existing ID newtype pattern (`src/agent_backend/domain/ids.rs`): UUID wrapping
 struct with `new()`, `from_uuid()`, `into_inner()`, `Default`, `AsRef<Uuid>`,
-`Display`. Derives: `Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize,
-Deserialize` with `#[serde(transparent)]`.
+`Display`. Derives:
+`Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize` with
+`#[serde(transparent)]`.
 
 Existing validated string pattern (`src/agent_backend/domain/name.rs`):
 `BackendName(String)` with `new(impl Into<String>) -> Result<Self, Error>`,
@@ -246,8 +235,8 @@ trimming, normalisation, character validation, length check. Derives:
 `#[serde(transparent)]`. Implements `AsRef<str>` and `Display`.
 
 Quality gates (from `AGENTS.md`): `make check-fmt`, `make lint`, `make test`
-before every commit. Makefile uses `cargo nextest run --all-targets
---all-features` for tests.
+before every commit. Makefile uses
+`cargo nextest run --all-targets --all-features` for tests.
 
 ## Plan of work
 
@@ -291,8 +280,8 @@ pub struct RequestContext {
 ```
 
 Private fields with getter methods and a builder or constructor. A
-`RequestContext::new()` taking all required fields, plus
-`with_causation_id()` for the optional field.
+`RequestContext::new()` taking all required fields, plus `with_causation_id()`
+for the optional field.
 
 **`src/context/tests.rs`** — unit tests for `RequestContext` construction,
 accessors, equality, and clone.
@@ -327,8 +316,8 @@ pub struct TenantSlug(String);
 ```
 
 Validation rules: trim, lowercase, reject empty, reject characters outside
-`[a-z0-9-]`, reject leading/trailing hyphens, reject consecutive hyphens,
-max 63 chars. Returns `Result<Self, TenantDomainError>`.
+`[a-z0-9-]`, reject leading/trailing hyphens, reject consecutive hyphens, max
+63 chars. Returns `Result<Self, TenantDomainError>`.
 
 **`src/tenant/domain/status.rs`** — `TenantStatus` enum:
 
@@ -361,24 +350,24 @@ pub struct Tenant {
 
 Constructor `Tenant::new(slug, display_name, owner_user_id, clock)` plus a
 `from_persisted()` for rehydration. Getter methods for all fields. The
-`owner_user_id` field models the "one owning user per tenant" requirement
-while keeping user and tenant identities separate (the `UserId` is a
-context-layer type, not a tenant-layer type, preserving the distinction).
+`owner_user_id` field models the "one owning user per tenant" requirement while
+keeping user and tenant identities separate (the `UserId` is a context-layer
+type, not a tenant-layer type, preserving the distinction).
 
 **`src/tenant/domain/error.rs`** — `TenantDomainError` enum covering slug
 validation failures, empty display name, and status parsing errors.
 
 Register the module in `src/lib.rs`: `pub mod tenant;`
 
-**Validation**: `cargo check` compiles. Unit tests for slug validation
-(happy path, empty, invalid chars, too long, leading/trailing hyphens,
-consecutive hyphens), tenant construction, and status round-tripping.
+**Validation**: `cargo check` compiles. Unit tests for slug validation (happy
+path, empty, invalid chars, too long, leading/trailing hyphens, consecutive
+hyphens), tenant construction, and status round-tripping.
 
 ### Stage C: Update port traits to accept `&RequestContext`
 
 Add `use crate::context::RequestContext;` to each port module and add
-`ctx: &RequestContext` as the first parameter to every method on the
-following traits:
+`ctx: &RequestContext` as the first parameter to every method on the following
+traits:
 
 1. `MessageRepository` in `src/message/ports/repository.rs` (5 methods)
 2. `AgentSessionRepository` in `src/message/ports/agent_session.rs` (5 methods)
@@ -432,9 +421,9 @@ For in-memory adapters, add the `ctx` parameter and prefix it with `_ctx`
 
 For Postgres adapters, add the `ctx` parameter. In the message adapter's
 `store()` (and `store_with_audit()`), convert `RequestContext` to
-`AuditContext` using the new `From<&RequestContext>` impl and call the
-existing `set_audit_context()` SQL helper. The `store_with_audit()` method
-signature changes from taking `&AuditContext` to `&RequestContext`.
+`AuditContext` using the new `From<&RequestContext>` impl and call the existing
+`set_audit_context()` SQL helper. The `store_with_audit()` method signature
+changes from taking `&AuditContext` to `&RequestContext`.
 
 **`AuditContext` conversion** — add to `src/message/adapters/audit_context.rs`:
 
@@ -464,7 +453,8 @@ repository calls.
   `deactivate`, `activate`, plus private helpers `update_status` and
   `find_by_id_or_error`.
 - `src/message/services/handoff.rs` — handoff service methods.
-- Any other service files under `src/message/services/` and `src/task/services/`.
+- Any other service files under `src/message/services/` and
+  `src/task/services/`.
 
 Example:
 
@@ -512,8 +502,8 @@ Add comprehensive unit tests:
 
 ### Stage G: Update existing integration and BDD tests
 
-Update all test call-sites to provide a `RequestContext` where port methods
-are called.
+Update all test call-sites to provide a `RequestContext` where port methods are
+called.
 
 Create a test helper fixture:
 
@@ -548,8 +538,8 @@ Update files:
 - BDD scenario entry points
 
 Each test that calls a repository or service method must now pass a
-`&RequestContext`. Where existing tests use `AuditContext` directly
-(e.g., `store_with_audit()`), convert to use `RequestContext`.
+`&RequestContext`. Where existing tests use `AuditContext` directly (e.g.,
+`store_with_audit()`), convert to use `RequestContext`.
 
 **Validation**: `make test` passes with all existing tests green.
 
@@ -575,11 +565,11 @@ Feature: Tenant identity and domain primitives
     Then tenant creation fails with a slug validation error
 ```
 
-**`tests/tenant_identity_steps/`** — step definitions directory with
-`mod.rs`, `world.rs`, `given.rs`, `when.rs`, `then.rs`.
+**`tests/tenant_identity_steps/`** — step definitions directory with `mod.rs`,
+`world.rs`, `given.rs`, `when.rs`, `then.rs`.
 
-**`tests/tenant_identity_scenarios.rs`** — BDD scenario entry point (note:
-name differs from directory per established convention).
+**`tests/tenant_identity_scenarios.rs`** — BDD scenario entry point (note: name
+differs from directory per established convention).
 
 **Validation**: `make test` passes including new BDD scenarios.
 
