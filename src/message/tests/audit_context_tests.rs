@@ -14,10 +14,7 @@ use uuid::Uuid;
 fn audit_context_empty_has_all_none_fields() {
     let ctx = AuditContext::empty();
 
-    assert!(ctx.correlation_id.is_none());
-    assert!(ctx.causation_id.is_none());
-    assert!(ctx.user_id.is_none());
-    assert!(ctx.session_id.is_none());
+    assert!(ctx.is_empty());
 }
 
 #[test]
@@ -37,10 +34,13 @@ fn audit_context_with_correlation_id_sets_field() {
     let id = Uuid::new_v4();
     let ctx = AuditContext::empty().with_correlation_id(id);
 
-    assert_eq!(ctx.correlation_id, Some(id));
-    assert!(ctx.causation_id.is_none());
-    assert!(ctx.user_id.is_none());
-    assert!(ctx.session_id.is_none());
+    assert_eq!(
+        ctx,
+        AuditContext {
+            correlation_id: Some(id),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 #[test]
@@ -48,10 +48,13 @@ fn audit_context_with_causation_id_sets_field() {
     let id = Uuid::new_v4();
     let ctx = AuditContext::empty().with_causation_id(id);
 
-    assert!(ctx.correlation_id.is_none());
-    assert_eq!(ctx.causation_id, Some(id));
-    assert!(ctx.user_id.is_none());
-    assert!(ctx.session_id.is_none());
+    assert_eq!(
+        ctx,
+        AuditContext {
+            causation_id: Some(id),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 #[test]
@@ -59,10 +62,13 @@ fn audit_context_with_user_id_sets_field() {
     let id = Uuid::new_v4();
     let ctx = AuditContext::empty().with_user_id(id);
 
-    assert!(ctx.correlation_id.is_none());
-    assert!(ctx.causation_id.is_none());
-    assert_eq!(ctx.user_id, Some(id));
-    assert!(ctx.session_id.is_none());
+    assert_eq!(
+        ctx,
+        AuditContext {
+            user_id: Some(id),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 #[test]
@@ -70,10 +76,13 @@ fn audit_context_with_session_id_sets_field() {
     let id = Uuid::new_v4();
     let ctx = AuditContext::empty().with_session_id(id);
 
-    assert!(ctx.correlation_id.is_none());
-    assert!(ctx.causation_id.is_none());
-    assert!(ctx.user_id.is_none());
-    assert_eq!(ctx.session_id, Some(id));
+    assert_eq!(
+        ctx,
+        AuditContext {
+            session_id: Some(id),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 #[test]
@@ -89,10 +98,13 @@ fn audit_context_builder_chain_preserves_all_fields() {
         .with_user_id(user)
         .with_session_id(session);
 
-    assert_eq!(ctx.correlation_id, Some(correlation));
-    assert_eq!(ctx.causation_id, Some(causation));
-    assert_eq!(ctx.user_id, Some(user));
-    assert_eq!(ctx.session_id, Some(session));
+    let expected = AuditContext {
+        correlation_id: Some(correlation),
+        causation_id: Some(causation),
+        user_id: Some(user),
+        session_id: Some(session),
+    };
+    assert_eq!(ctx, expected);
 }
 
 #[test]
@@ -104,10 +116,14 @@ fn audit_context_builder_allows_partial_population() {
         .with_correlation_id(correlation)
         .with_user_id(user);
 
-    assert_eq!(ctx.correlation_id, Some(correlation));
-    assert!(ctx.causation_id.is_none());
-    assert_eq!(ctx.user_id, Some(user));
-    assert!(ctx.session_id.is_none());
+    assert_eq!(
+        ctx,
+        AuditContext {
+            correlation_id: Some(correlation),
+            user_id: Some(user),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 // ============================================================================
@@ -196,27 +212,24 @@ fn audit_context_from_request_context_maps_all_fields() {
     let ctx = RequestContext::new(TenantId::new(), correlation_id, user_id, session_id)
         .with_causation_id(causation_id);
 
-    let audit = AuditContext::from(&ctx);
-
-    assert_eq!(audit.correlation_id, Some(correlation_id.into_inner()));
-    assert_eq!(audit.causation_id, Some(causation_id.into_inner()));
-    assert_eq!(audit.user_id, Some(user_id.into_inner()));
-    assert_eq!(audit.session_id, Some(session_id.into_inner()));
+    let expected = AuditContext::empty()
+        .with_correlation_id(correlation_id.into_inner())
+        .with_causation_id(causation_id.into_inner())
+        .with_user_id(user_id.into_inner())
+        .with_session_id(session_id.into_inner());
+    assert_eq!(AuditContext::from(&ctx), expected);
 }
 
 #[test]
 fn audit_context_from_request_context_without_causation() {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let correlation_id = CorrelationId::new();
+    let user_id = UserId::new();
+    let session_id = SessionId::new();
+    let ctx = RequestContext::new(TenantId::new(), correlation_id, user_id, session_id);
 
-    let audit = AuditContext::from(&ctx);
-
-    assert!(audit.correlation_id.is_some());
-    assert!(audit.causation_id.is_none());
-    assert!(audit.user_id.is_some());
-    assert!(audit.session_id.is_some());
+    let expected = AuditContext::empty()
+        .with_correlation_id(correlation_id.into_inner())
+        .with_user_id(user_id.into_inner())
+        .with_session_id(session_id.into_inner());
+    assert_eq!(AuditContext::from(&ctx), expected);
 }

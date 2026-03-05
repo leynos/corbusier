@@ -7,6 +7,37 @@ use std::fmt;
 /// Maximum length for a tenant slug, matching DNS label constraints.
 const MAX_SLUG_LENGTH: usize = 63;
 
+fn validate_chars(s: &str) -> Result<(), TenantDomainError> {
+    let valid = s
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if !valid {
+        return Err(TenantDomainError::InvalidSlug(s.to_owned()));
+    }
+    Ok(())
+}
+
+fn validate_boundaries(s: &str) -> Result<(), TenantDomainError> {
+    if s.starts_with('-') || s.ends_with('-') {
+        return Err(TenantDomainError::SlugBoundaryHyphen(s.to_owned()));
+    }
+    Ok(())
+}
+
+fn validate_no_consecutive_hyphens(s: &str) -> Result<(), TenantDomainError> {
+    if s.contains("--") {
+        return Err(TenantDomainError::SlugConsecutiveHyphens(s.to_owned()));
+    }
+    Ok(())
+}
+
+fn validate_length(s: &str) -> Result<(), TenantDomainError> {
+    if s.len() > MAX_SLUG_LENGTH {
+        return Err(TenantDomainError::SlugTooLong(s.to_owned()));
+    }
+    Ok(())
+}
+
 /// Validated tenant slug suitable for URLs and configuration keys.
 ///
 /// Tenant slugs are lowercased, 1-63 characters, containing only `[a-z0-9-]`.
@@ -40,25 +71,10 @@ impl TenantSlug {
             return Err(TenantDomainError::EmptySlug);
         }
 
-        let is_valid = normalized
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-
-        if !is_valid {
-            return Err(TenantDomainError::InvalidSlug(normalized));
-        }
-
-        if normalized.starts_with('-') || normalized.ends_with('-') {
-            return Err(TenantDomainError::SlugBoundaryHyphen(normalized));
-        }
-
-        if normalized.contains("--") {
-            return Err(TenantDomainError::SlugConsecutiveHyphens(normalized));
-        }
-
-        if normalized.len() > MAX_SLUG_LENGTH {
-            return Err(TenantDomainError::SlugTooLong(normalized));
-        }
+        validate_chars(&normalized)?;
+        validate_boundaries(&normalized)?;
+        validate_no_consecutive_hyphens(&normalized)?;
+        validate_length(&normalized)?;
 
         Ok(Self(normalized))
     }
