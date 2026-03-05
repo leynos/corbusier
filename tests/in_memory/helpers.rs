@@ -56,22 +56,46 @@ pub fn conversation_id() -> ConversationId {
     ConversationId::new()
 }
 
+/// Composite fixture bundling per-test repository, clock, conversation ID,
+/// and request context into a single injectable parameter.
+pub struct ConversationScenario {
+    pub repo: InMemoryMessageRepository,
+    pub clock: DefaultClock,
+    pub conversation_id: ConversationId,
+    pub ctx: RequestContext,
+}
+
+#[fixture]
+pub fn scenario() -> ConversationScenario {
+    ConversationScenario {
+        repo: InMemoryMessageRepository::new(),
+        clock: DefaultClock,
+        conversation_id: ConversationId::new(),
+        ctx: RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        ),
+    }
+}
+
 /// Stores conversation messages and returns them for verification.
 ///
 /// # Errors
 ///
 /// Returns an error if any message creation or store operation fails.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper needs runtime, repo, clock, conversation_id, and ctx"
-)]
 pub fn store_conversation_messages(
     rt: &Runtime,
-    repo: &InMemoryMessageRepository,
-    clock: &DefaultClock,
-    conversation_id: ConversationId,
-    ctx: &RequestContext,
+    s: &ConversationScenario,
 ) -> Result<Vec<Message>, Box<dyn std::error::Error + Send + Sync>> {
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id: cid,
+        ctx,
+    } = s;
+    let conversation_id = *cid;
     let user_message = Message::new(
         conversation_id,
         Role::User,

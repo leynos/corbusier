@@ -6,7 +6,7 @@ use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, HandoffStatus, SequenceNumber, TurnId,
 };
 use corbusier::message::ports::{agent_session::AgentSessionRepository, handoff::AgentHandoffPort};
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
@@ -62,14 +62,14 @@ async fn complete_handoff_to_agent(
         .await
         .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
+    let complete_params = CompleteHandoffParams::new(
+        handoff.handoff_id,
+        target_session.session_id,
+        params.start_sequence,
+    );
     let completed = harness
         .service
-        .complete(
-            ctx,
-            handoff.handoff_id,
-            target_session.session_id,
-            params.start_sequence,
-        )
+        .complete(ctx, complete_params)
         .await
         .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 

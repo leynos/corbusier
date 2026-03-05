@@ -6,7 +6,7 @@ use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, SequenceNumber, TurnId,
 };
 use corbusier::message::ports::agent_session::AgentSessionRepository;
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
@@ -106,14 +106,14 @@ fn get_pending_handoff_returns_none_when_completed(
             .await
             .expect("target");
 
+        let complete_params = CompleteHandoffParams::new(
+            handoff.handoff_id,
+            target.session_id,
+            SequenceNumber::new(6),
+        );
         harness
             .service
-            .complete(
-                &ctx,
-                handoff.handoff_id,
-                target.session_id,
-                SequenceNumber::new(6),
-            )
+            .complete(&ctx, complete_params)
             .await
             .expect("complete");
 

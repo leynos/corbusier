@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::agent_backend::{
     domain::{AgentBackendRegistration, BackendId, BackendName, BackendStatus},
@@ -28,6 +28,18 @@ impl InMemoryBackendRegistry {
     pub fn new() -> Self {
         Self::default()
     }
+
+    fn read_state(&self) -> BackendRegistryResult<RwLockReadGuard<'_, InMemoryRegistryState>> {
+        self.state.read().map_err(|err| {
+            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
+        })
+    }
+
+    fn write_state(&self) -> BackendRegistryResult<RwLockWriteGuard<'_, InMemoryRegistryState>> {
+        self.state.write().map_err(|err| {
+            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
+        })
+    }
 }
 
 #[async_trait]
@@ -37,9 +49,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         _ctx: &RequestContext,
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self.write_state()?;
 
         if state.backends.contains_key(&registration.id()) {
             return Err(BackendRegistryError::DuplicateBackend(registration.id()));
@@ -65,9 +75,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         _ctx: &RequestContext,
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self.write_state()?;
 
         let old_name = state
             .backends
@@ -101,9 +109,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         _ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        let state = self.state.read().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self.read_state()?;
         Ok(state.backends.get(&id).cloned())
     }
 
@@ -112,9 +118,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         _ctx: &RequestContext,
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        let state = self.state.read().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self.read_state()?;
         let backend = state
             .name_index
             .get(name)
@@ -127,9 +131,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         &self,
         _ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        let state = self.state.read().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self.read_state()?;
         let active = state
             .backends
             .values()
@@ -143,9 +145,7 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         &self,
         _ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        let state = self.state.read().map_err(|err| {
-            BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self.read_state()?;
         Ok(state.backends.values().cloned().collect())
     }
 }

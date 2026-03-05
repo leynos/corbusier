@@ -2,7 +2,7 @@
 
 use super::world::{HandoffWorld, run_async};
 use corbusier::message::domain::{HandoffSessionParams, SequenceNumber, TurnId};
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use eyre::{WrapErr, eyre};
 use rstest_bdd_macros::when;
 
@@ -63,12 +63,13 @@ fn complete_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("no target session"))?;
 
-    let completed = run_async(world.service.complete(
+    let complete_params = CompleteHandoffParams::new(
         handoff.handoff_id,
         target.session_id,
         SequenceNumber::new(10),
-    ))
-    .wrap_err("complete handoff")?;
+    );
+    let completed = run_async(world.service.complete(complete_params))
+        .wrap_err("complete handoff")?;
 
     world.current_handoff = Some(completed);
     Ok(())
@@ -141,12 +142,13 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
     let agent_c =
         run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
 
-    let completed = run_async(world.service.complete(
+    let complete_params = CompleteHandoffParams::new(
         handoff.handoff_id,
         agent_c.session_id,
         SequenceNumber::new(11),
-    ))
-    .wrap_err("complete B->C")?;
+    );
+    let completed =
+        run_async(world.service.complete(complete_params)).wrap_err("complete B->C")?;
 
     world.target_session = Some(agent_c);
     world.current_handoff = Some(completed);

@@ -2,15 +2,12 @@
 //!
 //! Tests duplicate detection and exists checks.
 
-use crate::in_memory::helpers::{clock, conversation_id, ctx, repo, runtime};
-use corbusier::context::RequestContext;
+use crate::in_memory::helpers::{ConversationScenario, runtime, scenario};
 use corbusier::message::{
-    adapters::memory::InMemoryMessageRepository,
-    domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
+    domain::{ContentPart, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
     ports::repository::MessageRepository,
 };
-use mockable::DefaultClock;
 use rstest::rstest;
 use std::io;
 use tokio::runtime::Runtime;
@@ -21,18 +18,17 @@ use tokio::runtime::Runtime;
     clippy::panic_in_result_fn,
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "rstest fixture injection requires individual parameters"
-)]
 fn duplicate_message_id_rejected(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
-    ctx: RequestContext,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,
@@ -62,18 +58,17 @@ fn duplicate_message_id_rejected(
     clippy::panic_in_result_fn,
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "rstest fixture injection requires individual parameters"
-)]
 fn duplicate_sequence_in_conversation_rejected(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
-    ctx: RequestContext,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,
@@ -112,18 +107,17 @@ fn duplicate_sequence_in_conversation_rejected(
     clippy::panic_in_result_fn,
     reason = "Test uses assertions for verification while returning Result for error propagation"
 )]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "rstest fixture injection requires individual parameters"
-)]
 fn exists_check_for_idempotent_operations(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
-    ctx: RequestContext,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,

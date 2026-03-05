@@ -3,7 +3,7 @@
 use super::world::{HandoffWorld, create_and_store_session, create_tool_call_refs, run_async};
 use corbusier::message::domain::{HandoffSessionParams, SequenceNumber, TurnId};
 use corbusier::message::ports::agent_session::AgentSessionRepository;
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use eyre::{WrapErr, eyre};
 use rstest_bdd_macros::given;
 
@@ -76,12 +76,12 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
     let agent_b =
         run_async(world.service.create_target_session(params)).wrap_err("create agent B")?;
 
-    run_async(world.service.complete(
+    let complete_params = CompleteHandoffParams::new(
         handoff.handoff_id,
         agent_b.session_id,
         SequenceNumber::new(6),
-    ))
-    .wrap_err("complete A->B")?;
+    );
+    run_async(world.service.complete(complete_params)).wrap_err("complete A->B")?;
 
     world.source_session = Some(agent_b);
     Ok(())

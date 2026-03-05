@@ -62,6 +62,33 @@ impl<'a> ServiceInitiateParams<'a> {
     }
 }
 
+/// Parameters for completing a handoff via the service.
+#[derive(Debug, Clone, Copy)]
+pub struct CompleteHandoffParams {
+    /// The handoff to complete.
+    pub handoff_id: HandoffId,
+    /// The new session created by the target agent.
+    pub target_session_id: AgentSessionId,
+    /// Starting sequence number for the target session.
+    pub start_sequence: SequenceNumber,
+}
+
+impl CompleteHandoffParams {
+    /// Creates new completion parameters.
+    #[must_use]
+    pub const fn new(
+        handoff_id: HandoffId,
+        target_session_id: AgentSessionId,
+        start_sequence: SequenceNumber,
+    ) -> Self {
+        Self {
+            handoff_id,
+            target_session_id,
+            start_sequence,
+        }
+    }
+}
+
 /// Service for coordinating agent handoffs with context preservation.
 ///
 /// Orchestrates the complete handoff workflow:
@@ -93,11 +120,12 @@ impl<'a> ServiceInitiateParams<'a> {
 /// let handoff = service.initiate(params).await?;
 ///
 /// // Complete handoff when target agent starts
-/// let completed = service.complete(
+/// let complete_params = CompleteHandoffParams::new(
 ///     handoff.handoff_id,
 ///     target_session_id,
 ///     start_sequence,
-/// ).await?;
+/// );
+/// let completed = service.complete(complete_params).await?;
 /// ```
 #[derive(Clone)]
 pub struct HandoffService<S, H, C, K>
@@ -223,29 +251,22 @@ where
     /// 2. Creates a context snapshot for the new session start
     /// 3. Completes the handoff record
     ///
-    /// # Parameters
-    ///
-    /// - `handoff_id`: The handoff to complete
-    /// - `target_session_id`: The new session created by the target agent
-    /// - `start_sequence`: Starting sequence number for the target session
-    ///
     /// # Errors
     ///
     /// Returns `HandoffError` if:
     /// - Handoff not found
     /// - Handoff is not in `Initiated` or `Accepted` state
     /// - Target session not found
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "completion requires handoff, session, sequence, and context parameters"
-    )]
     pub async fn complete(
         &self,
         ctx: &RequestContext,
-        handoff_id: HandoffId,
-        target_session_id: AgentSessionId,
-        start_sequence: SequenceNumber,
+        params: CompleteHandoffParams,
     ) -> HandoffResult<HandoffMetadata> {
+        let CompleteHandoffParams {
+            handoff_id,
+            target_session_id,
+            start_sequence,
+        } = params;
         // Verify the handoff exists and is in valid state
         let _handoff = self
             .handoff_adapter
