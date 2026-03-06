@@ -1223,6 +1223,112 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   (truncated with a marker), 100 logs per server maximum. Retention sweeps run
   during `store_startup_stderr` and can be triggered explicitly.
 
+_Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
+persistence model. The `mcp_servers` table is the parent entity; each server
+can host many tools (via `mcp_tool_catalog`), produce many audit log entries
+(via `tool_call_audit_log`), and generate many stderr log blobs (tracked via
+`tool_log_metadata`)._
+
+```mermaid
+erDiagram
+    mcp_servers {
+        uuid id PK
+        varchar name
+        varchar transport
+    }
+
+    mcp_tool_catalog {
+        uuid id PK
+        uuid server_id FK
+        varchar server_name
+        varchar tool_name
+        text tool_description
+        jsonb input_schema
+        jsonb output_schema
+        bool available
+        timestamptz discovered_at
+        timestamptz updated_at
+    }
+
+    tool_call_audit_log {
+        uuid id PK
+        uuid call_id
+        varchar tool_name
+        uuid server_id FK
+        jsonb parameters
+        varchar outcome
+        jsonb outcome_content
+        text outcome_error
+        bigint duration_ms
+        timestamptz initiated_at
+        timestamptz completed_at
+        varchar stderr_log_path
+    }
+
+    tool_log_metadata {
+        uuid id PK
+        uuid server_id FK
+        varchar kind
+        uuid call_id
+        varchar object_path
+        bigint byte_count
+        timestamptz captured_at
+        timestamptz expires_at
+    }
+
+    mcp_servers ||--o{ mcp_tool_catalog : hosts_tools
+    mcp_servers ||--o{ tool_log_metadata : has_logs
+    mcp_servers ||--o{ tool_call_audit_log : handles_calls
+```
+
+_Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within
+`ToolDiscoveryRoutingService`. The caller submits a `ToolCallRequest`; the
+service resolves the tool from the catalog, validates parameters against the
+declared schema, evaluates the policy, locates the hosting server, executes the
+tool call via the host adapter, optionally captures stderr in the log store,
+and records an audit trail before returning._
+
+```mermaid
+sequenceDiagram
+    actor Caller
+    participant Service as ToolDiscoveryRoutingService
+    participant Catalog as ToolCatalogRepository
+    participant Policy as ToolPolicyEnforcer
+    participant Registry as McpServerRegistryRepository
+    participant Host as McpServerHost
+    participant LogStore as ToolLogStore
+
+    Caller->>Service: call_tool(request: ToolCallRequest)
+
+    rect rgb(235, 235, 245)
+        Service->>Catalog: find_by_tool_name(tool_name)
+        Catalog-->>Service: CatalogEntry or None
+        Service-->>Service: check available
+        Service-->>Service: validate_parameters(input_schema, parameters)
+        Service->>Policy: evaluate(tool_name, parameters)
+        Policy-->>Service: PolicyDecision
+        Service->>Registry: find_by_id(server_id)
+        Registry-->>Service: McpServerRegistration
+    end
+
+    Service->>Host: call_tool(server, tool_name, parameters)
+    Host-->>Service: ToolCallHostResult or McpServerHostError
+
+    Service-->>Service: build ToolCallOutcome
+    Service-->>Service: build ToolCallResult
+
+    alt stderr_output present
+        Service->>LogStore: store_log(LogEntryMetadata::for_tool_call, stderr, LogRetentionPolicy)
+        LogStore-->>Service: result
+    end
+
+    Service-->>Service: build ToolCallAuditRecord
+    Service->>Catalog: record_audit(audit_record)
+    Catalog-->>Service: result
+
+    Service-->>Caller: ToolCallResult or error
+```
+
 ##### F-006-RQ-001: Weaver Change Tracking
 
 - **Technical Specifications:**
