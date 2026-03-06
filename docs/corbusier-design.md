@@ -1355,10 +1355,11 @@ _Table 2.2.5.1: Tenancy and identity requirement matrix._
   map to PostgreSQL session variables for audit triggers. Keeping it avoids
   coupling the Postgres adapter's `set_audit_context()` SQL helper directly to
   the domain-level `RequestContext`. The conversion is mechanical and tested.
-- `TenantSlug` uses lowercase alphanumeric plus hyphens (not underscores),
-  max 63 characters (Domain Name System (DNS) label convention). Hyphens are the standard word
-  separator in URLs and DNS labels. The 63-character limit matches DNS label
-  constraints. Leading/trailing hyphens and consecutive hyphens are rejected.
+- `TenantSlug` uses lowercase alphanumeric plus hyphens (not
+  underscores), max 63 characters (Domain Name System (DNS) label
+  convention). Hyphens are the standard word separator in URLs and
+  DNS labels. The 63-character limit matches DNS label constraints.
+  Leading/trailing hyphens and consecutive hyphens are rejected.
   Input is trimmed and lowercased automatically.
 - `&RequestContext` is added to all port trait methods (reads and writes), not
   just writes. Rationale: the design states "every state mutation and lookup

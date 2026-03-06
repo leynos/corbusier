@@ -2,20 +2,13 @@
 //!
 //! Tests role parsing, JSONB content, metadata, and UUID handling.
 
-// Module-level suppression required because `#[rstest]` macro expansion
-// generates the offending function signatures and per-function `#[expect]`
-// attributes are not visible to the macro-generated code.
-#![expect(
-    clippy::too_many_arguments,
-    reason = "rstest fixture + #[case] injection exceeds the project threshold of 4"
-)]
-
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, RoleResult, clock, ensure_template, insert_conversation,
     postgres_cluster, setup_repository, test_request_context,
 };
 use corbusier::context::RequestContext;
 use corbusier::message::{
+    adapters::postgres::PostgresMessageRepository,
     domain::{
         AgentResponseAudit, AgentResponseStatus, AttachmentPart, ContentPart, ConversationId,
         Message, MessageId, MessageMetadata, Role, SequenceNumber, TextPart, ToolCallAudit,
@@ -25,7 +18,38 @@ use corbusier::message::{
 };
 use diesel::prelude::*;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
+
+use super::cluster::TemporaryDatabase;
+
+/// Composite fixture bundling the common test infrastructure so that
+/// individual test functions stay below the clippy `too_many_arguments`
+/// threshold (project limit is 4).
+struct TestEnv {
+    cluster: PostgresCluster,
+    temp_db: TemporaryDatabase,
+    repo: PostgresMessageRepository,
+    clock: DefaultClock,
+    ctx: RequestContext,
+}
+
+#[fixture]
+async fn test_env(
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+    clock: DefaultClock,
+    test_request_context: RequestContext,
+) -> Result<TestEnv, BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
+    Ok(TestEnv {
+        cluster,
+        temp_db,
+        repo,
+        clock,
+        ctx: test_request_context,
+    })
+}
 
 // ============================================================================
 // Role Round-Trip Tests
@@ -38,31 +62,26 @@ use rstest::rstest;
 #[case(Role::System, "system")]
 #[tokio::test]
 async fn role_round_trip_through_persistence(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
     #[case] role: Role,
     #[case] expected_str: &str,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let message = Message::new(
         conv_id,
         role,
         vec![ContentPart::Text(TextPart::new("Role test"))],
         SequenceNumber::new(1),
-        &clock,
+        &env.clock,
     )?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &message).await?;
+    env.repo.store(&env.ctx, &message).await?;
 
-    let url = cluster.connection().database_url(temp_db.name());
+    let url = env.cluster.connection().database_url(env.temp_db.name());
     let mut conn = PgConnection::establish(&url).map_err(|err| Box::new(err) as BoxError)?;
     let stored_role: String = diesel::sql_query("SELECT role FROM messages WHERE id = $1")
         .bind::<diesel::sql_types::Uuid, _>(message.id().into_inner())
@@ -73,8 +92,9 @@ async fn role_round_trip_through_persistence(
     assert_eq!(stored_role, expected_str);
     drop(conn);
 
-    let retrieved = repo
-        .find_by_id(&ctx, message.id())
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -89,16 +109,12 @@ async fn role_round_trip_through_persistence(
 #[rstest]
 #[tokio::test]
 async fn content_jsonb_round_trip_with_multiple_parts(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let content = vec![
         ContentPart::Text(TextPart::new("Hello world")),
@@ -115,14 +131,14 @@ async fn content_jsonb_round_trip_with_multiple_parts(
         Role::Assistant,
         content,
         SequenceNumber::new(1),
-        &clock,
+        &env.clock,
     )?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &message).await?;
+    env.repo.store(&env.ctx, &message).await?;
 
-    let retrieved = repo
-        .find_by_id(&ctx, message.id())
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -160,16 +176,12 @@ async fn content_jsonb_round_trip_with_multiple_parts(
 #[rstest]
 #[tokio::test]
 async fn tool_result_jsonb_round_trip(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let success_result =
         ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
@@ -183,14 +195,14 @@ async fn tool_result_jsonb_round_trip(
             ContentPart::ToolResult(failure_result),
         ],
         SequenceNumber::new(1),
-        &clock,
+        &env.clock,
     )?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &message).await?;
+    env.repo.store(&env.ctx, &message).await?;
 
-    let retrieved = repo
-        .find_by_id(&ctx, message.id())
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -226,16 +238,12 @@ async fn tool_result_jsonb_round_trip(
 #[rstest]
 #[tokio::test]
 async fn metadata_jsonb_round_trip(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let metadata = MessageMetadata::with_agent_backend("claude-3-opus")
         .with_tool_call_audit(ToolCallAudit::new(
@@ -250,13 +258,13 @@ async fn metadata_jsonb_round_trip(
     let message = Message::builder(conv_id, Role::Assistant, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new("Response")))
         .with_metadata(metadata)
-        .build(&clock)?;
+        .build(&env.clock)?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &message).await?;
+    env.repo.store(&env.ctx, &message).await?;
 
-    let retrieved = repo
-        .find_by_id(&ctx, message.id())
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -290,30 +298,26 @@ async fn metadata_jsonb_round_trip(
 #[rstest]
 #[tokio::test]
 async fn from_persisted_preserves_all_domain_invariants(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let original = Message::new(
         conv_id,
         Role::User,
         vec![ContentPart::Text(TextPart::new("Test content"))],
         SequenceNumber::new(42),
-        &clock,
+        &env.clock,
     )?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &original).await?;
+    env.repo.store(&env.ctx, &original).await?;
 
-    let retrieved = repo
-        .find_by_id(&ctx, original.id())
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, original.id())
         .await?
         .expect("message should exist");
 
@@ -349,16 +353,12 @@ async fn from_persisted_preserves_all_domain_invariants(
 #[rstest]
 #[tokio::test]
 async fn uuid_round_trip_preserves_values(
-    clock: DefaultClock,
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-    test_request_context: RequestContext,
+    #[future] test_env: Result<TestEnv, BoxError>,
 ) -> Result<(), BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    let (temp_db, repo) = setup_repository(cluster).await?;
+    let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
 
     let specific_msg_id = MessageId::from_uuid(uuid::Uuid::parse_str(
         "550e8400-e29b-41d4-a716-446655440000",
@@ -367,13 +367,13 @@ async fn uuid_round_trip_preserves_values(
     let message = Message::builder(conv_id, Role::User, SequenceNumber::new(1))
         .with_id(specific_msg_id)
         .with_content(ContentPart::Text(TextPart::new("UUID test")))
-        .build(&clock)?;
+        .build(&env.clock)?;
 
-    let ctx = test_request_context;
-    repo.store(&ctx, &message).await?;
+    env.repo.store(&env.ctx, &message).await?;
 
-    let retrieved = repo
-        .find_by_id(&ctx, specific_msg_id)
+    let retrieved = env
+        .repo
+        .find_by_id(&env.ctx, specific_msg_id)
         .await?
         .expect("message should exist");
 

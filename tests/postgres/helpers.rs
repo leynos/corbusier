@@ -44,6 +44,11 @@ pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
 
+/// SQL to enforce unique active agent session per conversation.
+pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
+    "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
+);
+
 /// Template database name for pre-migrated schema.
 pub const TEMPLATE_DB: &str = "corbusier_test_template";
 
@@ -99,6 +104,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     conn.batch_execute(ADD_MCP_SERVERS_SQL)
+        .map_err(|err| Box::new(err) as BoxError)?;
+    conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL)
         .map_err(|err| Box::new(err) as BoxError)?;
     Ok(())
 }

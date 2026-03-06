@@ -57,6 +57,26 @@ impl InMemoryAgentSessionRepository {
     }
 }
 
+/// Returns `Err(ActiveSessionExists)` when `sessions` already contains an
+/// active session for `conversation_id`, optionally excluding `exclude_id`
+/// (used during updates so a session does not conflict with itself).
+fn check_active_session(
+    sessions: &HashMap<AgentSessionId, AgentSession>,
+    conversation_id: ConversationId,
+    exclude_id: Option<AgentSessionId>,
+) -> SessionResult<()> {
+    let conflict = sessions.values().any(|s| {
+        s.conversation_id == conversation_id
+            && s.state == AgentSessionState::Active
+            && exclude_id != Some(s.session_id)
+    });
+    if conflict {
+        Err(SessionError::ActiveSessionExists(conversation_id))
+    } else {
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl AgentSessionRepository for InMemoryAgentSessionRepository {
     async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
@@ -67,12 +87,8 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
             if sessions.contains_key(&session_id) {
                 return Err(SessionError::Duplicate(session_id));
             }
-            if is_active
-                && sessions.values().any(|s| {
-                    s.conversation_id == conversation_id && s.state == AgentSessionState::Active
-                })
-            {
-                return Err(SessionError::ActiveSessionExists(conversation_id));
+            if is_active {
+                check_active_session(sessions, conversation_id, None)?;
             }
             Ok(())
         })
@@ -86,14 +102,8 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
             if !sessions.contains_key(&session_id) {
                 return Err(SessionError::NotFound(session_id));
             }
-            if is_active
-                && sessions.values().any(|s| {
-                    s.conversation_id == conversation_id
-                        && s.state == AgentSessionState::Active
-                        && s.session_id != session_id
-                })
-            {
-                return Err(SessionError::ActiveSessionExists(conversation_id));
+            if is_active {
+                check_active_session(sessions, conversation_id, Some(session_id))?;
             }
             Ok(())
         })

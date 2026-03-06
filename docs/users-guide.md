@@ -6,7 +6,8 @@ Corbusier stores conversation messages as an append-only sequence. History is
 retrieved in sequence order via the message repository.
 
 ```rust,no_run
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::message::{
     adapters::memory::InMemoryMessageRepository,
     domain::{
@@ -116,7 +117,8 @@ creation time.
 ```rust,no_run
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::IssueRef,
@@ -165,7 +167,8 @@ to `in_review`.
 ```rust,no_run
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{BranchRef, PullRequestRef, TaskState},
@@ -256,7 +259,8 @@ Table 1. Allowed task state transitions.
 ```rust,no_run
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{TaskDomainError, TaskState},
@@ -324,7 +328,8 @@ use corbusier::agent_backend::{
     adapters::memory::InMemoryBackendRegistry,
     services::{BackendRegistryService, RegisterBackendRequest},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use mockable::DefaultClock;
 
 #[tokio::main]
@@ -392,8 +397,9 @@ distributed tracing identifiers, and the authenticated principal.
 
 ```rust,no_run
 use corbusier::context::{
-    CausationId, CorrelationId, RequestContext, SessionId, TenantId, UserId,
+    CausationId, CorrelationId, RequestContext, SessionId, UserId,
 };
+use corbusier::tenant::TenantId;
 
 fn build_request_context() {
     // Required fields: tenant, correlation, user, session.

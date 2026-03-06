@@ -2,12 +2,18 @@
 //!
 //! Provides production-grade persistence for agent sessions with JSONB storage
 //! for turn IDs and context snapshots.
+//!
+//! Tenant isolation is enforced via `SET LOCAL app.tenant_id`, which sets a
+//! `PostgreSQL` session variable scoped to the current transaction.  This
+//! prepares the connection for Row-Level Security (RLS) policies once they
+//! land in milestone 1.5.3.
 
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use serde::Serialize;
+use uuid::Uuid;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 use crate::context::RequestContext;
@@ -20,6 +26,72 @@ use crate::message::{
     },
     ports::agent_session::{AgentSessionRepository, SessionError, SessionResult},
 };
+
+// ---------------------------------------------------------------------------
+// Transaction helper
+// ---------------------------------------------------------------------------
+
+/// Adapter-local wrapper that satisfies Diesel's `From<diesel::result::Error>`
+/// bound on [`PgConnection::transaction`] without leaking Diesel types into
+/// the port layer.
+enum TxError {
+    Session(SessionError),
+    Diesel(diesel::result::Error),
+}
+
+impl From<diesel::result::Error> for TxError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::Diesel(err)
+    }
+}
+
+impl From<SessionError> for TxError {
+    fn from(err: SessionError) -> Self {
+        Self::Session(err)
+    }
+}
+
+impl From<TxError> for SessionError {
+    fn from(err: TxError) -> Self {
+        match err {
+            TxError::Session(e) => e,
+            TxError::Diesel(e) => Self::persistence(e),
+        }
+    }
+}
+
+/// Runs `body` inside a transaction that first sets `app.tenant_id`.
+fn with_tenant_tx<T, F>(conn: &mut PgConnection, tenant_id: Uuid, body: F) -> SessionResult<T>
+where
+    F: FnOnce(&mut PgConnection) -> SessionResult<T>,
+{
+    conn.transaction::<T, TxError, _>(|tx| {
+        set_tenant_context(tx, tenant_id)?;
+        body(tx).map_err(TxError::from)
+    })
+    .map_err(SessionError::from)
+}
+
+/// Sets the `PostgreSQL` session variable `app.tenant_id` for the current
+/// transaction.
+///
+/// This prepares the connection for Row-Level Security (RLS) policies.
+/// `SET LOCAL` scopes the variable to the enclosing transaction, so each
+/// request gets an isolated tenant context.
+///
+/// # Security
+///
+/// UUID values are formatted using their canonical hyphenated representation
+/// which contains only hexadecimal digits and hyphens, making SQL injection
+/// impossible.
+fn set_tenant_context(conn: &mut PgConnection, tenant_id: Uuid) -> Result<(), TxError> {
+    diesel::sql_query(format!("SET LOCAL app.tenant_id = '{tenant_id}'")).execute(conn)?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Adapter
+// ---------------------------------------------------------------------------
 
 /// `PostgreSQL` implementation of [`AgentSessionRepository`].
 ///
@@ -36,8 +108,8 @@ impl PostgresAgentSessionRepository {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Helper to execute a database query with standard error handling.
-    async fn query_with<F, T>(&self, query_fn: F) -> SessionResult<T>
+    /// Executes a query inside a transaction with tenant context.
+    async fn execute_query<F, T>(&self, tenant_id: Uuid, query_fn: F) -> SessionResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
         T: Send + 'static,
@@ -47,7 +119,7 @@ impl PostgresAgentSessionRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
-                query_fn(&mut conn)
+                with_tenant_tx(&mut conn, tenant_id, query_fn)
             },
             SessionError::persistence,
         )
@@ -55,24 +127,32 @@ impl PostgresAgentSessionRepository {
     }
 
     /// Execute a query that returns a single optional session.
-    async fn find_one<F>(&self, build_query: F) -> SessionResult<Option<AgentSession>>
+    async fn find_one<F>(
+        &self,
+        tenant_id: Uuid,
+        build_query: F,
+    ) -> SessionResult<Option<AgentSession>>
     where
         F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
             + Send
             + 'static,
     {
-        let sessions = self.find_many(build_query).await?;
+        let sessions = self.find_many(tenant_id, build_query).await?;
         Ok(sessions.into_iter().next())
     }
 
     /// Execute a query that returns multiple sessions.
-    async fn find_many<F>(&self, build_query: F) -> SessionResult<Vec<AgentSession>>
+    async fn find_many<F>(
+        &self,
+        tenant_id: Uuid,
+        build_query: F,
+    ) -> SessionResult<Vec<AgentSession>>
     where
         F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
             + Send
             + 'static,
     {
-        self.query_with(move |conn| {
+        self.execute_query(tenant_id, move |conn| {
             let rows = build_query(agent_sessions::table)
                 .select(AgentSessionRow::as_select())
                 .load::<AgentSessionRow>(conn)
@@ -86,8 +166,9 @@ impl PostgresAgentSessionRepository {
 
 #[async_trait]
 impl AgentSessionRepository for PostgresAgentSessionRepository {
-    async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
+    async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
+        let tenant_id = ctx.tenant_id().into_inner();
         let new_session = session_to_new_row(session)?;
         let session_id = session.session_id;
         let conversation_id = session.conversation_id;
@@ -96,30 +177,32 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id, |tx| {
+                    diesel::insert_into(agent_sessions::table)
+                        .values(&new_session)
+                        .execute(tx)
+                        .map_err(|err| match err {
+                            DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
+                                SessionError::Duplicate(session_id)
+                            }
+                            _ => SessionError::persistence(err),
+                        })?;
 
-                diesel::insert_into(agent_sessions::table)
-                    .values(&new_session)
-                    .execute(&mut conn)
-                    .map_err(|err| match err {
-                        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
-                            SessionError::Duplicate(session_id)
-                        }
-                        _ => SessionError::persistence(err),
-                    })?;
+                    if is_active {
+                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                    }
 
-                if is_active {
-                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
-                }
-
-                Ok(())
+                    Ok(())
+                })
             },
             SessionError::persistence,
         )
         .await
     }
 
-    async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
+    async fn update(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
+        let tenant_id = ctx.tenant_id().into_inner();
         let session_id = session.session_id;
         let conversation_id = session.conversation_id;
         let is_active = session.state == AgentSessionState::Active;
@@ -128,23 +211,25 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id, |tx| {
+                    let updated_rows = diesel::update(
+                        agent_sessions::table
+                            .filter(agent_sessions::id.eq(session_id.into_inner())),
+                    )
+                    .set(&updated)
+                    .execute(tx)
+                    .map_err(SessionError::persistence)?;
 
-                let updated_rows = diesel::update(
-                    agent_sessions::table.filter(agent_sessions::id.eq(session_id.into_inner())),
-                )
-                .set(&updated)
-                .execute(&mut conn)
-                .map_err(SessionError::persistence)?;
+                    if updated_rows == 0 {
+                        return Err(SessionError::NotFound(session_id));
+                    }
 
-                if updated_rows == 0 {
-                    return Err(SessionError::NotFound(session_id));
-                }
+                    if is_active {
+                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                    }
 
-                if is_active {
-                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
-                }
-
-                Ok(())
+                    Ok(())
+                })
             },
             SessionError::persistence,
         )
@@ -153,23 +238,27 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         id: AgentSessionId,
     ) -> SessionResult<Option<AgentSession>> {
+        let tenant_id = ctx.tenant_id().into_inner();
         let uuid = id.into_inner();
 
-        self.find_one(move |table| table.filter(agent_sessions::id.eq(uuid)).into_boxed())
-            .await
+        self.find_one(tenant_id, move |table| {
+            table.filter(agent_sessions::id.eq(uuid)).into_boxed()
+        })
+        .await
     }
 
     async fn find_active_for_conversation(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
+        let tenant_id = ctx.tenant_id().into_inner();
         let uuid = conversation_id.into_inner();
 
-        self.find_one(move |table| {
+        self.find_one(tenant_id, move |table| {
             table
                 .filter(agent_sessions::conversation_id.eq(uuid))
                 .filter(agent_sessions::state.eq(AgentSessionState::Active.as_str()))
@@ -180,12 +269,13 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
     async fn find_by_conversation(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
+        let tenant_id = ctx.tenant_id().into_inner();
         let uuid = conversation_id.into_inner();
 
-        self.find_many(move |table| {
+        self.find_many(tenant_id, move |table| {
             table
                 .filter(agent_sessions::conversation_id.eq(uuid))
                 .order(agent_sessions::started_at.asc())

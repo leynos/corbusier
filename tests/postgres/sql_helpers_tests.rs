@@ -3,14 +3,6 @@
 //! These tests require a running `PostgreSQL` instance and exercise the SQL
 //! helpers through the repository stack rather than in isolation.
 
-// Module-level suppression required because `#[rstest]` macro expansion
-// generates the offending function signatures and per-function `#[expect]`
-// attributes are not visible to the macro-generated code.
-#![expect(
-    clippy::too_many_arguments,
-    reason = "rstest fixture + #[case] injection exceeds the project threshold of 4"
-)]
-
 use corbusier::context::{CausationId, RequestContext};
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, MessageId, Role, SequenceNumber, TextPart},
@@ -141,25 +133,25 @@ async fn insert_message_maps_duplicate_sequence_constraint(
 /// - With causation: all context fields propagated
 /// - Without causation: `causation_id` absent from audit log
 #[rstest]
-#[case::with_causation(true, "with_causation")]
-#[case::without_causation(false, "without_causation")]
+#[case::with_causation(true)]
+#[case::without_causation(false)]
 #[tokio::test]
 async fn set_audit_context_propagates_fields(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
     test_request_context: RequestContext,
     #[case] include_causation: bool,
-    #[case] scenario: &str,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
     insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
-    let mut req_ctx = test_request_context;
-    if include_causation {
-        req_ctx = req_ctx.with_causation_id(CausationId::new());
-    }
+    let req_ctx = if include_causation {
+        test_request_context.with_causation_id(CausationId::new())
+    } else {
+        test_request_context
+    };
 
     let message = Message::new(
         conv_id,
@@ -181,22 +173,22 @@ async fn set_audit_context_propagates_fields(
     assert_eq!(
         audit_log.correlation_id,
         Some(req_ctx.correlation_id().into_inner()),
-        "scenario: {scenario}"
+        "include_causation={include_causation}"
     );
     assert_eq!(
         audit_log.causation_id,
         req_ctx.causation_id().map(CausationId::into_inner),
-        "scenario: {scenario}"
+        "include_causation={include_causation}"
     );
     assert_eq!(
         audit_log.user_id,
         Some(req_ctx.user_id().into_inner()),
-        "scenario: {scenario}"
+        "include_causation={include_causation}"
     );
     assert_eq!(
         audit_log.session_id,
         Some(req_ctx.session_id().into_inner()),
-        "scenario: {scenario}"
+        "include_causation={include_causation}"
     );
     Ok(())
 }

@@ -24,8 +24,13 @@ pub type SessionResult<T> = Result<T, SessionError>;
 /// - Only one active session per conversation at any time
 /// - Sessions are mutable during their lifecycle
 /// - Concurrent access is handled safely
-/// - All queries and mutations are scoped to the tenant identified
-///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
+/// - **Tenant isolation is not yet enforced here.** The `ctx`
+///   parameter (`_ctx` in current adapters) carries
+///   [`RequestContext::tenant_id`](crate::context::RequestContext)
+///   but adapter implementations do not filter by tenant until
+///   Row-Level Security (RLS) or adapter-level filtering is wired
+///   (planned for milestone 1.5.3).  Callers must not rely on this
+///   trait to enforce tenant boundaries at present
 #[async_trait]
 pub trait AgentSessionRepository: Send + Sync {
     /// Stores a new agent session.
