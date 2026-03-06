@@ -12,8 +12,8 @@ use corbusier::tool_registry::{
         ToolRegistryDomainError,
     },
     services::{
-        McpServerLifecycleService, RegisterMcpServerRequest, ToolDiscoveryRoutingService,
-        ToolDiscoveryRoutingServiceError,
+        McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
+        ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError,
     },
 };
 use eyre::Result;
@@ -49,11 +49,13 @@ fn ctx() -> IntegrationContext {
 
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let discovery = ToolDiscoveryRoutingService::new(
-        catalog.clone(),
-        registry,
-        host.clone(),
-        Arc::new(AllowAllPolicy),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        ServicePorts {
+            catalog: catalog.clone(),
+            registry,
+            host: host.clone(),
+            policy: Arc::new(AllowAllPolicy),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
         LogRetentionPolicy::default(),
         clock,
     );

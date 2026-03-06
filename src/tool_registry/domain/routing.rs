@@ -124,6 +124,15 @@ impl ToolCallOutcome {
     }
 }
 
+/// Timing metadata for a completed tool call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolCallTiming {
+    /// How long the call took.
+    pub duration: Duration,
+    /// When the call completed.
+    pub completed_at: DateTime<Utc>,
+}
+
 /// Completed tool call result with timing and routing metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolCallResult {
@@ -136,27 +145,22 @@ pub struct ToolCallResult {
 }
 
 impl ToolCallResult {
-    /// Creates a new tool call result.
+    /// Creates a tool call result from a request, server, outcome, and
+    /// timing metadata.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "result struct captures all routing metadata fields"
-    )]
-    pub fn new(
-        call_id: ToolCallId,
-        tool_name: impl Into<String>,
+    pub fn from_request(
+        request: &ToolCallRequest,
         server_id: McpServerId,
         outcome: ToolCallOutcome,
-        duration: Duration,
-        completed_at: DateTime<Utc>,
+        timing: ToolCallTiming,
     ) -> Self {
         Self {
-            call_id,
-            tool_name: tool_name.into(),
+            call_id: request.call_id(),
+            tool_name: request.tool_name().to_owned(),
             server_id,
             outcome,
-            duration,
-            completed_at,
+            duration: timing.duration,
+            completed_at: timing.completed_at,
         }
     }
 

@@ -8,7 +8,7 @@ use super::{
 use crate::tool_registry::{
     domain::{
         CatalogEntry, CatalogEntryId, McpServerId, McpServerName, McpToolDefinition,
-        ToolCallAuditRecord, ToolCallOutcome,
+        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome,
     },
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
@@ -165,15 +165,15 @@ fn row_to_entry(row: CatalogEntryRow) -> ToolCatalogResult<CatalogEntry> {
         tool = tool.with_output_schema(output);
     }
 
-    Ok(CatalogEntry::from_persisted(
-        CatalogEntryId::from_uuid(row.id),
-        McpServerId::from_uuid(row.server_id),
+    Ok(CatalogEntry::from_persisted(PersistedCatalogEntryData {
+        id: CatalogEntryId::from_uuid(row.id),
+        server_id: McpServerId::from_uuid(row.server_id),
         server_name,
         tool,
-        row.available,
-        row.discovered_at,
-        row.updated_at,
-    ))
+        available: row.available,
+        discovered_at: row.discovered_at,
+        updated_at: row.updated_at,
+    }))
 }
 
 #[expect(

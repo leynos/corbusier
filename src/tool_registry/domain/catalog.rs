@@ -48,6 +48,26 @@ impl fmt::Display for CatalogEntryId {
     }
 }
 
+/// All fields needed to reconstruct a [`CatalogEntry`] from persisted
+/// storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistedCatalogEntryData {
+    /// Catalog entry identifier.
+    pub id: CatalogEntryId,
+    /// Hosting server identifier.
+    pub server_id: McpServerId,
+    /// Hosting server name.
+    pub server_name: McpServerName,
+    /// Tool definition.
+    pub tool: McpToolDefinition,
+    /// Whether the tool is currently available.
+    pub available: bool,
+    /// Timestamp when the tool was first discovered.
+    pub discovered_at: DateTime<Utc>,
+    /// Timestamp of the latest update.
+    pub updated_at: DateTime<Utc>,
+}
+
 /// A tool discovered from an MCP server and persisted in the catalog.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CatalogEntry {
@@ -143,27 +163,15 @@ impl CatalogEntry {
     /// identifier or timestamp -- all fields are supplied by the persistence
     /// layer.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "reconstruction from persistence requires all stored fields"
-    )]
-    pub const fn from_persisted(
-        id: CatalogEntryId,
-        server_id: McpServerId,
-        server_name: McpServerName,
-        tool: McpToolDefinition,
-        available: bool,
-        discovered_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
-    ) -> Self {
+    pub fn from_persisted(data: PersistedCatalogEntryData) -> Self {
         Self {
-            id,
-            server_id,
-            server_name,
-            tool,
-            available,
-            discovered_at,
-            updated_at,
+            id: data.id,
+            server_id: data.server_id,
+            server_name: data.server_name,
+            tool: data.tool,
+            available: data.available,
+            discovered_at: data.discovered_at,
+            updated_at: data.updated_at,
         }
     }
 

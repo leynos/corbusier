@@ -92,17 +92,20 @@ pub struct LogEntryMetadata {
 }
 
 impl LogEntryMetadata {
-    /// Creates metadata for a server startup stderr capture.
-    #[must_use]
-    pub fn for_startup(
+    /// Shared construction logic for all log entry kinds.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "private builder groups all metadata fields for a log entry"
+    )]
+    fn build(
         server_id: McpServerId,
+        kind: LogEntryKind,
         byte_count: u64,
         clock: &impl Clock,
         retention: &LogRetentionPolicy,
     ) -> Self {
         let id = LogEntryId::new();
-        let kind = LogEntryKind::ServerStartup;
-        let object_path = format!("tool_logs/{server_id}/{}/{id}.stderr", kind.path_segment(),);
+        let object_path = format!("tool_logs/{server_id}/{}/{id}.stderr", kind.path_segment());
         let captured_at = clock.utc();
         let expires_at = captured_at + retention.retention_period;
         Self {
@@ -114,6 +117,23 @@ impl LogEntryMetadata {
             captured_at,
             expires_at,
         }
+    }
+
+    /// Creates metadata for a server startup stderr capture.
+    #[must_use]
+    pub fn for_startup(
+        server_id: McpServerId,
+        byte_count: u64,
+        clock: &impl Clock,
+        retention: &LogRetentionPolicy,
+    ) -> Self {
+        Self::build(
+            server_id,
+            LogEntryKind::ServerStartup,
+            byte_count,
+            clock,
+            retention,
+        )
     }
 
     /// Creates metadata for a tool call stderr capture.
@@ -129,20 +149,13 @@ impl LogEntryMetadata {
         clock: &impl Clock,
         retention: &LogRetentionPolicy,
     ) -> Self {
-        let id = LogEntryId::new();
-        let kind = LogEntryKind::ToolCall { call_id };
-        let object_path = format!("tool_logs/{server_id}/{}/{id}.stderr", kind.path_segment(),);
-        let captured_at = clock.utc();
-        let expires_at = captured_at + retention.retention_period;
-        Self {
-            id,
+        Self::build(
             server_id,
-            kind,
-            object_path,
+            LogEntryKind::ToolCall { call_id },
             byte_count,
-            captured_at,
-            expires_at,
-        }
+            clock,
+            retention,
+        )
     }
 
     /// Returns the log entry identifier.

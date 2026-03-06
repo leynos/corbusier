@@ -20,7 +20,7 @@ mod transport;
 pub mod validation;
 
 pub use audit::ToolCallAuditRecord;
-pub use catalog::{CatalogEntry, CatalogEntryId};
+pub use catalog::{CatalogEntry, CatalogEntryId, PersistedCatalogEntryData};
 pub use error::{
     ParseMcpServerHealthStatusError, ParseMcpServerLifecycleStateError, ToolRegistryDomainError,
 };
@@ -28,7 +28,7 @@ pub use health::{McpServerHealthSnapshot, McpServerHealthStatus};
 pub use ids::{McpServerId, McpServerName};
 pub use log_capture::{LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy};
 pub use policy::PolicyDecision;
-pub use routing::{ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult};
+pub use routing::{ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming};
 pub use server::{McpServerLifecycleState, McpServerRegistration, PersistedMcpServerData};
 pub use tool::McpToolDefinition;
 pub use transport::{HttpSseTransportConfig, McpTransport, StdioTransportConfig};

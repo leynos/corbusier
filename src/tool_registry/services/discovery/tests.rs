@@ -1,6 +1,6 @@
 //! Unit tests for tool discovery and routing service.
 
-use super::{ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError};
+use super::{ServicePorts, ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError};
 use crate::tool_registry::{
     adapters::{
         AllowAllPolicy, DenyAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -46,11 +46,13 @@ fn bundle() -> TestBundle {
 
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let discovery = ToolDiscoveryRoutingService::new(
-        catalog.clone(),
-        registry,
-        host.clone(),
-        Arc::new(AllowAllPolicy),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        ServicePorts {
+            catalog: catalog.clone(),
+            registry,
+            host: host.clone(),
+            policy: Arc::new(AllowAllPolicy),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
         LogRetentionPolicy::default(),
         clock,
     );
@@ -76,6 +78,32 @@ fn read_file_tool() -> Result<McpToolDefinition> {
     )?)
 }
 
+async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
+    host: &InMemoryMcpServerHost,
+    lifecycle: &TestLifecycleService,
+    discovery: &ToolDiscoveryRoutingService<
+        InMemoryToolCatalog,
+        InMemoryMcpServerRegistry,
+        InMemoryMcpServerHost,
+        Pol,
+        ObjectStoreLogAdapter,
+        DefaultClock,
+    >,
+) -> Result<crate::tool_registry::domain::McpServerId> {
+    host.set_tool_catalog(
+        McpServerName::new("workspace_tools")?,
+        vec![read_file_tool()?],
+    )?;
+    let registered = lifecycle
+        .register(stdio_request("workspace_tools")?)
+        .await?;
+    lifecycle.start(registered.id()).await?;
+    discovery
+        .discover_and_persist_tools(registered.id())
+        .await?;
+    Ok(registered.id())
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 #[expect(
@@ -90,26 +118,13 @@ async fn discover_tools_persists_catalog(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-
-    let entries = discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].tool().name(), "read_file");
-    assert!(entries[0].available());
+    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
 
     let catalog_entries = discovery.list_catalog().await?;
     assert_eq!(catalog_entries.len(), 1);
+    assert_eq!(catalog_entries[0].tool().name(), "read_file");
+    assert!(catalog_entries[0].available());
+    assert_eq!(catalog_entries[0].server_id(), server_id);
 
     Ok(())
 }
@@ -152,20 +167,9 @@ async fn mark_unavailable_updates_catalog(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
 
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
-    discovery.mark_tools_unavailable(registered.id()).await?;
+    discovery.mark_tools_unavailable(server_id).await?;
 
     let entries = discovery.list_catalog().await?;
     assert_eq!(entries.len(), 1);
@@ -189,30 +193,19 @@ async fn call_tool_routes_to_correct_server(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
     host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello world"}),
     )?;
 
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     let result = discovery.call_tool(&request).await?;
 
     assert!(result.outcome().is_success());
-    assert_eq!(result.server_id(), registered.id());
+    assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
 
     let audit_records = catalog.audit_records()?;
@@ -258,20 +251,9 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
 
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
-    discovery.mark_tools_unavailable(registered.id()).await?;
+    discovery.mark_tools_unavailable(server_id).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
@@ -296,18 +278,7 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
+    register_start_discover(&host, &lifecycle, &discovery).await?;
 
     // Missing required 'path' parameter.
     let request = ToolCallRequest::new("read_file", json!({}), &DefaultClock);
@@ -332,27 +303,18 @@ async fn call_tool_policy_denied() -> Result<()> {
 
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let discovery = ToolDiscoveryRoutingService::new(
-        catalog,
-        registry,
-        host.clone(),
-        Arc::new(DenyAllPolicy::new("not authorised")),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        ServicePorts {
+            catalog,
+            registry,
+            host: host.clone(),
+            policy: Arc::new(DenyAllPolicy::new("not authorised")),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
         LogRetentionPolicy::default(),
         clock,
     );
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
+    register_start_discover(&host, &lifecycle, &discovery).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
@@ -382,19 +344,8 @@ async fn call_tool_host_failure_still_records_audit(bundle: TestBundle) -> Resul
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
     // Don't configure a call result -- the host will return ToolCallFailed.
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
+    register_start_discover(&host, &lifecycle, &discovery).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
@@ -424,10 +375,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    register_start_discover(&host, &lifecycle, &discovery).await?;
     host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
@@ -438,14 +386,6 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
         "read_file",
         bytes::Bytes::from("debug: opening file"),
     )?;
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
@@ -475,23 +415,12 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
         ..
     } = bundle;
 
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    register_start_discover(&host, &lifecycle, &discovery).await?;
     host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
     )?;
-
-    let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);

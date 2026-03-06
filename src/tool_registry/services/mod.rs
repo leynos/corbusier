@@ -5,7 +5,7 @@ mod discovery;
 mod lifecycle;
 
 pub use discovery::{
-    ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError,
+    ServicePorts, ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError,
     ToolDiscoveryRoutingServiceResult,
 };
 pub use lifecycle::{

@@ -9,7 +9,10 @@ use corbusier::tool_registry::{
         postgres::{McpServerPgPool, PostgresMcpServerRegistry, PostgresToolCatalog},
     },
     domain::{LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport, ToolCallRequest},
-    services::{McpServerLifecycleService, RegisterMcpServerRequest, ToolDiscoveryRoutingService},
+    services::{
+        McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
+        ToolDiscoveryRoutingService,
+    },
 };
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
@@ -64,11 +67,13 @@ async fn setup_context(cluster: PostgresCluster) -> Result<PgTestContext, BoxErr
 
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let discovery = ToolDiscoveryRoutingService::new(
-        catalog,
-        registry,
-        host.clone(),
-        Arc::new(AllowAllPolicy),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        ServicePorts {
+            catalog,
+            registry,
+            host: host.clone(),
+            policy: Arc::new(AllowAllPolicy),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
         LogRetentionPolicy::default(),
         clock,
     );
@@ -275,11 +280,13 @@ async fn catalog_survives_service_reconstruction(
     let catalog2 = Arc::new(PostgresToolCatalog::new(ctx.pool.clone()));
     let clock2 = Arc::new(DefaultClock);
     let discovery2: TestDiscoveryService = ToolDiscoveryRoutingService::new(
-        catalog2,
-        registry2,
-        ctx.host.clone(),
-        Arc::new(AllowAllPolicy),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
+        ServicePorts {
+            catalog: catalog2,
+            registry: registry2,
+            host: ctx.host.clone(),
+            policy: Arc::new(AllowAllPolicy),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
         LogRetentionPolicy::default(),
         clock2,
     );

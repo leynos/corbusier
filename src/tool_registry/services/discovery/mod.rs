@@ -1,14 +1,13 @@
 //! Service layer for tool discovery, catalog management, and call routing.
 //!
-//! [`ToolDiscoveryRoutingService`] orchestrates the flow from tool
-//! discovery through schema validation, policy enforcement, call routing,
-//! stderr capture, and audit recording.
+//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema validation, policy
+//! enforcement, call routing, stderr capture, and audit recording.
 
 use crate::tool_registry::{
     domain::{
         CatalogEntry, LogEntryMetadata, LogRetentionPolicy, McpServerId, PolicyDecision,
         ToolCallAuditRecord, ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult,
-        ToolRegistryDomainError, validation::validate_parameters,
+        ToolCallTiming, ToolRegistryDomainError, validation::validate_parameters,
     },
     ports::{
         McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
@@ -49,6 +48,20 @@ pub enum ToolDiscoveryRoutingServiceError {
 /// Result type for discovery and routing service operations.
 pub type ToolDiscoveryRoutingServiceResult<T> = Result<T, ToolDiscoveryRoutingServiceError>;
 
+/// Port dependencies for [`ToolDiscoveryRoutingService`].
+pub struct ServicePorts<Cat, Reg, H, Pol, Log> {
+    /// Catalog repository.
+    pub catalog: Arc<Cat>,
+    /// Server registry.
+    pub registry: Arc<Reg>,
+    /// Server host.
+    pub host: Arc<H>,
+    /// Policy enforcer.
+    pub policy: Arc<Pol>,
+    /// Log store.
+    pub log_store: Arc<Log>,
+}
+
 /// Tool discovery, catalog management, and call routing service.
 ///
 /// This service is a sibling to [`super::McpServerLifecycleService`],
@@ -83,25 +96,17 @@ where
 {
     /// Creates a new discovery and routing service.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "hexagonal service requires all port dependencies"
-    )]
-    pub const fn new(
-        catalog: Arc<Cat>,
-        registry: Arc<Reg>,
-        host: Arc<H>,
-        policy: Arc<Pol>,
-        log_store: Arc<Log>,
+    pub fn new(
+        ports: ServicePorts<Cat, Reg, H, Pol, Log>,
         retention_policy: LogRetentionPolicy,
         clock: Arc<C>,
     ) -> Self {
         Self {
-            catalog,
-            registry,
-            host,
-            policy,
-            log_store,
+            catalog: ports.catalog,
+            registry: ports.registry,
+            host: ports.host,
+            policy: ports.policy,
+            log_store: ports.log_store,
             retention_policy,
             clock,
         }
@@ -138,7 +143,6 @@ where
     /// Marks all tools for a server as unavailable in the catalog.
     ///
     /// # Errors
-    ///
     /// Returns [`ToolCatalogError`] on persistence failures.
     pub async fn mark_tools_unavailable(
         &self,
@@ -153,7 +157,6 @@ where
     /// Marks all tools for a server as available in the catalog.
     ///
     /// # Errors
-    ///
     /// Returns [`ToolCatalogError`] on persistence failures.
     pub async fn mark_tools_available(
         &self,
@@ -166,7 +169,6 @@ where
     /// Returns the complete tool catalog.
     ///
     /// # Errors
-    ///
     /// Returns [`ToolCatalogError`] on persistence failures.
     pub async fn list_catalog(&self) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>> {
         Ok(self.catalog.list_all().await?)
@@ -176,7 +178,6 @@ where
     /// capture, and audit recording.
     ///
     /// # Errors
-    ///
     /// Returns errors for tool resolution, schema validation, policy
     /// denial, host execution failures, or timeout.
     pub async fn call_tool(
@@ -216,14 +217,11 @@ where
             }
         };
 
-        let result = ToolCallResult::new(
-            request.call_id(),
-            request.tool_name(),
-            entry.server_id(),
-            outcome,
+        let timing = ToolCallTiming {
             duration,
             completed_at,
-        );
+        };
+        let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
 
         self.capture_and_audit(request, &result, stderr_output)
             .await;
@@ -320,11 +318,9 @@ where
     }
 
     /// Stores startup stderr captured from `McpServerHost::start`.
-    ///
     /// Also triggers a retention sweep for the server.
     ///
     /// # Errors
-    ///
     /// Returns [`ToolLogStoreError`] when the store operation fails.
     pub async fn store_startup_stderr(
         &self,

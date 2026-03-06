@@ -54,6 +54,12 @@ impl InMemoryMcpServerHost {
             .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))
     }
 
+    fn modify_state(&self, f: impl FnOnce(&mut InMemoryHostState)) -> McpServerHostResult<()> {
+        let mut state = self.write_state()?;
+        f(&mut state);
+        Ok(())
+    }
+
     /// Associates a tool catalog with a server name.
     ///
     /// Existing catalog entries are replaced.
@@ -66,9 +72,9 @@ impl InMemoryMcpServerHost {
         server_name: McpServerName,
         tools: Vec<McpToolDefinition>,
     ) -> McpServerHostResult<()> {
-        let mut state = self.write_state()?;
-        state.tool_catalogs.insert(server_name, tools);
-        Ok(())
+        self.modify_state(|s| {
+            s.tool_catalogs.insert(server_name, tools);
+        })
     }
 
     /// Marks a running server as unhealthy with a diagnostic message.
@@ -81,11 +87,10 @@ impl InMemoryMcpServerHost {
         server_id: McpServerId,
         message: impl Into<String>,
     ) -> McpServerHostResult<()> {
-        let mut state = self.write_state()?;
-        state
-            .unhealthy_servers
-            .insert(server_id, message.into().trim().to_owned());
-        Ok(())
+        let msg = message.into().trim().to_owned();
+        self.modify_state(|s| {
+            s.unhealthy_servers.insert(server_id, msg);
+        })
     }
 
     /// Configures the result that `call_tool` will return for a given
@@ -100,11 +105,10 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         result: Value,
     ) -> McpServerHostResult<()> {
-        let mut state = self.write_state()?;
-        state
-            .tool_call_results
-            .insert((server_name, tool_name.into()), result);
-        Ok(())
+        let key = (server_name, tool_name.into());
+        self.modify_state(|s| {
+            s.tool_call_results.insert(key, result);
+        })
     }
 
     /// Configures stderr output that `call_tool` will include for a
@@ -119,11 +123,10 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         stderr: bytes::Bytes,
     ) -> McpServerHostResult<()> {
-        let mut state = self.write_state()?;
-        state
-            .tool_call_stderr
-            .insert((server_name, tool_name.into()), stderr);
-        Ok(())
+        let key = (server_name, tool_name.into());
+        self.modify_state(|s| {
+            s.tool_call_stderr.insert(key, stderr);
+        })
     }
 
     /// Configures stderr output that `start` will return for a given
@@ -137,9 +140,9 @@ impl InMemoryMcpServerHost {
         server_name: McpServerName,
         stderr: bytes::Bytes,
     ) -> McpServerHostResult<()> {
-        let mut state = self.write_state()?;
-        state.startup_stderr.insert(server_name, stderr);
-        Ok(())
+        self.modify_state(|s| {
+            s.startup_stderr.insert(server_name, stderr);
+        })
     }
 }
 
