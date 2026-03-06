@@ -24,6 +24,8 @@ pub type SessionResult<T> = Result<T, SessionError>;
 /// - Only one active session per conversation at any time
 /// - Sessions are mutable during their lifecycle
 /// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait AgentSessionRepository: Send + Sync {
     /// Stores a new agent session.
@@ -84,6 +86,10 @@ pub enum SessionError {
     /// Conversation not found (when validating foreign key).
     #[error("conversation not found: {0}")]
     ConversationNotFound(ConversationId),
+
+    /// An active session already exists for the conversation.
+    #[error("active session already exists for conversation: {0}")]
+    ActiveSessionExists(ConversationId),
 
     /// Database or connection error.
     #[error("persistence error: {0}")]

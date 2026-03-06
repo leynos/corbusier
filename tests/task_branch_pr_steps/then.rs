@@ -1,7 +1,6 @@
 //! Then steps for branch and pull request association BDD scenarios.
 
 use super::world::{TaskBranchPrWorld, run_async};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::{
     domain::{TaskDomainError, TaskState},
     services::TaskLifecycleError,
@@ -29,16 +28,10 @@ fn task_retrievable_by_branch_ref(world: &TaskBranchPrWorld) -> Result<(), eyre:
         .last_created_task
         .as_ref()
         .ok_or_else(|| eyre::eyre!("missing created task"))?;
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let branch_ref = task
         .branch_ref()
         .ok_or_else(|| eyre::eyre!("task should have a branch reference"))?;
-    let found = run_async(world.service.find_by_branch_ref(&ctx, branch_ref))
+    let found = run_async(world.service.find_by_branch_ref(&world.ctx, branch_ref))
         .map_err(|err| eyre::eyre!("branch ref lookup failed: {err}"))?;
     if found.is_empty() {
         return Err(eyre::eyre!("expected at least one task for branch ref"));

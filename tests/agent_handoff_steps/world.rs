@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::memory::{
         InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
@@ -10,9 +11,7 @@ use corbusier::message::{
         AgentSession, ConversationId, HandoffMetadata, MessageId, SequenceNumber,
         ToolCallReference, TurnId,
     },
-    ports::{
-        agent_session::AgentSessionRepository,
-    },
+    ports::agent_session::AgentSessionRepository,
     services::HandoffService,
 };
 use eyre::WrapErr;
@@ -32,6 +31,8 @@ pub struct HandoffWorld {
     pub handoff_adapter: Arc<InMemoryHandoffAdapter<DefaultClock>>,
     pub snapshot_adapter: Arc<InMemoryContextSnapshotAdapter>,
     pub service: TestHandoffService,
+    /// Scenario-scoped request context for service calls.
+    pub ctx: RequestContext,
     pub conversation_id: ConversationId,
     pub source_session: Option<AgentSession>,
     pub target_session: Option<AgentSession>,
@@ -60,6 +61,12 @@ impl Default for HandoffWorld {
             handoff_adapter,
             snapshot_adapter,
             service,
+            ctx: RequestContext::new(
+                TenantId::new(),
+                CorrelationId::new(),
+                UserId::new(),
+                SessionId::new(),
+            ),
             conversation_id: ConversationId::new(),
             source_session: None,
             target_session: None,
@@ -87,7 +94,7 @@ pub fn create_and_store_session(
 ) -> Result<AgentSession, eyre::Report> {
     let session =
         AgentSession::new(world.conversation_id, agent_backend, start_sequence, &world.clock);
-    run_async(world.session_repo.store(&session)).wrap_err("store session")?;
+    run_async(world.session_repo.store(&world.ctx, &session)).wrap_err("store session")?;
     Ok(session)
 }
 

@@ -3,7 +3,12 @@
 //! These tests require a running `PostgreSQL` instance and exercise the SQL
 //! helpers through the repository stack rather than in isolation.
 
-use corbusier::context::{CausationId, CorrelationId, RequestContext, SessionId, TenantId, UserId};
+#![expect(
+    clippy::too_many_arguments,
+    reason = "rstest fixture injection adds parameters beyond the Clippy threshold"
+)]
+
+use corbusier::context::{CausationId, RequestContext};
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, MessageId, Role, SequenceNumber, TextPart},
     error::RepositoryError,
@@ -15,6 +20,7 @@ use rstest::rstest;
 use super::cluster::BoxError;
 use super::helpers::{
     PreparedRepo, clock, fetch_audit_log_for_message, insert_conversation, prepared_repo,
+    test_request_context,
 };
 
 // ============================================================================
@@ -27,6 +33,7 @@ use super::helpers::{
 async fn insert_message_maps_duplicate_id_constraint(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -54,12 +61,7 @@ async fn insert_message_maps_duplicate_id_constraint(
     )
     .expect("valid message");
 
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     // Store first message
     ctx.repo.store(&req_ctx, &message1).await?;
@@ -81,6 +83,7 @@ async fn insert_message_maps_duplicate_id_constraint(
 async fn insert_message_maps_duplicate_sequence_constraint(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -105,12 +108,7 @@ async fn insert_message_maps_duplicate_sequence_constraint(
     )
     .expect("valid message");
 
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     // Store first message
     ctx.repo.store(&req_ctx, &message1).await?;
@@ -146,6 +144,7 @@ async fn insert_message_maps_duplicate_sequence_constraint(
 async fn set_audit_context_propagates_fields(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
+    test_request_context: RequestContext,
     #[case] include_causation: bool,
     #[case] scenario: &str,
 ) -> Result<(), BoxError> {
@@ -154,12 +153,7 @@ async fn set_audit_context_propagates_fields(
     let conv_id = ConversationId::new();
     insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
 
-    let mut req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let mut req_ctx = test_request_context;
     if include_causation {
         req_ctx = req_ctx.with_causation_id(CausationId::new());
     }
@@ -214,6 +208,7 @@ async fn set_audit_context_propagates_fields(
 async fn insert_message_succeeds_for_valid_message(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -229,12 +224,7 @@ async fn insert_message_succeeds_for_valid_message(
     )
     .expect("valid message");
 
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     ctx.repo.store(&req_ctx, &message).await?;
 
     // Verify the message was stored
@@ -256,6 +246,7 @@ async fn insert_message_succeeds_for_valid_message(
 async fn insert_message_wraps_generic_database_errors(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
     clock: DefaultClock,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -271,12 +262,7 @@ async fn insert_message_wraps_generic_database_errors(
     )
     .expect("valid message");
 
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     let result = ctx.repo.store(&req_ctx, &message).await;
 
     // Should get a Database error (not DuplicateMessage or DuplicateSequence)

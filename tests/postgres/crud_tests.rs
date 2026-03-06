@@ -3,8 +3,9 @@
 use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
     PreparedRepo, clock, create_test_message, insert_conversation, prepared_repo,
+    test_request_context,
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     domain::{ConversationId, MessageId, Role},
     ports::repository::MessageRepository,
@@ -17,6 +18,7 @@ use rstest::rstest;
 async fn store_and_retrieve_message(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -25,12 +27,7 @@ async fn store_and_retrieve_message(
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     ctx.repo.store(&req_ctx, &message).await?;
 
@@ -51,14 +48,10 @@ async fn store_and_retrieve_message(
 #[tokio::test]
 async fn find_by_id_returns_none_for_missing(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     let result = ctx.repo.find_by_id(&req_ctx, MessageId::new()).await?;
     assert!(result.is_none());
@@ -70,6 +63,7 @@ async fn find_by_id_returns_none_for_missing(
 async fn find_by_conversation_returns_ordered_messages(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -79,12 +73,7 @@ async fn find_by_conversation_returns_ordered_messages(
     let msg3 = create_test_message(&clock, conv_id, 3)?;
     let msg1 = create_test_message(&clock, conv_id, 1)?;
     let msg2 = create_test_message(&clock, conv_id, 2)?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     ctx.repo.store(&req_ctx, &msg3).await?;
     ctx.repo.store(&req_ctx, &msg1).await?;
@@ -106,6 +95,7 @@ async fn find_by_conversation_returns_ordered_messages(
 async fn exists_returns_correct_status(
     clock: DefaultClock,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
 
@@ -114,12 +104,7 @@ async fn exists_returns_correct_status(
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
 
     let exists_before = ctx.repo.exists(&req_ctx, msg_id).await?;
     assert!(!exists_before);

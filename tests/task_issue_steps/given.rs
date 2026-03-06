@@ -1,7 +1,6 @@
 //! Given steps for task lifecycle BDD scenarios.
 
 use super::world::{TaskWorld, run_async};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::{domain::IssueRef, services::CreateTaskFromIssueRequest};
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
@@ -29,17 +28,11 @@ fn issue_has_title(world: &mut TaskWorld, title: String) -> Result<(), eyre::Rep
 
 #[given("a task has already been created from that issue")]
 fn task_already_exists(world: &mut TaskWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let request = world
         .pending_request
         .clone()
         .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
-    let created = run_async(world.service.create_from_issue(&ctx, request))
+    let created = run_async(world.service.create_from_issue(&world.ctx, request))
         .wrap_err("create initial task for duplicate scenario")?;
 
     world.last_created_task = Some(created);

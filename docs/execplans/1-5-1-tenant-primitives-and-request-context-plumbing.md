@@ -41,7 +41,7 @@ After this change:
 
 This is step 1 of 6 in the multi-tenancy delivery sequence. Later steps
 (1.5.2-1.5.4) will deliver schema migrations, adapter-level tenant filtering,
-RLS policies, and two-tenant isolation tests. This step focuses exclusively on
+Row-Level Security (RLS) policies, and two-tenant isolation tests. This step focuses exclusively on
 domain primitives and plumbing signatures.
 
 ## Constraints
@@ -230,7 +230,7 @@ struct with `new()`, `from_uuid()`, `into_inner()`, `Default`, `AsRef<Uuid>`,
 
 Existing validated string pattern (`src/agent_backend/domain/name.rs`):
 `BackendName(String)` with `new(impl Into<String>) -> Result<Self, Error>`,
-trimming, normalisation, character validation, length check. Derives:
+trimming, normalization, character validation, length check. Derives:
 `Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize` with
 `#[serde(transparent)]`. Implements `AsRef<str>` and `Display`.
 

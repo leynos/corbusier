@@ -90,10 +90,16 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let pool = self.pool.clone();
         let new_session = session_to_new_row(session)?;
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
 
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+
+                if is_active {
+                    check_no_active_session(&mut conn, conversation_id, None)?;
+                }
 
                 diesel::insert_into(agent_sessions::table)
                     .values(&new_session)
@@ -115,11 +121,17 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
         let updated = session_to_update_values(session)?;
 
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+
+                if is_active {
+                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
+                }
 
                 let updated_rows = diesel::update(
                     agent_sessions::table.filter(agent_sessions::id.eq(session_id.into_inner())),
@@ -181,6 +193,39 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         })
         .await
     }
+}
+
+/// Checks that no other active session exists for the given conversation.
+///
+/// When `exclude_id` is `Some`, the check ignores the session with that ID
+/// (used during updates to allow re-saving the same active session).
+fn check_no_active_session(
+    conn: &mut PgConnection,
+    conversation_id: ConversationId,
+    exclude_id: Option<AgentSessionId>,
+) -> SessionResult<()> {
+    let active_state = AgentSessionState::Active.as_str();
+    let conv_uuid = conversation_id.into_inner();
+
+    let mut query = agent_sessions::table
+        .filter(agent_sessions::conversation_id.eq(conv_uuid))
+        .filter(agent_sessions::state.eq(active_state))
+        .into_boxed();
+
+    if let Some(id) = exclude_id {
+        query = query.filter(agent_sessions::id.ne(id.into_inner()));
+    }
+
+    let count: i64 = query
+        .count()
+        .get_result(conn)
+        .map_err(SessionError::persistence)?;
+
+    if count > 0 {
+        return Err(SessionError::ActiveSessionExists(conversation_id));
+    }
+
+    Ok(())
 }
 
 /// Converts a domain `AgentSession` to a `NewAgentSession` for insertion.

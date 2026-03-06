@@ -34,7 +34,7 @@ async fn reject_empty_display_name(world: TenantWorld) {
 
 #[scenario(
     path = "tests/features/tenant_identity.feature",
-    name = "Tenant slug normalises to lowercase"
+    name = "Tenant slug normalizes to lowercase"
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn slug_normalises_to_lowercase(world: TenantWorld) {

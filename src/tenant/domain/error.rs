@@ -24,7 +24,7 @@ pub enum TenantDomainError {
     SlugConsecutiveHyphens(String),
 
     /// The tenant slug exceeds the 63-character storage limit.
-    #[error("tenant slug exceeds 63 character limit: {0}")]
+    #[error("tenant slug exceeds 63-character limit: {0}")]
     SlugTooLong(String),
 
     /// The tenant display name is empty after trimming.

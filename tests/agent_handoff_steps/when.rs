@@ -25,7 +25,8 @@ fn initiate_specialist_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Rep
     )
     .with_reason("task requires specialist");
     let handoff =
-        run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
+        run_async(world.service.initiate(&world.ctx, initiate_params))
+            .wrap_err("initiate handoff")?;
 
     world.current_handoff = Some(handoff);
     Ok(())
@@ -44,8 +45,8 @@ fn target_creates_session(world: &mut HandoffWorld) -> Result<(), eyre::Report> 
         SequenceNumber::new(10),
         handoff.handoff_id,
     );
-    let target =
-        run_async(world.service.create_target_session(params)).wrap_err("create target session")?;
+    let target = run_async(world.service.create_target_session(&world.ctx, params))
+        .wrap_err("create target session")?;
 
     world.target_session = Some(target);
     Ok(())
@@ -68,7 +69,7 @@ fn complete_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         target.session_id,
         SequenceNumber::new(10),
     );
-    let completed = run_async(world.service.complete(complete_params))
+    let completed = run_async(world.service.complete(&world.ctx, complete_params))
         .wrap_err("complete handoff")?;
 
     world.current_handoff = Some(completed);
@@ -85,7 +86,7 @@ fn cancel_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
     run_async(
         world
             .service
-            .cancel(handoff.handoff_id, Some("target unavailable")),
+            .cancel(&world.ctx, handoff.handoff_id, Some("target unavailable")),
     )
     .wrap_err("cancel handoff")?;
 
@@ -106,8 +107,8 @@ fn initiate_with_tool_calls(world: &mut HandoffWorld) -> Result<(), eyre::Report
         SequenceNumber::new(5),
     )
     .with_reason("tool results need review");
-    let mut handoff =
-        run_async(world.service.initiate(initiate_params)).wrap_err("initiate handoff")?;
+    let mut handoff = run_async(world.service.initiate(&world.ctx, initiate_params))
+        .wrap_err("initiate handoff")?;
 
     for tcr in &world.tool_call_refs {
         handoff = handoff.with_triggering_tool_call(tcr.clone());
@@ -131,7 +132,8 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         SequenceNumber::new(10),
     )
     .with_reason("need domain expert");
-    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate B->C")?;
+    let handoff =
+        run_async(world.service.initiate(&world.ctx, initiate_params)).wrap_err("initiate B->C")?;
 
     let params = HandoffSessionParams::new(
         world.conversation_id,
@@ -139,16 +141,16 @@ fn agent_b_to_c(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         SequenceNumber::new(11),
         handoff.handoff_id,
     );
-    let agent_c =
-        run_async(world.service.create_target_session(params)).wrap_err("create agent C")?;
+    let agent_c = run_async(world.service.create_target_session(&world.ctx, params))
+        .wrap_err("create agent C")?;
 
     let complete_params = CompleteHandoffParams::new(
         handoff.handoff_id,
         agent_c.session_id,
         SequenceNumber::new(11),
     );
-    let completed =
-        run_async(world.service.complete(complete_params)).wrap_err("complete B->C")?;
+    let completed = run_async(world.service.complete(&world.ctx, complete_params))
+        .wrap_err("complete B->C")?;
 
     world.target_session = Some(agent_c);
     world.current_handoff = Some(completed);

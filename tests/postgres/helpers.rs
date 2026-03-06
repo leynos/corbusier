@@ -2,6 +2,7 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
@@ -50,6 +51,17 @@ pub const TEMPLATE_DB: &str = "corbusier_test_template";
 #[fixture]
 pub fn clock() -> DefaultClock {
     DefaultClock
+}
+
+/// Provides a [`RequestContext`] for test fixtures.
+#[fixture]
+pub fn test_request_context() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
 }
 
 /// Ensures the template database exists with the schema applied.

@@ -51,7 +51,7 @@ macro_rules! test_id_newtype {
             #[rstest]
             fn clone_produces_equal_value() {
                 let id = $ty::new();
-                let cloned = id;
+                let cloned = id.clone();
                 assert_eq!(id, cloned);
             }
 

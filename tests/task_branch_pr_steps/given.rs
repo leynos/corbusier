@@ -1,7 +1,6 @@
 //! Given steps for branch and pull request association BDD scenarios.
 
 use super::world::{TaskBranchPrWorld, run_async};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::services::{
     AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
 };
@@ -36,17 +35,11 @@ fn issue_has_title(world: &mut TaskBranchPrWorld, title: String) -> Result<(), e
 
 #[given("the issue has been converted into a task")]
 fn issue_converted_to_task(world: &mut TaskBranchPrWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let request = world
         .pending_request
         .clone()
         .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
-    let created = run_async(world.service.create_from_issue(&ctx, request))
+    let created = run_async(world.service.create_from_issue(&world.ctx, request))
         .wrap_err("create task from issue for association scenario")?;
     world.last_created_task = Some(created);
     Ok(())
@@ -54,12 +47,6 @@ fn issue_converted_to_task(world: &mut TaskBranchPrWorld) -> Result<(), eyre::Re
 
 #[given("a branch is already associated with the task")]
 fn branch_already_associated(world: &mut TaskBranchPrWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let task = world
         .last_created_task
         .as_ref()
@@ -70,7 +57,7 @@ fn branch_already_associated(world: &mut TaskBranchPrWorld) -> Result<(), eyre::
         "corbusier/core",
         "feature/initial-branch",
     );
-    let updated = run_async(world.service.associate_branch(&ctx, request))
+    let updated = run_async(world.service.associate_branch(&world.ctx, request))
         .wrap_err("associate initial branch for duplicate scenario")?;
     world.last_created_task = Some(updated);
     Ok(())
@@ -78,18 +65,12 @@ fn branch_already_associated(world: &mut TaskBranchPrWorld) -> Result<(), eyre::
 
 #[given("a pull request is already associated with the task")]
 fn pr_already_associated(world: &mut TaskBranchPrWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let task = world
         .last_created_task
         .as_ref()
         .ok_or_else(|| eyre::eyre!("missing created task in scenario world"))?;
     let request = AssociatePullRequestRequest::new(task.id(), "github", "corbusier/core", 100);
-    let updated = run_async(world.service.associate_pull_request(&ctx, request))
+    let updated = run_async(world.service.associate_pull_request(&world.ctx, request))
         .wrap_err("associate initial PR for duplicate scenario")?;
     world.last_created_task = Some(updated);
     Ok(())

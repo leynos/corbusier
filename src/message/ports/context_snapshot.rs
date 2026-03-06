@@ -17,6 +17,14 @@ pub type SnapshotResult<T> = Result<T, SnapshotError>;
 ///
 /// Implementations store and retrieve snapshots of the context window
 /// at various points during an agent session.
+///
+/// # Implementation Notes
+///
+/// Implementations must ensure:
+/// - Snapshot IDs are unique across the entire system
+/// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait ContextSnapshotPort: Send + Sync {
     /// Stores a pre-built context snapshot.

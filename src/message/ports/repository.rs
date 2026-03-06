@@ -25,6 +25,8 @@ pub type RepositoryResult<T> = Result<T, RepositoryError>;
 /// - Sequence numbers are unique within a conversation
 /// - Messages are immutable after storage (no update operations)
 /// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait MessageRepository: Send + Sync {
     /// Stores a new message.

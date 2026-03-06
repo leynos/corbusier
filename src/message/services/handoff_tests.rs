@@ -14,6 +14,15 @@ use crate::message::{
 };
 use std::sync::Arc;
 
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
 struct ServiceHarness {
     service: HandoffService<
         InMemoryAgentSessionRepository,
@@ -45,12 +54,7 @@ fn create_service() -> ServiceHarness {
 
 #[tokio::test]
 async fn initiate_handoff_requires_active_session() {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = ctx();
     let service = create_service().service;
     let session_id = AgentSessionId::new();
 
@@ -69,12 +73,7 @@ async fn initiate_handoff_requires_active_session() {
 
 #[tokio::test]
 async fn create_target_session_stores_session() {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = ctx();
     let harness = create_service();
     let conversation_id = ConversationId::new();
     let handoff_id = HandoffId::new();

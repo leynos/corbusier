@@ -126,9 +126,12 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [ ] Success criteria: same issue reference and backend name can exist in
     multiple tenants without collisions.
 - [ ] 1.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
-  1.5.2. See corbusier-design.md §6.2.2 and §6.2.3.
-  - [ ] Update repository ports/adapters so tenant context is mandatory, and all
-    lookups are tenant scoped. See corbusier-design.md §2.2.5.
+  1.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 1.5.1 added
+  `&RequestContext` to port signatures; this item makes adapters *use* the
+  tenant context for query scoping and RLS enforcement.
+  - [ ] Update adapter implementations to extract and apply `tenant_id` from
+    `RequestContext` in all queries and mutations. See
+    corbusier-design.md §2.2.5.
   - [ ] Set `set_config('app.tenant_id', <value>, true)` inside each
     transaction, and enable RLS policies on tenant-owned tables. See
     corbusier-design.md §6.2.3.5.

@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::Task,
@@ -16,6 +17,8 @@ pub type TestTaskService = TaskLifecycleService<InMemoryTaskRepository, DefaultC
 /// Scenario world for branch and pull request association behaviour tests.
 pub struct TaskBranchPrWorld {
     pub service: TestTaskService,
+    /// Scenario-scoped request context shared across all steps.
+    pub ctx: RequestContext,
     pub pending_issue_ref: Option<(String, String, u64)>,
     pub pending_issue_title: Option<String>,
     pub pending_request: Option<CreateTaskFromIssueRequest>,
@@ -32,8 +35,15 @@ impl TaskBranchPrWorld {
             Arc::new(InMemoryTaskRepository::new()),
             Arc::new(DefaultClock),
         );
+        let ctx = RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        );
         Self {
             service,
+            ctx,
             pending_issue_ref: None,
             pending_issue_title: None,
             pending_request: None,

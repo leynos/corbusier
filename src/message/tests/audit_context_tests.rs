@@ -14,6 +14,10 @@ use uuid::Uuid;
 fn audit_context_empty_has_all_none_fields() {
     let ctx = AuditContext::empty();
 
+    assert!(ctx.correlation_id.is_none());
+    assert!(ctx.causation_id.is_none());
+    assert!(ctx.user_id.is_none());
+    assert!(ctx.session_id.is_none());
     assert!(ctx.is_empty());
 }
 

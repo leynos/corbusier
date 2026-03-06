@@ -7,6 +7,7 @@ use corbusier::agent_backend::{
     domain::AgentBackendRegistration,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use mockable::DefaultClock;
 use rstest::fixture;
 
@@ -25,6 +26,8 @@ pub struct PendingBackend {
 pub struct BackendWorld {
     /// The registry service under test.
     pub service: TestRegistryService,
+    /// Scenario-scoped request context shared across all steps.
+    pub ctx: RequestContext,
     /// Backends queued for registration.
     pub pending_backends: Vec<PendingBackend>,
     /// Last successfully registered backend.
@@ -47,8 +50,15 @@ impl BackendWorld {
             Arc::new(InMemoryBackendRegistry::new()),
             Arc::new(DefaultClock),
         );
+        let ctx = RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        );
         Self {
             service,
+            ctx,
             pending_backends: Vec::new(),
             last_registered: None,
             registered_backends: Vec::new(),

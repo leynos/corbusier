@@ -1,18 +1,19 @@
-//! Handoff service for orchestrating agent transitions.
+//! Handoff workflow orchestration.
 //!
-//! The `HandoffService` coordinates the lifecycle of agent handoffs,
-//! ensuring context is preserved and proper audit trails are maintained.
+//! Contains the [`HandoffService`] which coordinates the lifecycle of agent
+//! handoffs, ensuring context is preserved and proper audit trails are
+//! maintained.
 
 use std::sync::Arc;
 
 use mockable::Clock;
 
+use super::params::{CompleteHandoffParams, ServiceInitiateParams};
 use crate::context::RequestContext;
 use crate::message::{
     domain::{
-        AgentSession, AgentSessionId, ContextWindowSnapshot, ConversationId, HandoffId,
-        HandoffMetadata, HandoffSessionParams, MessageSummary, SequenceNumber, SequenceRange,
-        SnapshotParams, SnapshotType, TurnId,
+        AgentSession, ContextWindowSnapshot, ConversationId, HandoffId, HandoffMetadata,
+        HandoffSessionParams, MessageSummary, SequenceRange, SnapshotParams, SnapshotType,
     },
     ports::{
         agent_session::{AgentSessionRepository, SessionResult},
@@ -20,74 +21,6 @@ use crate::message::{
         handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
     },
 };
-
-/// Parameters for initiating a handoff via the service.
-#[derive(Debug, Clone)]
-pub struct ServiceInitiateParams<'a> {
-    /// The session initiating the handoff.
-    pub source_session_id: AgentSessionId,
-    /// The agent backend to hand off to.
-    pub target_agent: &'a str,
-    /// The turn that triggered the handoff.
-    pub prior_turn_id: TurnId,
-    /// Current sequence number for snapshot.
-    pub current_sequence: SequenceNumber,
-    /// Optional reason for the handoff.
-    pub reason: Option<&'a str>,
-}
-
-impl<'a> ServiceInitiateParams<'a> {
-    /// Creates new service initiate parameters.
-    #[must_use]
-    pub const fn new(
-        source_session_id: AgentSessionId,
-        target_agent: &'a str,
-        prior_turn_id: TurnId,
-        current_sequence: SequenceNumber,
-    ) -> Self {
-        Self {
-            source_session_id,
-            target_agent,
-            prior_turn_id,
-            current_sequence,
-            reason: None,
-        }
-    }
-
-    /// Sets the reason for the handoff.
-    #[must_use]
-    pub const fn with_reason(mut self, reason: &'a str) -> Self {
-        self.reason = Some(reason);
-        self
-    }
-}
-
-/// Parameters for completing a handoff via the service.
-#[derive(Debug, Clone, Copy)]
-pub struct CompleteHandoffParams {
-    /// The handoff to complete.
-    pub handoff_id: HandoffId,
-    /// The new session created by the target agent.
-    pub target_session_id: AgentSessionId,
-    /// Starting sequence number for the target session.
-    pub start_sequence: SequenceNumber,
-}
-
-impl CompleteHandoffParams {
-    /// Creates new completion parameters.
-    #[must_use]
-    pub const fn new(
-        handoff_id: HandoffId,
-        target_session_id: AgentSessionId,
-        start_sequence: SequenceNumber,
-    ) -> Self {
-        Self {
-            handoff_id,
-            target_session_id,
-            start_sequence,
-        }
-    }
-}
 
 /// Service for coordinating agent handoffs with context preservation.
 ///
@@ -101,7 +34,10 @@ impl CompleteHandoffParams {
 /// # Example
 ///
 /// ```ignore
-/// use corbusier::message::services::HandoffService;
+/// use corbusier::context::RequestContext;
+/// use corbusier::message::services::{
+///     HandoffService, ServiceInitiateParams, CompleteHandoffParams,
+/// };
 ///
 /// let service = HandoffService::new(
 ///     session_repo,
@@ -109,6 +45,7 @@ impl CompleteHandoffParams {
 ///     snapshot_adapter,
 ///     clock,
 /// );
+/// let ctx = RequestContext::new(tenant_id, correlation_id, user_id, session_id);
 ///
 /// // Initiate handoff
 /// let params = ServiceInitiateParams::new(
@@ -117,7 +54,7 @@ impl CompleteHandoffParams {
 ///     prior_turn_id,
 ///     current_sequence,
 /// ).with_reason("task too complex");
-/// let handoff = service.initiate(params).await?;
+/// let handoff = service.initiate(&ctx, params).await?;
 ///
 /// // Complete handoff when target agent starts
 /// let complete_params = CompleteHandoffParams::new(
@@ -125,7 +62,7 @@ impl CompleteHandoffParams {
 ///     target_session_id,
 ///     start_sequence,
 /// );
-/// let completed = service.complete(complete_params).await?;
+/// let completed = service.complete(&ctx, complete_params).await?;
 /// ```
 #[derive(Clone)]
 pub struct HandoffService<S, H, C, K>
@@ -268,7 +205,7 @@ where
             start_sequence,
         } = params;
         // Verify the handoff exists and is in valid state
-        let _handoff = self
+        let handoff = self
             .handoff_adapter
             .find_handoff(ctx, handoff_id)
             .await?
@@ -281,6 +218,21 @@ where
             .await
             .map_err(|_| HandoffError::SessionNotFound(target_session_id))?
             .ok_or(HandoffError::SessionNotFound(target_session_id))?;
+
+        // Verify handoff source and target sessions share the same conversation
+        let source_session = self
+            .session_repo
+            .find_by_id(ctx, handoff.source_session_id)
+            .await
+            .map_err(|_| HandoffError::SessionNotFound(handoff.source_session_id))?
+            .ok_or(HandoffError::SessionNotFound(handoff.source_session_id))?;
+
+        if source_session.conversation_id != target_session.conversation_id {
+            return Err(HandoffError::ConversationMismatch {
+                source_conversation: source_session.conversation_id,
+                target_conversation: target_session.conversation_id,
+            });
+        }
 
         // Capture session start snapshot for target
         let snapshot = self.build_snapshot(SnapshotParams {
@@ -409,17 +361,5 @@ where
 
     fn build_snapshot(&self, params: SnapshotParams) -> ContextWindowSnapshot {
         ContextWindowSnapshot::new(params, self.clock.as_ref())
-    }
-}
-
-// Conversion helper for session state to handoff status
-impl From<crate::message::domain::AgentSessionState> for crate::message::domain::HandoffStatus {
-    fn from(state: crate::message::domain::AgentSessionState) -> Self {
-        use crate::message::domain::AgentSessionState;
-        match state {
-            AgentSessionState::Active => Self::Initiated,
-            AgentSessionState::HandedOff | AgentSessionState::Completed => Self::Completed,
-            AgentSessionState::Failed | AgentSessionState::Paused => Self::Failed,
-        }
     }
 }

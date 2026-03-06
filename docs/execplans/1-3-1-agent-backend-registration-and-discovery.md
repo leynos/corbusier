@@ -346,8 +346,14 @@ pub struct ParseBackendStatusError(pub String);
 
 **`src/agent_backend/ports/repository.rs`** — Define the repository trait:
 
+> **Superseded by 1.5.1** — The signatures below are historical. All
+> repository trait methods now require `&RequestContext` as the first
+> parameter after `&self`. See the current `RequestContext` pattern in
+> `src/context/` and the 1.5.1 exec plan for migration details.
+
 ```rust
 // src/agent_backend/ports/repository.rs
+// HISTORICAL — see supersession note above
 #[async_trait]
 pub trait BackendRegistryRepository: Send + Sync {
     async fn register(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()>;
@@ -394,6 +400,11 @@ pub enum BackendRegistryError {
 submodules.
 
 ### Stage D: Service layer
+
+> **Superseded by 1.5.1** — The service method signatures below are
+> historical. All service methods now require `&RequestContext` as the
+> first parameter after `&self`. See the current `RequestContext` pattern
+> in `src/context/` and the 1.5.1 exec plan for migration details.
 
 **`src/agent_backend/services/registry.rs`** — Define `BackendRegistryService`:
 

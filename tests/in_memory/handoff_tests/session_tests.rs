@@ -90,17 +90,27 @@ fn session_repository_lists_by_conversation(
     runtime_handle.block_on(async {
         let conversation_id = ConversationId::new();
 
-        let session1 =
+        let mut session1 =
             AgentSession::new(conversation_id, "agent-1", SequenceNumber::new(1), &clock);
-
-        let session2 =
-            AgentSession::new(conversation_id, "agent-2", SequenceNumber::new(10), &clock);
 
         harness
             .session_repo
             .store(&ctx, &session1)
             .await
             .expect("store 1");
+
+        // End session1 so session2 can be the active session (one active per conversation).
+        let handoff_id = corbusier::message::domain::HandoffId::new();
+        session1.handoff(SequenceNumber::new(9), handoff_id, &clock);
+        harness
+            .session_repo
+            .update(&ctx, &session1)
+            .await
+            .expect("end session 1");
+
+        let session2 =
+            AgentSession::new(conversation_id, "agent-2", SequenceNumber::new(10), &clock);
+
         harness
             .session_repo
             .store(&ctx, &session2)

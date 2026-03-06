@@ -17,11 +17,27 @@ use mockable::DefaultClock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
-#[derive(Default)]
 struct HistoryWorld {
     repo: InMemoryMessageRepository,
+    ctx: RequestContext,
     conversation_id: ConversationId,
     last_validation_error: Option<ValidationError>,
+}
+
+impl Default for HistoryWorld {
+    fn default() -> Self {
+        Self {
+            repo: InMemoryMessageRepository::default(),
+            ctx: RequestContext::new(
+                TenantId::new(),
+                CorrelationId::new(),
+                UserId::new(),
+                SessionId::new(),
+            ),
+            conversation_id: ConversationId::default(),
+            last_validation_error: None,
+        }
+    }
 }
 
 #[fixture]
@@ -77,26 +93,18 @@ fn persist_tool_call_and_agent_response(world: &mut HistoryWorld) -> Result<(), 
     .build(&clock)
     .wrap_err("message should build")?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
-    run_async(world.repo.store(&ctx, &message)).wrap_err("store should succeed")?;
+    run_async(world.repo.store(&world.ctx, &message)).wrap_err("store should succeed")?;
     Ok(())
 }
 
 #[then("the conversation history includes audit metadata")]
 fn history_includes_audit_metadata(world: &HistoryWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
-    let history = run_async(world.repo.find_by_conversation(&ctx, world.conversation_id))
-        .wrap_err("history fetch should succeed")?;
+    let history = run_async(
+        world
+            .repo
+            .find_by_conversation(&world.ctx, world.conversation_id),
+    )
+    .wrap_err("history fetch should succeed")?;
 
     let message = history
         .first()

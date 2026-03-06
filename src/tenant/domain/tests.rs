@@ -1,7 +1,7 @@
 //! Unit tests for tenant domain primitives.
 
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use crate::context::UserId;
 
@@ -150,12 +150,24 @@ fn tenant_id_from_uuid_round_trips() {
 
 // ── Tenant aggregate ─────────────────────────────────────────────
 
-#[rstest]
-fn new_tenant_defaults_to_active() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme-corp").expect("valid slug");
-    let owner = UserId::new();
+#[fixture]
+fn clock() -> DefaultClock {
+    DefaultClock
+}
 
+#[fixture]
+fn acme_slug() -> TenantSlug {
+    TenantSlug::new("acme").expect("valid slug")
+}
+
+#[fixture]
+fn owner() -> UserId {
+    UserId::new()
+}
+
+#[rstest]
+fn new_tenant_defaults_to_active(clock: DefaultClock, owner: UserId) {
+    let slug = TenantSlug::new("acme-corp").expect("valid slug");
     let tenant = Tenant::new(slug, "Acme Corporation", owner, &clock).expect("valid tenant");
 
     assert_eq!(tenant.slug().as_str(), "acme-corp");
@@ -166,46 +178,42 @@ fn new_tenant_defaults_to_active() {
 }
 
 #[rstest]
-fn new_tenant_trims_display_name() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme").expect("valid slug");
-    let tenant = Tenant::new(slug, "  Acme Corp  ", UserId::new(), &clock).expect("valid tenant");
+fn new_tenant_trims_display_name(clock: DefaultClock, acme_slug: TenantSlug) {
+    let tenant =
+        Tenant::new(acme_slug, "  Acme Corp  ", UserId::new(), &clock).expect("valid tenant");
     assert_eq!(tenant.display_name(), "Acme Corp");
 }
 
 #[rstest]
-fn new_tenant_with_empty_display_name_fails() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme").expect("valid slug");
-    let result = Tenant::new(slug, "   ", UserId::new(), &clock);
+fn new_tenant_with_empty_display_name_fails(clock: DefaultClock, acme_slug: TenantSlug) {
+    let result = Tenant::new(acme_slug, "   ", UserId::new(), &clock);
     assert!(matches!(result, Err(TenantDomainError::EmptyDisplayName)));
 }
 
 #[rstest]
-fn suspend_changes_status_to_suspended() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme").expect("valid slug");
-    let mut tenant = Tenant::new(slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
+fn suspend_changes_status_to_suspended(clock: DefaultClock, acme_slug: TenantSlug) {
+    let mut tenant =
+        Tenant::new(acme_slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
     tenant.suspend(&clock);
     assert_eq!(tenant.status(), TenantStatus::Suspended);
 }
 
 #[rstest]
-fn reactivate_changes_status_to_active() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme").expect("valid slug");
-    let mut tenant = Tenant::new(slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
+fn reactivate_changes_status_to_active(clock: DefaultClock, acme_slug: TenantSlug) {
+    let mut tenant =
+        Tenant::new(acme_slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
     tenant.suspend(&clock);
     tenant.reactivate(&clock);
     assert_eq!(tenant.status(), TenantStatus::Active);
 }
 
 #[rstest]
-fn tenant_owner_user_id_is_distinct_from_tenant_id() {
-    let clock = DefaultClock;
-    let slug = TenantSlug::new("acme").expect("valid slug");
-    let owner = UserId::new();
-    let tenant = Tenant::new(slug, "Acme Corp", owner, &clock).expect("valid tenant");
+fn tenant_owner_user_id_is_distinct_from_tenant_id(
+    clock: DefaultClock,
+    acme_slug: TenantSlug,
+    owner: UserId,
+) {
+    let tenant = Tenant::new(acme_slug, "Acme Corp", owner, &clock).expect("valid tenant");
 
     // The owner user ID and tenant ID are distinct types with distinct values.
     assert_eq!(tenant.owner_user_id(), owner);
@@ -216,10 +224,8 @@ fn tenant_owner_user_id_is_distinct_from_tenant_id() {
 }
 
 #[rstest]
-fn tenant_from_persisted_preserves_all_fields() {
-    let clock = DefaultClock;
+fn tenant_from_persisted_preserves_all_fields(clock: DefaultClock, owner: UserId) {
     let slug = TenantSlug::new("acme").expect("valid slug");
-    let owner = UserId::new();
     let original = Tenant::new(slug, "Acme Corp", owner, &clock).expect("valid tenant");
 
     let data = super::PersistedTenantData {
@@ -231,7 +237,7 @@ fn tenant_from_persisted_preserves_all_fields() {
         created_at: original.created_at(),
         updated_at: original.updated_at(),
     };
-    let rehydrated = Tenant::from_persisted(data);
+    let rehydrated = Tenant::from_persisted(data).expect("valid persisted data");
 
     assert_eq!(original, rehydrated);
 }

@@ -1,7 +1,6 @@
 //! Given steps for task state transition BDD scenarios.
 
 use super::world::{TaskTransitionWorld, run_async};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::task::services::{CreateTaskFromIssueRequest, TransitionTaskRequest};
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
@@ -33,17 +32,11 @@ fn issue_has_title(world: &mut TaskTransitionWorld, title: String) -> Result<(),
 
 #[given("the issue has been converted into a task")]
 fn issue_converted_to_task(world: &mut TaskTransitionWorld) -> Result<(), eyre::Report> {
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
     let request = world
         .pending_request
         .clone()
         .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
-    let created = run_async(world.service.create_from_issue(&ctx, request))
+    let created = run_async(world.service.create_from_issue(&world.ctx, request))
         .wrap_err("create task from issue for transition scenario")?;
     world.last_created_task = Some(created);
     Ok(())
@@ -59,17 +52,10 @@ fn task_has_been_transitioned(
         .as_ref()
         .ok_or_else(|| eyre::eyre!("missing created task in scenario world"))?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
-    let transitioned = run_async(
-        world
-            .service
-            .transition_task(&ctx, TransitionTaskRequest::new(task.id(), target_state)),
-    )
+    let transitioned = run_async(world.service.transition_task(
+        &world.ctx,
+        TransitionTaskRequest::new(task.id(), target_state),
+    ))
     .wrap_err("transition task in scenario setup")?;
 
     world.last_created_task = Some(transitioned);

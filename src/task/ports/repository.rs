@@ -10,6 +10,15 @@ use thiserror::Error;
 pub type TaskRepositoryResult<T> = Result<T, TaskRepositoryError>;
 
 /// Task persistence contract.
+///
+/// # Implementation Notes
+///
+/// Implementations must ensure:
+/// - Task IDs are unique across the entire system
+/// - Issue references are unique within a tenant
+/// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait TaskRepository: Send + Sync {
     /// Stores a new task.

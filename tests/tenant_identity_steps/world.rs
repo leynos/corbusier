@@ -47,6 +47,11 @@ impl TenantWorld {
             .ok_or_else(|| eyre::eyre!("pending display name must be set before creation"))?;
         let clock = DefaultClock;
 
+        // Reset prior results so created_tenant and creation_error remain
+        // mutually exclusive across repeated creation attempts.
+        self.created_tenant = None;
+        self.creation_error = None;
+
         match TenantSlug::new(slug_str) {
             Ok(slug) => match Tenant::new(slug, display_name, UserId::new(), &clock) {
                 Ok(tenant) => {

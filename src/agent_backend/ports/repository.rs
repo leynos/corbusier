@@ -10,6 +10,15 @@ use thiserror::Error;
 pub type BackendRegistryResult<T> = Result<T, BackendRegistryError>;
 
 /// Backend registry persistence contract.
+///
+/// # Implementation Notes
+///
+/// Implementations must ensure:
+/// - Backend IDs are unique across the entire system
+/// - Backend names are unique within a tenant
+/// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait BackendRegistryRepository: Send + Sync {
     /// Stores a new backend registration.

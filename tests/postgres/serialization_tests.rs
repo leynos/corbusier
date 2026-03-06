@@ -2,11 +2,16 @@
 //!
 //! Tests role parsing, JSONB content, metadata, and UUID handling.
 
+#![expect(
+    clippy::too_many_arguments,
+    reason = "rstest fixture injection adds parameters beyond the Clippy threshold"
+)]
+
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, RoleResult, clock, ensure_template, insert_conversation,
-    postgres_cluster, setup_repository,
+    postgres_cluster, setup_repository, test_request_context,
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     domain::{
         AgentResponseAudit, AgentResponseStatus, AttachmentPart, ContentPart, ConversationId,
@@ -32,6 +37,7 @@ use rstest::rstest;
 async fn role_round_trip_through_persistence(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
     #[case] role: Role,
     #[case] expected_str: &str,
 ) -> Result<(), BoxError> {
@@ -50,12 +56,7 @@ async fn role_round_trip_through_persistence(
         &clock,
     )?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let url = cluster.connection().database_url(temp_db.name());
@@ -87,6 +88,7 @@ async fn role_round_trip_through_persistence(
 async fn content_jsonb_round_trip_with_multiple_parts(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
@@ -113,12 +115,7 @@ async fn content_jsonb_round_trip_with_multiple_parts(
         &clock,
     )?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let retrieved = repo
@@ -162,6 +159,7 @@ async fn content_jsonb_round_trip_with_multiple_parts(
 async fn tool_result_jsonb_round_trip(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
@@ -185,12 +183,7 @@ async fn tool_result_jsonb_round_trip(
         &clock,
     )?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let retrieved = repo
@@ -232,6 +225,7 @@ async fn tool_result_jsonb_round_trip(
 async fn metadata_jsonb_round_trip(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
@@ -255,12 +249,7 @@ async fn metadata_jsonb_round_trip(
         .with_metadata(metadata)
         .build(&clock)?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let retrieved = repo
@@ -300,6 +289,7 @@ async fn metadata_jsonb_round_trip(
 async fn from_persisted_preserves_all_domain_invariants(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
@@ -316,12 +306,7 @@ async fn from_persisted_preserves_all_domain_invariants(
         &clock,
     )?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &original).await?;
 
     let retrieved = repo
@@ -363,6 +348,7 @@ async fn from_persisted_preserves_all_domain_invariants(
 async fn uuid_round_trip_preserves_values(
     clock: DefaultClock,
     postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
@@ -380,12 +366,7 @@ async fn uuid_round_trip_preserves_values(
         .with_content(ContentPart::Text(TextPart::new("UUID test")))
         .build(&clock)?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let retrieved = repo

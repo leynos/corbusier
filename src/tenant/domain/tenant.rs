@@ -73,9 +73,17 @@ impl Tenant {
     }
 
     /// Reconstructs a tenant from persisted storage.
-    #[must_use]
-    pub fn from_persisted(data: PersistedTenantData) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TenantDomainError::EmptyDisplayName`] when the persisted
+    /// display name is empty after trimming.
+    pub fn from_persisted(data: PersistedTenantData) -> Result<Self, TenantDomainError> {
+        if data.display_name.trim().is_empty() {
+            return Err(TenantDomainError::EmptyDisplayName);
+        }
+
+        Ok(Self {
             id: data.id,
             slug: data.slug,
             display_name: data.display_name,
@@ -83,7 +91,7 @@ impl Tenant {
             status: data.status,
             created_at: data.created_at,
             updated_at: data.updated_at,
-        }
+        })
     }
 
     /// Returns the tenant identifier.

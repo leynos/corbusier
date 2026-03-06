@@ -1313,8 +1313,9 @@ _Table 2.2.5.1: Tenancy and identity requirement matrix._
 - Initial tenant model: one user principal owns one tenant. Team and
   organization tenants are explicitly deferred while keeping user and tenant
   identities distinct from day one.
-- Introduce first-class tenant primitives in Rust under `src/tenant/`:
-  `TenantId`, `TenantSlug`, and `Tenant`.
+- Introduce first-class tenant primitives in Rust: `TenantSlug` and `Tenant`
+  under `src/tenant/`, `TenantId` under `src/context/` (alongside
+  `RequestContext` which defines the cross-cutting ID newtypes).
 - Replace message-only audit context plumbing with a cross-cutting
   `RequestContext` containing `tenant_id`, `correlation_id`, `causation_id`,
   `user_id`, and `session_id`, used by repositories, services, tracing, and

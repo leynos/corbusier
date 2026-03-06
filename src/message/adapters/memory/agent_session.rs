@@ -61,22 +61,40 @@ impl InMemoryAgentSessionRepository {
 impl AgentSessionRepository for InMemoryAgentSessionRepository {
     async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
         self.upsert_with_check(session, |sessions| {
             if sessions.contains_key(&session_id) {
                 return Err(SessionError::Duplicate(session_id));
             }
-
+            if is_active
+                && sessions.values().any(|s| {
+                    s.conversation_id == conversation_id && s.state == AgentSessionState::Active
+                })
+            {
+                return Err(SessionError::ActiveSessionExists(conversation_id));
+            }
             Ok(())
         })
     }
 
     async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
         self.upsert_with_check(session, |sessions| {
             if !sessions.contains_key(&session_id) {
                 return Err(SessionError::NotFound(session_id));
             }
-
+            if is_active
+                && sessions.values().any(|s| {
+                    s.conversation_id == conversation_id
+                        && s.state == AgentSessionState::Active
+                        && s.session_id != session_id
+                })
+            {
+                return Err(SessionError::ActiveSessionExists(conversation_id));
+            }
             Ok(())
         })
     }

@@ -18,7 +18,7 @@ Feature: Tenant identity and domain primitives
     When the tenant creation is attempted
     Then tenant creation fails with an empty display name error
 
-  Scenario: Tenant slug normalises to lowercase
+  Scenario: Tenant slug normalizes to lowercase
     Given a tenant slug "My-Tenant" with display name "My Tenant"
     When the tenant is created
     Then the tenant slug is "my-tenant"

@@ -6,7 +6,7 @@ use corbusier::agent_backend::{
     ports::BackendRegistryError,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use mockable::DefaultClock;
@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_context,
 };
 
 type TestService = BackendRegistryService<PostgresBackendRegistry, DefaultClock>;
@@ -68,14 +68,10 @@ fn codex_request() -> RegisterBackendRequest {
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_register_and_retrieve_by_id(
     #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let bctx = context.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     let created = bctx
         .service
         .register(&req_ctx, claude_request())
@@ -101,14 +97,10 @@ async fn postgres_register_and_retrieve_by_id(
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_register_and_retrieve_by_name(
     #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let bctx = context.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     let created = bctx
         .service
         .register(&req_ctx, claude_request())
@@ -131,14 +123,10 @@ async fn postgres_register_and_retrieve_by_name(
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_duplicate_name_is_rejected(
     #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let bctx = context.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     bctx.service
         .register(&req_ctx, claude_request())
         .await
@@ -159,14 +147,10 @@ async fn postgres_duplicate_name_is_rejected(
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_list_active_excludes_inactive(
     #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let bctx = context.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     let claude = bctx
         .service
         .register(&req_ctx, claude_request())
@@ -198,14 +182,10 @@ async fn postgres_list_active_excludes_inactive(
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_list_all_includes_inactive(
     #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let bctx = context.await?;
-    let req_ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let req_ctx = test_request_context;
     let claude = bctx
         .service
         .register(&req_ctx, claude_request())
