@@ -3,10 +3,11 @@
 //! Provides production-grade persistence for handoff metadata with JSONB storage
 //! for tool call references.
 //!
-//! Tenant isolation is enforced via `SET LOCAL app.tenant_id`, which sets a
+//! Tenant context is propagated via `SET LOCAL app.tenant_id`, which sets a
 //! `PostgreSQL` session variable scoped to the current transaction.  This
-//! prepares the connection for Row-Level Security (RLS) policies once they
-//! land in milestone 1.5.3.
+//! prepares the connection for Row-Level Security (RLS) policies but does
+//! not enforce row isolation by itself; actual enforcement requires RLS
+//! policies on the `handoffs` table, which land in milestone 1.5.3.
 
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
@@ -26,67 +27,19 @@ use crate::message::{
 };
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
+use super::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 
 // ---------------------------------------------------------------------------
-// Transaction helper
+// Error bridging for the shared transaction helper
 // ---------------------------------------------------------------------------
 
-/// Adapter-local wrapper that satisfies Diesel's `From<diesel::result::Error>`
-/// bound on [`PgConnection::transaction`] without leaking Diesel types into
-/// the port layer.
-enum TxError {
-    Handoff(HandoffError),
-    Diesel(diesel::result::Error),
-}
-
-impl From<diesel::result::Error> for TxError {
-    fn from(err: diesel::result::Error) -> Self {
-        Self::Diesel(err)
-    }
-}
-
-impl From<HandoffError> for TxError {
-    fn from(err: HandoffError) -> Self {
-        Self::Handoff(err)
-    }
-}
-
-impl From<TxError> for HandoffError {
-    fn from(err: TxError) -> Self {
+impl FromTxError<Self> for HandoffError {
+    fn from_tx_error(err: TxError<Self>) -> Self {
         match err {
-            TxError::Handoff(e) => e,
+            TxError::Domain(e) => e,
             TxError::Diesel(e) => Self::persistence(e),
         }
     }
-}
-
-/// Runs `body` inside a transaction that first sets `app.tenant_id`.
-fn with_tenant_tx<T, F>(conn: &mut PgConnection, tenant_id: Uuid, body: F) -> HandoffResult<T>
-where
-    F: FnOnce(&mut PgConnection) -> HandoffResult<T>,
-{
-    conn.transaction::<T, TxError, _>(|tx| {
-        set_tenant_context(tx, tenant_id)?;
-        body(tx).map_err(TxError::from)
-    })
-    .map_err(HandoffError::from)
-}
-
-/// Sets the `PostgreSQL` session variable `app.tenant_id` for the current
-/// transaction.
-///
-/// This prepares the connection for Row-Level Security (RLS) policies.
-/// `SET LOCAL` scopes the variable to the enclosing transaction, so each
-/// request gets an isolated tenant context.
-///
-/// # Security
-///
-/// UUID values are formatted using their canonical hyphenated representation
-/// which contains only hexadecimal digits and hyphens, making SQL injection
-/// impossible.
-fn set_tenant_context(conn: &mut PgConnection, tenant_id: Uuid) -> Result<(), TxError> {
-    diesel::sql_query(format!("SET LOCAL app.tenant_id = '{tenant_id}'")).execute(conn)?;
-    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -187,10 +140,12 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id, |tx| {
-                    // Find the handoff
+                    // Lock the row for the duration of the transaction to
+                    // prevent concurrent state transitions from interleaving.
                     let row = handoffs::table
                         .filter(handoffs::id.eq(handoff_id.into_inner()))
                         .select(HandoffRow::as_select())
+                        .for_update()
                         .first::<HandoffRow>(tx)
                         .optional()
                         .map_err(HandoffError::persistence)?
@@ -244,10 +199,12 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id, |tx| {
-                    // Check if handoff exists and is not terminal
+                    // Lock the row for the duration of the transaction to
+                    // prevent concurrent state transitions from interleaving.
                     let row = handoffs::table
                         .filter(handoffs::id.eq(handoff_id.into_inner()))
                         .select(HandoffRow::as_select())
+                        .for_update()
                         .first::<HandoffRow>(tx)
                         .optional()
                         .map_err(HandoffError::persistence)?

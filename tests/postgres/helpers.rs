@@ -50,7 +50,10 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
 );
 
 /// Template database name for pre-migrated schema.
-pub const TEMPLATE_DB: &str = "corbusier_test_template";
+///
+/// Bump the version suffix whenever a new migration is added so that stale
+/// template databases created by earlier test runs are not reused.
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v2";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]

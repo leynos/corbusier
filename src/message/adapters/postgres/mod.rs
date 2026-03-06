@@ -10,6 +10,7 @@ mod context_snapshot;
 mod conversion_helpers;
 mod handoff;
 mod sql_helpers;
+mod tenant_tx;
 
 pub use agent_session::PostgresAgentSessionRepository;
 pub use context_snapshot::PostgresContextSnapshotAdapter;

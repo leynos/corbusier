@@ -4,7 +4,7 @@
 //! without database dependencies.
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use async_trait::async_trait;
 
@@ -39,6 +39,16 @@ impl InMemoryAgentSessionRepository {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Acquires a read lock on the sessions map, mapping a poisoned lock
+    /// into a persistence error.
+    fn read_locked(
+        &self,
+    ) -> SessionResult<RwLockReadGuard<'_, HashMap<AgentSessionId, AgentSession>>> {
+        self.sessions
+            .read()
+            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))
     }
 
     fn upsert_with_check<F>(&self, session: &AgentSession, validate: F) -> SessionResult<()>
@@ -114,11 +124,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
         _ctx: &RequestContext,
         id: AgentSessionId,
     ) -> SessionResult<Option<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+        let guard = self.read_locked()?;
         Ok(guard.get(&id).cloned())
     }
 
@@ -127,11 +133,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
         _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+        let guard = self.read_locked()?;
         Ok(guard
             .values()
             .find(|s| s.conversation_id == conversation_id && s.state == AgentSessionState::Active)
@@ -143,11 +145,7 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
         _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+        let guard = self.read_locked()?;
         let mut sessions: Vec<AgentSession> = guard
             .values()
             .filter(|s| s.conversation_id == conversation_id)

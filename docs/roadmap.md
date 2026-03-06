@@ -108,7 +108,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §2.2.5.
   - [x] Model initial tenancy as one owning user per tenant, while preserving a
     separate user-versus-tenant identity model for future team and
-    organisation tenants. See corbusier-design.md §2.2.5.
+    organization tenants. See corbusier-design.md §2.2.5.
   - [x] Replace message-only audit context usage with cross-cutting
     `RequestContext` carrying tenant, correlation, causation, user, and
     session identifiers.

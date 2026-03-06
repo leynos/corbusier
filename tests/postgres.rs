@@ -2,6 +2,7 @@
 //!
 //! Tests are organized into modules by functionality:
 //! - `cluster`: Embedded `PostgreSQL` cluster lifecycle helpers
+//! - `agent_session_tests`: Agent session persistence and active-session uniqueness
 //! - `audit_tests`: Audit context capture and verification
 //! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `crud_tests`: Basic CRUD operations
@@ -20,6 +21,7 @@ mod postgres {
     pub mod cluster;
     pub mod helpers;
 
+    mod agent_session_tests;
     mod audit_tests;
     mod backend_registry_tests;
     mod crud_tests;
