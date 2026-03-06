@@ -41,8 +41,9 @@ After this change:
 
 This is step 1 of 6 in the multi-tenancy delivery sequence. Later steps
 (1.5.2-1.5.4) will deliver schema migrations, adapter-level tenant filtering,
-Row-Level Security (RLS) policies, and two-tenant isolation tests. This step focuses exclusively on
-domain primitives and plumbing signatures.
+Row-Level Security (RLS) policies, and two-tenant isolation
+tests. This step focuses exclusively on domain primitives and plumbing
+signatures.
 
 ## Constraints
 
@@ -94,7 +95,8 @@ domain primitives and plumbing signatures.
 - Risk: The `TenantSlug` validation rules are not fully specified in the design
   doc beyond "suitable for URLs and config keys." Severity: low Likelihood:
   high Mitigation: Use the same validation pattern as `BackendName` (lowercase
-  alphanumeric plus hyphens, max 63 characters to match DNS label rules).
+  alphanumeric plus hyphens, max 63 characters to match Domain Name
+  System (DNS) label rules).
   Hyphens (not underscores) are more URL-conventional. Document the choice in
   the decision log.
 

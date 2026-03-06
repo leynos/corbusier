@@ -128,7 +128,8 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 - [ ] 1.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
   1.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 1.5.1 added
   `&RequestContext` to port signatures; this item makes adapters *use* the
-  tenant context for query scoping and RLS enforcement.
+  tenant context for query scoping and Row-Level Security (RLS)
+  enforcement.
   - [ ] Update adapter implementations to extract and apply `tenant_id` from
     `RequestContext` in all queries and mutations. See
     corbusier-design.md §2.2.5.

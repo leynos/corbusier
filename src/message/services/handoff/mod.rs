@@ -12,5 +12,7 @@ mod conversions;
 mod params;
 mod workflows;
 
+/// Parameter types for initiating and completing handoffs.
 pub use params::{CompleteHandoffParams, ServiceInitiateParams};
+/// Service for coordinating agent handoffs with context preservation.
 pub use workflows::HandoffService;

@@ -410,9 +410,10 @@ fn build_request_context() {
 }
 ```
 
-Tenant identity is modelled separately from user identity. The `TenantSlug`
-type enforces Domain Name System (DNS)-label-safe formatting: lowercase alphanumeric plus hyphens,
-1–63 characters, no leading or trailing hyphens, no consecutive hyphens.
+Tenant identity is modelled separately from user identity.
+The `TenantSlug` type enforces Domain Name System (DNS)-label-safe
+formatting: lowercase alphanumeric plus hyphens, 1–63 characters,
+no leading or trailing hyphens, no consecutive hyphens.
 
 ```rust,no_run
 use corbusier::tenant::{Tenant, TenantSlug, TenantStatus};

@@ -3,9 +3,12 @@
 //! These tests require a running `PostgreSQL` instance and exercise the SQL
 //! helpers through the repository stack rather than in isolation.
 
+// Module-level suppression required because `#[rstest]` macro expansion
+// generates the offending function signatures and per-function `#[expect]`
+// attributes are not visible to the macro-generated code.
 #![expect(
     clippy::too_many_arguments,
-    reason = "rstest fixture injection adds parameters beyond the Clippy threshold"
+    reason = "rstest fixture + #[case] injection exceeds the project threshold of 4"
 )]
 
 use corbusier::context::{CausationId, RequestContext};

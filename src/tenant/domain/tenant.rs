@@ -79,14 +79,15 @@ impl Tenant {
     /// Returns [`TenantDomainError::EmptyDisplayName`] when the persisted
     /// display name is empty after trimming.
     pub fn from_persisted(data: PersistedTenantData) -> Result<Self, TenantDomainError> {
-        if data.display_name.trim().is_empty() {
+        let trimmed = data.display_name.trim();
+        if trimmed.is_empty() {
             return Err(TenantDomainError::EmptyDisplayName);
         }
 
         Ok(Self {
             id: data.id,
             slug: data.slug,
-            display_name: data.display_name,
+            display_name: trimmed.to_owned(),
             owner_user_id: data.owner_user_id,
             status: data.status,
             created_at: data.created_at,

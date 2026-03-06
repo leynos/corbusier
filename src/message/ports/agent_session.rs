@@ -33,15 +33,21 @@ pub trait AgentSessionRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns `SessionError` if:
-    /// - A session with the same ID already exists
-    /// - The database connection fails
+    /// - A session with the same ID already exists ([`SessionError::Duplicate`])
+    /// - An active session already exists for the conversation
+    ///   ([`SessionError::ActiveSessionExists`])
+    /// - The database connection fails ([`SessionError::Persistence`])
     async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Updates an existing session.
     ///
     /// # Errors
     ///
-    /// Returns `SessionError::NotFound` if the session does not exist.
+    /// Returns `SessionError` if:
+    /// - The session does not exist ([`SessionError::NotFound`])
+    /// - The update would create a second active session for the
+    ///   conversation ([`SessionError::ActiveSessionExists`])
+    /// - The database connection fails ([`SessionError::Persistence`])
     async fn update(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Retrieves a session by its ID.

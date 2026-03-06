@@ -97,10 +97,6 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-                if is_active {
-                    check_no_active_session(&mut conn, conversation_id, None)?;
-                }
-
                 diesel::insert_into(agent_sessions::table)
                     .values(&new_session)
                     .execute(&mut conn)
@@ -110,6 +106,10 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                         }
                         _ => SessionError::persistence(err),
                     })?;
+
+                if is_active {
+                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
+                }
 
                 Ok(())
             },
@@ -129,10 +129,6 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
 
-                if is_active {
-                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
-                }
-
                 let updated_rows = diesel::update(
                     agent_sessions::table.filter(agent_sessions::id.eq(session_id.into_inner())),
                 )
@@ -142,6 +138,10 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
 
                 if updated_rows == 0 {
                     return Err(SessionError::NotFound(session_id));
+                }
+
+                if is_active {
+                    check_no_active_session(&mut conn, conversation_id, Some(session_id))?;
                 }
 
                 Ok(())
