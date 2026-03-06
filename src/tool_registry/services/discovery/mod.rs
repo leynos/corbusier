@@ -12,7 +12,7 @@ use crate::tool_registry::{
     },
     ports::{
         McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
-        ToolCatalogError, ToolCatalogRepository, ToolLogStore, ToolLogStoreError,
+        SweepContext, ToolCatalogError, ToolCatalogRepository, ToolLogStore, ToolLogStoreError,
         ToolPolicyEnforcer, ToolPolicyError,
     },
 };
@@ -362,10 +362,12 @@ where
         // adapter manages its own listing internally for path-based
         // sweeps. Full metadata-based sweeps are used by the Postgres
         // integration where metadata is maintained externally.
-        Ok(self
-            .log_store
-            .sweep_expired(server_id, &self.retention_policy, now, &[])
-            .await?)
+        let ctx = SweepContext {
+            policy: &self.retention_policy,
+            now,
+            entry_metadata: &[],
+        };
+        Ok(self.log_store.sweep_expired(server_id, &ctx).await?)
     }
 
     /// Best-effort stderr capture for a tool call. Returns the object

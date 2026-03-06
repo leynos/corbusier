@@ -2,11 +2,10 @@
 
 use crate::tool_registry::{
     domain::{LogEntryMetadata, LogRetentionPolicy, McpServerId},
-    ports::{ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
+    ports::{SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use object_store::{ObjectStore, path::Path};
 use std::sync::Arc;
 
@@ -33,6 +32,46 @@ impl ObjectStoreLogAdapter {
         Self {
             store: Arc::new(object_store::memory::InMemory::new()),
         }
+    }
+
+    /// Deletes log entries whose retention period has elapsed.
+    async fn delete_expired_entries(&self, ctx: &SweepContext<'_>) -> ToolLogStoreResult<usize> {
+        let mut deleted = 0usize;
+        for entry in ctx.entry_metadata {
+            if ctx.policy.is_expired(entry, ctx.now) {
+                self.delete_log(entry.object_path()).await?;
+                deleted = deleted.saturating_add(1);
+            }
+        }
+        Ok(deleted)
+    }
+
+    /// Removes the oldest logs when a server exceeds its count limit.
+    async fn enforce_count_limit(
+        &self,
+        server_id: McpServerId,
+        ctx: &SweepContext<'_>,
+    ) -> ToolLogStoreResult<usize> {
+        let mut remaining: Vec<&LogEntryMetadata> = ctx
+            .entry_metadata
+            .iter()
+            .filter(|e| e.server_id() == server_id && !ctx.policy.is_expired(e, ctx.now))
+            .collect();
+
+        let max = ctx.policy.max_logs_per_server;
+        if remaining.len() <= max {
+            return Ok(0);
+        }
+
+        let excess = remaining.len().saturating_sub(max);
+        remaining.sort_by_key(|e| e.captured_at());
+
+        let mut deleted = 0usize;
+        for entry in remaining.into_iter().take(excess) {
+            self.delete_log(entry.object_path()).await?;
+            deleted = deleted.saturating_add(1);
+        }
+        Ok(deleted)
     }
 }
 
@@ -99,37 +138,11 @@ impl ToolLogStore for ObjectStoreLogAdapter {
     async fn sweep_expired(
         &self,
         server_id: McpServerId,
-        policy: &LogRetentionPolicy,
-        now: DateTime<Utc>,
-        entry_metadata: &[LogEntryMetadata],
+        ctx: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let mut deleted = 0usize;
-
-        // Delete expired entries.
-        for entry in entry_metadata {
-            if policy.is_expired(entry, now) {
-                self.delete_log(entry.object_path()).await?;
-                deleted = deleted.saturating_add(1);
-            }
-        }
-
-        // Enforce max count per server: delete oldest first.
-        let remaining: Vec<&LogEntryMetadata> = entry_metadata
-            .iter()
-            .filter(|e| e.server_id() == server_id && !policy.is_expired(e, now))
-            .collect();
-
-        if remaining.len() > policy.max_logs_per_server {
-            let excess = remaining.len().saturating_sub(policy.max_logs_per_server);
-            let mut by_time: Vec<&LogEntryMetadata> = remaining;
-            by_time.sort_by_key(|e| e.captured_at());
-            for entry in by_time.into_iter().take(excess) {
-                self.delete_log(entry.object_path()).await?;
-                deleted = deleted.saturating_add(1);
-            }
-        }
-
-        Ok(deleted)
+        let expired = self.delete_expired_entries(ctx).await?;
+        let excess = self.enforce_count_limit(server_id, ctx).await?;
+        Ok(expired.saturating_add(excess))
     }
 }
 

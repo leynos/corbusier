@@ -12,14 +12,24 @@ use thiserror::Error;
 /// Result type for log store operations.
 pub type ToolLogStoreResult<T> = Result<T, ToolLogStoreError>;
 
+/// Context bundle for a log retention sweep.
+///
+/// Groups the policy, wall-clock timestamp, and entry metadata
+/// that [`ToolLogStore::sweep_expired`] needs, keeping the trait
+/// method to two non-`self` parameters.
+pub struct SweepContext<'a> {
+    /// Retention policy governing expiry and count limits.
+    pub policy: &'a LogRetentionPolicy,
+    /// Current wall-clock time used for expiry checks.
+    pub now: DateTime<Utc>,
+    /// Known log entry metadata maintained by the service layer.
+    pub entry_metadata: &'a [LogEntryMetadata],
+}
+
 /// Storage contract for captured stderr log blobs.
 ///
 /// Implementations store and retrieve opaque byte blobs keyed by
 /// object store paths derived from [`LogEntryMetadata`].
-#[expect(
-    clippy::too_many_arguments,
-    reason = "sweep_expired requires server, policy, timestamp, and metadata parameters"
-)]
 #[async_trait]
 pub trait ToolLogStore: Send + Sync {
     /// Writes a log blob to the store.
@@ -77,9 +87,7 @@ pub trait ToolLogStore: Send + Sync {
     async fn sweep_expired(
         &self,
         server_id: McpServerId,
-        policy: &LogRetentionPolicy,
-        now: DateTime<Utc>,
-        entry_metadata: &[LogEntryMetadata],
+        ctx: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize>;
 }
 
