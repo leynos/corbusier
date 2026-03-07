@@ -87,7 +87,6 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
-        let pool = self.pool.clone();
         let tenant_id = ctx.tenant_id().into_inner();
         let source_session_id = params.source_session.session_id;
         let source_agent = params.source_session.agent_backend.clone();
@@ -109,20 +108,14 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
         let new_handoff = handoff_to_new_row(&handoff, params.conversation_id)?;
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id, |tx| {
-                    diesel::insert_into(handoffs::table)
-                        .values(&new_handoff)
-                        .execute(tx)
-                        .map_err(HandoffError::persistence)?;
+        self.execute_query(tenant_id, move |conn| {
+            diesel::insert_into(handoffs::table)
+                .values(&new_handoff)
+                .execute(conn)
+                .map_err(HandoffError::persistence)?;
 
-                    Ok(handoff)
-                })
-            },
-            HandoffError::persistence,
-        )
+            Ok(handoff)
+        })
         .await
     }
 
@@ -132,56 +125,44 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
-        let pool = self.pool.clone();
         let tenant_id = ctx.tenant_id().into_inner();
         let clock = DefaultClock;
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id, |tx| {
-                    // Lock the row for the duration of the transaction to
-                    // prevent concurrent state transitions from interleaving.
-                    let row = handoffs::table
-                        .filter(handoffs::id.eq(handoff_id.into_inner()))
-                        .select(HandoffRow::as_select())
-                        .for_update()
-                        .first::<HandoffRow>(tx)
-                        .optional()
-                        .map_err(HandoffError::persistence)?
-                        .ok_or(HandoffError::NotFound(handoff_id))?;
+        self.execute_query(tenant_id, move |conn| {
+            // Lock the row for the duration of the transaction to
+            // prevent concurrent state transitions from interleaving.
+            let row = handoffs::table
+                .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .select(HandoffRow::as_select())
+                .for_update()
+                .first::<HandoffRow>(conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .ok_or(HandoffError::NotFound(handoff_id))?;
 
-                    let mut handoff = row_to_handoff(row)?;
+            let mut handoff = row_to_handoff(row)?;
 
-                    // Check if already completed
-                    if handoff.is_terminal() {
-                        return Err(HandoffError::invalid_transition(
-                            handoff.status,
-                            HandoffStatus::Completed,
-                        ));
-                    }
+            if handoff.is_terminal() {
+                return Err(HandoffError::invalid_transition(
+                    handoff.status,
+                    HandoffStatus::Completed,
+                ));
+            }
 
-                    // Complete the handoff
-                    handoff = handoff.complete(target_session_id, &clock);
-                    let completed_at = handoff.completed_at;
+            handoff = handoff.complete(target_session_id, &clock);
+            let completed_at = handoff.completed_at;
 
-                    // Update in database
-                    diesel::update(
-                        handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())),
-                    )
-                    .set((
-                        handoffs::target_session_id.eq(target_session_id.into_inner()),
-                        handoffs::completed_at.eq(completed_at),
-                        handoffs::status.eq(HandoffStatus::Completed.as_str()),
-                    ))
-                    .execute(tx)
-                    .map_err(HandoffError::persistence)?;
+            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                .set((
+                    handoffs::target_session_id.eq(target_session_id.into_inner()),
+                    handoffs::completed_at.eq(completed_at),
+                    handoffs::status.eq(HandoffStatus::Completed.as_str()),
+                ))
+                .execute(conn)
+                .map_err(HandoffError::persistence)?;
 
-                    Ok(handoff)
-                })
-            },
-            HandoffError::persistence,
-        )
+            Ok(handoff)
+        })
         .await
     }
 
@@ -191,51 +172,41 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()> {
-        let pool = self.pool.clone();
         let tenant_id = ctx.tenant_id().into_inner();
         let owned_reason = reason.map(str::to_owned);
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id, |tx| {
-                    // Lock the row for the duration of the transaction to
-                    // prevent concurrent state transitions from interleaving.
-                    let row = handoffs::table
-                        .filter(handoffs::id.eq(handoff_id.into_inner()))
-                        .select(HandoffRow::as_select())
-                        .for_update()
-                        .first::<HandoffRow>(tx)
-                        .optional()
-                        .map_err(HandoffError::persistence)?
-                        .ok_or(HandoffError::NotFound(handoff_id))?;
+        self.execute_query(tenant_id, move |conn| {
+            // Lock the row for the duration of the transaction to
+            // prevent concurrent state transitions from interleaving.
+            let row = handoffs::table
+                .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .select(HandoffRow::as_select())
+                .for_update()
+                .first::<HandoffRow>(conn)
+                .optional()
+                .map_err(HandoffError::persistence)?
+                .ok_or(HandoffError::NotFound(handoff_id))?;
 
-                    let status = HandoffStatus::try_from(row.status.as_str())
-                        .map_err(HandoffError::persistence)?;
+            let status =
+                HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
 
-                    if status.is_terminal() {
-                        return Err(HandoffError::invalid_transition(
-                            status,
-                            HandoffStatus::Cancelled,
-                        ));
-                    }
+            if status.is_terminal() {
+                return Err(HandoffError::invalid_transition(
+                    status,
+                    HandoffStatus::Cancelled,
+                ));
+            }
 
-                    // Cancel the handoff
-                    diesel::update(
-                        handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())),
-                    )
-                    .set((
-                        handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
-                        handoffs::reason.eq(owned_reason),
-                    ))
-                    .execute(tx)
-                    .map_err(HandoffError::persistence)?;
+            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
+                .set((
+                    handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
+                    handoffs::reason.eq(owned_reason),
+                ))
+                .execute(conn)
+                .map_err(HandoffError::persistence)?;
 
-                    Ok(())
-                })
-            },
-            HandoffError::persistence,
-        )
+            Ok(())
+        })
         .await
     }
 

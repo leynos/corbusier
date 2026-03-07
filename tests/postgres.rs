@@ -13,6 +13,7 @@
 //! - `task_lifecycle_tests`: Issue-to-task creation and lookup
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 //! - `mcp_server_lifecycle_tests`: MCP server lifecycle persistence
+//! - `slash_command_tests`: Slash command metadata round-trips
 
 mod test_helpers;
 mod worker_locator;
