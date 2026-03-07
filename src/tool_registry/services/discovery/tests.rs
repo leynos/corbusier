@@ -104,6 +104,44 @@ async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnf
     Ok(registered.id())
 }
 
+async fn call_read_file_tool(
+    discovery: &TestDiscoveryService,
+    params: serde_json::Value,
+) -> std::result::Result<
+    crate::tool_registry::domain::ToolCallResult,
+    ToolDiscoveryRoutingServiceError,
+> {
+    let request = ToolCallRequest::new("read_file", params, &DefaultClock);
+    discovery.call_tool(&request).await
+}
+
+fn setup_success_result(host: &InMemoryMcpServerHost) -> Result<()> {
+    host.set_tool_call_result(
+        McpServerName::new("workspace_tools")?,
+        "read_file",
+        json!({"content": "hello"}),
+    )?;
+    Ok(())
+}
+
+#[expect(
+    clippy::indexing_slicing,
+    reason = "asserts on first element after verifying len() == 1"
+)]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "test helper uses assertions to validate audit state"
+)]
+fn assert_single_audit_stderr_path(
+    catalog: &InMemoryToolCatalog,
+    expected_some: bool,
+) -> Result<()> {
+    let audit_records = catalog.audit_records()?;
+    assert_eq!(audit_records.len(), 1);
+    assert_eq!(audit_records[0].stderr_log_path().is_some(), expected_some);
+    Ok(())
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 #[expect(
@@ -255,9 +293,7 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
 
     discovery.mark_tools_unavailable(server_id).await?;
 
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = discovery.call_tool(&request).await;
+    let result = call_read_file_tool(&discovery, json!({"path": "/tmp/test.txt"})).await;
 
     assert!(matches!(
         result,
@@ -281,8 +317,7 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
     register_start_discover(&host, &lifecycle, &discovery).await?;
 
     // Missing required 'path' parameter.
-    let request = ToolCallRequest::new("read_file", json!({}), &DefaultClock);
-    let result = discovery.call_tool(&request).await;
+    let result = call_read_file_tool(&discovery, json!({})).await;
 
     assert!(matches!(
         result,
@@ -362,10 +397,6 @@ async fn call_tool_host_failure_still_records_audit(bundle: TestBundle) -> Resul
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-#[expect(
-    clippy::indexing_slicing,
-    reason = "test asserts on first element after verifying len() == 1"
-)]
 async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()> {
     let TestBundle {
         host,
@@ -376,36 +407,24 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
     } = bundle;
 
     register_start_discover(&host, &lifecycle, &discovery).await?;
-    host.set_tool_call_result(
-        McpServerName::new("workspace_tools")?,
-        "read_file",
-        json!({"content": "hello"}),
-    )?;
+    setup_success_result(&host)?;
     host.set_tool_call_stderr(
         McpServerName::new("workspace_tools")?,
         "read_file",
         bytes::Bytes::from("debug: opening file"),
     )?;
 
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = discovery.call_tool(&request).await?;
+    let result = call_read_file_tool(&discovery, json!({"path": "/tmp/test.txt"})).await?;
 
     assert!(result.outcome().is_success());
 
-    let audit_records = catalog.audit_records()?;
-    assert_eq!(audit_records.len(), 1);
-    assert!(audit_records[0].stderr_log_path().is_some());
+    assert_single_audit_stderr_path(&catalog, true)?;
 
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-#[expect(
-    clippy::indexing_slicing,
-    reason = "test asserts on first element after verifying len() == 1"
-)]
 async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<()> {
     let TestBundle {
         host,
@@ -416,19 +435,11 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
     } = bundle;
 
     register_start_discover(&host, &lifecycle, &discovery).await?;
-    host.set_tool_call_result(
-        McpServerName::new("workspace_tools")?,
-        "read_file",
-        json!({"content": "hello"}),
-    )?;
+    setup_success_result(&host)?;
 
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    discovery.call_tool(&request).await?;
+    call_read_file_tool(&discovery, json!({"path": "/tmp/test.txt"})).await?;
 
-    let audit_records = catalog.audit_records()?;
-    assert_eq!(audit_records.len(), 1);
-    assert!(audit_records[0].stderr_log_path().is_none());
+    assert_single_audit_stderr_path(&catalog, false)?;
 
     Ok(())
 }

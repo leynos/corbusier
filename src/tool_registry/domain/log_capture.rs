@@ -79,6 +79,13 @@ impl LogEntryKind {
     }
 }
 
+/// Bundles the clock and retention policy used to derive timestamps
+/// and expiry for log capture operations.
+struct LogCaptureContext<'a> {
+    clock: &'a dyn Clock,
+    retention: &'a LogRetentionPolicy,
+}
+
 /// Metadata for a captured stderr log blob stored in the object store.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogEntryMetadata {
@@ -93,21 +100,16 @@ pub struct LogEntryMetadata {
 
 impl LogEntryMetadata {
     /// Shared construction logic for all log entry kinds.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "private builder groups all metadata fields for a log entry"
-    )]
     fn build(
         server_id: McpServerId,
         kind: LogEntryKind,
         byte_count: u64,
-        clock: &impl Clock,
-        retention: &LogRetentionPolicy,
+        ctx: &LogCaptureContext<'_>,
     ) -> Self {
         let id = LogEntryId::new();
         let object_path = format!("tool_logs/{server_id}/{}/{id}.stderr", kind.path_segment());
-        let captured_at = clock.utc();
-        let expires_at = captured_at + retention.retention_period;
+        let captured_at = ctx.clock.utc();
+        let expires_at = captured_at + ctx.retention.retention_period;
         Self {
             id,
             server_id,
@@ -127,13 +129,8 @@ impl LogEntryMetadata {
         clock: &impl Clock,
         retention: &LogRetentionPolicy,
     ) -> Self {
-        Self::build(
-            server_id,
-            LogEntryKind::ServerStartup,
-            byte_count,
-            clock,
-            retention,
-        )
+        let ctx = LogCaptureContext { clock, retention };
+        Self::build(server_id, LogEntryKind::ServerStartup, byte_count, &ctx)
     }
 
     /// Creates metadata for a tool call stderr capture.
@@ -149,12 +146,12 @@ impl LogEntryMetadata {
         clock: &impl Clock,
         retention: &LogRetentionPolicy,
     ) -> Self {
+        let ctx = LogCaptureContext { clock, retention };
         Self::build(
             server_id,
             LogEntryKind::ToolCall { call_id },
             byte_count,
-            clock,
-            retention,
+            &ctx,
         )
     }
 
