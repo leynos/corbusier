@@ -115,6 +115,19 @@ async fn call_read_file_tool(
     discovery.call_tool(&request).await
 }
 
+/// Calls `"read_file"` with the given `params` and asserts the call fails,
+/// returning the unwrapped error for variant matching by the caller.
+///
+/// Panics if `call_tool` unexpectedly succeeds.
+async fn call_read_file_expecting_error(
+    discovery: &TestDiscoveryService,
+    params: serde_json::Value,
+) -> ToolDiscoveryRoutingServiceError {
+    call_read_file_tool(discovery, params)
+        .await
+        .expect_err("expected call_tool to return an error")
+}
+
 fn setup_success_result(host: &InMemoryMcpServerHost) -> Result<()> {
     host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
@@ -293,13 +306,11 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
 
     discovery.mark_tools_unavailable(server_id).await?;
 
-    let result = call_read_file_tool(&discovery, json!({"path": "/tmp/test.txt"})).await;
-
+    let err =
+        call_read_file_expecting_error(&discovery, json!({"path": "/tmp/test.txt"})).await;
     assert!(matches!(
-        result,
-        Err(ToolDiscoveryRoutingServiceError::Domain(
-            ToolRegistryDomainError::ToolUnavailable { .. }
-        ))
+        err,
+        ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::ToolUnavailable { .. })
     ));
     Ok(())
 }
@@ -317,13 +328,12 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
     register_start_discover(&host, &lifecycle, &discovery).await?;
 
     // Missing required 'path' parameter.
-    let result = call_read_file_tool(&discovery, json!({})).await;
-
+    let err = call_read_file_expecting_error(&discovery, json!({})).await;
     assert!(matches!(
-        result,
-        Err(ToolDiscoveryRoutingServiceError::Domain(
+        err,
+        ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::SchemaValidationFailed { .. }
-        ))
+        )
     ));
     Ok(())
 }
