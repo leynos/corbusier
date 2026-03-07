@@ -14,7 +14,7 @@ use corbusier::message::{
     },
 };
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 fn missing_handoff_error() -> BoxError {
     Box::new(std::io::Error::new(
@@ -23,13 +23,25 @@ fn missing_handoff_error() -> BoxError {
     ))
 }
 
-#[rstest]
-#[tokio::test]
-async fn initiate_and_list_handoffs_for_conversation(
+/// Pre-built scenario providing a stored source session and handoff adapters.
+///
+/// Bundles the common setup shared by every handoff integration test:
+/// pool construction, adapter wiring, conversation insertion, and
+/// source-session storage.
+struct PreparedHandoffScenario {
+    session_repo: PostgresAgentSessionRepository,
+    handoff_adapter: PostgresHandoffAdapter,
+    ctx: RequestContext,
+    conversation_id: ConversationId,
+    source_session: AgentSession,
+}
+
+#[fixture]
+async fn prepared_handoff_scenario(
     clock: DefaultClock,
     test_request_context: RequestContext,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
-) -> Result<(), BoxError> {
+) -> Result<PreparedHandoffScenario, BoxError> {
     let prep = prepared_repo.await?;
     let pool = build_pool(prep.temp_db.url(), 1)?;
 
@@ -48,23 +60,41 @@ async fn initiate_and_list_handoffs_for_conversation(
     );
     session_repo.store(&ctx, &source_session).await?;
 
-    let params = InitiateHandoffParams::new(
+    Ok(PreparedHandoffScenario {
+        session_repo,
+        handoff_adapter,
+        ctx,
         conversation_id,
-        &source_session,
+        source_session,
+    })
+}
+
+#[rstest]
+#[tokio::test]
+async fn initiate_and_list_handoffs_for_conversation(
+    #[future] prepared_handoff_scenario: Result<PreparedHandoffScenario, BoxError>,
+) -> Result<(), BoxError> {
+    let scenario = prepared_handoff_scenario.await?;
+
+    let params = InitiateHandoffParams::new(
+        scenario.conversation_id,
+        &scenario.source_session,
         "agent-b",
         TurnId::new(),
     )
     .with_reason("escalation");
-    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
+    let handoff = scenario
+        .handoff_adapter
+        .initiate_handoff(&scenario.ctx, params)
+        .await?;
 
-    let handoffs = handoff_adapter
-        .list_handoffs_for_conversation(&ctx, conversation_id)
+    let handoffs = scenario
+        .handoff_adapter
+        .list_handoffs_for_conversation(&scenario.ctx, scenario.conversation_id)
         .await?;
 
     assert_eq!(handoffs.len(), 1);
-    let first = handoffs
-        .first()
-        .ok_or_else(missing_handoff_error)?;
+    let first = handoffs.first().ok_or_else(missing_handoff_error)?;
     assert_eq!(first.handoff_id, handoff.handoff_id);
     Ok(())
 }
@@ -73,41 +103,35 @@ async fn initiate_and_list_handoffs_for_conversation(
 #[tokio::test]
 async fn complete_handoff_updates_target_and_status(
     clock: DefaultClock,
-    test_request_context: RequestContext,
-    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    #[future] prepared_handoff_scenario: Result<PreparedHandoffScenario, BoxError>,
 ) -> Result<(), BoxError> {
-    let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url(), 1)?;
+    let scenario = prepared_handoff_scenario.await?;
 
-    let session_repo = PostgresAgentSessionRepository::new(pool.clone());
-    let handoff_adapter = PostgresHandoffAdapter::new(pool);
-
-    let ctx = test_request_context;
-    let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
-
-    let source_session = AgentSession::new(
-        conversation_id,
-        "agent-a",
-        SequenceNumber::new(1),
-        &clock,
+    let params = InitiateHandoffParams::new(
+        scenario.conversation_id,
+        &scenario.source_session,
+        "agent-b",
+        TurnId::new(),
     );
-    session_repo.store(&ctx, &source_session).await?;
-
-    let params =
-        InitiateHandoffParams::new(conversation_id, &source_session, "agent-b", TurnId::new());
-    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
+    let handoff = scenario
+        .handoff_adapter
+        .initiate_handoff(&scenario.ctx, params)
+        .await?;
 
     let target_session = AgentSession::new(
-        conversation_id,
+        scenario.conversation_id,
         "agent-b",
         SequenceNumber::new(10),
         &clock,
     );
-    session_repo.store(&ctx, &target_session).await?;
+    scenario
+        .session_repo
+        .store(&scenario.ctx, &target_session)
+        .await?;
 
-    let completed = handoff_adapter
-        .complete_handoff(&ctx, handoff.handoff_id, target_session.session_id)
+    let completed = scenario
+        .handoff_adapter
+        .complete_handoff(&scenario.ctx, handoff.handoff_id, target_session.session_id)
         .await?;
 
     assert_eq!(completed.target_session_id, Some(target_session.session_id));
@@ -118,38 +142,29 @@ async fn complete_handoff_updates_target_and_status(
 #[rstest]
 #[tokio::test]
 async fn cancel_handoff_persists_reason(
-    clock: DefaultClock,
-    test_request_context: RequestContext,
-    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    #[future] prepared_handoff_scenario: Result<PreparedHandoffScenario, BoxError>,
 ) -> Result<(), BoxError> {
-    let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url(), 1)?;
+    let scenario = prepared_handoff_scenario.await?;
 
-    let session_repo = PostgresAgentSessionRepository::new(pool.clone());
-    let handoff_adapter = PostgresHandoffAdapter::new(pool);
-
-    let ctx = test_request_context;
-    let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
-
-    let source_session = AgentSession::new(
-        conversation_id,
-        "agent-a",
-        SequenceNumber::new(1),
-        &clock,
+    let params = InitiateHandoffParams::new(
+        scenario.conversation_id,
+        &scenario.source_session,
+        "agent-b",
+        TurnId::new(),
     );
-    session_repo.store(&ctx, &source_session).await?;
-
-    let params =
-        InitiateHandoffParams::new(conversation_id, &source_session, "agent-b", TurnId::new());
-    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
-
-    handoff_adapter
-        .cancel_handoff(&ctx, handoff.handoff_id, Some("target unavailable"))
+    let handoff = scenario
+        .handoff_adapter
+        .initiate_handoff(&scenario.ctx, params)
         .await?;
 
-    let found = handoff_adapter
-        .find_handoff(&ctx, handoff.handoff_id)
+    scenario
+        .handoff_adapter
+        .cancel_handoff(&scenario.ctx, handoff.handoff_id, Some("target unavailable"))
+        .await?;
+
+    let found = scenario
+        .handoff_adapter
+        .find_handoff(&scenario.ctx, handoff.handoff_id)
         .await?
         .ok_or_else(missing_handoff_error)?;
 
@@ -162,44 +177,31 @@ async fn cancel_handoff_persists_reason(
 #[rstest]
 #[tokio::test]
 async fn cancel_handoff_with_none_preserves_original_reason(
-    clock: DefaultClock,
-    test_request_context: RequestContext,
-    #[future] prepared_repo: Result<PreparedRepo, BoxError>,
+    #[future] prepared_handoff_scenario: Result<PreparedHandoffScenario, BoxError>,
 ) -> Result<(), BoxError> {
-    let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url(), 1)?;
-
-    let session_repo = PostgresAgentSessionRepository::new(pool.clone());
-    let handoff_adapter = PostgresHandoffAdapter::new(pool);
-
-    let ctx = test_request_context;
-    let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
-
-    let source_session = AgentSession::new(
-        conversation_id,
-        "agent-a",
-        SequenceNumber::new(1),
-        &clock,
-    );
-    session_repo.store(&ctx, &source_session).await?;
+    let scenario = prepared_handoff_scenario.await?;
 
     let params = InitiateHandoffParams::new(
-        conversation_id,
-        &source_session,
+        scenario.conversation_id,
+        &scenario.source_session,
         "agent-b",
         TurnId::new(),
     )
     .with_reason("escalation needed");
-    let handoff = handoff_adapter.initiate_handoff(&ctx, params).await?;
-
-    // Cancel with None — the original reason should be preserved.
-    handoff_adapter
-        .cancel_handoff(&ctx, handoff.handoff_id, None)
+    let handoff = scenario
+        .handoff_adapter
+        .initiate_handoff(&scenario.ctx, params)
         .await?;
 
-    let found = handoff_adapter
-        .find_handoff(&ctx, handoff.handoff_id)
+    // Cancel with None — the original reason should be preserved.
+    scenario
+        .handoff_adapter
+        .cancel_handoff(&scenario.ctx, handoff.handoff_id, None)
+        .await?;
+
+    let found = scenario
+        .handoff_adapter
+        .find_handoff(&scenario.ctx, handoff.handoff_id)
         .await?
         .ok_or_else(missing_handoff_error)?;
 

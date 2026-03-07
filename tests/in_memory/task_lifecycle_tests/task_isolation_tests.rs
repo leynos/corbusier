@@ -1,21 +1,24 @@
 //! Tests for cross-tenant task isolation.
 
-use super::{TestService, service};
+use super::{TestService, assert_single_task_found, service};
 use crate::in_memory::helpers::{ctx, other_ctx};
 use corbusier::context::RequestContext;
 use corbusier::task::{
-    domain::IssueRef,
+    domain::{BranchRef, IssueRef, PullRequestRef},
     ports::TaskRepositoryError,
     services::{
-        AssociateBranchRequest, CreateTaskFromIssueRequest, TaskLifecycleError,
-        TransitionTaskRequest,
+        AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
+        TaskLifecycleError, TransitionTaskRequest,
     },
 };
 use rstest::rstest;
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn lookup_is_scoped_to_tenant(service: TestService, ctx: RequestContext) {
+async fn lookup_is_scoped_to_tenant(
+    service: TestService,
+    ctx: RequestContext,
+) -> Result<(), eyre::Report> {
     let ctx_b = other_ctx();
 
     let task = service
@@ -79,6 +82,63 @@ async fn lookup_is_scoped_to_tenant(service: TestService, ctx: RequestContext) {
         "branch association under tenant B should fail with NotFound"
     );
 
+    // Branch lookup is scoped to tenant.
+    let ctx_a = &ctx;
+    service
+        .associate_branch(
+            ctx_a,
+            AssociateBranchRequest::new(
+                task.id(),
+                "github",
+                "corbusier/core",
+                "feature/cross-tenant",
+            ),
+        )
+        .await
+        .expect("branch association under tenant A should succeed");
+
+    let branch_ref = BranchRef::from_parts("github", "corbusier/core", "feature/cross-tenant")
+        .expect("valid branch ref");
+    let found_a = service
+        .find_by_branch_ref(ctx_a, &branch_ref)
+        .await
+        .expect("branch lookup under tenant A should succeed");
+    assert_single_task_found(&found_a, task.id())?;
+
+    let found_b_branch = service
+        .find_by_branch_ref(&ctx_b, &branch_ref)
+        .await
+        .expect("branch lookup under tenant B should succeed");
+    assert!(
+        found_b_branch.is_empty(),
+        "tenant B must not see tenant A branch associations"
+    );
+
+    // PR lookup is scoped to tenant.
+    service
+        .associate_pull_request(
+            ctx_a,
+            AssociatePullRequestRequest::new(task.id(), "github", "corbusier/core", 900),
+        )
+        .await
+        .expect("PR association under tenant A should succeed");
+
+    let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 900).expect("valid PR ref");
+    let found_a_pr = service
+        .find_by_pull_request_ref(ctx_a, &pr_ref)
+        .await
+        .expect("PR lookup under tenant A should succeed");
+    assert_single_task_found(&found_a_pr, task.id())?;
+
+    let found_b_pr = service
+        .find_by_pull_request_ref(&ctx_b, &pr_ref)
+        .await
+        .expect("PR lookup under tenant B should succeed");
+    assert!(
+        found_b_pr.is_empty(),
+        "tenant B must not see tenant A PR associations"
+    );
+
     // Same issue ref under tenant B is allowed (no cross-tenant duplicate).
     service
         .create_from_issue(
@@ -92,4 +152,6 @@ async fn lookup_is_scoped_to_tenant(service: TestService, ctx: RequestContext) {
         )
         .await
         .expect("same issue ref under tenant B should succeed");
+
+    Ok(())
 }

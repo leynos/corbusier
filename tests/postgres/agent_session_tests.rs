@@ -34,6 +34,10 @@ async fn concurrent_active_session_store_rejects_second(
     let pool = build_pool(prep.temp_db.url(), 2)?;
     let repo = PostgresAgentSessionRepository::new(pool);
 
+    // Build a shared RequestContext inline so both spawned tasks operate
+    // under the same tenant.  The tenant_id binding exists only for
+    // readability; it is not referenced elsewhere.  Each task clones ctx
+    // (see ctx_a / ctx_b below) to satisfy the 'static bound on spawn.
     let tenant_id = TenantId::new();
     let ctx = RequestContext::new(
         tenant_id,

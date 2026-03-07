@@ -98,9 +98,10 @@ focuses exclusively on domain primitives and plumbing signatures.
   (DNS) label rules). Hyphens (not underscores) are more URL-conventional.
   Document the choice in the decision log.
 
-- Risk: BDD test step definitions may collide with existing step names from
-  other subsystems. Severity: low Likelihood: low Mitigation: Use
-  tenant-specific vocabulary in step definitions.
+- Risk: Behaviour-Driven Development (BDD) test step definitions
+  may collide with existing step names from other subsystems.
+  Severity: low Likelihood: low Mitigation: Use tenant-specific
+  vocabulary in step definitions.
 
 ## Progress
 

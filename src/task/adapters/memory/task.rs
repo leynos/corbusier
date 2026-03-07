@@ -133,6 +133,14 @@ impl TaskRepository for InMemoryTaskRepository {
             .ok_or(TaskRepositoryError::NotFound(task.id()))?
             .clone();
 
+        // Reject if the new issue ref already belongs to a different task.
+        let new_issue = task.origin().issue_ref().clone();
+        if let Some(&owner) = state.issue_index.get(&new_issue)
+            && owner != task.id()
+        {
+            return Err(TaskRepositoryError::DuplicateIssueOrigin(new_issue));
+        }
+
         // Remove old issue/branch/PR index entries before adding updated ones.
         let old_issue = old_task.origin().issue_ref().clone();
         state.issue_index.remove(&old_issue);
