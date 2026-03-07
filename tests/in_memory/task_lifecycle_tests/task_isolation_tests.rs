@@ -44,14 +44,19 @@ async fn issue_visibility_is_scoped_to_tenant(
     service: TestService,
     ctx: RequestContext,
 ) -> Result<(), eyre::Report> {
-    create_task(&service, &ctx, "Tenant isolation test").await?;
+    let task = create_task(&service, &ctx, "Tenant isolation test").await?;
 
     let issue_ref = IssueRef::from_parts(PROVIDER, REPO, ISSUE_NO)?;
 
-    let found = service.find_by_issue_ref(&other_ctx(), &issue_ref).await?;
+    // Positive control: owning tenant resolves its own task.
+    let found_own = service.find_by_issue_ref(&ctx, &issue_ref).await?;
+    let own_task = found_own.expect("owning tenant must find its task");
+    assert_eq!(own_task.id(), task.id());
 
+    // Cross-tenant: other tenant cannot see the task.
+    let found_other = service.find_by_issue_ref(&other_ctx(), &issue_ref).await?;
     assert!(
-        found.is_none(),
+        found_other.is_none(),
         "other tenant must not see tasks via issue ref"
     );
     Ok(())
@@ -151,7 +156,29 @@ async fn duplicate_issue_across_tenants_is_allowed(
     service: TestService,
     ctx: RequestContext,
 ) -> Result<(), eyre::Report> {
-    create_task(&service, &ctx, "Tenant isolation test").await?;
-    create_task(&service, &other_ctx(), "Same issue different tenant").await?;
+    let task_a = create_task(&service, &ctx, "Tenant isolation test").await?;
+    let ctx_b = other_ctx();
+    let task_b = create_task(&service, &ctx_b, "Same issue different tenant").await?;
+
+    // Each tenant's index must resolve to its own task.
+    let issue_ref = IssueRef::from_parts(PROVIDER, REPO, ISSUE_NO)?;
+
+    let found_a = service
+        .find_by_issue_ref(&ctx, &issue_ref)
+        .await?
+        .expect("tenant A must still find its task");
+    assert_eq!(found_a.id(), task_a.id());
+
+    let found_b = service
+        .find_by_issue_ref(&ctx_b, &issue_ref)
+        .await?
+        .expect("tenant B must find its task");
+    assert_eq!(found_b.id(), task_b.id());
+
+    assert_ne!(
+        task_a.id(),
+        task_b.id(),
+        "tasks must be distinct across tenants"
+    );
     Ok(())
 }
