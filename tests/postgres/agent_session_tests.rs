@@ -148,11 +148,11 @@ async fn update_to_active_when_another_active_exists_is_rejected(
     // Store a second session in paused state (does not conflict).
     let mut session_b =
         AgentSession::new(conversation_id, "agent-b", SequenceNumber::new(2), &clock);
-    session_b.state = corbusier::message::domain::AgentSessionState::Paused;
+    session_b.pause();
     repo.store(&ctx, &session_b).await?;
 
     // Now try to update session_b to active — should fail.
-    session_b.state = corbusier::message::domain::AgentSessionState::Active;
+    session_b.resume();
     let err = repo
         .update(&ctx, &session_b)
         .await

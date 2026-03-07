@@ -2,14 +2,14 @@
 
 use std::sync::Arc;
 
-use super::helpers::ctx;
+use super::helpers::{ctx, other_ctx};
 use corbusier::agent_backend::{
     adapters::memory::InMemoryBackendRegistry,
     domain::BackendStatus,
     ports::BackendRegistryError,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 
@@ -129,16 +129,6 @@ async fn find_by_name_returns_none_for_unknown(service: TestService, ctx: Reques
 }
 
 // ── Cross-tenant isolation tests ────────────────────────────────────
-
-/// Creates a second `RequestContext` with a distinct `TenantId`.
-fn other_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]

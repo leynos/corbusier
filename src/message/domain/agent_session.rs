@@ -213,6 +213,25 @@ impl AgentSession {
         self.state = AgentSessionState::Completed;
     }
 
+    /// Reverts a session from handed-off state back to active.
+    ///
+    /// Used when a handoff is cancelled: clears the termination handoff,
+    /// end sequence, and ended-at timestamp, returning the session to active.
+    /// Returns `true` if the revert succeeds (session was terminated by the
+    /// given handoff), `false` otherwise.
+    pub fn revert_from_handoff(&mut self, handoff_id: HandoffId) -> bool {
+        if self.state == AgentSessionState::HandedOff
+            && self.terminated_by_handoff == Some(handoff_id)
+        {
+            self.state = AgentSessionState::Active;
+            self.terminated_by_handoff = None;
+            self.end_sequence = None;
+            self.ended_at = None;
+            return true;
+        }
+        false
+    }
+
     /// Marks the session as failed.
     pub fn fail(&mut self, end_sequence: SequenceNumber, clock: &impl mockable::Clock) {
         self.end_sequence = Some(end_sequence);

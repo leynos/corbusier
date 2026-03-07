@@ -290,14 +290,8 @@ where
             .find_by_id(ctx, handoff.source_session_id)
             .await
             .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?
-            && source_session.terminated_by_handoff == Some(handoff_id)
+            && source_session.revert_from_handoff(handoff_id)
         {
-            // Revert to active state
-            source_session.state = crate::message::domain::AgentSessionState::Active;
-            source_session.terminated_by_handoff = None;
-            source_session.end_sequence = None;
-            source_session.ended_at = None;
-
             self.session_repo
                 .update(ctx, &source_session)
                 .await

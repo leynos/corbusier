@@ -50,6 +50,18 @@ pub fn ctx() -> RequestContext {
     )
 }
 
+/// Creates a second `RequestContext` with a distinct `TenantId`.
+///
+/// Use this alongside `ctx()` when testing cross-tenant isolation.
+pub fn other_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
 /// Provides a conversation ID for tests.
 #[fixture]
 pub fn conversation_id() -> ConversationId {

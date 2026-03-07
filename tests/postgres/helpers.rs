@@ -90,26 +90,24 @@ pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
 ///
 /// This is a blocking operation that should be called from `spawn_blocking`
 /// or a synchronous context.
+/// Converts any `std::error::Error + Send + Sync` into a `BoxError`.
+fn map_box<T, E: std::error::Error + Send + Sync + 'static>(
+    result: Result<T, E>,
+) -> Result<T, BoxError> {
+    result.map_err(|err| Box::new(err) as BoxError)
+}
+
 fn apply_migrations(url: &str) -> Result<(), BoxError> {
-    let mut conn = PgConnection::establish(url).map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(CREATE_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_CONSTRAINTS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_TASKS_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_MCP_SERVERS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
+    let mut conn = map_box(PgConnection::establish(url))?;
+    map_box(conn.batch_execute(CREATE_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_CONSTRAINTS_SQL))?;
+    map_box(conn.batch_execute(ADD_AUDIT_TRIGGER_SQL))?;
+    map_box(conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_TASKS_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
+    map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
+    map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     Ok(())
 }
 

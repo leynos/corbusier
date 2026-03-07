@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::context::{RequestContext, TenantId};
 use crate::task::{
@@ -30,6 +30,29 @@ impl InMemoryTaskRepository {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Acquires a read lock, converting poison errors to repository errors.
+    fn read_state(
+        &self,
+    ) -> TaskRepositoryResult<RwLockReadGuard<'_, HashMap<TenantId, TenantTaskState>>> {
+        self.state
+            .read()
+            .map_err(|err| TaskRepositoryError::persistence(std::io::Error::other(err.to_string())))
+    }
+
+    /// Acquires a write lock, converting poison errors to repository errors.
+    fn write_state(
+        &self,
+    ) -> TaskRepositoryResult<RwLockWriteGuard<'_, HashMap<TenantId, TenantTaskState>>> {
+        self.state
+            .write()
+            .map_err(|err| TaskRepositoryError::persistence(std::io::Error::other(err.to_string())))
+    }
+}
+
+fn index_issue(state: &mut TenantTaskState, task: &Task) {
+    let issue_ref = task.origin().issue_ref().clone();
+    state.issue_index.insert(issue_ref, task.id());
 }
 
 fn index_branch(state: &mut TenantTaskState, task: &Task) {
@@ -79,9 +102,7 @@ fn find_by_index(
 #[async_trait]
 impl TaskRepository for InMemoryTaskRepository {
     async fn store(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
-        let mut tenants = self.state.write().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut tenants = self.write_state()?;
         let state = tenants.entry(ctx.tenant_id()).or_default();
 
         if state.tasks.contains_key(&task.id()) {
@@ -93,7 +114,7 @@ impl TaskRepository for InMemoryTaskRepository {
             return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref));
         }
 
-        state.issue_index.insert(issue_ref, task.id());
+        index_issue(state, task);
         index_branch(state, task);
         index_pull_request(state, task);
         state.tasks.insert(task.id(), task.clone());
@@ -101,10 +122,10 @@ impl TaskRepository for InMemoryTaskRepository {
     }
 
     async fn update(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
-        let mut tenants = self.state.write().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
-        let state = tenants.entry(ctx.tenant_id()).or_default();
+        let mut tenants = self.write_state()?;
+        let state = tenants
+            .get_mut(&ctx.tenant_id())
+            .ok_or(TaskRepositoryError::NotFound(task.id()))?;
 
         let old_task = state
             .tasks
@@ -112,7 +133,10 @@ impl TaskRepository for InMemoryTaskRepository {
             .ok_or(TaskRepositoryError::NotFound(task.id()))?
             .clone();
 
-        // Remove old branch/PR index entries before adding updated ones.
+        // Remove old issue/branch/PR index entries before adding updated ones.
+        let old_issue = old_task.origin().issue_ref().clone();
+        state.issue_index.remove(&old_issue);
+
         if let Some(old_branch) = old_task.branch_ref() {
             remove_from_index(&mut state.branch_index, task.id(), &old_branch.to_string());
         }
@@ -124,6 +148,7 @@ impl TaskRepository for InMemoryTaskRepository {
             );
         }
 
+        index_issue(state, task);
         index_branch(state, task);
         index_pull_request(state, task);
         state.tasks.insert(task.id(), task.clone());
@@ -135,9 +160,7 @@ impl TaskRepository for InMemoryTaskRepository {
         ctx: &RequestContext,
         id: TaskId,
     ) -> TaskRepositoryResult<Option<Task>> {
-        let tenants = self.state.read().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let tenants = self.read_state()?;
         Ok(tenants
             .get(&ctx.tenant_id())
             .and_then(|state| state.tasks.get(&id).cloned()))
@@ -148,9 +171,7 @@ impl TaskRepository for InMemoryTaskRepository {
         ctx: &RequestContext,
         issue_ref: &IssueRef,
     ) -> TaskRepositoryResult<Option<Task>> {
-        let tenants = self.state.read().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let tenants = self.read_state()?;
         let task = tenants.get(&ctx.tenant_id()).and_then(|state| {
             state
                 .issue_index
@@ -166,9 +187,7 @@ impl TaskRepository for InMemoryTaskRepository {
         ctx: &RequestContext,
         branch_ref: &BranchRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
-        let tenants = self.state.read().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let tenants = self.read_state()?;
         let key = branch_ref.to_string();
         Ok(tenants
             .get(&ctx.tenant_id())
@@ -181,9 +200,7 @@ impl TaskRepository for InMemoryTaskRepository {
         ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
-        let tenants = self.state.read().map_err(|err| {
-            TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let tenants = self.read_state()?;
         let key = pr_ref.to_string();
         Ok(tenants
             .get(&ctx.tenant_id())

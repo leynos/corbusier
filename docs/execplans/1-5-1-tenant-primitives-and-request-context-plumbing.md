@@ -585,7 +585,8 @@ differs from directory per established convention).
   the choices made (slug validation rules, `RequestContext` module location,
   `AuditContext` migration approach).
 
-**Validation**: `make markdownlint` passes, manual review.
+**Validation**: `make markdownlint`, `make fmt`, and `make nixie` all pass;
+manual review.
 
 ### Stage J: Final validation
 
@@ -637,11 +638,14 @@ Stage J (final):
 
 ```bash
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-5-1-check-fmt.log
+set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-5-1-markdownlint.log
 set -o pipefail; make lint 2>&1 | tee /tmp/1-5-1-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/1-5-1-test.log
+set -o pipefail; make nixie 2>&1 | tee /tmp/1-5-1-nixie.log
+set -o pipefail; make fmt 2>&1 | tee /tmp/1-5-1-fmt.log
 ```
 
-Expected: all three exit 0.
+Expected: all six commands must exit 0.
 
 ## Validation and acceptance
 

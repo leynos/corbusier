@@ -2,7 +2,7 @@
 
 use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
-    PreparedRepo, build_pool, insert_conversation, prepared_repo, test_request_context,
+    PreparedRepo, build_pool, clock, insert_conversation, prepared_repo, test_request_context,
 };
 use corbusier::context::RequestContext;
 use corbusier::message::{
