@@ -10,7 +10,7 @@ Status: COMPLETE
 ## Purpose / big picture
 
 Corbusier is an AI agent orchestration platform that manages conversations,
-tasks, agent backends, and tool registries. Today every repository and service
+tasks, agent backends, and tool registries. Today, every repository and service
 method operates without knowing which tenant owns the data. There is a small
 `AuditContext` struct in the message adapter layer that carries four optional
 bare `Uuid` fields (`correlation_id`, `causation_id`, `user_id`, `session_id`),
@@ -164,7 +164,7 @@ focuses exclusively on domain primitives and plumbing signatures.
   lookup executes within a tenant context." Future steps (1.5.3) will add
   tenant filtering to reads. Adding the parameter now avoids a second
   cross-cutting signature change later. The read path can initially ignore the
-  tenant_id but having it in the signature is the contract that callers must
+  tenant_id, but having it in the signature is the contract that callers must
   provide context. Date: 2026-03-03
 
 - Decision: `SlashCommandRegistry` is excluded from `RequestContext` plumbing.
@@ -184,7 +184,7 @@ Completed 2026-03-04. All stages delivered successfully.
 - All service layers updated.
 - `AuditContext` retained as adapter-internal type with `From<&RequestContext>`.
 - 4 new BDD scenarios for tenant identity.
-- Users guide, design doc, and roadmap updated.
+- User guide, design doc, and roadmap updated.
 - No new external dependencies added.
 - The `#[expect(clippy::..., reason = "...")]` pattern was required in several
   places where `too_many_arguments` needed suppression on rstest-injected test
