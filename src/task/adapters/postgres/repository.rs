@@ -285,6 +285,11 @@ fn is_issue_origin_unique_violation(info: &dyn DatabaseErrorInformation) -> bool
         .is_some_and(|name| name == "idx_tasks_issue_origin_unique")
 }
 
+// FIXME(1.5.3): This query does not filter by `tenant_id`. The enclosing
+// `execute_query` sets `SET LOCAL app.tenant_id` within the transaction, but
+// without row-level security (RLS) policies on the `tasks` table the session
+// variable has no effect on query results. Until RLS is enabled in milestone
+// 1.5.3, this function can return cross-tenant rows.
 fn find_task_by_issue_ref(
     connection: &mut PgConnection,
     issue_ref: &IssueRef,

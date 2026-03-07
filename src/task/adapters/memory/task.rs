@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::task::{
     domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskId},
     ports::{TaskRepository, TaskRepositoryError, TaskRepositoryResult},
@@ -13,11 +13,11 @@ use crate::task::{
 /// Thread-safe in-memory task repository.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryTaskRepository {
-    state: Arc<RwLock<InMemoryTaskState>>,
+    state: Arc<RwLock<HashMap<TenantId, TenantTaskState>>>,
 }
 
 #[derive(Debug, Default)]
-struct InMemoryTaskState {
+struct TenantTaskState {
     tasks: HashMap<TaskId, Task>,
     issue_index: HashMap<IssueRef, TaskId>,
     branch_index: HashMap<String, Vec<TaskId>>,
@@ -32,14 +32,14 @@ impl InMemoryTaskRepository {
     }
 }
 
-fn index_branch(state: &mut InMemoryTaskState, task: &Task) {
+fn index_branch(state: &mut TenantTaskState, task: &Task) {
     if let Some(branch_ref) = task.branch_ref() {
         let key = branch_ref.to_string();
         state.branch_index.entry(key).or_default().push(task.id());
     }
 }
 
-fn index_pull_request(state: &mut InMemoryTaskState, task: &Task) {
+fn index_pull_request(state: &mut TenantTaskState, task: &Task) {
     if let Some(pr_ref) = task.pull_request_ref() {
         let key = pr_ref.to_string();
         state
@@ -62,7 +62,7 @@ fn remove_from_index(index: &mut HashMap<String, Vec<TaskId>>, task_id: TaskId, 
 
 /// Helper to look up tasks by index key.
 fn find_by_index(
-    state: &InMemoryTaskState,
+    state: &TenantTaskState,
     index: &HashMap<String, Vec<TaskId>>,
     key: &str,
 ) -> Vec<Task> {
@@ -78,10 +78,12 @@ fn find_by_index(
 
 #[async_trait]
 impl TaskRepository for InMemoryTaskRepository {
-    async fn store(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
+    async fn store(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+        let mut tenants = self.state.write().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
+
         if state.tasks.contains_key(&task.id()) {
             return Err(TaskRepositoryError::DuplicateTask(task.id()));
         }
@@ -92,16 +94,17 @@ impl TaskRepository for InMemoryTaskRepository {
         }
 
         state.issue_index.insert(issue_ref, task.id());
-        index_branch(&mut state, task);
-        index_pull_request(&mut state, task);
+        index_branch(state, task);
+        index_pull_request(state, task);
         state.tasks.insert(task.id(), task.clone());
         Ok(())
     }
 
-    async fn update(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
+    async fn update(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+        let mut tenants = self.state.write().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         let old_task = state
             .tasks
@@ -121,60 +124,70 @@ impl TaskRepository for InMemoryTaskRepository {
             );
         }
 
-        index_branch(&mut state, task);
-        index_pull_request(&mut state, task);
+        index_branch(state, task);
+        index_pull_request(state, task);
         state.tasks.insert(task.id(), task.clone());
         Ok(())
     }
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         id: TaskId,
     ) -> TaskRepositoryResult<Option<Task>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        Ok(state.tasks.get(&id).cloned())
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .and_then(|state| state.tasks.get(&id).cloned()))
     }
 
     async fn find_by_issue_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         issue_ref: &IssueRef,
     ) -> TaskRepositoryResult<Option<Task>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        let task = state
-            .issue_index
-            .get(issue_ref)
-            .and_then(|task_id| state.tasks.get(task_id))
-            .cloned();
+        let task = tenants.get(&ctx.tenant_id()).and_then(|state| {
+            state
+                .issue_index
+                .get(issue_ref)
+                .and_then(|task_id| state.tasks.get(task_id))
+                .cloned()
+        });
         Ok(task)
     }
 
     async fn find_by_branch_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         branch_ref: &BranchRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
         let key = branch_ref.to_string();
-        Ok(find_by_index(&state, &state.branch_index, &key))
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .map(|state| find_by_index(state, &state.branch_index, &key))
+            .unwrap_or_default())
     }
 
     async fn find_by_pull_request_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             TaskRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
         let key = pr_ref.to_string();
-        Ok(find_by_index(&state, &state.pull_request_index, &key))
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .map(|state| find_by_index(state, &state.pull_request_index, &key))
+            .unwrap_or_default())
     }
 }

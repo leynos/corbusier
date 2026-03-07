@@ -2,7 +2,7 @@
 
 use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
-    PreparedRepo, insert_conversation, prepared_repo, test_request_context,
+    PreparedRepo, build_pool, insert_conversation, prepared_repo, test_request_context,
 };
 use corbusier::context::RequestContext;
 use corbusier::message::{
@@ -13,18 +13,8 @@ use corbusier::message::{
         handoff::{AgentHandoffPort, InitiateHandoffParams},
     },
 };
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::PgConnection;
 use mockable::DefaultClock;
 use rstest::rstest;
-
-fn build_pool(url: &str) -> Result<Pool<ConnectionManager<PgConnection>>, BoxError> {
-    let manager = ConnectionManager::<PgConnection>::new(url);
-    Pool::builder()
-        .max_size(1)
-        .build(manager)
-        .map_err(|err| Box::new(err) as BoxError)
-}
 
 fn missing_handoff_error() -> BoxError {
     Box::new(std::io::Error::new(
@@ -41,7 +31,7 @@ async fn initiate_and_list_handoffs_for_conversation(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url())?;
+    let pool = build_pool(prep.temp_db.url(), 1)?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
@@ -87,7 +77,7 @@ async fn complete_handoff_updates_target_and_status(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url())?;
+    let pool = build_pool(prep.temp_db.url(), 1)?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
@@ -133,7 +123,7 @@ async fn cancel_handoff_persists_reason(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url())?;
+    let pool = build_pool(prep.temp_db.url(), 1)?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);
@@ -177,7 +167,7 @@ async fn cancel_handoff_with_none_preserves_original_reason(
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
-    let pool = build_pool(prep.temp_db.url())?;
+    let pool = build_pool(prep.temp_db.url(), 1)?;
 
     let session_repo = PostgresAgentSessionRepository::new(pool.clone());
     let handoff_adapter = PostgresHandoffAdapter::new(pool);

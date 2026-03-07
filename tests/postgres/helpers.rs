@@ -113,6 +113,22 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     Ok(())
 }
 
+/// Builds a Diesel `r2d2` connection pool for the given database URL.
+///
+/// # Errors
+///
+/// Returns an error if the pool cannot be built.
+pub fn build_pool(
+    url: &str,
+    max_size: u32,
+) -> Result<Pool<ConnectionManager<PgConnection>>, BoxError> {
+    let manager = ConnectionManager::<PgConnection>::new(url);
+    Pool::builder()
+        .max_size(max_size)
+        .build(manager)
+        .map_err(|err| Box::new(err) as BoxError)
+}
+
 /// Creates a test database from template and returns it alongside a repository.
 ///
 /// # Errors
@@ -125,12 +141,7 @@ pub async fn setup_repository(
         .temporary_database_from_template(&format!("test_{}", Uuid::new_v4()), TEMPLATE_DB)
         .await?;
 
-    let url = temp_db.url();
-    let manager = ConnectionManager::<PgConnection>::new(url);
-    let pool = Pool::builder()
-        .max_size(1)
-        .build(manager)
-        .map_err(|e| Box::new(e) as BoxError)?;
+    let pool = build_pool(temp_db.url(), 1)?;
 
     let repo = PostgresMessageRepository::new(pool);
     Ok((temp_db, repo))

@@ -191,14 +191,17 @@ Completed 2026-03-04. All stages delivered successfully.
 
 ## Context and orientation
 
-The codebase lives in a single Rust crate (`corbusier`) with four top-level
+The codebase lives in a single Rust crate (`corbusier`) with seven top-level
 modules declared in `src/lib.rs`:
 
 ```plaintext
-src/lib.rs          -> pub mod agent_backend, message, task, worker
+src/lib.rs          -> pub mod agent_backend, context, message, task, tenant, tool_registry, worker
+src/context/        -> ids, request_context, tests
+src/tenant/         -> domain, mod
 src/agent_backend/  -> domain, ports, adapters (memory + postgres), services
 src/message/        -> domain, ports, adapters (memory + postgres), services, validation, tests
 src/task/           -> domain, ports, adapters (memory + postgres), services
+src/tool_registry/  -> domain, ports, adapters (memory + postgres), services
 src/worker.rs       -> shell_escape utility (not a bounded context)
 ```
 
@@ -582,7 +585,7 @@ differs from directory per established convention).
   the choices made (slug validation rules, `RequestContext` module location,
   `AuditContext` migration approach).
 
-**Validation**: `make markdownlint` passes (if available), manual review.
+**Validation**: `make markdownlint` passes, manual review.
 
 ### Stage J: Final validation
 
@@ -590,12 +593,14 @@ Run the full quality gate:
 
 ```bash
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-5-1-check-fmt.log
+set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-5-1-markdownlint.log
 set -o pipefail; make lint 2>&1 | tee /tmp/1-5-1-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/1-5-1-test.log
+set -o pipefail; make nixie 2>&1 | tee /tmp/1-5-1-nixie.log
+set -o pipefail; make fmt 2>&1 | tee /tmp/1-5-1-fmt.log
 ```
 
-All three must exit 0. If `make nixie` is available and relevant, run that too
-for Mermaid diagram validation.
+All commands must exit 0.
 
 ## Concrete steps
 

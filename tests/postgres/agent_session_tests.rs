@@ -6,7 +6,7 @@
 
 use crate::postgres::cluster::BoxError;
 use crate::postgres::helpers::{
-    PreparedRepo, insert_conversation, prepared_repo, test_request_context,
+    PreparedRepo, build_pool, insert_conversation, prepared_repo, test_request_context,
 };
 use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
@@ -14,18 +14,8 @@ use corbusier::message::{
     domain::{AgentSession, ConversationId, SequenceNumber},
     ports::agent_session::{AgentSessionRepository, SessionError},
 };
-use diesel::PgConnection;
-use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::rstest;
-
-fn build_pool(url: &str, max_size: u32) -> Result<Pool<ConnectionManager<PgConnection>>, BoxError> {
-    let manager = ConnectionManager::<PgConnection>::new(url);
-    Pool::builder()
-        .max_size(max_size)
-        .build(manager)
-        .map_err(|err| Box::new(err) as BoxError)
-}
 
 /// Proves that two concurrent `store` calls for active sessions on the same
 /// conversation produce exactly one `ActiveSessionExists` error and one

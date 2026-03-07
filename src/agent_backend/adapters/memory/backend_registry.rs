@@ -8,16 +8,16 @@ use crate::agent_backend::{
     domain::{AgentBackendRegistration, BackendId, BackendName, BackendStatus},
     ports::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult},
 };
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 
 /// Thread-safe in-memory backend registry repository.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryBackendRegistry {
-    state: Arc<RwLock<InMemoryRegistryState>>,
+    state: Arc<RwLock<HashMap<TenantId, TenantRegistryState>>>,
 }
 
 #[derive(Debug, Default)]
-struct InMemoryRegistryState {
+struct TenantRegistryState {
     backends: HashMap<BackendId, AgentBackendRegistration>,
     name_index: HashMap<BackendName, BackendId>,
 }
@@ -29,13 +29,17 @@ impl InMemoryBackendRegistry {
         Self::default()
     }
 
-    fn read_state(&self) -> BackendRegistryResult<RwLockReadGuard<'_, InMemoryRegistryState>> {
+    fn read_state(
+        &self,
+    ) -> BackendRegistryResult<RwLockReadGuard<'_, HashMap<TenantId, TenantRegistryState>>> {
         self.state.read().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })
     }
 
-    fn write_state(&self) -> BackendRegistryResult<RwLockWriteGuard<'_, InMemoryRegistryState>> {
+    fn write_state(
+        &self,
+    ) -> BackendRegistryResult<RwLockWriteGuard<'_, HashMap<TenantId, TenantRegistryState>>> {
         self.state.write().map_err(|err| {
             BackendRegistryError::persistence(std::io::Error::other(err.to_string()))
         })
@@ -46,10 +50,11 @@ impl InMemoryBackendRegistry {
 impl BackendRegistryRepository for InMemoryBackendRegistry {
     async fn register(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
-        let mut state = self.write_state()?;
+        let mut tenants = self.write_state()?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         if state.backends.contains_key(&registration.id()) {
             return Err(BackendRegistryError::DuplicateBackend(registration.id()));
@@ -72,10 +77,11 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
 
     async fn update(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
-        let mut state = self.write_state()?;
+        let mut tenants = self.write_state()?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         let old_name = state
             .backends
@@ -106,46 +112,58 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        let state = self.read_state()?;
-        Ok(state.backends.get(&id).cloned())
+        let tenants = self.read_state()?;
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .and_then(|state| state.backends.get(&id).cloned()))
     }
 
     async fn find_by_name(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
-        let state = self.read_state()?;
-        let backend = state
-            .name_index
-            .get(name)
-            .and_then(|id| state.backends.get(id))
-            .cloned();
+        let tenants = self.read_state()?;
+        let backend = tenants.get(&ctx.tenant_id()).and_then(|state| {
+            state
+                .name_index
+                .get(name)
+                .and_then(|id| state.backends.get(id))
+                .cloned()
+        });
         Ok(backend)
     }
 
     async fn list_active(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        let state = self.read_state()?;
-        let active = state
-            .backends
-            .values()
-            .filter(|b| b.status() == BackendStatus::Active)
-            .cloned()
-            .collect();
+        let tenants = self.read_state()?;
+        let active = tenants
+            .get(&ctx.tenant_id())
+            .map(|state| {
+                state
+                    .backends
+                    .values()
+                    .filter(|b| b.status() == BackendStatus::Active)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(active)
     }
 
     async fn list_all(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
-        let state = self.read_state()?;
-        Ok(state.backends.values().cloned().collect())
+        let tenants = self.read_state()?;
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .map(|state| state.backends.values().cloned().collect())
+            .unwrap_or_default())
     }
 }
