@@ -5,7 +5,9 @@
 //! prevents TOCTOU races when two active sessions are stored concurrently.
 
 use crate::postgres::cluster::BoxError;
-use crate::postgres::helpers::{PreparedRepo, insert_conversation, prepared_repo};
+use crate::postgres::helpers::{
+    PreparedRepo, insert_conversation, prepared_repo, test_request_context,
+};
 use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::postgres::PostgresAgentSessionRepository,
@@ -101,18 +103,14 @@ async fn concurrent_active_session_store_rejects_second(
 #[rstest]
 #[tokio::test]
 async fn sequential_duplicate_active_session_store_is_rejected(
+    test_request_context: RequestContext,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
     let pool = build_pool(prep.temp_db.url(), 1)?;
     let repo = PostgresAgentSessionRepository::new(pool);
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     let conversation_id = ConversationId::new();
     insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
 
@@ -140,18 +138,14 @@ async fn sequential_duplicate_active_session_store_is_rejected(
 #[rstest]
 #[tokio::test]
 async fn update_to_active_when_another_active_exists_is_rejected(
+    test_request_context: RequestContext,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let prep = prepared_repo.await?;
     let pool = build_pool(prep.temp_db.url(), 1)?;
     let repo = PostgresAgentSessionRepository::new(pool);
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     let conversation_id = ConversationId::new();
     insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
 

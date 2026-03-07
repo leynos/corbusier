@@ -13,9 +13,8 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use mockable::DefaultClock;
-use uuid::Uuid;
 
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::message::{
     adapters::models::{HandoffRow, NewHandoff},
     adapters::schema::handoffs,
@@ -62,7 +61,7 @@ impl PostgresHandoffAdapter {
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
     /// Executes a query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: Uuid, query_fn: F) -> HandoffResult<T>
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
     where
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
@@ -72,7 +71,7 @@ impl PostgresHandoffAdapter {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id, query_fn)
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             HandoffError::persistence,
         )
@@ -87,7 +86,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let source_session_id = params.source_session.session_id;
         let source_agent = params.source_session.agent_backend.clone();
         let owned_target_agent = params.target_agent.to_owned();
@@ -125,7 +124,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata> {
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let clock = DefaultClock;
 
         self.execute_query(tenant_id, move |conn| {
@@ -172,7 +171,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()> {
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let owned_reason = reason.map(str::to_owned);
 
         self.execute_query(tenant_id, move |conn| {
@@ -200,7 +199,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
                 .set((
                     handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
-                    handoffs::reason.eq(owned_reason),
+                    handoffs::reason.eq(owned_reason.or(row.reason)),
                 ))
                 .execute(conn)
                 .map_err(HandoffError::persistence)?;
@@ -215,7 +214,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         ctx: &RequestContext,
         handoff_id: HandoffId,
     ) -> HandoffResult<Option<HandoffMetadata>> {
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let uuid = handoff_id.into_inner();
 
         self.execute_query(tenant_id, move |conn| {
@@ -236,7 +235,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>> {
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
         self.execute_query(tenant_id, move |conn| {

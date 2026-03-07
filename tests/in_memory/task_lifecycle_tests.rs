@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use super::helpers::ctx;
+use corbusier::context::RequestContext;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{
@@ -24,16 +25,6 @@ fn service() -> TestService {
     TaskLifecycleService::new(
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
-    )
-}
-
-#[fixture]
-fn ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
     )
 }
 

@@ -1,10 +1,20 @@
 //! `PostgreSQL` repository implementation for task lifecycle storage.
+//!
+//! Tenant context is propagated via `SET LOCAL app.tenant_id`, which sets a
+//! `PostgreSQL` session variable scoped to the current transaction.  This
+//! prepares the connection for Row-Level Security (RLS) policies but does
+//! not enforce row isolation by itself; actual enforcement requires RLS
+//! policies on the `tasks` table, which land in milestone 1.5.3.
 
 use super::{
     models::{NewTaskRow, TaskRow},
     schema::tasks,
 };
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
+use crate::message::adapters::postgres::blocking_helpers::{
+    PgPool, get_conn_with, run_blocking_with,
+};
+use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use crate::task::{
     domain::{
         BranchRef, IssueRef, PersistedTaskData, PullRequestRef, Task, TaskId, TaskOrigin, TaskState,
@@ -14,11 +24,27 @@ use crate::task::{
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 
 /// `PostgreSQL` connection pool type used by task adapters.
-pub type TaskPgPool = Pool<ConnectionManager<PgConnection>>;
+pub type TaskPgPool = PgPool;
+
+// ---------------------------------------------------------------------------
+// Error bridging for the shared transaction helper
+// ---------------------------------------------------------------------------
+
+impl FromTxError<Self> for TaskRepositoryError {
+    fn from_tx_error(err: TxError<Self>) -> Self {
+        match err {
+            TxError::Domain(e) => e,
+            TxError::Diesel(e) => Self::persistence(e),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Adapter
+// ---------------------------------------------------------------------------
 
 /// `PostgreSQL`-backed task repository.
 #[derive(Debug, Clone)]
@@ -29,36 +55,39 @@ pub struct PostgresTaskRepository {
 impl PostgresTaskRepository {
     /// Creates a new repository from a `PostgreSQL` connection pool.
     #[must_use]
-    pub const fn new(pool: TaskPgPool) -> Self {
-        Self { pool }
-    }
+    #[rustfmt::skip]
+    pub const fn new(pool: TaskPgPool) -> Self { Self { pool } }
 
-    async fn run_blocking<F, T>(&self, f: F) -> TaskRepositoryResult<T>
+    /// Executes a query inside a transaction with tenant context.
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> TaskRepositoryResult<T>
     where
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
         let pool = self.pool.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut connection = pool.get().map_err(TaskRepositoryError::persistence)?;
-            f(&mut connection)
-        })
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, TaskRepositoryError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            TaskRepositoryError::persistence,
+        )
         .await
-        .map_err(TaskRepositoryError::persistence)?
     }
 }
 
 /// Generates a `find_by_*_ref` body that filters `tasks` by a nullable
 /// `VARCHAR` column and maps the resulting rows to domain `Task` values.
 macro_rules! find_tasks_by_ref_column {
-    ($self:expr, $ref_str:expr, $column:expr) => {{
+    ($self:expr, $tenant_id:expr, $ref_str:expr, $column:expr) => {{
         let value = $ref_str;
         $self
-            .run_blocking(move |connection| {
+            .execute_query($tenant_id, move |conn| {
                 let rows = tasks::table
                     .filter($column.eq(&value))
                     .select(TaskRow::as_select())
-                    .load::<TaskRow>(connection)
+                    .load::<TaskRow>(conn)
                     .map_err(TaskRepositoryError::persistence)?;
                 rows.into_iter().map(row_to_task).collect()
             })
@@ -68,22 +97,23 @@ macro_rules! find_tasks_by_ref_column {
 
 #[async_trait]
 impl TaskRepository for PostgresTaskRepository {
-    async fn store(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+    async fn store(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+        let tenant_id = ctx.tenant_id();
         let task_id = task.id();
         let issue_ref = task.origin().issue_ref().clone();
         let new_row = to_new_row(task)?;
 
-        self.run_blocking(move |connection| {
+        self.execute_query(tenant_id, move |conn| {
             // Pre-check for semantic error reporting; the unique index still
             // enforces integrity in the TOCTOU window between check and insert.
-            let duplicate_issue = find_task_by_issue_ref(connection, &issue_ref)?;
+            let duplicate_issue = find_task_by_issue_ref(conn, &issue_ref)?;
             if duplicate_issue.is_some() {
                 return Err(TaskRepositoryError::DuplicateIssueOrigin(issue_ref.clone()));
             }
 
             diesel::insert_into(tasks::table)
                 .values(&new_row)
-                .execute(connection)
+                .execute(conn)
                 .map_err(|err| match err {
                     DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info)
                         if is_issue_origin_unique_violation(info.as_ref()) =>
@@ -101,14 +131,15 @@ impl TaskRepository for PostgresTaskRepository {
         .await
     }
 
-    async fn update(&self, _ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+    async fn update(&self, ctx: &RequestContext, task: &Task) -> TaskRepositoryResult<()> {
+        let tenant_id = ctx.tenant_id();
         let task_id = task.id().into_inner();
         let branch_val = task.branch_ref().map(ToString::to_string);
         let pr_val = task.pull_request_ref().map(ToString::to_string);
         let state_val = task.state().as_str().to_owned();
         let updated_val = task.updated_at();
 
-        self.run_blocking(move |connection| {
+        self.execute_query(tenant_id, move |conn| {
             let updated_count = diesel::update(tasks::table.filter(tasks::id.eq(task_id)))
                 .set((
                     tasks::branch_ref.eq(&branch_val),
@@ -116,7 +147,7 @@ impl TaskRepository for PostgresTaskRepository {
                     tasks::state.eq(&state_val),
                     tasks::updated_at.eq(updated_val),
                 ))
-                .execute(connection)
+                .execute(conn)
                 .map_err(TaskRepositoryError::persistence)?;
 
             if updated_count == 0 {
@@ -129,14 +160,16 @@ impl TaskRepository for PostgresTaskRepository {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         id: TaskId,
     ) -> TaskRepositoryResult<Option<Task>> {
-        self.run_blocking(move |connection| {
+        let tenant_id = ctx.tenant_id();
+
+        self.execute_query(tenant_id, move |conn| {
             let row = tasks::table
                 .filter(tasks::id.eq(id.into_inner()))
                 .select(TaskRow::as_select())
-                .first::<TaskRow>(connection)
+                .first::<TaskRow>(conn)
                 .optional()
                 .map_err(TaskRepositoryError::persistence)?;
             row.map(row_to_task).transpose()
@@ -146,12 +179,14 @@ impl TaskRepository for PostgresTaskRepository {
 
     async fn find_by_issue_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         issue_ref: &IssueRef,
     ) -> TaskRepositoryResult<Option<Task>> {
+        let tenant_id = ctx.tenant_id();
         let lookup_issue_ref = issue_ref.clone();
-        self.run_blocking(move |connection| {
-            let row = find_task_by_issue_ref(connection, &lookup_issue_ref)?;
+
+        self.execute_query(tenant_id, move |conn| {
+            let row = find_task_by_issue_ref(conn, &lookup_issue_ref)?;
             row.map(row_to_task).transpose()
         })
         .await
@@ -159,22 +194,28 @@ impl TaskRepository for PostgresTaskRepository {
 
     async fn find_by_branch_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         branch_ref: &BranchRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
+        let tenant_id = ctx.tenant_id();
         let ref_str = branch_ref.to_string();
-        find_tasks_by_ref_column!(self, ref_str, tasks::branch_ref)
+        find_tasks_by_ref_column!(self, tenant_id, ref_str, tasks::branch_ref)
     }
 
     async fn find_by_pull_request_ref(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskRepositoryResult<Vec<Task>> {
+        let tenant_id = ctx.tenant_id();
         let ref_str = pr_ref.to_string();
-        find_tasks_by_ref_column!(self, ref_str, tasks::pull_request_ref)
+        find_tasks_by_ref_column!(self, tenant_id, ref_str, tasks::pull_request_ref)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Conversion helpers
+// ---------------------------------------------------------------------------
 
 fn to_new_row(task: &Task) -> TaskRepositoryResult<NewTaskRow> {
     let origin = serde_json::to_value(task.origin()).map_err(TaskRepositoryError::persistence)?;
@@ -234,6 +275,10 @@ fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
     };
     Ok(Task::from_persisted(data))
 }
+
+// ---------------------------------------------------------------------------
+// Constraint helpers
+// ---------------------------------------------------------------------------
 
 fn is_issue_origin_unique_violation(info: &dyn DatabaseErrorInformation) -> bool {
     info.constraint_name()

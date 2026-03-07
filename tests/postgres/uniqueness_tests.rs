@@ -2,9 +2,9 @@
 
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, clock, create_test_message, ensure_template, insert_conversation,
-    postgres_cluster, setup_repository,
+    postgres_cluster, setup_repository, test_request_context,
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
@@ -17,6 +17,7 @@ use rstest::rstest;
 #[tokio::test]
 async fn store_rejects_duplicate_message_id(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -28,12 +29,7 @@ async fn store_rejects_duplicate_message_id(
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
 
     repo.store(&ctx, &message).await?;
 
@@ -54,6 +50,7 @@ async fn store_rejects_duplicate_message_id(
 #[tokio::test]
 async fn store_rejects_duplicate_sequence_in_conversation(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -64,12 +61,7 @@ async fn store_rejects_duplicate_sequence_in_conversation(
     insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let msg1 = create_test_message(&clock, conv_id, 1)?;
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
 
     repo.store(&ctx, &msg1).await?;
 
@@ -93,6 +85,7 @@ async fn store_rejects_duplicate_sequence_in_conversation(
 #[tokio::test]
 async fn store_allows_same_sequence_in_different_conversations(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -106,12 +99,7 @@ async fn store_allows_same_sequence_in_different_conversations(
 
     let msg1 = create_test_message(&clock, conv1, 1)?;
     let msg2 = create_test_message(&clock, conv2, 1)?;
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
 
     repo.store(&ctx, &msg1).await?;
     repo.store(&ctx, &msg2).await?;

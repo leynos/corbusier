@@ -2,13 +2,14 @@
 
 use std::sync::Arc;
 
+use super::helpers::ctx;
 use corbusier::agent_backend::{
     adapters::memory::InMemoryBackendRegistry,
     domain::BackendStatus,
     ports::BackendRegistryError,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 
@@ -19,16 +20,6 @@ fn service() -> TestService {
     BackendRegistryService::new(
         Arc::new(InMemoryBackendRegistry::new()),
         Arc::new(DefaultClock),
-    )
-}
-
-#[fixture]
-fn ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
     )
 }
 

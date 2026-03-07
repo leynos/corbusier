@@ -10,19 +10,20 @@ mod context_snapshot;
 mod conversion_helpers;
 mod handoff;
 mod sql_helpers;
-mod tenant_tx;
+pub(crate) mod tenant_tx;
 
 pub use agent_session::PostgresAgentSessionRepository;
 pub use context_snapshot::PostgresContextSnapshotAdapter;
 pub use handoff::PostgresHandoffAdapter;
 
 use async_trait::async_trait;
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 
 use super::audit_context::AuditContext;
 use super::models::{MessageRow, NewMessage};
 use super::schema::messages;
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
     error::RepositoryError,
@@ -30,10 +31,24 @@ use crate::message::{
 };
 
 pub use blocking_helpers::PgPool;
-use blocking_helpers::{get_conn, run_blocking};
+use blocking_helpers::{get_conn_with, run_blocking_with};
 pub(crate) use conversion_helpers::row_to_message;
 use conversion_helpers::ser_err;
 use sql_helpers::{InsertIds, insert_message, set_audit_context};
+use tenant_tx::{FromTxError, TxError, with_tenant_tx};
+
+// ---------------------------------------------------------------------------
+// Error bridging for the shared transaction helper
+// ---------------------------------------------------------------------------
+
+impl FromTxError<Self> for RepositoryError {
+    fn from_tx_error(err: TxError<Self>) -> Self {
+        match err {
+            TxError::Domain(e) => e,
+            TxError::Diesel(e) => Self::database(e),
+        }
+    }
+}
 
 /// `PostgreSQL` implementation of [`MessageRepository`].
 ///
@@ -71,6 +86,24 @@ impl PostgresMessageRepository {
         &self.pool
     }
 
+    /// Executes a query inside a transaction with tenant context.
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> RepositoryResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> RepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, RepositoryError::database)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            RepositoryError::database,
+        )
+        .await
+    }
+
     /// Stores a message with audit context for tracking.
     ///
     /// This method wraps the store operation in a transaction that also:
@@ -85,9 +118,9 @@ impl PostgresMessageRepository {
         ctx: &RequestContext,
         message: &Message,
     ) -> RepositoryResult<()> {
-        let pool = self.pool.clone();
         let new_message = NewMessage::try_from_domain(message)?;
         let audit_ctx = AuditContext::from(ctx);
+        let tenant_id = ctx.tenant_id();
         let msg_id = message.id();
         let conv_id = message.conversation_id();
         let seq_num = message.sequence_number();
@@ -98,13 +131,10 @@ impl PostgresMessageRepository {
             seq_num,
         };
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-            conn.transaction::<_, RepositoryError, _>(|tx_conn| {
-                set_audit_context(tx_conn, &audit_ctx)?;
-                insert_message(tx_conn, &new_message, &ids)?;
-                Ok(())
-            })
+        self.execute_query(tenant_id, move |tx_conn| {
+            set_audit_context(tx_conn, &audit_ctx)?;
+            insert_message(tx_conn, &new_message, &ids)?;
+            Ok(())
         })
         .await
     }
@@ -112,21 +142,19 @@ impl PostgresMessageRepository {
 
 #[async_trait]
 impl MessageRepository for PostgresMessageRepository {
-    async fn store(&self, _ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
-        let pool = self.pool.clone();
+    async fn store(&self, ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
         let new_message = NewMessage::try_from_domain(message)?;
+        let tenant_id = ctx.tenant_id();
         let msg_id = message.id();
         let conv_id = message.conversation_id();
         let seq_num = message.sequence_number();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-
+        self.execute_query(tenant_id, move |conn| {
             // Pre-check for duplicate message ID to provide semantic error
             let id_exists: i64 = messages::table
                 .filter(messages::id.eq(msg_id.into_inner()))
                 .count()
-                .get_result(&mut conn)
+                .get_result(conn)
                 .map_err(RepositoryError::database)?;
 
             if id_exists > 0 {
@@ -141,7 +169,7 @@ impl MessageRepository for PostgresMessageRepository {
                         .map_err(|e| RepositoryError::serialization(e.to_string()))?),
                 )
                 .count()
-                .get_result(&mut conn)
+                .get_result(conn)
                 .map_err(RepositoryError::database)?;
 
             if seq_exists > 0 {
@@ -156,26 +184,24 @@ impl MessageRepository for PostgresMessageRepository {
                 conv_id,
                 seq_num,
             };
-            insert_message(&mut conn, &new_message, &ids)
+            insert_message(conn, &new_message, &ids)
         })
         .await
     }
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         id: MessageId,
     ) -> RepositoryResult<Option<Message>> {
-        let pool = self.pool.clone();
+        let tenant_id = ctx.tenant_id();
         let uuid = id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-
+        self.execute_query(tenant_id, move |conn| {
             messages::table
                 .filter(messages::id.eq(uuid))
                 .select(MessageRow::as_select())
-                .first::<MessageRow>(&mut conn)
+                .first::<MessageRow>(conn)
                 .optional()
                 .map_err(RepositoryError::database)?
                 .map(row_to_message)
@@ -186,20 +212,18 @@ impl MessageRepository for PostgresMessageRepository {
 
     async fn find_by_conversation(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>> {
-        let pool = self.pool.clone();
+        let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-
+        self.execute_query(tenant_id, move |conn| {
             let rows = messages::table
                 .filter(messages::conversation_id.eq(uuid))
                 .order(messages::sequence_number.asc())
                 .select(MessageRow::as_select())
-                .load::<MessageRow>(&mut conn)
+                .load::<MessageRow>(conn)
                 .map_err(RepositoryError::database)?;
 
             rows.into_iter().map(row_to_message).collect()
@@ -209,19 +233,17 @@ impl MessageRepository for PostgresMessageRepository {
 
     async fn next_sequence_number(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber> {
-        let pool = self.pool.clone();
+        let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-
+        self.execute_query(tenant_id, move |conn| {
             let max_seq: Option<i64> = messages::table
                 .filter(messages::conversation_id.eq(uuid))
                 .select(diesel::dsl::max(messages::sequence_number))
-                .first(&mut conn)
+                .first(conn)
                 .map_err(RepositoryError::database)?;
 
             let current = max_seq.unwrap_or(0);
@@ -235,17 +257,15 @@ impl MessageRepository for PostgresMessageRepository {
         .await
     }
 
-    async fn exists(&self, _ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool> {
-        let pool = self.pool.clone();
+    async fn exists(&self, ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool> {
+        let tenant_id = ctx.tenant_id();
         let uuid = id.into_inner();
 
-        run_blocking(move || {
-            let mut conn = get_conn(&pool)?;
-
+        self.execute_query(tenant_id, move |conn| {
             let count: i64 = messages::table
                 .filter(messages::id.eq(uuid))
                 .count()
-                .get_result(&mut conn)
+                .get_result(conn)
                 .map_err(RepositoryError::database)?;
 
             Ok(count > 0)

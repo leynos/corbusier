@@ -17,7 +17,7 @@ use uuid::Uuid;
 /// the port layer.
 ///
 /// `E` is the caller's domain error type (e.g. `SessionError`, `HandoffError`).
-pub(super) enum TxError<E> {
+pub(crate) enum TxError<E> {
     Domain(E),
     Diesel(diesel::result::Error),
 }
@@ -32,7 +32,7 @@ impl<E> From<diesel::result::Error> for TxError<E> {
 ///
 /// Implementors map `TxError::Diesel` into their own persistence error variant
 /// and unwrap `TxError::Domain` transparently.
-pub(super) trait FromTxError<E> {
+pub(crate) trait FromTxError<E> {
     fn from_tx_error(err: TxError<E>) -> E;
 }
 
@@ -40,7 +40,7 @@ pub(super) trait FromTxError<E> {
 ///
 /// The caller's domain error `E` must implement [`FromTxError`] so that both
 /// Diesel errors and domain errors can be propagated.
-pub(super) fn with_tenant_tx<T, E, F>(
+pub(crate) fn with_tenant_tx<T, E, F>(
     conn: &mut PgConnection,
     tenant_id: Uuid,
     body: F,
@@ -68,7 +68,7 @@ where
 /// UUID values are formatted using their canonical hyphenated representation
 /// which contains only hexadecimal digits and hyphens, making SQL injection
 /// impossible.
-pub(super) fn set_tenant_context<E>(
+pub(crate) fn set_tenant_context<E>(
     conn: &mut PgConnection,
     tenant_id: Uuid,
 ) -> Result<(), TxError<E>> {

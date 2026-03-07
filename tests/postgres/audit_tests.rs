@@ -3,11 +3,16 @@
 //! Tests `store_with_audit` session variable propagation and `audit_logs` table
 //! verification via the database trigger.
 
+#![expect(
+    clippy::too_many_arguments,
+    reason = "rstest fixture injection with #[case] parameters requires multiple arguments"
+)]
+
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
-    insert_conversation, postgres_cluster, setup_repository,
+    insert_conversation, postgres_cluster, setup_repository, test_request_context,
 };
-use corbusier::context::{CausationId, CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::{CausationId, RequestContext};
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     ports::repository::MessageRepository,
@@ -26,6 +31,7 @@ use rstest::rstest;
 #[tokio::test]
 async fn store_with_audit_captures_context(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
     #[case] include_causation: bool,
     #[case] scenario: &str,
@@ -45,12 +51,7 @@ async fn store_with_audit_captures_context(
         &clock,
     )?;
 
-    let mut ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let mut ctx = test_request_context;
     if include_causation {
         ctx = ctx.with_causation_id(CausationId::new());
     }

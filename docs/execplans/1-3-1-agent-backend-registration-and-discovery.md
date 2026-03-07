@@ -389,8 +389,8 @@ pub enum BackendRegistryError {
 `InMemoryBackendRegistry` following the `InMemoryTaskRepository` pattern:
 
 - `Arc<RwLock<InMemoryRegistryState>>` with
-  `HashMap<BackendId, AgentBackendRegistration>`
-  and a `name_index: HashMap<BackendName, BackendId>`.
+  `HashMap<BackendId, AgentBackendRegistration>` and a
+  `name_index: HashMap<BackendName, BackendId>`.
 - Implement all `BackendRegistryRepository` methods.
 - Enforce uniqueness on both `id` and `name` during `register`.
 

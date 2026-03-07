@@ -3,8 +3,10 @@
 use std::sync::Arc;
 
 use crate::postgres::cluster::BoxError;
-use crate::postgres::helpers::{PreparedRepo, insert_conversation, prepared_repo};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use crate::postgres::helpers::{
+    PreparedRepo, insert_conversation, prepared_repo, test_request_context,
+};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     adapters::memory::InMemorySlashCommandRegistry,
     domain::{
@@ -20,6 +22,7 @@ use rstest::rstest;
 #[rstest]
 #[tokio::test]
 async fn slash_command_metadata_round_trip_postgres(
+    test_request_context: RequestContext,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let context = prepared_repo.await?;
@@ -43,12 +46,7 @@ async fn slash_command_metadata_round_trip_postgres(
         .with_metadata(metadata)
         .build(&DefaultClock)?;
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let stored = repo
@@ -97,6 +95,7 @@ async fn slash_command_metadata_round_trip_postgres(
 #[rstest]
 #[tokio::test]
 async fn slash_command_unknown_command_returns_error(
+    test_request_context: RequestContext,
     #[future] prepared_repo: Result<PreparedRepo, BoxError>,
 ) -> Result<(), BoxError> {
     let context = prepared_repo.await?;
@@ -116,12 +115,7 @@ async fn slash_command_unknown_command_returns_error(
         if command == "nonexistent"
     ));
 
-    let ctx = RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    );
+    let ctx = test_request_context;
     let stored_messages = repo.find_by_conversation(&ctx, conversation_id).await?;
     assert!(stored_messages.is_empty());
     Ok(())
