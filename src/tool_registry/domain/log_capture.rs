@@ -81,9 +81,11 @@ impl LogEntryKind {
 
 /// Bundles the clock and retention policy used to derive timestamps
 /// and expiry for log capture operations.
-struct LogCaptureContext<'a> {
-    clock: &'a dyn Clock,
-    retention: &'a LogRetentionPolicy,
+pub struct LogCaptureContext<'a> {
+    /// Clock used to obtain the current time.
+    pub clock: &'a dyn Clock,
+    /// Retention policy governing log expiry.
+    pub retention: &'a LogRetentionPolicy,
 }
 
 /// Metadata for a captured stderr log blob stored in the object store.
@@ -126,32 +128,24 @@ impl LogEntryMetadata {
     pub fn for_startup(
         server_id: McpServerId,
         byte_count: u64,
-        clock: &impl Clock,
-        retention: &LogRetentionPolicy,
+        ctx: &LogCaptureContext<'_>,
     ) -> Self {
-        let ctx = LogCaptureContext { clock, retention };
-        Self::build(server_id, LogEntryKind::ServerStartup, byte_count, &ctx)
+        Self::build(server_id, LogEntryKind::ServerStartup, byte_count, ctx)
     }
 
     /// Creates metadata for a tool call stderr capture.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "factory method captures all metadata fields for a tool call log entry"
-    )]
     pub fn for_tool_call(
         server_id: McpServerId,
         call_id: ToolCallId,
         byte_count: u64,
-        clock: &impl Clock,
-        retention: &LogRetentionPolicy,
+        ctx: &LogCaptureContext<'_>,
     ) -> Self {
-        let ctx = LogCaptureContext { clock, retention };
         Self::build(
             server_id,
             LogEntryKind::ToolCall { call_id },
             byte_count,
-            &ctx,
+            ctx,
         )
     }
 

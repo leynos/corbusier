@@ -30,6 +30,24 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
+    /// Sets the `available` flag for every catalog entry belonging to
+    /// `server_id`.
+    async fn set_server_tools_availability(
+        &self,
+        server_id: McpServerId,
+        available: bool,
+    ) -> ToolCatalogResult<()> {
+        let sid = server_id.into_inner();
+        self.run_blocking(move |connection| {
+            diesel::update(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
+                .set(mcp_tool_catalog::available.eq(available))
+                .execute(connection)
+                .map_err(ToolCatalogError::persistence)?;
+            Ok(())
+        })
+        .await
+    }
+
     async fn run_blocking<F, T>(&self, operation: F) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
@@ -79,27 +97,11 @@ impl ToolCatalogRepository for PostgresToolCatalog {
     }
 
     async fn mark_server_tools_unavailable(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
-        let sid = server_id.into_inner();
-        self.run_blocking(move |connection| {
-            diesel::update(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
-                .set(mcp_tool_catalog::available.eq(false))
-                .execute(connection)
-                .map_err(ToolCatalogError::persistence)?;
-            Ok(())
-        })
-        .await
+        self.set_server_tools_availability(server_id, false).await
     }
 
     async fn mark_server_tools_available(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
-        let sid = server_id.into_inner();
-        self.run_blocking(move |connection| {
-            diesel::update(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
-                .set(mcp_tool_catalog::available.eq(true))
-                .execute(connection)
-                .map_err(ToolCatalogError::persistence)?;
-            Ok(())
-        })
-        .await
+        self.set_server_tools_availability(server_id, true).await
     }
 
     async fn find_by_tool_name(&self, tool_name: &str) -> ToolCatalogResult<Option<CatalogEntry>> {

@@ -28,6 +28,24 @@ impl InMemoryToolCatalog {
         Self::default()
     }
 
+    fn apply_to_server_entries(
+        &self,
+        server_id: McpServerId,
+        apply: fn(&mut CatalogEntry, &DefaultClock),
+    ) -> ToolCatalogResult<()> {
+        let mut state = self
+            .state
+            .write()
+            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
+        let clock = DefaultClock;
+        for entry in state.entries.values_mut() {
+            if entry.server_id() == server_id {
+                apply(entry, &clock);
+            }
+        }
+        Ok(())
+    }
+
     /// Returns a snapshot of audit records for test assertions.
     ///
     /// # Errors
@@ -74,35 +92,11 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
     }
 
     async fn mark_server_tools_unavailable(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
-        let clock = DefaultClock;
-
-        for entry in state.entries.values_mut() {
-            if entry.server_id() == server_id {
-                entry.mark_unavailable(&clock);
-            }
-        }
-
-        Ok(())
+        self.apply_to_server_entries(server_id, CatalogEntry::mark_unavailable)
     }
 
     async fn mark_server_tools_available(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
-        let clock = DefaultClock;
-
-        for entry in state.entries.values_mut() {
-            if entry.server_id() == server_id {
-                entry.mark_available(&clock);
-            }
-        }
-
-        Ok(())
+        self.apply_to_server_entries(server_id, CatalogEntry::mark_available)
     }
 
     async fn find_by_tool_name(&self, tool_name: &str) -> ToolCatalogResult<Option<CatalogEntry>> {

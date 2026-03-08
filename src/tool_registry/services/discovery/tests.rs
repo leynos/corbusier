@@ -306,8 +306,7 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
 
     discovery.mark_tools_unavailable(server_id).await?;
 
-    let err =
-        call_read_file_expecting_error(&discovery, json!({"path": "/tmp/test.txt"})).await;
+    let err = call_read_file_expecting_error(&discovery, json!({"path": "/tmp/test.txt"})).await;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::ToolUnavailable { .. })

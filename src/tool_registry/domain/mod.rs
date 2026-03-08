@@ -26,7 +26,9 @@ pub use error::{
 };
 pub use health::{McpServerHealthSnapshot, McpServerHealthStatus};
 pub use ids::{McpServerId, McpServerName};
-pub use log_capture::{LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy};
+pub use log_capture::{
+    LogCaptureContext, LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy,
+};
 pub use policy::PolicyDecision;
 pub use routing::{ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming};
 pub use server::{McpServerLifecycleState, McpServerRegistration, PersistedMcpServerData};

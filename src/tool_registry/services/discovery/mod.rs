@@ -5,9 +5,9 @@
 
 use crate::tool_registry::{
     domain::{
-        CatalogEntry, LogEntryMetadata, LogRetentionPolicy, McpServerId, PolicyDecision,
-        ToolCallAuditRecord, ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult,
-        ToolCallTiming, ToolRegistryDomainError, validation::validate_parameters,
+        CatalogEntry, LogCaptureContext, LogEntryMetadata, LogRetentionPolicy, McpServerId,
+        PolicyDecision, ToolCallAuditRecord, ToolCallId, ToolCallOutcome, ToolCallRequest,
+        ToolCallResult, ToolCallTiming, ToolRegistryDomainError, validation::validate_parameters,
     },
     ports::{
         McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
@@ -328,12 +328,11 @@ where
         stderr: bytes::Bytes,
     ) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata> {
         let byte_count = stderr.len() as u64;
-        let metadata = LogEntryMetadata::for_startup(
-            server_id,
-            byte_count,
-            &*self.clock,
-            &self.retention_policy,
-        );
+        let ctx = LogCaptureContext {
+            clock: &*self.clock,
+            retention: &self.retention_policy,
+        };
+        let metadata = LogEntryMetadata::for_startup(server_id, byte_count, &ctx);
         self.log_store
             .store_log(&metadata, stderr, &self.retention_policy)
             .await?;
@@ -376,13 +375,11 @@ where
     ) -> Option<String> {
         let stderr = stderr_output.filter(|b| !b.is_empty())?;
         let byte_count = stderr.len() as u64;
-        let metadata = LogEntryMetadata::for_tool_call(
-            server_id,
-            call_id,
-            byte_count,
-            &*self.clock,
-            &self.retention_policy,
-        );
+        let ctx = LogCaptureContext {
+            clock: &*self.clock,
+            retention: &self.retention_policy,
+        };
+        let metadata = LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &ctx);
         let path = metadata.object_path().to_owned();
         match self
             .log_store
