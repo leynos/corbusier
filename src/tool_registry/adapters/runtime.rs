@@ -60,6 +60,17 @@ impl InMemoryMcpServerHost {
         Ok(())
     }
 
+    fn set_tool_entry<V>(
+        &self,
+        key: (McpServerName, String),
+        value: V,
+        select: impl FnOnce(&mut InMemoryHostState) -> &mut HashMap<(McpServerName, String), V>,
+    ) -> McpServerHostResult<()> {
+        self.modify_state(|s| {
+            select(s).insert(key, value);
+        })
+    }
+
     /// Associates a tool catalog with a server name.
     ///
     /// Existing catalog entries are replaced.
@@ -105,10 +116,11 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         result: Value,
     ) -> McpServerHostResult<()> {
-        let key = (server_name, tool_name.into());
-        self.modify_state(|s| {
-            s.tool_call_results.insert(key, result);
-        })
+        self.set_tool_entry(
+            (server_name, tool_name.into()),
+            result,
+            |s| &mut s.tool_call_results,
+        )
     }
 
     /// Configures stderr output that `call_tool` will include for a
@@ -123,10 +135,11 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         stderr: bytes::Bytes,
     ) -> McpServerHostResult<()> {
-        let key = (server_name, tool_name.into());
-        self.modify_state(|s| {
-            s.tool_call_stderr.insert(key, stderr);
-        })
+        self.set_tool_entry(
+            (server_name, tool_name.into()),
+            stderr,
+            |s| &mut s.tool_call_stderr,
+        )
     }
 
     /// Configures stderr output that `start` will return for a given
