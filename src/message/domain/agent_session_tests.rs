@@ -12,17 +12,27 @@ fn clock() -> DefaultClock {
 }
 
 fn assert_reverted_to_active(session: &AgentSession) {
-    assert_eq!(session.state, AgentSessionState::Active);
-    assert!(session.end_sequence.is_none());
-    assert!(session.terminated_by_handoff.is_none());
-    assert!(session.ended_at.is_none());
+    assert_eq!(
+        (
+            session.state,
+            session.end_sequence,
+            session.terminated_by_handoff,
+            session.ended_at,
+        ),
+        (AgentSessionState::Active, None, None, None),
+    );
 }
 
 fn assert_still_handed_off(session: &AgentSession, expected: HandoffId) {
-    assert_eq!(session.state, AgentSessionState::HandedOff);
-    assert_eq!(session.terminated_by_handoff, Some(expected));
-    assert!(session.end_sequence.is_some());
-    assert!(session.ended_at.is_some());
+    assert_eq!(
+        (
+            session.state,
+            session.end_sequence.is_some(),
+            session.terminated_by_handoff,
+            session.ended_at.is_some(),
+        ),
+        (AgentSessionState::HandedOff, true, Some(expected), true,),
+    );
 }
 
 #[rstest]
@@ -100,34 +110,32 @@ fn handed_off_session(clock: DefaultClock) -> HandedOffSession {
 }
 
 #[rstest]
-fn revert_from_handoff_with_matching_id_restores_active(mut handed_off_session: HandedOffSession) {
+#[case::matching(true)]
+#[case::non_matching(false)]
+fn revert_from_handoff_obeys_handoff_id(
+    mut handed_off_session: HandedOffSession,
+    #[case] use_matching_id: bool,
+) {
     let HandedOffSession {
         ref mut session,
         handoff_id,
     } = handed_off_session;
+    assert_eq!(session.state, AgentSessionState::HandedOff,);
 
-    // Precondition: session is handed off.
-    assert_eq!(session.state, AgentSessionState::HandedOff);
+    let id_to_revert = if use_matching_id {
+        handoff_id
+    } else {
+        HandoffId::new()
+    };
+    let reverted = session.revert_from_handoff(id_to_revert);
 
-    let reverted = session.revert_from_handoff(handoff_id);
-    assert!(reverted, "revert should succeed for the matching handoff");
-    assert_reverted_to_active(session);
-}
-
-#[rstest]
-fn revert_from_handoff_with_wrong_id_is_noop(mut handed_off_session: HandedOffSession) {
-    let HandedOffSession {
-        ref mut session,
-        handoff_id,
-    } = handed_off_session;
-
-    // Precondition: session is handed off.
-    assert_eq!(session.state, AgentSessionState::HandedOff);
-
-    let wrong_id = HandoffId::new();
-    let reverted = session.revert_from_handoff(wrong_id);
-    assert!(!reverted, "revert should fail for a non-matching handoff");
-    assert_still_handed_off(session, handoff_id);
+    if use_matching_id {
+        assert!(reverted, "revert should succeed for the matching handoff",);
+        assert_reverted_to_active(session);
+    } else {
+        assert!(!reverted, "revert should fail for a different handoff id",);
+        assert_still_handed_off(session, handoff_id);
+    }
 }
 
 #[rstest]
