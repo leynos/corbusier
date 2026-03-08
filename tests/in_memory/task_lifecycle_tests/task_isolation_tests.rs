@@ -1,10 +1,10 @@
 //! Tests for cross-tenant task isolation.
 
 use super::{TestService, assert_single_task_found, service};
-use crate::in_memory::helpers::{ctx, other_ctx};
-use corbusier::context::RequestContext;
+use crate::in_memory::helpers::ctx;
+use corbusier::context::{RequestContext, TenantId};
 use corbusier::task::{
-    domain::{BranchRef, IssueRef, PullRequestRef, Task},
+    domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskState},
     ports::TaskRepositoryError,
     services::{
         AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
@@ -12,6 +12,20 @@ use corbusier::task::{
     },
 };
 use rstest::rstest;
+
+/// Creates a context that differs from `source` only in `tenant_id`.
+///
+/// This isolates exactly the tenant dimension so assertions prove
+/// that tenant scoping — not user or session identity — drives
+/// visibility.
+fn ctx_other_tenant(source: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        source.correlation_id(),
+        source.user_id(),
+        source.session_id(),
+    )
+}
 
 const PROVIDER: &str = "github";
 const REPO: &str = "corbusier/core";
@@ -54,7 +68,8 @@ async fn issue_visibility_is_scoped_to_tenant(
     assert_eq!(own_task.id(), task.id());
 
     // Cross-tenant: other tenant cannot see the task.
-    let found_other = service.find_by_issue_ref(&other_ctx(), &issue_ref).await?;
+    let ctx_b = ctx_other_tenant(&ctx);
+    let found_other = service.find_by_issue_ref(&ctx_b, &issue_ref).await?;
     assert!(
         found_other.is_none(),
         "other tenant must not see tasks via issue ref"
@@ -70,15 +85,26 @@ async fn transition_in_other_tenant_fails_with_not_found(
 ) -> Result<(), eyre::Report> {
     let task = create_task(&service, &ctx, "Tenant isolation test").await?;
 
+    let ctx_b = ctx_other_tenant(&ctx);
     let result = service
-        .transition_task(
-            &other_ctx(),
-            TransitionTaskRequest::new(task.id(), "in_progress"),
-        )
+        .transition_task(&ctx_b, TransitionTaskRequest::new(task.id(), "in_progress"))
         .await;
 
     let err = result.expect_err("transition under other tenant should fail");
     assert!(is_repo_not_found(&err), "expected NotFound, got {err}");
+
+    // Verify the rejected transition had no side effects on the
+    // owning tenant's task.
+    let issue_ref = IssueRef::from_parts(PROVIDER, REPO, ISSUE_NO)?;
+    let refetched = service
+        .find_by_issue_ref(&ctx, &issue_ref)
+        .await?
+        .expect("owning tenant must still find its task");
+    assert_eq!(
+        refetched.state(),
+        TaskState::Draft,
+        "task state must remain Draft after rejected cross-tenant transition",
+    );
     Ok(())
 }
 
@@ -102,9 +128,8 @@ async fn branch_lookup_is_scoped_to_tenant(
     let found_own = service.find_by_branch_ref(&ctx, &branch_ref).await?;
     assert_single_task_found(&found_own, task.id())?;
 
-    let found_other = service
-        .find_by_branch_ref(&other_ctx(), &branch_ref)
-        .await?;
+    let ctx_b = ctx_other_tenant(&ctx);
+    let found_other = service.find_by_branch_ref(&ctx_b, &branch_ref).await?;
     assert!(
         found_other.is_empty(),
         "other tenant must not see branch associations"
@@ -140,9 +165,8 @@ async fn pr_lookup_is_scoped_to_tenant(
     let found_own = service.find_by_pull_request_ref(&ctx, &pr_ref).await?;
     assert_single_task_found(&found_own, task.id())?;
 
-    let found_other = service
-        .find_by_pull_request_ref(&other_ctx(), &pr_ref)
-        .await?;
+    let ctx_b = ctx_other_tenant(&ctx);
+    let found_other = service.find_by_pull_request_ref(&ctx_b, &pr_ref).await?;
     assert!(
         found_other.is_empty(),
         "other tenant must not see PR associations"
@@ -157,7 +181,7 @@ async fn duplicate_issue_across_tenants_is_allowed(
     ctx: RequestContext,
 ) -> Result<(), eyre::Report> {
     let task_a = create_task(&service, &ctx, "Tenant isolation test").await?;
-    let ctx_b = other_ctx();
+    let ctx_b = ctx_other_tenant(&ctx);
     let task_b = create_task(&service, &ctx_b, "Same issue different tenant").await?;
 
     // Each tenant's index must resolve to its own task.
