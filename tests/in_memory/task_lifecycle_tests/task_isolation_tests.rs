@@ -4,7 +4,7 @@ use super::{TestService, assert_single_task_found, service};
 use crate::in_memory::helpers::ctx;
 use corbusier::context::{RequestContext, TenantId};
 use corbusier::task::{
-    domain::{BranchRef, IssueRef, PullRequestRef, Task, TaskState},
+    domain::{BranchRef, IssueRef, PullRequestRef, Task},
     ports::TaskRepositoryError,
     services::{
         AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
@@ -84,6 +84,7 @@ async fn transition_in_other_tenant_fails_with_not_found(
     ctx: RequestContext,
 ) -> Result<(), eyre::Report> {
     let task = create_task(&service, &ctx, "Tenant isolation test").await?;
+    let initial_state = task.state();
 
     let ctx_b = ctx_other_tenant(&ctx);
     let result = service
@@ -102,8 +103,8 @@ async fn transition_in_other_tenant_fails_with_not_found(
         .expect("owning tenant must still find its task");
     assert_eq!(
         refetched.state(),
-        TaskState::Draft,
-        "task state must remain Draft after rejected cross-tenant transition",
+        initial_state,
+        "task state must be unchanged after rejected cross-tenant transition",
     );
     Ok(())
 }
