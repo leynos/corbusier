@@ -1,5 +1,6 @@
 //! Shared test helpers for in-memory repository integration tests.
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::memory::InMemoryMessageRepository,
     domain::{
@@ -38,10 +39,57 @@ pub fn clock() -> DefaultClock {
     DefaultClock
 }
 
+/// Provides a default request context for tests.
+#[fixture]
+pub fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
+/// Creates a second `RequestContext` with a distinct `TenantId`.
+///
+/// Use this alongside `ctx()` when testing cross-tenant isolation.
+pub fn other_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
 /// Provides a conversation ID for tests.
 #[fixture]
 pub fn conversation_id() -> ConversationId {
     ConversationId::new()
+}
+
+/// Composite fixture bundling per-test repository, clock, conversation ID,
+/// and request context into a single injectable parameter.
+pub struct ConversationScenario {
+    pub repo: InMemoryMessageRepository,
+    pub clock: DefaultClock,
+    pub conversation_id: ConversationId,
+    pub ctx: RequestContext,
+}
+
+#[fixture]
+pub fn scenario() -> ConversationScenario {
+    ConversationScenario {
+        repo: InMemoryMessageRepository::new(),
+        clock: DefaultClock,
+        conversation_id: ConversationId::new(),
+        ctx: RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        ),
+    }
 }
 
 /// Stores conversation messages and returns them for verification.
@@ -51,10 +99,15 @@ pub fn conversation_id() -> ConversationId {
 /// Returns an error if any message creation or store operation fails.
 pub fn store_conversation_messages(
     rt: &Runtime,
-    repo: &InMemoryMessageRepository,
-    clock: &DefaultClock,
-    conversation_id: ConversationId,
+    s: &ConversationScenario,
 ) -> Result<Vec<Message>, Box<dyn std::error::Error + Send + Sync>> {
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id: cid,
+        ctx,
+    } = s;
+    let conversation_id = *cid;
     let user_message = Message::new(
         conversation_id,
         Role::User,
@@ -63,7 +116,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&user_message))?;
+    rt.block_on(repo.store(ctx, &user_message))?;
 
     let assistant_message = Message::new(
         conversation_id,
@@ -80,7 +133,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&assistant_message))?;
+    rt.block_on(repo.store(ctx, &assistant_message))?;
 
     let tool_message = Message::new(
         conversation_id,
@@ -93,7 +146,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&tool_message))?;
+    rt.block_on(repo.store(ctx, &tool_message))?;
 
     let final_message = Message::new(
         conversation_id,
@@ -105,7 +158,7 @@ pub fn store_conversation_messages(
         clock,
     )?;
 
-    rt.block_on(repo.store(&final_message))?;
+    rt.block_on(repo.store(ctx, &final_message))?;
 
     Ok(vec![
         user_message,

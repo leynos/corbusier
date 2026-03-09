@@ -11,6 +11,30 @@ fn clock() -> DefaultClock {
     DefaultClock
 }
 
+fn assert_reverted_to_active(session: &AgentSession) {
+    assert_eq!(
+        (
+            session.state,
+            session.end_sequence,
+            session.terminated_by_handoff,
+            session.ended_at,
+        ),
+        (AgentSessionState::Active, None, None, None),
+    );
+}
+
+fn assert_still_handed_off(session: &AgentSession, expected: HandoffId) {
+    assert_eq!(
+        (
+            session.state,
+            session.end_sequence.is_some(),
+            session.terminated_by_handoff,
+            session.ended_at.is_some(),
+        ),
+        (AgentSessionState::HandedOff, true, Some(expected), true,),
+    );
+}
+
 #[rstest]
 fn agent_session_new_is_active(clock: DefaultClock) {
     let session = AgentSession::new(
@@ -60,6 +84,58 @@ fn agent_session_handoff_terminates(clock: DefaultClock) {
     assert_eq!(session.end_sequence, Some(SequenceNumber::new(5)));
     assert_eq!(session.terminated_by_handoff, Some(handoff_id));
     assert!(session.ended_at.is_some());
+}
+
+/// A handed-off session together with its originating handoff
+/// ID, ready for revert testing.
+struct HandedOffSession {
+    session: AgentSession,
+    handoff_id: HandoffId,
+}
+
+#[fixture]
+fn handed_off_session(clock: DefaultClock) -> HandedOffSession {
+    let mut session = AgentSession::new(
+        ConversationId::new(),
+        "claude-code",
+        SequenceNumber::new(1),
+        &clock,
+    );
+    let handoff_id = HandoffId::new();
+    session.handoff(SequenceNumber::new(5), handoff_id, &clock);
+    HandedOffSession {
+        session,
+        handoff_id,
+    }
+}
+
+#[rstest]
+#[case::matching(true)]
+#[case::non_matching(false)]
+fn revert_from_handoff_obeys_handoff_id(
+    mut handed_off_session: HandedOffSession,
+    #[case] use_matching_id: bool,
+) {
+    let HandedOffSession {
+        ref mut session,
+        handoff_id,
+    } = handed_off_session;
+    assert_eq!(session.state, AgentSessionState::HandedOff,);
+
+    let id_to_revert = if use_matching_id {
+        handoff_id
+    } else {
+        HandoffId::new()
+    };
+    let reverted = session.revert_from_handoff(id_to_revert);
+
+    if use_matching_id {
+        assert!(reverted, "revert should succeed for the matching handoff",);
+        assert_reverted_to_active(session);
+    } else {
+        assert!(!reverted, "revert should fail for a different handoff id",);
+        assert_still_handed_off(session, handoff_id);
+    }
 }
 
 #[rstest]

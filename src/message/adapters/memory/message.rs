@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
     error::RepositoryError,
@@ -54,11 +55,23 @@ impl InMemoryMessageRepository {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Acquires a read lock on the message store.
+    ///
+    /// Maps a poisoned-lock error to [`RepositoryError::connection`] so that
+    /// callers can use `?` directly.
+    fn read_locked(
+        &self,
+    ) -> RepositoryResult<std::sync::RwLockReadGuard<'_, HashMap<MessageId, Message>>> {
+        self.messages
+            .read()
+            .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))
+    }
 }
 
 #[async_trait]
 impl MessageRepository for InMemoryMessageRepository {
-    async fn store(&self, message: &Message) -> RepositoryResult<()> {
+    async fn store(&self, _ctx: &RequestContext, message: &Message) -> RepositoryResult<()> {
         let mut guard = self
             .messages
             .write()
@@ -86,25 +99,21 @@ impl MessageRepository for InMemoryMessageRepository {
         Ok(())
     }
 
-    async fn find_by_id(&self, id: MessageId) -> RepositoryResult<Option<Message>> {
-        let guard = self
-            .messages
-            .read()
-            .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
-
-        Ok(guard.get(&id).cloned())
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: MessageId,
+    ) -> RepositoryResult<Option<Message>> {
+        Ok(self.read_locked()?.get(&id).cloned())
     }
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<Vec<Message>> {
-        let guard = self
-            .messages
-            .read()
-            .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
-
-        let mut messages: Vec<Message> = guard
+        let mut messages: Vec<Message> = self
+            .read_locked()?
             .values()
             .filter(|m| m.conversation_id() == conversation_id)
             .cloned()
@@ -118,14 +127,11 @@ impl MessageRepository for InMemoryMessageRepository {
 
     async fn next_sequence_number(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> RepositoryResult<SequenceNumber> {
-        let guard = self
-            .messages
-            .read()
-            .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
-
-        let max_seq = guard
+        let max_seq = self
+            .read_locked()?
             .values()
             .filter(|m| m.conversation_id() == conversation_id)
             .map(|m| m.sequence_number().value())
@@ -135,12 +141,7 @@ impl MessageRepository for InMemoryMessageRepository {
         Ok(SequenceNumber::new(max_seq.saturating_add(1)))
     }
 
-    async fn exists(&self, id: MessageId) -> RepositoryResult<bool> {
-        let guard = self
-            .messages
-            .read()
-            .map_err(|e| RepositoryError::connection(format!("lock poisoned: {e}")))?;
-
-        Ok(guard.contains_key(&id))
+    async fn exists(&self, _ctx: &RequestContext, id: MessageId) -> RepositoryResult<bool> {
+        Ok(self.read_locked()?.contains_key(&id))
     }
 }

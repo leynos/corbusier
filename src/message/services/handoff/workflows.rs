@@ -1,17 +1,19 @@
-//! Handoff service for orchestrating agent transitions.
+//! Handoff workflow orchestration.
 //!
-//! The `HandoffService` coordinates the lifecycle of agent handoffs,
-//! ensuring context is preserved and proper audit trails are maintained.
+//! Contains the [`HandoffService`] which coordinates the lifecycle of agent
+//! handoffs, ensuring context is preserved and proper audit trails are
+//! maintained.
 
 use std::sync::Arc;
 
 use mockable::Clock;
 
+use super::params::{CompleteHandoffParams, ServiceInitiateParams};
+use crate::context::RequestContext;
 use crate::message::{
     domain::{
-        AgentSession, AgentSessionId, ContextWindowSnapshot, ConversationId, HandoffId,
-        HandoffMetadata, HandoffSessionParams, MessageSummary, SequenceNumber, SequenceRange,
-        SnapshotParams, SnapshotType, TurnId,
+        AgentSession, ContextWindowSnapshot, ConversationId, HandoffId, HandoffMetadata,
+        HandoffSessionParams, MessageSummary, SequenceRange, SnapshotParams, SnapshotType,
     },
     ports::{
         agent_session::{AgentSessionRepository, SessionResult},
@@ -19,47 +21,6 @@ use crate::message::{
         handoff::{AgentHandoffPort, HandoffError, HandoffResult, InitiateHandoffParams},
     },
 };
-
-/// Parameters for initiating a handoff via the service.
-#[derive(Debug, Clone)]
-pub struct ServiceInitiateParams<'a> {
-    /// The session initiating the handoff.
-    pub source_session_id: AgentSessionId,
-    /// The agent backend to hand off to.
-    pub target_agent: &'a str,
-    /// The turn that triggered the handoff.
-    pub prior_turn_id: TurnId,
-    /// Current sequence number for snapshot.
-    pub current_sequence: SequenceNumber,
-    /// Optional reason for the handoff.
-    pub reason: Option<&'a str>,
-}
-
-impl<'a> ServiceInitiateParams<'a> {
-    /// Creates new service initiate parameters.
-    #[must_use]
-    pub const fn new(
-        source_session_id: AgentSessionId,
-        target_agent: &'a str,
-        prior_turn_id: TurnId,
-        current_sequence: SequenceNumber,
-    ) -> Self {
-        Self {
-            source_session_id,
-            target_agent,
-            prior_turn_id,
-            current_sequence,
-            reason: None,
-        }
-    }
-
-    /// Sets the reason for the handoff.
-    #[must_use]
-    pub const fn with_reason(mut self, reason: &'a str) -> Self {
-        self.reason = Some(reason);
-        self
-    }
-}
 
 /// Service for coordinating agent handoffs with context preservation.
 ///
@@ -73,7 +34,10 @@ impl<'a> ServiceInitiateParams<'a> {
 /// # Example
 ///
 /// ```ignore
-/// use corbusier::message::services::HandoffService;
+/// use corbusier::context::RequestContext;
+/// use corbusier::message::services::{
+///     HandoffService, ServiceInitiateParams, CompleteHandoffParams,
+/// };
 ///
 /// let service = HandoffService::new(
 ///     session_repo,
@@ -81,6 +45,7 @@ impl<'a> ServiceInitiateParams<'a> {
 ///     snapshot_adapter,
 ///     clock,
 /// );
+/// let ctx = RequestContext::new(tenant_id, correlation_id, user_id, session_id);
 ///
 /// // Initiate handoff
 /// let params = ServiceInitiateParams::new(
@@ -89,14 +54,15 @@ impl<'a> ServiceInitiateParams<'a> {
 ///     prior_turn_id,
 ///     current_sequence,
 /// ).with_reason("task too complex");
-/// let handoff = service.initiate(params).await?;
+/// let handoff = service.initiate(&ctx, params).await?;
 ///
 /// // Complete handoff when target agent starts
-/// let completed = service.complete(
+/// let complete_params = CompleteHandoffParams::new(
 ///     handoff.handoff_id,
 ///     target_session_id,
 ///     start_sequence,
-/// ).await?;
+/// );
+/// let completed = service.complete(&ctx, complete_params).await?;
 /// ```
 #[derive(Clone)]
 pub struct HandoffService<S, H, C, K>
@@ -151,12 +117,13 @@ where
     /// - Source session update fails
     pub async fn initiate(
         &self,
+        ctx: &RequestContext,
         params: ServiceInitiateParams<'_>,
     ) -> HandoffResult<HandoffMetadata> {
         // Find and validate source session
         let mut source_session = self
             .session_repo
-            .find_by_id(params.source_session_id)
+            .find_by_id(ctx, params.source_session_id)
             .await
             .map_err(|_| HandoffError::SessionNotFound(params.source_session_id))?
             .ok_or(HandoffError::SessionNotFound(params.source_session_id))?;
@@ -180,7 +147,7 @@ where
             snapshot_type: SnapshotType::HandoffInitiated,
         });
         self.snapshot_adapter
-            .store_snapshot(&snapshot)
+            .store_snapshot(ctx, &snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
@@ -196,7 +163,7 @@ where
         }
         let handoff = self
             .handoff_adapter
-            .initiate_handoff(handoff_params)
+            .initiate_handoff(ctx, handoff_params)
             .await?;
 
         // Update source session state
@@ -207,7 +174,7 @@ where
         );
 
         self.session_repo
-            .update(&source_session)
+            .update(ctx, &source_session)
             .await
             .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
 
@@ -221,12 +188,6 @@ where
     /// 2. Creates a context snapshot for the new session start
     /// 3. Completes the handoff record
     ///
-    /// # Parameters
-    ///
-    /// - `handoff_id`: The handoff to complete
-    /// - `target_session_id`: The new session created by the target agent
-    /// - `start_sequence`: Starting sequence number for the target session
-    ///
     /// # Errors
     ///
     /// Returns `HandoffError` if:
@@ -235,24 +196,43 @@ where
     /// - Target session not found
     pub async fn complete(
         &self,
-        handoff_id: HandoffId,
-        target_session_id: AgentSessionId,
-        start_sequence: SequenceNumber,
+        ctx: &RequestContext,
+        params: CompleteHandoffParams,
     ) -> HandoffResult<HandoffMetadata> {
+        let CompleteHandoffParams {
+            handoff_id,
+            target_session_id,
+            start_sequence,
+        } = params;
         // Verify the handoff exists and is in valid state
-        let _handoff = self
+        let handoff = self
             .handoff_adapter
-            .find_handoff(handoff_id)
+            .find_handoff(ctx, handoff_id)
             .await?
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
         // Find the target session to get conversation_id
         let target_session = self
             .session_repo
-            .find_by_id(target_session_id)
+            .find_by_id(ctx, target_session_id)
             .await
             .map_err(|_| HandoffError::SessionNotFound(target_session_id))?
             .ok_or(HandoffError::SessionNotFound(target_session_id))?;
+
+        // Verify handoff source and target sessions share the same conversation
+        let source_session = self
+            .session_repo
+            .find_by_id(ctx, handoff.source_session_id)
+            .await
+            .map_err(|_| HandoffError::SessionNotFound(handoff.source_session_id))?
+            .ok_or(HandoffError::SessionNotFound(handoff.source_session_id))?;
+
+        if source_session.conversation_id != target_session.conversation_id {
+            return Err(HandoffError::ConversationMismatch {
+                source_conversation: source_session.conversation_id,
+                target_conversation: target_session.conversation_id,
+            });
+        }
 
         // Capture session start snapshot for target
         let snapshot = self.build_snapshot(SnapshotParams {
@@ -263,14 +243,14 @@ where
             snapshot_type: SnapshotType::SessionStart,
         });
         self.snapshot_adapter
-            .store_snapshot(&snapshot)
+            .store_snapshot(ctx, &snapshot)
             .await
             .map_err(|e| HandoffError::SnapshotFailed(e.to_string()))?;
 
         // Complete the handoff
         let completed = self
             .handoff_adapter
-            .complete_handoff(handoff_id, target_session_id)
+            .complete_handoff(ctx, handoff_id, target_session_id)
             .await?;
 
         Ok(completed)
@@ -291,37 +271,36 @@ where
     /// - Handoff not found
     /// - Handoff is already in a terminal state
     /// - Source session update fails
-    pub async fn cancel(&self, handoff_id: HandoffId, reason: Option<&str>) -> HandoffResult<()> {
+    pub async fn cancel(
+        &self,
+        ctx: &RequestContext,
+        handoff_id: HandoffId,
+        reason: Option<&str>,
+    ) -> HandoffResult<()> {
         // Find the handoff
         let handoff = self
             .handoff_adapter
-            .find_handoff(handoff_id)
+            .find_handoff(ctx, handoff_id)
             .await?
             .ok_or(HandoffError::NotFound(handoff_id))?;
 
         // Revert source session if needed
         if let Some(mut source_session) = self
             .session_repo
-            .find_by_id(handoff.source_session_id)
+            .find_by_id(ctx, handoff.source_session_id)
             .await
             .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?
-            && source_session.terminated_by_handoff == Some(handoff_id)
+            && source_session.revert_from_handoff(handoff_id)
         {
-            // Revert to active state
-            source_session.state = crate::message::domain::AgentSessionState::Active;
-            source_session.terminated_by_handoff = None;
-            source_session.end_sequence = None;
-            source_session.ended_at = None;
-
             self.session_repo
-                .update(&source_session)
+                .update(ctx, &source_session)
                 .await
                 .map_err(|e| HandoffError::SessionUpdateFailed(e.to_string()))?;
         }
 
         // Cancel the handoff
         self.handoff_adapter
-            .cancel_handoff(handoff_id, reason)
+            .cancel_handoff(ctx, handoff_id, reason)
             .await
     }
 
@@ -345,11 +324,12 @@ where
     /// Returns `SessionError` if the session could not be stored.
     pub async fn create_target_session(
         &self,
+        ctx: &RequestContext,
         params: HandoffSessionParams,
     ) -> SessionResult<AgentSession> {
         let session = AgentSession::from_handoff(params, self.clock.as_ref());
 
-        self.session_repo.store(&session).await?;
+        self.session_repo.store(ctx, &session).await?;
 
         Ok(session)
     }
@@ -361,11 +341,12 @@ where
     /// Returns `HandoffError` if the handoff list could not be retrieved.
     pub async fn get_pending_handoff(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Option<HandoffMetadata>> {
         let handoffs = self
             .handoff_adapter
-            .list_handoffs_for_conversation(conversation_id)
+            .list_handoffs_for_conversation(ctx, conversation_id)
             .await?;
 
         // Find a non-terminal handoff
@@ -374,17 +355,5 @@ where
 
     fn build_snapshot(&self, params: SnapshotParams) -> ContextWindowSnapshot {
         ContextWindowSnapshot::new(params, self.clock.as_ref())
-    }
-}
-
-// Conversion helper for session state to handoff status
-impl From<crate::message::domain::AgentSessionState> for crate::message::domain::HandoffStatus {
-    fn from(state: crate::message::domain::AgentSessionState) -> Self {
-        use crate::message::domain::AgentSessionState;
-        match state {
-            AgentSessionState::Active => Self::Initiated,
-            AgentSessionState::HandedOff | AgentSessionState::Completed => Self::Completed,
-            AgentSessionState::Failed | AgentSessionState::Paused => Self::Failed,
-        }
     }
 }

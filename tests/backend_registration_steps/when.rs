@@ -7,7 +7,7 @@ use rstest_bdd_macros::when;
 fn register_both_backends(world: &mut BackendWorld) -> Result<(), eyre::Report> {
     for pending in &world.pending_backends {
         let request = build_request(&pending.name, &pending.provider);
-        let result = run_async(world.service.register(request));
+        let result = run_async(world.service.register(&world.ctx, request));
         match result {
             Ok(registration) => {
                 world.registered_backends.push(registration);
@@ -27,7 +27,7 @@ fn register_duplicate_backend(world: &mut BackendWorld) -> Result<(), eyre::Repo
         .last()
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
     let request = build_request(&pending.name, &pending.provider);
-    world.last_register_result = Some(run_async(world.service.register(request)));
+    world.last_register_result = Some(run_async(world.service.register(&world.ctx, request)));
     Ok(())
 }
 
@@ -37,7 +37,7 @@ fn deactivate_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
         .last_registered
         .as_ref()
         .ok_or_else(|| eyre::eyre!("no registered backend to deactivate"))?;
-    run_async(world.service.deactivate(registration.id()))
+    run_async(world.service.deactivate(&world.ctx, registration.id()))
         .map_err(|err| eyre::eyre!("deactivation failed: {err}"))?;
     Ok(())
 }

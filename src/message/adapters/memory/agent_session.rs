@@ -4,10 +4,11 @@
 //! without database dependencies.
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use async_trait::async_trait;
 
+use crate::context::RequestContext;
 use crate::message::{
     domain::{AgentSession, AgentSessionId, AgentSessionState, ConversationId},
     ports::agent_session::{AgentSessionRepository, SessionError, SessionResult},
@@ -40,6 +41,16 @@ impl InMemoryAgentSessionRepository {
         self.len() == 0
     }
 
+    /// Acquires a read lock on the sessions map, mapping a poisoned lock
+    /// into a persistence error.
+    fn read_locked(
+        &self,
+    ) -> SessionResult<RwLockReadGuard<'_, HashMap<AgentSessionId, AgentSession>>> {
+        self.sessions
+            .read()
+            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))
+    }
+
     fn upsert_with_check<F>(&self, session: &AgentSession, validate: F) -> SessionResult<()>
     where
         F: FnOnce(&HashMap<AgentSessionId, AgentSession>) -> SessionResult<()>,
@@ -56,48 +67,73 @@ impl InMemoryAgentSessionRepository {
     }
 }
 
+/// Returns `Err(ActiveSessionExists)` when `sessions` already contains an
+/// active session for `conversation_id`, optionally excluding `exclude_id`
+/// (used during updates so a session does not conflict with itself).
+fn check_active_session(
+    sessions: &HashMap<AgentSessionId, AgentSession>,
+    conversation_id: ConversationId,
+    exclude_id: Option<AgentSessionId>,
+) -> SessionResult<()> {
+    let conflict = sessions.values().any(|s| {
+        s.conversation_id == conversation_id
+            && s.state == AgentSessionState::Active
+            && exclude_id != Some(s.session_id)
+    });
+    if conflict {
+        Err(SessionError::ActiveSessionExists(conversation_id))
+    } else {
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl AgentSessionRepository for InMemoryAgentSessionRepository {
-    async fn store(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn store(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
         self.upsert_with_check(session, |sessions| {
             if sessions.contains_key(&session_id) {
                 return Err(SessionError::Duplicate(session_id));
             }
-
+            if is_active {
+                check_active_session(sessions, conversation_id, None)?;
+            }
             Ok(())
         })
     }
 
-    async fn update(&self, session: &AgentSession) -> SessionResult<()> {
+    async fn update(&self, _ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let session_id = session.session_id;
+        let conversation_id = session.conversation_id;
+        let is_active = session.state == AgentSessionState::Active;
         self.upsert_with_check(session, |sessions| {
             if !sessions.contains_key(&session_id) {
                 return Err(SessionError::NotFound(session_id));
             }
-
+            if is_active {
+                check_active_session(sessions, conversation_id, Some(session_id))?;
+            }
             Ok(())
         })
     }
 
-    async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+    async fn find_by_id(
+        &self,
+        _ctx: &RequestContext,
+        id: AgentSessionId,
+    ) -> SessionResult<Option<AgentSession>> {
+        let guard = self.read_locked()?;
         Ok(guard.get(&id).cloned())
     }
 
     async fn find_active_for_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+        let guard = self.read_locked()?;
         Ok(guard
             .values()
             .find(|s| s.conversation_id == conversation_id && s.state == AgentSessionState::Active)
@@ -106,13 +142,10 @@ impl AgentSessionRepository for InMemoryAgentSessionRepository {
 
     async fn find_by_conversation(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
-        let guard = self
-            .sessions
-            .read()
-            .map_err(|e| SessionError::persistence(std::io::Error::other(e.to_string())))?;
-
+        let guard = self.read_locked()?;
         let mut sessions: Vec<AgentSession> = guard
             .values()
             .filter(|s| s.conversation_id == conversation_id)

@@ -3,57 +3,37 @@
 //! Tests `store_with_audit` session variable propagation and `audit_logs` table
 //! verification via the database trigger.
 
+#![expect(
+    clippy::too_many_arguments,
+    reason = "rstest fixture injection with #[case] parameters requires multiple arguments"
+)]
+
 use crate::postgres::helpers::{
-    BoxError, ExpectedAuditContext, PostgresCluster, clock, ensure_template,
-    fetch_audit_log_for_message, insert_conversation, postgres_cluster, setup_repository,
+    BoxError, PostgresCluster, clock, ensure_template, fetch_audit_log_for_message,
+    insert_conversation, postgres_cluster, setup_repository, test_request_context,
 };
+use corbusier::context::{CausationId, RequestContext};
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     ports::repository::MessageRepository,
 };
 use mockable::DefaultClock;
 use rstest::rstest;
-use uuid::Uuid;
 
 /// Tests `store_with_audit` correctly propagates audit context to `audit_logs` table.
 ///
-/// Parameterized across three scenarios:
-/// - Full context: all fields populated
-/// - Empty context: all fields None
-/// - Partial context: only `correlation` populated
+/// Parameterized across two scenarios:
+/// - With causation: all context fields propagated
+/// - Without causation: `causation_id` absent from audit log
 #[rstest]
-#[case::full_context(
-    ExpectedAuditContext {
-        correlation: Some(Uuid::new_v4()),
-        causation: Some(Uuid::new_v4()),
-        user: Some(Uuid::new_v4()),
-        session: Some(Uuid::new_v4()),
-    },
-    "full"
-)]
-#[case::empty_context(
-    ExpectedAuditContext {
-        correlation: None,
-        causation: None,
-        user: None,
-        session: None,
-    },
-    "empty"
-)]
-#[case::partial_context(
-    ExpectedAuditContext {
-        correlation: Some(Uuid::new_v4()),
-        causation: None,
-        user: None,
-        session: None,
-    },
-    "partial"
-)]
+#[case::with_causation(true, "with_causation")]
+#[case::without_causation(false, "without_causation")]
 #[tokio::test]
 async fn store_with_audit_captures_context(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
-    #[case] expected: ExpectedAuditContext,
+    #[case] include_causation: bool,
     #[case] scenario: &str,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -71,12 +51,15 @@ async fn store_with_audit_captures_context(
         &clock,
     )?;
 
-    let audit = expected.to_audit_context();
+    let mut ctx = test_request_context;
+    if include_causation {
+        ctx = ctx.with_causation_id(CausationId::new());
+    }
 
-    repo.store_with_audit(&message, &audit).await?;
+    repo.store_with_audit(&ctx, &message).await?;
 
     let retrieved = repo
-        .find_by_id(message.id())
+        .find_by_id(&ctx, message.id())
         .await?
         .expect("message should exist");
 
@@ -91,11 +74,24 @@ async fn store_with_audit_captures_context(
     assert_eq!(audit_log.operation, "INSERT");
     assert_eq!(audit_log.row_id, Some(message.id().into_inner()));
     assert_eq!(
-        audit_log.correlation_id, expected.correlation,
+        audit_log.correlation_id,
+        Some(ctx.correlation_id().into_inner()),
         "scenario: {scenario}"
     );
-    assert_eq!(audit_log.causation_id, expected.causation);
-    assert_eq!(audit_log.user_id, expected.user);
-    assert_eq!(audit_log.session_id, expected.session);
+    assert_eq!(
+        audit_log.causation_id,
+        ctx.causation_id().map(CausationId::into_inner),
+        "scenario: {scenario}"
+    );
+    assert_eq!(
+        audit_log.user_id,
+        Some(ctx.user_id().into_inner()),
+        "scenario: {scenario}"
+    );
+    assert_eq!(
+        audit_log.session_id,
+        Some(ctx.session_id().into_inner()),
+        "scenario: {scenario}"
+    );
     Ok(())
 }

@@ -14,11 +14,10 @@ fn transition_task(
         .as_ref()
         .ok_or_else(|| eyre::eyre!("missing created task in scenario world"))?;
 
-    let result = run_async(
-        world
-            .service
-            .transition_task(TransitionTaskRequest::new(task.id(), target_state)),
-    );
+    let result = run_async(world.service.transition_task(
+        &world.ctx,
+        TransitionTaskRequest::new(task.id(), target_state),
+    ));
     if let Ok(ref updated) = result {
         world.last_created_task = Some(updated.clone());
     }

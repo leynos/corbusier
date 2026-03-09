@@ -2,8 +2,8 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
-    adapters::audit_context::AuditContext,
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
@@ -44,13 +44,32 @@ pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
 
+/// SQL to enforce unique active agent session per conversation.
+pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
+    "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
+);
+
 /// Template database name for pre-migrated schema.
-pub const TEMPLATE_DB: &str = "corbusier_test_template";
+///
+/// Bump the version suffix whenever a new migration is added so that stale
+/// template databases created by earlier test runs are not reused.
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v2";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
 pub fn clock() -> DefaultClock {
     DefaultClock
+}
+
+/// Provides a [`RequestContext`] for test fixtures.
+#[fixture]
+pub fn test_request_context() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
 }
 
 /// Ensures the template database exists with the schema applied.
@@ -71,25 +90,41 @@ pub async fn ensure_template(cluster: &ManagedCluster) -> Result<(), BoxError> {
 ///
 /// This is a blocking operation that should be called from `spawn_blocking`
 /// or a synchronous context.
+/// Converts any `std::error::Error + Send + Sync` into a `BoxError`.
+fn map_box<T, E: std::error::Error + Send + Sync + 'static>(
+    result: Result<T, E>,
+) -> Result<T, BoxError> {
+    result.map_err(|err| Box::new(err) as BoxError)
+}
+
 fn apply_migrations(url: &str) -> Result<(), BoxError> {
-    let mut conn = PgConnection::establish(url).map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(CREATE_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_CONSTRAINTS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_AUDIT_TRIGGER_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_TASKS_SCHEMA_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
-    conn.batch_execute(ADD_MCP_SERVERS_SQL)
-        .map_err(|err| Box::new(err) as BoxError)?;
+    let mut conn = map_box(PgConnection::establish(url))?;
+    map_box(conn.batch_execute(CREATE_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_CONSTRAINTS_SQL))?;
+    map_box(conn.batch_execute(ADD_AUDIT_TRIGGER_SQL))?;
+    map_box(conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_TASKS_SCHEMA_SQL))?;
+    map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
+    map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
+    map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     Ok(())
+}
+
+/// Builds a Diesel `r2d2` connection pool for the given database URL.
+///
+/// # Errors
+///
+/// Returns an error if the pool cannot be built.
+pub fn build_pool(
+    url: &str,
+    max_size: u32,
+) -> Result<Pool<ConnectionManager<PgConnection>>, BoxError> {
+    let manager = ConnectionManager::<PgConnection>::new(url);
+    Pool::builder()
+        .max_size(max_size)
+        .build(manager)
+        .map_err(|err| Box::new(err) as BoxError)
 }
 
 /// Creates a test database from template and returns it alongside a repository.
@@ -104,12 +139,7 @@ pub async fn setup_repository(
         .temporary_database_from_template(&format!("test_{}", Uuid::new_v4()), TEMPLATE_DB)
         .await?;
 
-    let url = temp_db.url();
-    let manager = ConnectionManager::<PgConnection>::new(url);
-    let pool = Pool::builder()
-        .max_size(1)
-        .build(manager)
-        .map_err(|e| Box::new(e) as BoxError)?;
+    let pool = build_pool(temp_db.url(), 1)?;
 
     let repo = PostgresMessageRepository::new(pool);
     Ok((temp_db, repo))
@@ -168,35 +198,6 @@ pub fn create_test_message(
         clock,
     )
     .map_err(|e| Box::new(e) as BoxError)
-}
-
-/// Expected audit context values for parameterized tests.
-pub struct ExpectedAuditContext {
-    pub correlation: Option<Uuid>,
-    pub causation: Option<Uuid>,
-    pub user: Option<Uuid>,
-    pub session: Option<Uuid>,
-}
-
-impl ExpectedAuditContext {
-    /// Creates an [`AuditContext`] from expected values.
-    #[must_use]
-    pub const fn to_audit_context(&self) -> AuditContext {
-        let mut audit = AuditContext::empty();
-        if let Some(id) = self.correlation {
-            audit = audit.with_correlation_id(id);
-        }
-        if let Some(id) = self.causation {
-            audit = audit.with_causation_id(id);
-        }
-        if let Some(id) = self.user {
-            audit = audit.with_user_id(id);
-        }
-        if let Some(id) = self.session {
-            audit = audit.with_session_id(id);
-        }
-        audit
-    }
 }
 
 /// Helper struct for querying role from database.

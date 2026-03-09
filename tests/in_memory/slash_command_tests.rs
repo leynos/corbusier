@@ -1,19 +1,16 @@
 //! In-memory integration tests for slash-command orchestration.
 
-use std::sync::Arc;
-
-use crate::in_memory::helpers::{clock, conversation_id, repo, runtime};
+use crate::in_memory::helpers::{ConversationScenario, runtime, scenario};
 use corbusier::message::{
-    adapters::memory::{InMemoryMessageRepository, InMemorySlashCommandRegistry},
+    adapters::memory::InMemorySlashCommandRegistry,
     domain::{
-        ContentPart, ConversationId, Message, MessageMetadata, Role, SequenceNumber, TextPart,
-        ToolCallStatus,
+        ContentPart, Message, MessageMetadata, Role, SequenceNumber, TextPart, ToolCallStatus,
     },
     ports::repository::MessageRepository,
     services::SlashCommandService,
 };
-use mockable::DefaultClock;
 use rstest::rstest;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 // Helper functions for assertion reuse across slash command tests
@@ -77,11 +74,15 @@ fn assert_tool_call_audit(message: &Message, audit_index: usize, expected: &Expe
 #[rstest]
 fn slash_command_execution_metadata_round_trip_in_memory(
     runtime: std::io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
+    scenario: ConversationScenario,
 ) {
     let rt = runtime.expect("runtime fixture should initialize");
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
 
     let execution = service
@@ -100,11 +101,11 @@ fn slash_command_execution_metadata_round_trip_in_memory(
         .build(&clock)
         .expect("message build should succeed");
 
-    rt.block_on(repo.store(&message))
+    rt.block_on(repo.store(&ctx, &message))
         .expect("storing message should succeed");
 
     let persisted = rt
-        .block_on(repo.find_by_conversation(conversation_id))
+        .block_on(repo.find_by_conversation(&ctx, conversation_id))
         .expect("message lookup should succeed")
         .first()
         .cloned()

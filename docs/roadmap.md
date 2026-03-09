@@ -102,18 +102,18 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 1.5. Tenant context and identity isolation
 
-- [ ] 1.5.1 Establish tenant primitives and request context plumbing. See
+- [x] 1.5.1 Establish tenant primitives and request context plumbing. See
   corbusier-design.md §2.1.5 and §2.2.5.
-  - [ ] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
+  - [x] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
     corbusier-design.md §2.2.5.
-  - [ ] Model initial tenancy as one owning user per tenant, while preserving a
+  - [x] Model initial tenancy as one owning user per tenant, while preserving a
     separate user-versus-tenant identity model for future team and
     organization tenants. See corbusier-design.md §2.2.5.
-  - [ ] Replace message-only audit context usage with cross-cutting
+  - [x] Replace message-only audit context usage with cross-cutting
     `RequestContext` carrying tenant, correlation, causation, user, and
     session identifiers.
     See corbusier-design.md §2.2.5.
-  - [ ] Success criteria: repository/service signatures require tenant-aware
+  - [x] Success criteria: repository/service signatures require tenant-aware
     request context for tenant-owned operations.
 - [ ] 1.5.2 Deliver tenant-aware schema and constraints. Requires 1.5.1. See
   corbusier-design.md §6.2.1 and §6.2.2.
@@ -126,9 +126,12 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [ ] Success criteria: same issue reference and backend name can exist in
     multiple tenants without collisions.
 - [ ] 1.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
-  1.5.2. See corbusier-design.md §6.2.2 and §6.2.3.
-  - [ ] Update repository ports/adapters so tenant context is mandatory, and all
-    lookups are tenant scoped. See corbusier-design.md §2.2.5.
+  1.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 1.5.1 added
+  `&RequestContext` to port signatures; this item makes adapters *use* the
+  tenant context for query scoping and Row-Level Security (RLS) enforcement.
+  - [ ] Update adapter implementations to extract and apply `tenant_id` from
+    `RequestContext` in all queries and mutations. See
+    corbusier-design.md §2.2.5.
   - [ ] Set `set_config('app.tenant_id', <value>, true)` inside each
     transaction, and enable RLS policies on tenant-owned tables. See
     corbusier-design.md §6.2.3.5.

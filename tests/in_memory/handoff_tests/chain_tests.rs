@@ -1,11 +1,12 @@
 //! Multi-handoff chain tests for in-memory adapters.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, HandoffStatus, SequenceNumber, TurnId,
 };
 use corbusier::message::ports::{agent_session::AgentSessionRepository, handoff::AgentHandoffPort};
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
@@ -30,6 +31,7 @@ impl<'a> HandoffParams<'a> {
 /// Helper to initiate, create target session, and complete a handoff.
 async fn complete_handoff_to_agent(
     harness: &HandoffTestHarness,
+    ctx: &RequestContext,
     source_session: &AgentSession,
     params: HandoffParams<'_>,
 ) -> TestResult<(corbusier::message::domain::HandoffMetadata, AgentSession)> {
@@ -43,7 +45,7 @@ async fn complete_handoff_to_agent(
 
     let handoff = harness
         .service
-        .initiate(initiate_params)
+        .initiate(ctx, initiate_params)
         .await
         .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
@@ -56,17 +58,18 @@ async fn complete_handoff_to_agent(
 
     let target_session = harness
         .service
-        .create_target_session(session_params)
+        .create_target_session(ctx, session_params)
         .await
         .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
+    let complete_params = CompleteHandoffParams::new(
+        handoff.handoff_id,
+        target_session.session_id,
+        params.start_sequence,
+    );
     let completed = harness
         .service
-        .complete(
-            handoff.handoff_id,
-            target_session.session_id,
-            params.start_sequence,
-        )
+        .complete(ctx, complete_params)
         .await
         .map_err(|err| Box::new(err) as Box<dyn std::error::Error + Send + Sync>)?;
 
@@ -77,6 +80,7 @@ async fn complete_handoff_to_agent(
 fn handoff_chain_tracks_all_sessions(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) -> TestResult<()> {
     let runtime_handle = runtime?;
@@ -84,10 +88,15 @@ fn handoff_chain_tracks_all_sessions(
         let conversation_id = ConversationId::new();
 
         let agent1 = AgentSession::new(conversation_id, "agent-1", SequenceNumber::new(1), &clock);
-        harness.session_repo.store(&agent1).await.expect("store 1");
+        harness
+            .session_repo
+            .store(&ctx, &agent1)
+            .await
+            .expect("store 1");
 
         let (_handoff1, agent2) = complete_handoff_to_agent(
             &harness,
+            &ctx,
             &agent1,
             HandoffParams::new("agent-2", SequenceNumber::new(6), "escalate to specialist"),
         )
@@ -95,6 +104,7 @@ fn handoff_chain_tracks_all_sessions(
         .expect("handoff 1");
         let (_handoff2, _agent3) = complete_handoff_to_agent(
             &harness,
+            &ctx,
             &agent2,
             HandoffParams::new("agent-3", SequenceNumber::new(11), "need domain expert"),
         )
@@ -103,7 +113,7 @@ fn handoff_chain_tracks_all_sessions(
 
         let sessions = harness
             .session_repo
-            .find_by_conversation(conversation_id)
+            .find_by_conversation(&ctx, conversation_id)
             .await
             .expect("list");
 
@@ -117,7 +127,7 @@ fn handoff_chain_tracks_all_sessions(
 
         let handoffs = harness
             .handoff_adapter
-            .list_handoffs_for_conversation(conversation_id)
+            .list_handoffs_for_conversation(&ctx, conversation_id)
             .await
             .expect("list handoffs");
 

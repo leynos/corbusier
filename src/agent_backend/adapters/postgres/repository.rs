@@ -11,6 +11,7 @@ use crate::agent_backend::{
     },
     ports::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult},
 };
+use crate::context::RequestContext;
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -50,7 +51,11 @@ impl PostgresBackendRegistry {
 
 #[async_trait]
 impl BackendRegistryRepository for PostgresBackendRegistry {
-    async fn register(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()> {
+    async fn register(
+        &self,
+        _ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()> {
         let backend_id = registration.id();
         let backend_name = registration.name().clone();
         let new_row = to_new_row(registration)?;
@@ -75,7 +80,11 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         .await
     }
 
-    async fn update(&self, registration: &AgentBackendRegistration) -> BackendRegistryResult<()> {
+    async fn update(
+        &self,
+        _ctx: &RequestContext,
+        registration: &AgentBackendRegistration,
+    ) -> BackendRegistryResult<()> {
         let backend_id = registration.id().into_inner();
         let serialized = serialize_registration_fields(registration)?;
 
@@ -104,6 +113,7 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
 
     async fn find_by_id(
         &self,
+        _ctx: &RequestContext,
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         self.run_blocking(move |connection| {
@@ -120,6 +130,7 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
 
     async fn find_by_name(
         &self,
+        _ctx: &RequestContext,
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let name_str = name.as_str().to_owned();
@@ -135,7 +146,10 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         .await
     }
 
-    async fn list_active(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
+    async fn list_active(
+        &self,
+        _ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         self.run_blocking(move |connection| {
             let rows = backend_registrations::table
                 .filter(backend_registrations::status.eq(BackendStatus::Active.as_str()))
@@ -147,7 +161,10 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         .await
     }
 
-    async fn list_all(&self) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
+    async fn list_all(
+        &self,
+        _ctx: &RequestContext,
+    ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         self.run_blocking(move |connection| {
             let rows = backend_registrations::table
                 .select(BackendRegistrationRow::as_select())

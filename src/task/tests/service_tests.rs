@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{IssueRef, TaskDomainError},
@@ -14,6 +15,16 @@ use rstest::{fixture, rstest};
 type TestService = TaskLifecycleService<InMemoryTaskRepository, DefaultClock>;
 
 #[fixture]
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
+#[fixture]
 fn service() -> TestService {
     TaskLifecycleService::new(
         Arc::new(InMemoryTaskRepository::new()),
@@ -21,13 +32,18 @@ fn service() -> TestService {
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper groups service, context, request, matcher, and description"
+)]
 async fn assert_create_from_issue_fails_with_domain_error(
     service: &TestService,
+    ctx: &RequestContext,
     request: CreateTaskFromIssueRequest,
     error_matcher: impl FnOnce(&TaskDomainError) -> bool,
     error_description: &str,
 ) {
-    let result = service.create_from_issue(request).await;
+    let result = service.create_from_issue(ctx, request).await;
 
     match result {
         Err(TaskLifecycleError::Domain(ref error)) if error_matcher(error) => {}
@@ -37,7 +53,7 @@ async fn assert_create_from_issue_fails_with_domain_error(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_from_issue_persists_and_is_retrievable(service: TestService) {
+async fn create_from_issue_persists_and_is_retrievable(service: TestService, ctx: RequestContext) {
     let request = CreateTaskFromIssueRequest::new(
         "github",
         "owner/repo",
@@ -50,13 +66,13 @@ async fn create_from_issue_persists_and_is_retrievable(service: TestService) {
     .with_milestone("Phase 1");
 
     let created = service
-        .create_from_issue(request)
+        .create_from_issue(&ctx, request)
         .await
         .expect("task creation should succeed");
     let issue_ref =
         IssueRef::from_parts("github", "owner/repo", 123).expect("valid issue reference");
     let fetched = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
 
@@ -65,15 +81,18 @@ async fn create_from_issue_persists_and_is_retrievable(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_from_issue_rejects_duplicate_issue_reference(service: TestService) {
+async fn create_from_issue_rejects_duplicate_issue_reference(
+    service: TestService,
+    ctx: RequestContext,
+) {
     let first = CreateTaskFromIssueRequest::new("gitlab", "team/repo", 77, "Initial task");
     service
-        .create_from_issue(first)
+        .create_from_issue(&ctx, first)
         .await
         .expect("first task creation should succeed");
 
     let duplicate = CreateTaskFromIssueRequest::new("gitlab", "team/repo", 77, "Duplicate");
-    let result = service.create_from_issue(duplicate).await;
+    let result = service.create_from_issue(&ctx, duplicate).await;
 
     let Err(TaskLifecycleError::Repository(TaskRepositoryError::DuplicateIssueOrigin(issue_ref))) =
         result
@@ -90,36 +109,37 @@ async fn create_from_issue_rejects_duplicate_issue_reference(service: TestServic
 #[case(
     CreateTaskFromIssueRequest::new("unknown-provider", "owner/repo", 10, "Invalid provider"),
     TaskDomainError::InvalidIssueProvider("unknown-provider".to_owned()),
-    "InvalidIssueProvider domain error"
 )]
 #[case(
     CreateTaskFromIssueRequest::new("github", "owner-only", 10, "Invalid repository"),
     TaskDomainError::InvalidRepository("owner-only".to_owned()),
-    "InvalidRepository domain error"
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_from_issue_rejects_invalid_issue_metadata(
     service: TestService,
+    ctx: RequestContext,
     #[case] request: CreateTaskFromIssueRequest,
     #[case] expected_error: TaskDomainError,
-    #[case] error_description: &str,
 ) {
+    let error_description = format!("{expected_error:?} domain error");
     assert_create_from_issue_fails_with_domain_error(
         &service,
+        &ctx,
         request,
         |error| error == &expected_error,
-        error_description,
+        &error_description,
     )
     .await;
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_from_issue_rejects_empty_title(service: TestService) {
+async fn create_from_issue_rejects_empty_title(service: TestService, ctx: RequestContext) {
     let request = CreateTaskFromIssueRequest::new("github", "owner/repo", 10, "   ");
 
     assert_create_from_issue_fails_with_domain_error(
         &service,
+        &ctx,
         request,
         |error| matches!(error, TaskDomainError::EmptyIssueTitle),
         "EmptyIssueTitle domain error",
@@ -129,11 +149,11 @@ async fn create_from_issue_rejects_empty_title(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn find_by_issue_ref_returns_none_when_missing(service: TestService) {
+async fn find_by_issue_ref_returns_none_when_missing(service: TestService, ctx: RequestContext) {
     let issue_ref =
         IssueRef::from_parts("github", "missing/repo", 808).expect("valid issue reference");
     let fetched = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
     assert!(fetched.is_none());

@@ -108,7 +108,7 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         .pending_lookup
         .clone()
         .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
-    let lookup_result = run_async(world.service.find_by_issue_ref(&issue_ref));
+    let lookup_result = run_async(world.service.find_by_issue_ref(&world.ctx, &issue_ref));
     let found = match lookup_result {
         Ok(found) => {
             world.last_lookup_result = Some(Ok(found.clone()));

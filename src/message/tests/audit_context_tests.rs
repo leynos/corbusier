@@ -1,5 +1,7 @@
-//! Unit tests for `AuditContext` builder and `is_empty` semantics.
+//! Unit tests for `AuditContext` builder, `is_empty` semantics, and
+//! `From<&RequestContext>` conversion.
 
+use crate::context::{CausationId, CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::message::adapters::audit_context::AuditContext;
 use rstest::rstest;
 use uuid::Uuid;
@@ -16,6 +18,7 @@ fn audit_context_empty_has_all_none_fields() {
     assert!(ctx.causation_id.is_none());
     assert!(ctx.user_id.is_none());
     assert!(ctx.session_id.is_none());
+    assert!(ctx.is_empty());
 }
 
 #[test]
@@ -26,53 +29,43 @@ fn audit_context_default_matches_empty() {
     assert_eq!(empty, default);
 }
 
+macro_rules! assert_single_field_builder {
+    ($name:ident, $method:ident, $field:ident) => {
+        #[test]
+        fn $name() {
+            let id = Uuid::new_v4();
+            let ctx = AuditContext::empty().$method(id);
+            assert_eq!(
+                ctx,
+                AuditContext {
+                    $field: Some(id),
+                    ..AuditContext::empty()
+                }
+            );
+        }
+    };
+}
+
 // ============================================================================
 // with_* builder method tests
 // ============================================================================
 
-#[test]
-fn audit_context_with_correlation_id_sets_field() {
-    let id = Uuid::new_v4();
-    let ctx = AuditContext::empty().with_correlation_id(id);
-
-    assert_eq!(ctx.correlation_id, Some(id));
-    assert!(ctx.causation_id.is_none());
-    assert!(ctx.user_id.is_none());
-    assert!(ctx.session_id.is_none());
-}
-
-#[test]
-fn audit_context_with_causation_id_sets_field() {
-    let id = Uuid::new_v4();
-    let ctx = AuditContext::empty().with_causation_id(id);
-
-    assert!(ctx.correlation_id.is_none());
-    assert_eq!(ctx.causation_id, Some(id));
-    assert!(ctx.user_id.is_none());
-    assert!(ctx.session_id.is_none());
-}
-
-#[test]
-fn audit_context_with_user_id_sets_field() {
-    let id = Uuid::new_v4();
-    let ctx = AuditContext::empty().with_user_id(id);
-
-    assert!(ctx.correlation_id.is_none());
-    assert!(ctx.causation_id.is_none());
-    assert_eq!(ctx.user_id, Some(id));
-    assert!(ctx.session_id.is_none());
-}
-
-#[test]
-fn audit_context_with_session_id_sets_field() {
-    let id = Uuid::new_v4();
-    let ctx = AuditContext::empty().with_session_id(id);
-
-    assert!(ctx.correlation_id.is_none());
-    assert!(ctx.causation_id.is_none());
-    assert!(ctx.user_id.is_none());
-    assert_eq!(ctx.session_id, Some(id));
-}
+assert_single_field_builder!(
+    audit_context_with_correlation_id_sets_field,
+    with_correlation_id,
+    correlation_id
+);
+assert_single_field_builder!(
+    audit_context_with_causation_id_sets_field,
+    with_causation_id,
+    causation_id
+);
+assert_single_field_builder!(audit_context_with_user_id_sets_field, with_user_id, user_id);
+assert_single_field_builder!(
+    audit_context_with_session_id_sets_field,
+    with_session_id,
+    session_id
+);
 
 #[test]
 fn audit_context_builder_chain_preserves_all_fields() {
@@ -87,10 +80,13 @@ fn audit_context_builder_chain_preserves_all_fields() {
         .with_user_id(user)
         .with_session_id(session);
 
-    assert_eq!(ctx.correlation_id, Some(correlation));
-    assert_eq!(ctx.causation_id, Some(causation));
-    assert_eq!(ctx.user_id, Some(user));
-    assert_eq!(ctx.session_id, Some(session));
+    let expected = AuditContext {
+        correlation_id: Some(correlation),
+        causation_id: Some(causation),
+        user_id: Some(user),
+        session_id: Some(session),
+    };
+    assert_eq!(ctx, expected);
 }
 
 #[test]
@@ -102,10 +98,14 @@ fn audit_context_builder_allows_partial_population() {
         .with_correlation_id(correlation)
         .with_user_id(user);
 
-    assert_eq!(ctx.correlation_id, Some(correlation));
-    assert!(ctx.causation_id.is_none());
-    assert_eq!(ctx.user_id, Some(user));
-    assert!(ctx.session_id.is_none());
+    assert_eq!(
+        ctx,
+        AuditContext {
+            correlation_id: Some(correlation),
+            user_id: Some(user),
+            ..AuditContext::empty()
+        }
+    );
 }
 
 // ============================================================================
@@ -178,4 +178,33 @@ fn audit_context_debug_output() {
 
     assert!(debug.contains("AuditContext"));
     assert!(debug.contains("correlation_id"));
+}
+
+// ============================================================================
+// From<&RequestContext> conversion tests
+// ============================================================================
+
+#[rstest]
+#[case(Some(CausationId::new()))]
+#[case(None)]
+fn audit_context_from_request_context_maps_fields(#[case] causation_id: Option<CausationId>) {
+    let correlation_id = CorrelationId::new();
+    let user_id = UserId::new();
+    let session_id = SessionId::new();
+
+    let base = RequestContext::new(TenantId::new(), correlation_id, user_id, session_id);
+    let mut expected = AuditContext::empty()
+        .with_correlation_id(correlation_id.into_inner())
+        .with_user_id(user_id.into_inner())
+        .with_session_id(session_id.into_inner());
+
+    let ctx = match causation_id {
+        Some(cid) => {
+            expected = expected.with_causation_id(cid.into_inner());
+            base.with_causation_id(cid)
+        }
+        None => base,
+    };
+
+    assert_eq!(AuditContext::from(&ctx), expected);
 }

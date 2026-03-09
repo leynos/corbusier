@@ -1,11 +1,12 @@
 //! Handoff completion tests for in-memory adapters.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, HandoffStatus, SequenceNumber, TurnId,
 };
 use corbusier::message::ports::agent_session::AgentSessionRepository;
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
@@ -15,6 +16,7 @@ fn complete_handoff_links_target_session(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
     clock: DefaultClock,
+    ctx: RequestContext,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
@@ -29,7 +31,7 @@ fn complete_handoff_links_target_session(
 
         harness
             .session_repo
-            .store(&source_session)
+            .store(&ctx, &source_session)
             .await
             .expect("store");
 
@@ -41,7 +43,7 @@ fn complete_handoff_links_target_session(
         );
         let handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("initiate");
 
@@ -53,17 +55,18 @@ fn complete_handoff_links_target_session(
         );
         let target_session = harness
             .service
-            .create_target_session(params)
+            .create_target_session(&ctx, params)
             .await
             .expect("create target");
 
+        let complete_params = CompleteHandoffParams::new(
+            handoff.handoff_id,
+            target_session.session_id,
+            SequenceNumber::new(6),
+        );
         let completed = harness
             .service
-            .complete(
-                handoff.handoff_id,
-                target_session.session_id,
-                SequenceNumber::new(6),
-            )
+            .complete(&ctx, complete_params)
             .await
             .expect("complete");
 

@@ -8,10 +8,21 @@ use crate::agent_backend::{
     ports::BackendRegistryError,
     services::{BackendRegistryService, BackendRegistryServiceError, RegisterBackendRequest},
 };
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 
 type TestService = BackendRegistryService<InMemoryBackendRegistry, DefaultClock>;
+
+#[fixture]
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 #[fixture]
 fn service() -> TestService {
@@ -33,37 +44,40 @@ fn codex_request() -> RegisterBackendRequest {
 
 async fn register_backend(
     service: &TestService,
+    ctx: &RequestContext,
     request: RegisterBackendRequest,
 ) -> Result<AgentBackendRegistration, BackendRegistryServiceError> {
-    service.register(request).await
+    service.register(ctx, request).await
 }
 
 async fn register_and_deactivate(
     service: &TestService,
+    ctx: &RequestContext,
     request: RegisterBackendRequest,
 ) -> Result<AgentBackendRegistration, BackendRegistryServiceError> {
-    let created = register_backend(service, request).await?;
-    service.deactivate(created.id()).await
+    let created = register_backend(service, ctx, request).await?;
+    service.deactivate(ctx, created.id()).await
 }
 
 async fn setup_active_and_inactive(
     service: &TestService,
+    ctx: &RequestContext,
 ) -> Result<(), BackendRegistryServiceError> {
-    let claude = register_backend(service, claude_request()).await?;
-    register_backend(service, codex_request()).await?;
-    service.deactivate(claude.id()).await?;
+    let claude = register_backend(service, ctx, claude_request()).await?;
+    register_backend(service, ctx, codex_request()).await?;
+    service.deactivate(ctx, claude.id()).await?;
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn register_and_retrieve_by_id(service: TestService) {
-    let created = register_backend(&service, claude_request())
+async fn register_and_retrieve_by_id(service: TestService, ctx: RequestContext) {
+    let created = register_backend(&service, &ctx, claude_request())
         .await
         .expect("registration should succeed");
 
     let found = service
-        .find_by_id(created.id())
+        .find_by_id(&ctx, created.id())
         .await
         .expect("lookup should succeed");
 
@@ -72,13 +86,13 @@ async fn register_and_retrieve_by_id(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn register_and_retrieve_by_name(service: TestService) {
-    let created = register_backend(&service, claude_request())
+async fn register_and_retrieve_by_name(service: TestService, ctx: RequestContext) {
+    let created = register_backend(&service, &ctx, claude_request())
         .await
         .expect("registration should succeed");
 
     let found = service
-        .find_by_name("claude_code_sdk")
+        .find_by_name(&ctx, "claude_code_sdk")
         .await
         .expect("lookup should succeed");
 
@@ -87,13 +101,13 @@ async fn register_and_retrieve_by_name(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn duplicate_name_is_rejected(service: TestService) {
+async fn duplicate_name_is_rejected(service: TestService, ctx: RequestContext) {
     service
-        .register(claude_request())
+        .register(&ctx, claude_request())
         .await
         .expect("first registration should succeed");
 
-    let duplicate = service.register(claude_request()).await;
+    let duplicate = service.register(&ctx, claude_request()).await;
 
     assert!(matches!(
         duplicate,
@@ -105,8 +119,8 @@ async fn duplicate_name_is_rejected(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn deactivate_changes_status(service: TestService) {
-    let deactivated = register_and_deactivate(&service, claude_request())
+async fn deactivate_changes_status(service: TestService, ctx: RequestContext) {
+    let deactivated = register_and_deactivate(&service, &ctx, claude_request())
         .await
         .expect("register and deactivate should succeed");
 
@@ -115,12 +129,15 @@ async fn deactivate_changes_status(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_active_excludes_inactive(service: TestService) {
-    setup_active_and_inactive(&service)
+async fn list_active_excludes_inactive(service: TestService, ctx: RequestContext) {
+    setup_active_and_inactive(&service, &ctx)
         .await
         .expect("setup should succeed");
 
-    let active = service.list_active().await.expect("listing should succeed");
+    let active = service
+        .list_active(&ctx)
+        .await
+        .expect("listing should succeed");
 
     assert_eq!(active.len(), 1);
     assert_eq!(
@@ -131,31 +148,37 @@ async fn list_active_excludes_inactive(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_all_includes_inactive(service: TestService) {
-    setup_active_and_inactive(&service)
+async fn list_all_includes_inactive(service: TestService, ctx: RequestContext) {
+    setup_active_and_inactive(&service, &ctx)
         .await
         .expect("setup should succeed");
 
-    let all = service.list_all().await.expect("listing should succeed");
+    let all = service
+        .list_all(&ctx)
+        .await
+        .expect("listing should succeed");
 
     assert_eq!(all.len(), 2);
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn find_unknown_id_returns_none(service: TestService) {
+async fn find_unknown_id_returns_none(service: TestService, ctx: RequestContext) {
     let id = crate::agent_backend::domain::BackendId::new();
-    let found = service.find_by_id(id).await.expect("lookup should succeed");
+    let found = service
+        .find_by_id(&ctx, id)
+        .await
+        .expect("lookup should succeed");
     assert!(found.is_none());
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn invalid_name_in_registration_is_rejected(service: TestService) {
+async fn invalid_name_in_registration_is_rejected(service: TestService, ctx: RequestContext) {
     let request = RegisterBackendRequest::new("invalid-name", "Display", "1.0.0", "Provider")
         .with_capabilities(true, true);
 
-    let result = service.register(request).await;
+    let result = service.register(&ctx, request).await;
 
     assert!(matches!(
         result,
@@ -167,13 +190,13 @@ async fn invalid_name_in_registration_is_rejected(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn activate_restores_status(service: TestService) {
-    let deactivated = register_and_deactivate(&service, claude_request())
+async fn activate_restores_status(service: TestService, ctx: RequestContext) {
+    let deactivated = register_and_deactivate(&service, &ctx, claude_request())
         .await
         .expect("register and deactivate should succeed");
 
     let activated = service
-        .activate(deactivated.id())
+        .activate(&ctx, deactivated.id())
         .await
         .expect("activation should succeed");
 

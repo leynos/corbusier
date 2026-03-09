@@ -3,6 +3,7 @@
 //! Defines the abstract interface for initiating and completing handoffs
 //! between agent backends while preserving context.
 
+use crate::context::RequestContext;
 use crate::message::domain::{
     AgentSession, AgentSessionId, ConversationId, HandoffId, HandoffMetadata, HandoffStatus, TurnId,
 };
@@ -58,6 +59,15 @@ impl<'a> InitiateHandoffParams<'a> {
 ///
 /// Implementations coordinate context transfer between agent backends
 /// and ensure no context is lost during transitions.
+///
+/// # Implementation Notes
+///
+/// Implementations must ensure:
+/// - Handoff IDs are unique across the entire system
+/// - State transitions follow the valid lifecycle (Initiated → Accepted → Completed | Cancelled)
+/// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait AgentHandoffPort: Send + Sync {
     /// Initiates a handoff from the current agent to a target agent.
@@ -67,6 +77,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff could not be initiated.
     async fn initiate_handoff(
         &self,
+        ctx: &RequestContext,
         params: InitiateHandoffParams<'_>,
     ) -> HandoffResult<HandoffMetadata>;
 
@@ -80,6 +91,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff cannot be completed or persisted.
     async fn complete_handoff(
         &self,
+        ctx: &RequestContext,
         handoff_id: HandoffId,
         target_session_id: AgentSessionId,
     ) -> HandoffResult<HandoffMetadata>;
@@ -91,6 +103,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the handoff cannot be cancelled or persisted.
     async fn cancel_handoff(
         &self,
+        ctx: &RequestContext,
         handoff_id: HandoffId,
         reason: Option<&str>,
     ) -> HandoffResult<()>;
@@ -100,7 +113,11 @@ pub trait AgentHandoffPort: Send + Sync {
     /// # Errors
     ///
     /// Returns `HandoffError` if lookup fails.
-    async fn find_handoff(&self, handoff_id: HandoffId) -> HandoffResult<Option<HandoffMetadata>>;
+    async fn find_handoff(
+        &self,
+        ctx: &RequestContext,
+        handoff_id: HandoffId,
+    ) -> HandoffResult<Option<HandoffMetadata>>;
 
     /// Lists all handoffs for a conversation.
     ///
@@ -109,6 +126,7 @@ pub trait AgentHandoffPort: Send + Sync {
     /// Returns `HandoffError` if the list cannot be retrieved.
     async fn list_handoffs_for_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HandoffResult<Vec<HandoffMetadata>>;
 }
@@ -140,6 +158,17 @@ pub enum HandoffError {
     /// Prior turn not found.
     #[error("prior turn not found: {0}")]
     PriorTurnNotFound(TurnId),
+
+    /// Target session belongs to a different conversation than the handoff source.
+    #[error(
+        "conversation mismatch: handoff source in {source_conversation}, target session in {target_conversation}"
+    )]
+    ConversationMismatch {
+        /// Conversation of the handoff source session.
+        source_conversation: ConversationId,
+        /// Conversation of the target session.
+        target_conversation: ConversationId,
+    },
 
     /// Context snapshot capture failed.
     #[error("context snapshot failed: {0}")]

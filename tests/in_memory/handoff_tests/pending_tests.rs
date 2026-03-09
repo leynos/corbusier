@@ -1,11 +1,12 @@
 //! Pending handoff query tests for in-memory adapters.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, ConversationId, HandoffSessionParams, SequenceNumber, TurnId,
 };
 use corbusier::message::ports::agent_session::AgentSessionRepository;
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use mockable::DefaultClock;
 use rstest::rstest;
 use tokio::runtime::Runtime;
@@ -14,6 +15,7 @@ use tokio::runtime::Runtime;
 fn get_pending_handoff_returns_initiated(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) {
     let runtime_handle = runtime.expect("runtime");
@@ -29,7 +31,7 @@ fn get_pending_handoff_returns_initiated(
 
         harness
             .session_repo
-            .store(&source_session)
+            .store(&ctx, &source_session)
             .await
             .expect("store");
 
@@ -41,13 +43,13 @@ fn get_pending_handoff_returns_initiated(
         );
         let handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("initiate");
 
         let pending = harness
             .service
-            .get_pending_handoff(conversation_id)
+            .get_pending_handoff(&ctx, conversation_id)
             .await
             .expect("query")
             .expect("should have pending");
@@ -60,6 +62,7 @@ fn get_pending_handoff_returns_initiated(
 fn get_pending_handoff_returns_none_when_completed(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) {
     let runtime_handle = runtime.expect("runtime");
@@ -75,7 +78,7 @@ fn get_pending_handoff_returns_none_when_completed(
 
         harness
             .session_repo
-            .store(&source_session)
+            .store(&ctx, &source_session)
             .await
             .expect("store");
 
@@ -87,7 +90,7 @@ fn get_pending_handoff_returns_none_when_completed(
         );
         let handoff = harness
             .service
-            .initiate(initiate_params)
+            .initiate(&ctx, initiate_params)
             .await
             .expect("initiate");
 
@@ -99,23 +102,24 @@ fn get_pending_handoff_returns_none_when_completed(
         );
         let target = harness
             .service
-            .create_target_session(session_params)
+            .create_target_session(&ctx, session_params)
             .await
             .expect("target");
 
+        let complete_params = CompleteHandoffParams::new(
+            handoff.handoff_id,
+            target.session_id,
+            SequenceNumber::new(6),
+        );
         harness
             .service
-            .complete(
-                handoff.handoff_id,
-                target.session_id,
-                SequenceNumber::new(6),
-            )
+            .complete(&ctx, complete_params)
             .await
             .expect("complete");
 
         let pending = harness
             .service
-            .get_pending_handoff(conversation_id)
+            .get_pending_handoff(&ctx, conversation_id)
             .await
             .expect("query");
 

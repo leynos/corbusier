@@ -2,8 +2,7 @@
 
 use super::world::{HandoffWorld, create_and_store_session, create_tool_call_refs, run_async};
 use corbusier::message::domain::{HandoffSessionParams, SequenceNumber, TurnId};
-use corbusier::message::ports::agent_session::AgentSessionRepository;
-use corbusier::message::services::ServiceInitiateParams;
+use corbusier::message::services::{CompleteHandoffParams, ServiceInitiateParams};
 use eyre::{WrapErr, eyre};
 use rstest_bdd_macros::given;
 
@@ -40,7 +39,8 @@ fn initiated_handoff(world: &mut HandoffWorld) -> Result<(), eyre::Report> {
         SequenceNumber::new(5),
     )
     .with_reason("task requires specialist");
-    let handoff = run_async(world.service.initiate(params)).wrap_err("initiate handoff")?;
+    let handoff =
+        run_async(world.service.initiate(&world.ctx, params)).wrap_err("initiate handoff")?;
 
     world.current_handoff = Some(handoff);
     Ok(())
@@ -65,7 +65,8 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
         TurnId::new(),
         SequenceNumber::new(5),
     );
-    let handoff = run_async(world.service.initiate(initiate_params)).wrap_err("initiate A->B")?;
+    let handoff = run_async(world.service.initiate(&world.ctx, initiate_params))
+        .wrap_err("initiate A->B")?;
 
     let params = HandoffSessionParams::new(
         world.conversation_id,
@@ -73,15 +74,15 @@ fn completed_handoff_a_to_b(world: &mut HandoffWorld) -> Result<(), eyre::Report
         SequenceNumber::new(6),
         handoff.handoff_id,
     );
-    let agent_b =
-        run_async(world.service.create_target_session(params)).wrap_err("create agent B")?;
+    let agent_b = run_async(world.service.create_target_session(&world.ctx, params))
+        .wrap_err("create agent B")?;
 
-    run_async(world.service.complete(
+    let complete_params = CompleteHandoffParams::new(
         handoff.handoff_id,
         agent_b.session_id,
         SequenceNumber::new(6),
-    ))
-    .wrap_err("complete A->B")?;
+    );
+    run_async(world.service.complete(&world.ctx, complete_params)).wrap_err("complete A->B")?;
 
     world.source_session = Some(agent_b);
     Ok(())

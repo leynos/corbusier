@@ -9,5 +9,5 @@ mod slash_command;
 #[cfg(test)]
 mod handoff_tests;
 
-pub use handoff::{HandoffService, ServiceInitiateParams};
+pub use handoff::{CompleteHandoffParams, HandoffService, ServiceInitiateParams};
 pub use slash_command::SlashCommandService;

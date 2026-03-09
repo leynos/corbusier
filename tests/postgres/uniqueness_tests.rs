@@ -2,8 +2,9 @@
 
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, clock, create_test_message, ensure_template, insert_conversation,
-    postgres_cluster, setup_repository,
+    postgres_cluster, setup_repository, test_request_context,
 };
+use corbusier::context::RequestContext;
 use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
@@ -16,6 +17,7 @@ use rstest::rstest;
 #[tokio::test]
 async fn store_rejects_duplicate_message_id(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -27,15 +29,16 @@ async fn store_rejects_duplicate_message_id(
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
+    let ctx = test_request_context;
 
-    repo.store(&message).await?;
+    repo.store(&ctx, &message).await?;
 
     let duplicate = Message::builder(conv_id, Role::User, SequenceNumber::new(2))
         .with_id(msg_id)
         .with_content(ContentPart::Text(TextPart::new("Different content")))
         .build(&clock)?;
 
-    let result = repo.store(&duplicate).await;
+    let result = repo.store(&ctx, &duplicate).await;
     assert!(
         matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == msg_id),
         "Expected DuplicateMessage error, got: {result:?}"
@@ -47,6 +50,7 @@ async fn store_rejects_duplicate_message_id(
 #[tokio::test]
 async fn store_rejects_duplicate_sequence_in_conversation(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -57,12 +61,13 @@ async fn store_rejects_duplicate_sequence_in_conversation(
     insert_conversation(cluster, temp_db.name(), conv_id).await?;
 
     let msg1 = create_test_message(&clock, conv_id, 1)?;
+    let ctx = test_request_context;
 
-    repo.store(&msg1).await?;
+    repo.store(&ctx, &msg1).await?;
 
     let msg2 = create_test_message(&clock, conv_id, 1)?;
 
-    let result = repo.store(&msg2).await;
+    let result = repo.store(&ctx, &msg2).await;
     assert!(
         matches!(
             result,
@@ -80,6 +85,7 @@ async fn store_rejects_duplicate_sequence_in_conversation(
 #[tokio::test]
 async fn store_allows_same_sequence_in_different_conversations(
     clock: DefaultClock,
+    test_request_context: RequestContext,
     postgres_cluster: Result<PostgresCluster, BoxError>,
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
@@ -93,11 +99,12 @@ async fn store_allows_same_sequence_in_different_conversations(
 
     let msg1 = create_test_message(&clock, conv1, 1)?;
     let msg2 = create_test_message(&clock, conv2, 1)?;
+    let ctx = test_request_context;
 
-    repo.store(&msg1).await?;
-    repo.store(&msg2).await?;
+    repo.store(&ctx, &msg1).await?;
+    repo.store(&ctx, &msg2).await?;
 
-    assert!(repo.exists(msg1.id()).await?);
-    assert!(repo.exists(msg2.id()).await?);
+    assert!(repo.exists(&ctx, msg1.id()).await?);
+    assert!(repo.exists(&ctx, msg2.id()).await?);
     Ok(())
 }

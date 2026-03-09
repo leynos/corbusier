@@ -2,14 +2,12 @@
 //!
 //! Tests duplicate detection and exists checks.
 
-use crate::in_memory::helpers::{clock, conversation_id, repo, runtime};
+use crate::in_memory::helpers::{ConversationScenario, runtime, scenario};
 use corbusier::message::{
-    adapters::memory::InMemoryMessageRepository,
-    domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
+    domain::{ContentPart, Message, Role, SequenceNumber, TextPart},
     error::RepositoryError,
     ports::repository::MessageRepository,
 };
-use mockable::DefaultClock;
 use rstest::rstest;
 use std::io;
 use tokio::runtime::Runtime;
@@ -22,11 +20,15 @@ use tokio::runtime::Runtime;
 )]
 fn duplicate_message_id_rejected(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,
@@ -35,14 +37,14 @@ fn duplicate_message_id_rejected(
         &clock,
     )?;
 
-    rt.block_on(repo.store(&msg))?;
+    rt.block_on(repo.store(&ctx, &msg))?;
 
     let dup_id_msg = Message::builder(conversation_id, Role::User, SequenceNumber::new(2))
         .with_id(msg.id())
         .with_content(ContentPart::Text(TextPart::new("Different content")))
         .build(&clock)?;
 
-    let result = rt.block_on(repo.store(&dup_id_msg));
+    let result = rt.block_on(repo.store(&ctx, &dup_id_msg));
     assert!(
         matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == msg.id()),
         "Should reject duplicate message ID"
@@ -58,11 +60,15 @@ fn duplicate_message_id_rejected(
 )]
 fn duplicate_sequence_in_conversation_rejected(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,
@@ -71,7 +77,7 @@ fn duplicate_sequence_in_conversation_rejected(
         &clock,
     )?;
 
-    rt.block_on(repo.store(&msg))?;
+    rt.block_on(repo.store(&ctx, &msg))?;
 
     let dup_seq_msg = Message::new(
         conversation_id,
@@ -81,7 +87,7 @@ fn duplicate_sequence_in_conversation_rejected(
         &clock,
     )?;
 
-    let result = rt.block_on(repo.store(&dup_seq_msg));
+    let result = rt.block_on(repo.store(&ctx, &dup_seq_msg));
     assert!(
         matches!(
             result,
@@ -103,11 +109,15 @@ fn duplicate_sequence_in_conversation_rejected(
 )]
 fn exists_check_for_idempotent_operations(
     runtime: io::Result<Runtime>,
-    repo: InMemoryMessageRepository,
-    clock: DefaultClock,
-    conversation_id: ConversationId,
+    scenario: ConversationScenario,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rt = runtime?;
+    let ConversationScenario {
+        repo,
+        clock,
+        conversation_id,
+        ctx,
+    } = scenario;
     let msg = Message::new(
         conversation_id,
         Role::User,
@@ -116,14 +126,14 @@ fn exists_check_for_idempotent_operations(
         &clock,
     )?;
 
-    let exists_before = rt.block_on(repo.exists(msg.id()))?;
+    let exists_before = rt.block_on(repo.exists(&ctx, msg.id()))?;
     assert!(!exists_before, "Should not exist before store");
 
     if !exists_before {
-        rt.block_on(repo.store(&msg))?;
+        rt.block_on(repo.store(&ctx, &msg))?;
     }
 
-    let exists_after = rt.block_on(repo.exists(msg.id()))?;
+    let exists_after = rt.block_on(repo.exists(&ctx, msg.id()))?;
     assert!(exists_after, "Should exist after store");
     Ok(())
 }

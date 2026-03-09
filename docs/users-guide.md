@@ -6,6 +6,8 @@ Corbusier stores conversation messages as an append-only sequence. History is
 retrieved in sequence order via the message repository.
 
 ```rust,no_run
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::message::{
     adapters::memory::InMemoryMessageRepository,
     domain::{
@@ -19,15 +21,21 @@ async fn load_history() -> Result<(), Box<dyn std::error::Error>> {
     let repo = InMemoryMessageRepository::new();
     let clock = DefaultClock;
     let conversation_id = ConversationId::new();
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     let message = Message::builder(conversation_id, Role::User, SequenceNumber::new(1))
         .with_content(ContentPart::Text(TextPart::new("Hello")))
         .with_metadata(MessageMetadata::with_agent_backend("claude"))
         .build(&clock)?;
 
-    repo.store(&message).await?;
+    repo.store(&ctx, &message).await?;
 
-    let history = repo.find_by_conversation(conversation_id).await?;
+    let history = repo.find_by_conversation(&ctx, conversation_id).await?;
     assert_eq!(history.len(), 1);
     Ok(())
 }
@@ -109,6 +117,8 @@ creation time.
 ```rust,no_run
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::IssueRef,
@@ -121,6 +131,12 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
     );
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     let request = CreateTaskFromIssueRequest::new(
         "github",
@@ -130,9 +146,9 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_labels(vec!["feature".to_owned(), "roadmap-1.2.1".to_owned()]);
 
-    let created = service.create_from_issue(request).await?;
+    let created = service.create_from_issue(&ctx, request).await?;
     let issue_ref = IssueRef::from_parts("github", "corbusier/core", 120)?;
-    let fetched = service.find_by_issue_ref(&issue_ref).await?;
+    let fetched = service.find_by_issue_ref(&ctx, &issue_ref).await?;
 
     assert_eq!(fetched, Some(created));
     Ok(())
@@ -151,6 +167,8 @@ to `in_review`.
 ```rust,no_run
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{BranchRef, PullRequestRef, TaskState},
@@ -166,10 +184,16 @@ async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
     );
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     // Create a task from an issue.
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
+        .create_from_issue(&ctx, CreateTaskFromIssueRequest::new(
             "github",
             "corbusier/core",
             200,
@@ -179,7 +203,7 @@ async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
 
     // Associate a branch with the task.
     let updated = service
-        .associate_branch(AssociateBranchRequest::new(
+        .associate_branch(&ctx, AssociateBranchRequest::new(
             task.id(),
             "github",
             "corbusier/core",
@@ -190,12 +214,12 @@ async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
 
     // Retrieve the task by branch reference.
     let branch_ref = BranchRef::from_parts("github", "corbusier/core", "feature/branch-tracking")?;
-    let found = service.find_by_branch_ref(&branch_ref).await?;
+    let found = service.find_by_branch_ref(&ctx, &branch_ref).await?;
     assert_eq!(found.len(), 1);
 
     // Associate a pull request — this transitions the task to in_review.
     let reviewed = service
-        .associate_pull_request(AssociatePullRequestRequest::new(
+        .associate_pull_request(&ctx, AssociatePullRequestRequest::new(
             task.id(),
             "github",
             "corbusier/core",
@@ -206,7 +230,7 @@ async fn associate_branch_and_pr() -> Result<(), Box<dyn std::error::Error>> {
 
     // Retrieve the task by pull request reference.
     let pr_ref = PullRequestRef::from_parts("github", "corbusier/core", 42)?;
-    let found = service.find_by_pull_request_ref(&pr_ref).await?;
+    let found = service.find_by_pull_request_ref(&ctx, &pr_ref).await?;
     assert_eq!(found.len(), 1);
 
     Ok(())
@@ -235,6 +259,8 @@ Table 1. Allowed task state transitions.
 ```rust,no_run
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{TaskDomainError, TaskState},
@@ -250,9 +276,15 @@ async fn transition_task_states() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(InMemoryTaskRepository::new()),
         Arc::new(DefaultClock),
     );
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
+        .create_from_issue(&ctx, CreateTaskFromIssueRequest::new(
             "github",
             "corbusier/core",
             330,
@@ -261,12 +293,12 @@ async fn transition_task_states() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let transitioned = service
-        .transition_task(TransitionTaskRequest::new(task.id(), "in_progress"))
+        .transition_task(&ctx, TransitionTaskRequest::new(task.id(), "in_progress"))
         .await?;
     assert_eq!(transitioned.state(), TaskState::InProgress);
 
     let invalid = service
-        .transition_task(TransitionTaskRequest::new(task.id(), "draft"))
+        .transition_task(&ctx, TransitionTaskRequest::new(task.id(), "draft"))
         .await;
 
     assert!(matches!(
@@ -296,6 +328,8 @@ use corbusier::agent_backend::{
     adapters::memory::InMemoryBackendRegistry,
     services::{BackendRegistryService, RegisterBackendRequest},
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use mockable::DefaultClock;
 
 #[tokio::main]
@@ -304,10 +338,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(InMemoryBackendRegistry::new()),
         Arc::new(DefaultClock),
     );
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     // Register two backends.
     let claude = service
         .register(
+            &ctx,
             RegisterBackendRequest::new(
                 "claude_code_sdk",
                 "Claude Code SDK",
@@ -320,6 +361,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     service
         .register(
+            &ctx,
             RegisterBackendRequest::new(
                 "codex_cli",
                 "Codex CLI",
@@ -331,18 +373,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // List all registered backends.
-    let all = service.list_all().await?;
+    let all = service.list_all(&ctx).await?;
     assert_eq!(all.len(), 2);
 
     // Look up a backend by name.
-    let found = service.find_by_name("claude_code_sdk").await?;
+    let found = service.find_by_name(&ctx, "claude_code_sdk").await?;
     assert!(found.is_some());
 
     // Deactivate a backend — it no longer appears in active listings.
-    service.deactivate(claude.id()).await?;
-    let active = service.list_active().await?;
+    service.deactivate(&ctx, claude.id()).await?;
+    let active = service.list_active(&ctx).await?;
     assert_eq!(active.len(), 1);
 
+    Ok(())
+}
+```
+
+## Tenant context
+
+All repository and service operations on tenant-owned data require a
+`RequestContext`. This cross-cutting struct carries the tenant identity,
+distributed tracing identifiers, and the authenticated principal.
+
+```rust,no_run
+use corbusier::context::{
+    CausationId, CorrelationId, RequestContext, SessionId, UserId,
+};
+use corbusier::tenant::TenantId;
+
+fn build_request_context() {
+    // Required fields: tenant, correlation, user, session.
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+
+    // Optional causation ID links the operation to its triggering event.
+    let ctx_with_cause = ctx.with_causation_id(CausationId::new());
+    assert!(ctx_with_cause.causation_id().is_some());
+}
+```
+
+Tenant identity is modelled separately from user identity. The `TenantSlug`
+type enforces Domain Name System (DNS)-label-safe formatting: lowercase
+alphanumeric plus hyphens, 1–63 characters, no leading or trailing hyphens, no
+consecutive hyphens.
+
+```rust,no_run
+use corbusier::tenant::{Tenant, TenantSlug, TenantStatus};
+use corbusier::context::UserId;
+use mockable::DefaultClock;
+
+fn create_tenant() -> Result<(), Box<dyn std::error::Error>> {
+    let clock = DefaultClock;
+    let slug = TenantSlug::new("acme-corp")?;
+    let owner = UserId::new();
+    let tenant = Tenant::new(slug, "Acme Corporation", owner, &clock)?;
+
+    assert_eq!(tenant.slug().as_str(), "acme-corp");
+    assert_eq!(tenant.display_name(), "Acme Corporation");
+    assert_eq!(tenant.status(), TenantStatus::Active);
     Ok(())
 }
 ```

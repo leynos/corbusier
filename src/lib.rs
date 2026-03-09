@@ -14,10 +14,15 @@
 //!
 //! # Modules
 //!
+//! - [`context`]: Cross-cutting request context and identity types
+//! - [`tenant`]: Tenant identity and lifecycle
 //! - [`agent_backend`]: Agent backend registration and discovery
 //! - [`message`]: Canonical message format and validation
 //! - [`task`]: Issue-to-task creation and lifecycle tracking
 //! - [`tool_registry`]: MCP server lifecycle management and tool discovery
+
+pub mod context;
+pub mod tenant;
 
 pub mod agent_backend;
 pub mod message;

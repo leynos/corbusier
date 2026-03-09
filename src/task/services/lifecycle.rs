@@ -3,6 +3,7 @@
 //! Provides [`TaskLifecycleService`] which coordinates issue-to-task creation,
 //! branch and pull request association, and lookup operations.
 
+use crate::context::RequestContext;
 use crate::task::{
     domain::{
         BranchRef, ExternalIssue, ExternalIssueMetadata, IssueRef, ParseTaskStateError,
@@ -204,9 +205,13 @@ where
         Self { repository, clock }
     }
 
-    async fn find_task_by_id_or_error(&self, task_id: TaskId) -> TaskLifecycleResult<Task> {
+    async fn find_task_by_id_or_error(
+        &self,
+        ctx: &RequestContext,
+        task_id: TaskId,
+    ) -> TaskLifecycleResult<Task> {
         self.repository
-            .find_by_id(task_id)
+            .find_by_id(ctx, task_id)
             .await?
             .ok_or_else(|| TaskRepositoryError::NotFound(task_id).into())
     }
@@ -219,6 +224,7 @@ where
     /// repository rejects persistence.
     pub async fn create_from_issue(
         &self,
+        ctx: &RequestContext,
         request: CreateTaskFromIssueRequest,
     ) -> TaskLifecycleResult<Task> {
         let CreateTaskFromIssueRequest {
@@ -240,7 +246,7 @@ where
 
         let external_issue = ExternalIssue::new(issue_ref, metadata);
         let task = Task::new_from_issue(&external_issue, &*self.clock);
-        self.repository.store(&task).await?;
+        self.repository.store(ctx, &task).await?;
         Ok(task)
     }
 
@@ -254,9 +260,10 @@ where
     /// fails.
     pub async fn find_by_issue_ref(
         &self,
+        ctx: &RequestContext,
         issue_ref: &IssueRef,
     ) -> TaskLifecycleResult<Option<Task>> {
-        Ok(self.repository.find_by_issue_ref(issue_ref).await?)
+        Ok(self.repository.find_by_issue_ref(ctx, issue_ref).await?)
     }
 
     /// Associates a branch with an existing task.
@@ -268,6 +275,7 @@ where
     /// when the task is not found or persistence fails.
     pub async fn associate_branch(
         &self,
+        ctx: &RequestContext,
         request: AssociateBranchRequest,
     ) -> TaskLifecycleResult<Task> {
         let AssociateBranchRequest {
@@ -278,9 +286,9 @@ where
         } = request;
 
         let branch_ref = BranchRef::from_parts(&provider, &repository, &branch_name)?;
-        let mut task = self.find_task_by_id_or_error(task_id).await?;
+        let mut task = self.find_task_by_id_or_error(ctx, task_id).await?;
         task.associate_branch(branch_ref, &*self.clock)?;
-        self.repository.update(&task).await?;
+        self.repository.update(ctx, &task).await?;
         Ok(task)
     }
 
@@ -294,6 +302,7 @@ where
     /// when the task is not found or persistence fails.
     pub async fn associate_pull_request(
         &self,
+        ctx: &RequestContext,
         request: AssociatePullRequestRequest,
     ) -> TaskLifecycleResult<Task> {
         let AssociatePullRequestRequest {
@@ -304,9 +313,9 @@ where
         } = request;
 
         let pr_ref = PullRequestRef::from_parts(&provider, &repository, pull_request_number)?;
-        let mut task = self.find_task_by_id_or_error(task_id).await?;
+        let mut task = self.find_task_by_id_or_error(ctx, task_id).await?;
         task.associate_pull_request(pr_ref, &*self.clock)?;
-        self.repository.update(&task).await?;
+        self.repository.update(ctx, &task).await?;
         Ok(task)
     }
 
@@ -320,6 +329,7 @@ where
     /// or persistence fails.
     pub async fn transition_task(
         &self,
+        ctx: &RequestContext,
         request: TransitionTaskRequest,
     ) -> TaskLifecycleResult<Task> {
         let TransitionTaskRequest {
@@ -328,9 +338,9 @@ where
         } = request;
 
         let parsed_target_state = TaskState::try_from(target_state.as_str())?;
-        let mut task = self.find_task_by_id_or_error(task_id).await?;
+        let mut task = self.find_task_by_id_or_error(ctx, task_id).await?;
         task.transition_to(parsed_target_state, &*self.clock)?;
-        self.repository.update(&task).await?;
+        self.repository.update(ctx, &task).await?;
         Ok(task)
     }
 
@@ -344,9 +354,10 @@ where
     /// fails.
     pub async fn find_by_branch_ref(
         &self,
+        ctx: &RequestContext,
         branch_ref: &BranchRef,
     ) -> TaskLifecycleResult<Vec<Task>> {
-        Ok(self.repository.find_by_branch_ref(branch_ref).await?)
+        Ok(self.repository.find_by_branch_ref(ctx, branch_ref).await?)
     }
 
     /// Retrieves all tasks linked to a pull request reference.
@@ -359,8 +370,12 @@ where
     /// fails.
     pub async fn find_by_pull_request_ref(
         &self,
+        ctx: &RequestContext,
         pr_ref: &PullRequestRef,
     ) -> TaskLifecycleResult<Vec<Task>> {
-        Ok(self.repository.find_by_pull_request_ref(pr_ref).await?)
+        Ok(self
+            .repository
+            .find_by_pull_request_ref(ctx, pr_ref)
+            .await?)
     }
 }

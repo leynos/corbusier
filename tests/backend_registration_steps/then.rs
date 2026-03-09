@@ -8,8 +8,8 @@ use rstest_bdd_macros::then;
 
 #[then("listing all backends returns {count:usize} entries")]
 fn list_all_returns_count(world: &mut BackendWorld, count: usize) -> Result<(), eyre::Report> {
-    let all =
-        run_async(world.service.list_all()).map_err(|err| eyre::eyre!("list_all failed: {err}"))?;
+    let all = run_async(world.service.list_all(&world.ctx))
+        .map_err(|err| eyre::eyre!("list_all failed: {err}"))?;
     world.last_list_all_result = Some(all.clone());
     if all.len() != count {
         return Err(eyre::eyre!(
@@ -22,7 +22,7 @@ fn list_all_returns_count(world: &mut BackendWorld, count: usize) -> Result<(), 
 
 #[then(r#"the backend "{name}" can be found by name"#)]
 fn backend_found_by_name(world: &mut BackendWorld, name: String) -> Result<(), eyre::Report> {
-    let found = run_async(world.service.find_by_name(&name))
+    let found = run_async(world.service.find_by_name(&world.ctx, &name))
         .map_err(|err| eyre::eyre!("find_by_name failed: {err}"))?;
     if found.is_none() {
         return Err(eyre::eyre!("expected backend '{name}' to exist"));
@@ -49,7 +49,7 @@ fn registration_fails_with_duplicate_name(world: &BackendWorld) -> Result<(), ey
 
 #[then(r#"listing active backends does not include "{name}""#)]
 fn active_listing_excludes(world: &mut BackendWorld, name: String) -> Result<(), eyre::Report> {
-    let active = run_async(world.service.list_active())
+    let active = run_async(world.service.list_active(&world.ctx))
         .map_err(|err| eyre::eyre!("list_active failed: {err}"))?;
     world.last_list_active_result = Some(active.clone());
     if active.iter().any(|b| b.name().as_str() == name) {
@@ -60,8 +60,8 @@ fn active_listing_excludes(world: &mut BackendWorld, name: String) -> Result<(),
 
 #[then(r#"listing all backends still includes "{name}""#)]
 fn all_listing_includes(world: &mut BackendWorld, name: String) -> Result<(), eyre::Report> {
-    let all =
-        run_async(world.service.list_all()).map_err(|err| eyre::eyre!("list_all failed: {err}"))?;
+    let all = run_async(world.service.list_all(&world.ctx))
+        .map_err(|err| eyre::eyre!("list_all failed: {err}"))?;
     if !all.iter().any(|b| b.name().as_str() == name) {
         return Err(eyre::eyre!("expected all-listing to include '{name}'"));
     }

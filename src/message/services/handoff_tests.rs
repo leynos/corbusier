@@ -1,6 +1,7 @@
 //! Tests for the handoff service.
 
 use super::{HandoffService, ServiceInitiateParams};
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::message::{
     adapters::memory::{
         InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
@@ -12,6 +13,15 @@ use crate::message::{
     ports::handoff::HandoffError,
 };
 use std::sync::Arc;
+
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 struct ServiceHarness {
     service: HandoffService<
@@ -44,6 +54,7 @@ fn create_service() -> ServiceHarness {
 
 #[tokio::test]
 async fn initiate_handoff_requires_active_session() {
+    let ctx = ctx();
     let service = create_service().service;
     let session_id = AgentSessionId::new();
 
@@ -53,7 +64,7 @@ async fn initiate_handoff_requires_active_session() {
         TurnId::new(),
         SequenceNumber::new(5),
     );
-    let result = service.initiate(params).await;
+    let result = service.initiate(&ctx, params).await;
 
     assert!(result.is_err());
     let err = result.expect_err("should be error");
@@ -62,6 +73,7 @@ async fn initiate_handoff_requires_active_session() {
 
 #[tokio::test]
 async fn create_target_session_stores_session() {
+    let ctx = ctx();
     let harness = create_service();
     let conversation_id = ConversationId::new();
     let handoff_id = HandoffId::new();
@@ -74,7 +86,7 @@ async fn create_target_session_stores_session() {
     );
     let session = harness
         .service
-        .create_target_session(params)
+        .create_target_session(&ctx, params)
         .await
         .expect("should create session");
 
@@ -84,7 +96,7 @@ async fn create_target_session_stores_session() {
 
     let found = harness
         .session_repo
-        .find_by_id(session.session_id)
+        .find_by_id(&ctx, session.session_id)
         .await
         .expect("should find")
         .expect("session should exist");

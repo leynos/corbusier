@@ -1,5 +1,6 @@
 //! `PostgreSQL` integration tests for issue-to-task creation and lookup.
 
+use corbusier::context::RequestContext;
 use corbusier::task::{
     adapters::postgres::{PostgresTaskRepository, TaskPgPool},
     domain::{IssueRef, TaskDomainError},
@@ -15,7 +16,7 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_context,
 };
 
 struct TaskTestContext {
@@ -56,10 +57,12 @@ async fn context(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_create_and_lookup_by_issue_reference(
+    test_request_context: RequestContext,
     #[future] context: Result<TaskTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let task_context = context.await?;
     let service = &task_context.service;
+    let ctx = test_request_context;
 
     let request = CreateTaskFromIssueRequest::new(
         "github",
@@ -69,14 +72,14 @@ async fn postgres_create_and_lookup_by_issue_reference(
     )
     .with_description("Verify task creation and retrieval in PostgreSQL");
     let created = service
-        .create_from_issue(request)
+        .create_from_issue(&ctx, request)
         .await
         .expect("task creation should succeed");
 
     let issue_ref =
         IssueRef::from_parts("github", "corbusier/core", 321).expect("valid issue reference");
     let found = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
 
@@ -98,28 +101,26 @@ async fn postgres_create_and_lookup_by_issue_reference(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_duplicate_issue_reference_is_rejected(
+    test_request_context: RequestContext,
     #[future] context: Result<TaskTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let task_context = context.await?;
     let service = &task_context.service;
+    let ctx = test_request_context;
 
     service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "gitlab",
-            "corbusier/core",
-            17,
-            "First task",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("gitlab", "corbusier/core", 17, "First task"),
+        )
         .await
         .expect("first task creation should succeed");
 
     let duplicate_result = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "gitlab",
-            "corbusier/core",
-            17,
-            "Duplicate task",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("gitlab", "corbusier/core", 17, "Duplicate task"),
+        )
         .await;
 
     assert!(matches!(
@@ -134,15 +135,17 @@ async fn postgres_duplicate_issue_reference_is_rejected(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_lookup_returns_none_for_missing_issue_reference(
+    test_request_context: RequestContext,
     #[future] context: Result<TaskTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let task_context = context.await?;
     let service = &task_context.service;
+    let ctx = test_request_context;
 
     let issue_ref =
         IssueRef::from_parts("github", "corbusier/core", 10001).expect("valid issue reference");
     let found = service
-        .find_by_issue_ref(&issue_ref)
+        .find_by_issue_ref(&ctx, &issue_ref)
         .await
         .expect("lookup should succeed");
 
@@ -153,19 +156,24 @@ async fn postgres_lookup_returns_none_for_missing_issue_reference(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_create_rejects_issue_number_beyond_supported_range(
+    test_request_context: RequestContext,
     #[future] context: Result<TaskTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let task_context = context.await?;
     let service = &task_context.service;
+    let ctx = test_request_context;
     let too_large_issue_number = (i64::MAX as u64) + 1;
 
     let result = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            too_large_issue_number,
-            "Out-of-range issue number",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                too_large_issue_number,
+                "Out-of-range issue number",
+            ),
+        )
         .await;
 
     assert!(
@@ -182,24 +190,29 @@ async fn postgres_create_rejects_issue_number_beyond_supported_range(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_repository_find_by_id_round_trips_created_task(
+    test_request_context: RequestContext,
     #[future] context: Result<TaskTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let task_context = context.await?;
     let service = &task_context.service;
     let repository = &task_context.repository;
+    let ctx = test_request_context;
 
     let created = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "corbusier/core",
-            42,
-            "find_by_id round trip",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                42,
+                "find_by_id round trip",
+            ),
+        )
         .await
         .expect("task creation should succeed");
 
     let fetched = repository
-        .find_by_id(created.id())
+        .find_by_id(&ctx, created.id())
         .await
         .expect("repository lookup should succeed")
         .expect("task should exist in repository");

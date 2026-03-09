@@ -1,6 +1,7 @@
 //! Session management tests for in-memory handoffs.
 
-use super::harness::{HandoffTestHarness, TestResult, clock, harness, runtime};
+use super::harness::{HandoffTestHarness, TestResult, clock, ctx, harness, runtime};
+use corbusier::context::RequestContext;
 use corbusier::message::domain::{
     AgentSession, AgentSessionState, ConversationId, HandoffSessionParams, SequenceNumber,
 };
@@ -13,6 +14,7 @@ use tokio::runtime::Runtime;
 fn create_session_from_handoff_stores_correctly(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
@@ -27,7 +29,7 @@ fn create_session_from_handoff_stores_correctly(
         );
         let session = harness
             .service
-            .create_target_session(params)
+            .create_target_session(&ctx, params)
             .await
             .expect("should create session");
 
@@ -38,7 +40,7 @@ fn create_session_from_handoff_stores_correctly(
 
         let found = harness
             .session_repo
-            .find_by_id(session.session_id)
+            .find_by_id(&ctx, session.session_id)
             .await
             .expect("should find")
             .expect("session should exist");
@@ -51,6 +53,7 @@ fn create_session_from_handoff_stores_correctly(
 fn session_repository_finds_active_session(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) {
     let runtime_handle = runtime.expect("runtime");
@@ -61,13 +64,13 @@ fn session_repository_finds_active_session(
 
         harness
             .session_repo
-            .store(&session)
+            .store(&ctx, &session)
             .await
             .expect("should store");
 
         let active = harness
             .session_repo
-            .find_active_for_conversation(conversation_id)
+            .find_active_for_conversation(&ctx, conversation_id)
             .await
             .expect("should query")
             .expect("should find active session");
@@ -80,32 +83,43 @@ fn session_repository_finds_active_session(
 fn session_repository_lists_by_conversation(
     runtime: TestResult<Runtime>,
     harness: HandoffTestHarness,
+    ctx: RequestContext,
     clock: DefaultClock,
 ) {
     let runtime_handle = runtime.expect("runtime");
     runtime_handle.block_on(async {
         let conversation_id = ConversationId::new();
 
-        let session1 =
+        let mut session1 =
             AgentSession::new(conversation_id, "agent-1", SequenceNumber::new(1), &clock);
+
+        harness
+            .session_repo
+            .store(&ctx, &session1)
+            .await
+            .expect("store 1");
+
+        // End session1 so session2 can be the active session (one active per conversation).
+        let handoff_id = corbusier::message::domain::HandoffId::new();
+        session1.handoff(SequenceNumber::new(9), handoff_id, &clock);
+        harness
+            .session_repo
+            .update(&ctx, &session1)
+            .await
+            .expect("end session 1");
 
         let session2 =
             AgentSession::new(conversation_id, "agent-2", SequenceNumber::new(10), &clock);
 
         harness
             .session_repo
-            .store(&session1)
-            .await
-            .expect("store 1");
-        harness
-            .session_repo
-            .store(&session2)
+            .store(&ctx, &session2)
             .await
             .expect("store 2");
 
         let sessions = harness
             .session_repo
-            .find_by_conversation(conversation_id)
+            .find_by_conversation(&ctx, conversation_id)
             .await
             .expect("should list");
 

@@ -3,6 +3,7 @@
 //! Defines the abstract interface for capturing and retrieving context window
 //! snapshots, enabling audit and reconstruction of agent session state.
 
+use crate::context::RequestContext;
 use crate::message::domain::{AgentSessionId, ContextWindowSnapshot, ConversationId};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -16,6 +17,14 @@ pub type SnapshotResult<T> = Result<T, SnapshotError>;
 ///
 /// Implementations store and retrieve snapshots of the context window
 /// at various points during an agent session.
+///
+/// # Implementation Notes
+///
+/// Implementations must ensure:
+/// - Snapshot IDs are unique across the entire system
+/// - Concurrent access is handled safely
+/// - All queries and mutations are scoped to the tenant identified
+///   by [`RequestContext::tenant_id`](crate::context::RequestContext)
 #[async_trait]
 pub trait ContextSnapshotPort: Send + Sync {
     /// Stores a pre-built context snapshot.
@@ -24,14 +33,22 @@ pub trait ContextSnapshotPort: Send + Sync {
     ///
     /// Returns [`SnapshotError::Duplicate`] if a snapshot with the same ID
     /// already exists, or [`SnapshotError::Persistence`] if storage fails.
-    async fn store_snapshot(&self, snapshot: &ContextWindowSnapshot) -> SnapshotResult<()>;
+    async fn store_snapshot(
+        &self,
+        ctx: &RequestContext,
+        snapshot: &ContextWindowSnapshot,
+    ) -> SnapshotResult<()>;
 
     /// Retrieves a snapshot by its ID.
     ///
     /// # Errors
     ///
     /// Returns [`SnapshotError::Persistence`] if the lookup fails.
-    async fn find_by_id(&self, snapshot_id: Uuid) -> SnapshotResult<Option<ContextWindowSnapshot>>;
+    async fn find_by_id(
+        &self,
+        ctx: &RequestContext,
+        snapshot_id: Uuid,
+    ) -> SnapshotResult<Option<ContextWindowSnapshot>>;
 
     /// Retrieves snapshots for a session.
     ///
@@ -40,6 +57,7 @@ pub trait ContextSnapshotPort: Send + Sync {
     /// Returns [`SnapshotError::Persistence`] if retrieval fails.
     async fn find_snapshots_for_session(
         &self,
+        ctx: &RequestContext,
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>>;
 
@@ -50,6 +68,7 @@ pub trait ContextSnapshotPort: Send + Sync {
     /// Returns [`SnapshotError::Persistence`] if retrieval fails.
     async fn find_latest_snapshot(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>>;
 }

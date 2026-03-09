@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::task::{
     adapters::memory::InMemoryTaskRepository,
     domain::{BranchRef, PullRequestRef, Task, TaskDomainError, TaskId, TaskState},
@@ -17,6 +18,16 @@ use rstest::{fixture, rstest};
 type TestService = TaskLifecycleService<InMemoryTaskRepository, DefaultClock>;
 
 #[fixture]
+fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
+#[fixture]
 fn service() -> TestService {
     TaskLifecycleService::new(
         Arc::new(InMemoryTaskRepository::new()),
@@ -26,12 +37,13 @@ fn service() -> TestService {
 
 async fn create_test_task(
     service: &TestService,
+    ctx: &RequestContext,
     issue_number: u32,
     title: &str,
 ) -> Result<Task, TaskLifecycleError> {
     let request =
         CreateTaskFromIssueRequest::new("github", "owner/repo", u64::from(issue_number), title);
-    service.create_from_issue(request).await
+    service.create_from_issue(ctx, request).await
 }
 
 fn assert_not_found_error<T: std::fmt::Debug>(result: Result<T, TaskLifecycleError>) {
@@ -92,15 +104,15 @@ async fn assert_duplicate_association_rejected<F1, F2, Fut1, Fut2, E>(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_persists_and_is_retrievable(service: TestService) {
-    let task = create_test_task(&service, 500, "Task for branch test")
+async fn associate_branch_persists_and_is_retrievable(service: TestService, ctx: RequestContext) {
+    let task = create_test_task(&service, &ctx, 500, "Task for branch test")
         .await
         .expect("task creation should succeed");
     let request =
         AssociateBranchRequest::new(task.id(), "github", "owner/repo", "feature/branch-test");
 
     let updated = service
-        .associate_branch(request)
+        .associate_branch(&ctx, request)
         .await
         .expect("branch association should succeed");
 
@@ -109,7 +121,7 @@ async fn associate_branch_persists_and_is_retrievable(service: TestService) {
     let branch_ref = BranchRef::from_parts("github", "owner/repo", "feature/branch-test")
         .expect("valid branch ref");
     let found = service
-        .find_by_branch_ref(&branch_ref)
+        .find_by_branch_ref(&ctx, &branch_ref)
         .await
         .expect("lookup should succeed");
     assert_single_task_found(&found, task.id());
@@ -117,28 +129,27 @@ async fn associate_branch_persists_and_is_retrievable(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
-    let task = create_test_task(&service, 501, "Task")
+async fn associate_branch_rejects_duplicate_on_same_task(
+    service: TestService,
+    ctx: RequestContext,
+) {
+    let task = create_test_task(&service, &ctx, 501, "Task")
         .await
         .expect("task creation should succeed");
 
     assert_duplicate_association_rejected(
         task.id(),
         |task_id| {
-            service.associate_branch(AssociateBranchRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                "branch-1",
-            ))
+            service.associate_branch(
+                &ctx,
+                AssociateBranchRequest::new(task_id, "github", "owner/repo", "branch-1"),
+            )
         },
         |task_id| {
-            service.associate_branch(AssociateBranchRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                "branch-2",
-            ))
+            service.associate_branch(
+                &ctx,
+                AssociateBranchRequest::new(task_id, "github", "owner/repo", "branch-2"),
+            )
         },
         assert_branch_already_associated_error,
     )
@@ -149,17 +160,21 @@ async fn associate_branch_rejects_duplicate_on_same_task(service: TestService) {
 #[case::branch("branch")]
 #[case::pull_request("pull_request")]
 #[tokio::test(flavor = "multi_thread")]
-async fn association_returns_not_found_for_unknown_task(service: TestService, #[case] kind: &str) {
+async fn association_returns_not_found_for_unknown_task(
+    service: TestService,
+    ctx: RequestContext,
+    #[case] kind: &str,
+) {
     let unknown_id = TaskId::new();
 
     let result: Result<Task, TaskLifecycleError> = match kind {
         "branch" => {
             let request = AssociateBranchRequest::new(unknown_id, "github", "owner/repo", "main");
-            service.associate_branch(request).await
+            service.associate_branch(&ctx, request).await
         }
         "pull_request" => {
             let request = AssociatePullRequestRequest::new(unknown_id, "github", "owner/repo", 1);
-            service.associate_pull_request(request).await
+            service.associate_pull_request(&ctx, request).await
         }
         other => panic!("unknown association kind: {other}"),
     };
@@ -169,19 +184,17 @@ async fn association_returns_not_found_for_unknown_task(service: TestService, #[
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_branch_rejects_invalid_branch_name(service: TestService) {
+async fn associate_branch_rejects_invalid_branch_name(service: TestService, ctx: RequestContext) {
     let task = service
-        .create_from_issue(CreateTaskFromIssueRequest::new(
-            "github",
-            "owner/repo",
-            502,
-            "Task",
-        ))
+        .create_from_issue(
+            &ctx,
+            CreateTaskFromIssueRequest::new("github", "owner/repo", 502, "Task"),
+        )
         .await
         .expect("task creation should succeed");
     let request = AssociateBranchRequest::new(task.id(), "github", "owner/repo", "invalid:branch");
 
-    let result = service.associate_branch(request).await;
+    let result = service.associate_branch(&ctx, request).await;
 
     assert!(matches!(
         result,
@@ -195,14 +208,17 @@ async fn associate_branch_rejects_invalid_branch_name(service: TestService) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_pull_request_persists_and_transitions_to_in_review(service: TestService) {
-    let task = create_test_task(&service, 600, "Task")
+async fn associate_pull_request_persists_and_transitions_to_in_review(
+    service: TestService,
+    ctx: RequestContext,
+) {
+    let task = create_test_task(&service, &ctx, 600, "Task")
         .await
         .expect("task creation should succeed");
     let request = AssociatePullRequestRequest::new(task.id(), "github", "owner/repo", 42);
 
     let updated = service
-        .associate_pull_request(request)
+        .associate_pull_request(&ctx, request)
         .await
         .expect("PR association should succeed");
 
@@ -211,7 +227,7 @@ async fn associate_pull_request_persists_and_transitions_to_in_review(service: T
 
     let pr_ref = PullRequestRef::from_parts("github", "owner/repo", 42).expect("valid PR ref");
     let found = service
-        .find_by_pull_request_ref(&pr_ref)
+        .find_by_pull_request_ref(&ctx, &pr_ref)
         .await
         .expect("lookup should succeed");
     assert_single_task_found(&found, task.id());
@@ -219,28 +235,27 @@ async fn associate_pull_request_persists_and_transitions_to_in_review(service: T
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn associate_pull_request_rejects_duplicate_on_same_task(service: TestService) {
-    let task = create_test_task(&service, 601, "Task")
+async fn associate_pull_request_rejects_duplicate_on_same_task(
+    service: TestService,
+    ctx: RequestContext,
+) {
+    let task = create_test_task(&service, &ctx, 601, "Task")
         .await
         .expect("task creation should succeed");
 
     assert_duplicate_association_rejected(
         task.id(),
         |task_id| {
-            service.associate_pull_request(AssociatePullRequestRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                10,
-            ))
+            service.associate_pull_request(
+                &ctx,
+                AssociatePullRequestRequest::new(task_id, "github", "owner/repo", 10),
+            )
         },
         |task_id| {
-            service.associate_pull_request(AssociatePullRequestRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                20,
-            ))
+            service.associate_pull_request(
+                &ctx,
+                AssociatePullRequestRequest::new(task_id, "github", "owner/repo", 20),
+            )
         },
         assert_pr_already_associated_error,
     )
@@ -282,14 +297,14 @@ async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
+async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: RequestContext) {
     let branch_ref =
         BranchRef::from_parts("github", "owner/repo", "shared/branch").expect("valid branch ref");
     let tasks = [
-        create_test_task(&service, 700, "Task 1")
+        create_test_task(&service, &ctx, 700, "Task 1")
             .await
             .expect("first task creation should succeed"),
-        create_test_task(&service, 701, "Task 2")
+        create_test_task(&service, &ctx, 701, "Task 2")
             .await
             .expect("second task creation should succeed"),
     ];
@@ -297,27 +312,28 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService) {
     assert_multiple_tasks_share_reference(
         tasks,
         |task_id| {
-            service.associate_branch(AssociateBranchRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                "shared/branch",
-            ))
+            service.associate_branch(
+                &ctx,
+                AssociateBranchRequest::new(task_id, "github", "owner/repo", "shared/branch"),
+            )
         },
-        || service.find_by_branch_ref(&branch_ref),
+        || service.find_by_branch_ref(&ctx, &branch_ref),
     )
     .await;
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) {
+async fn multiple_tasks_sharing_pull_request_all_returned(
+    service: TestService,
+    ctx: RequestContext,
+) {
     let pr_ref = PullRequestRef::from_parts("github", "owner/repo", 99).expect("valid PR ref");
     let tasks = [
-        create_test_task(&service, 800, "PR share 1")
+        create_test_task(&service, &ctx, 800, "PR share 1")
             .await
             .expect("first task creation should succeed"),
-        create_test_task(&service, 801, "PR share 2")
+        create_test_task(&service, &ctx, 801, "PR share 2")
             .await
             .expect("second task creation should succeed"),
     ];
@@ -325,14 +341,12 @@ async fn multiple_tasks_sharing_pull_request_all_returned(service: TestService) 
     assert_multiple_tasks_share_reference(
         tasks,
         |task_id| {
-            service.associate_pull_request(AssociatePullRequestRequest::new(
-                task_id,
-                "github",
-                "owner/repo",
-                99,
-            ))
+            service.associate_pull_request(
+                &ctx,
+                AssociatePullRequestRequest::new(task_id, "github", "owner/repo", 99),
+            )
         },
-        || service.find_by_pull_request_ref(&pr_ref),
+        || service.find_by_pull_request_ref(&ctx, &pr_ref),
     )
     .await;
 }

@@ -3,6 +3,7 @@
 //! Provides production-grade persistence for context window snapshots with JSONB
 //! storage for message summaries and tool call references.
 
+use crate::context::RequestContext;
 use crate::message::{
     adapters::models::{ContextSnapshotRow, NewContextSnapshot},
     adapters::schema::context_snapshots,
@@ -82,7 +83,11 @@ impl PostgresContextSnapshotAdapter {
 
 #[async_trait]
 impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
-    async fn store_snapshot(&self, snapshot: &ContextWindowSnapshot) -> SnapshotResult<()> {
+    async fn store_snapshot(
+        &self,
+        _ctx: &RequestContext,
+        snapshot: &ContextWindowSnapshot,
+    ) -> SnapshotResult<()> {
         let pool = self.pool.clone();
         let new_snapshot = snapshot_to_new_row(snapshot)?;
         let snapshot_id = snapshot.snapshot_id;
@@ -111,6 +116,7 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_by_id(
         &self,
+        _ctx: &RequestContext,
         snapshot_id: uuid::Uuid,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         self.find_one(move |table| {
@@ -123,6 +129,7 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_snapshots_for_session(
         &self,
+        _ctx: &RequestContext,
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>> {
         let uuid = session_id.into_inner();
@@ -138,6 +145,7 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_latest_snapshot(
         &self,
+        _ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         let uuid = conversation_id.into_inner();

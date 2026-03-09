@@ -32,7 +32,7 @@ fn task_already_exists(world: &mut TaskWorld) -> Result<(), eyre::Report> {
         .pending_request
         .clone()
         .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
-    let created = run_async(world.service.create_from_issue(request))
+    let created = run_async(world.service.create_from_issue(&world.ctx, request))
         .wrap_err("create initial task for duplicate scenario")?;
 
     world.last_created_task = Some(created);

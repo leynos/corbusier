@@ -3,6 +3,7 @@
 //! Context is propagated to `PostgreSQL` via session settings for trigger capture,
 //! enabling comprehensive audit trails per corbusier-design.md §6.2.3.4.
 
+use crate::context::RequestContext;
 use uuid::Uuid;
 
 /// Audit context for a database operation.
@@ -90,5 +91,18 @@ impl AuditContext {
             && self.causation_id.is_none()
             && self.user_id.is_none()
             && self.session_id.is_none()
+    }
+}
+
+impl From<&RequestContext> for AuditContext {
+    fn from(ctx: &RequestContext) -> Self {
+        Self {
+            correlation_id: Some(ctx.correlation_id().into_inner()),
+            causation_id: ctx
+                .causation_id()
+                .map(crate::context::CausationId::into_inner),
+            user_id: Some(ctx.user_id().into_inner()),
+            session_id: Some(ctx.session_id().into_inner()),
+        }
     }
 }

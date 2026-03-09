@@ -31,7 +31,7 @@ fn task_retrievable_by_branch_ref(world: &TaskBranchPrWorld) -> Result<(), eyre:
     let branch_ref = task
         .branch_ref()
         .ok_or_else(|| eyre::eyre!("task should have a branch reference"))?;
-    let found = run_async(world.service.find_by_branch_ref(branch_ref))
+    let found = run_async(world.service.find_by_branch_ref(&world.ctx, branch_ref))
         .map_err(|err| eyre::eyre!("branch ref lookup failed: {err}"))?;
     if found.is_empty() {
         return Err(eyre::eyre!("expected at least one task for branch ref"));

@@ -1,5 +1,6 @@
 //! Shared harness for in-memory handoff integration tests.
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::{
     adapters::memory::{
         InMemoryAgentSessionRepository, InMemoryContextSnapshotAdapter, InMemoryHandoffAdapter,
@@ -27,6 +28,17 @@ pub fn runtime() -> TestResult<Runtime> {
 #[fixture]
 pub fn clock() -> DefaultClock {
     DefaultClock
+}
+
+/// Provides a default request context for tests.
+#[fixture]
+pub fn ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
 }
 
 /// A test harness containing all components needed for handoff testing.

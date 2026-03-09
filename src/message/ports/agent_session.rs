@@ -3,6 +3,7 @@
 //! Defines the abstract interface for storing and retrieving agent sessions,
 //! enabling different persistence implementations.
 
+use crate::context::RequestContext;
 use crate::message::domain::{AgentSession, AgentSessionId, ConversationId};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -23,6 +24,13 @@ pub type SessionResult<T> = Result<T, SessionError>;
 /// - Only one active session per conversation at any time
 /// - Sessions are mutable during their lifecycle
 /// - Concurrent access is handled safely
+/// - **Tenant isolation is not yet enforced here.** The `ctx`
+///   parameter (`_ctx` in current adapters) carries
+///   [`RequestContext::tenant_id`](crate::context::RequestContext)
+///   but adapter implementations do not filter by tenant until
+///   Row-Level Security (RLS) or adapter-level filtering is wired
+///   (planned for milestone 1.5.3).  Callers must not rely on this
+///   trait to enforce tenant boundaries at present
 #[async_trait]
 pub trait AgentSessionRepository: Send + Sync {
     /// Stores a new agent session.
@@ -30,27 +38,38 @@ pub trait AgentSessionRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns `SessionError` if:
-    /// - A session with the same ID already exists
-    /// - The database connection fails
-    async fn store(&self, session: &AgentSession) -> SessionResult<()>;
+    /// - A session with the same ID already exists ([`SessionError::Duplicate`])
+    /// - An active session already exists for the conversation
+    ///   ([`SessionError::ActiveSessionExists`])
+    /// - The database connection fails ([`SessionError::Persistence`])
+    async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Updates an existing session.
     ///
     /// # Errors
     ///
-    /// Returns `SessionError::NotFound` if the session does not exist.
-    async fn update(&self, session: &AgentSession) -> SessionResult<()>;
+    /// Returns `SessionError` if:
+    /// - The session does not exist ([`SessionError::NotFound`])
+    /// - The update would create a second active session for the
+    ///   conversation ([`SessionError::ActiveSessionExists`])
+    /// - The database connection fails ([`SessionError::Persistence`])
+    async fn update(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()>;
 
     /// Retrieves a session by its ID.
     ///
     /// Returns `None` if the session does not exist.
-    async fn find_by_id(&self, id: AgentSessionId) -> SessionResult<Option<AgentSession>>;
+    async fn find_by_id(
+        &self,
+        ctx: &RequestContext,
+        id: AgentSessionId,
+    ) -> SessionResult<Option<AgentSession>>;
 
     /// Finds the active session for a conversation.
     ///
     /// Returns `None` if no active session exists.
     async fn find_active_for_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Option<AgentSession>>;
 
@@ -59,6 +78,7 @@ pub trait AgentSessionRepository: Send + Sync {
     /// Returns an empty vector if no sessions exist.
     async fn find_by_conversation(
         &self,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>>;
 }
@@ -77,6 +97,10 @@ pub enum SessionError {
     /// Conversation not found (when validating foreign key).
     #[error("conversation not found: {0}")]
     ConversationNotFound(ConversationId),
+
+    /// An active session already exists for the conversation.
+    #[error("active session already exists for conversation: {0}")]
+    ActiveSessionExists(ConversationId),
 
     /// Database or connection error.
     #[error("persistence error: {0}")]
