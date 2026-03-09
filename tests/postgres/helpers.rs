@@ -53,7 +53,7 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v2";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v3";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -108,6 +108,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
+    map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     Ok(())
 }
 
