@@ -116,11 +116,9 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         result: Value,
     ) -> McpServerHostResult<()> {
-        self.set_tool_entry(
-            (server_name, tool_name.into()),
-            result,
-            |s| &mut s.tool_call_results,
-        )
+        self.set_tool_entry((server_name, tool_name.into()), result, |s| {
+            &mut s.tool_call_results
+        })
     }
 
     /// Configures stderr output that `call_tool` will include for a
@@ -135,11 +133,9 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         stderr: bytes::Bytes,
     ) -> McpServerHostResult<()> {
-        self.set_tool_entry(
-            (server_name, tool_name.into()),
-            stderr,
-            |s| &mut s.tool_call_stderr,
-        )
+        self.set_tool_entry((server_name, tool_name.into()), stderr, |s| {
+            &mut s.tool_call_stderr
+        })
     }
 
     /// Configures stderr output that `start` will return for a given
