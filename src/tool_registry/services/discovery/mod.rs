@@ -1,7 +1,8 @@
 //! Service layer for tool discovery, catalog management, and call routing.
 //!
-//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema validation, policy
-//! enforcement, call routing, stderr capture, and audit recording.
+//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema
+//! validation, policy enforcement, call routing, stderr capture, and
+//! audit recording.
 
 use crate::tool_registry::{
     domain::{
@@ -177,6 +178,11 @@ where
     /// Routes a tool call through validation, policy, execution, stderr
     /// capture, and audit recording.
     ///
+    /// Pre-execution rejections (unavailable tool, schema validation
+    /// failure, policy denial) are audited as failures before the error
+    /// propagates. Only `ToolNotFound` skips auditing because no
+    /// `server_id` is available.
+    ///
     /// # Errors
     /// Returns errors for tool resolution, schema validation, policy
     /// denial, host execution failures, or timeout.
@@ -184,66 +190,47 @@ where
         &self,
         request: &ToolCallRequest,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let entry = self.resolve_and_validate(request).await?;
-
-        // Execute via host.
-        let execute_result = self
-            .host
-            .call_tool(
-                &self.find_running_server(entry.server_id()).await?,
-                request.tool_name(),
-                request.parameters().clone(),
-            )
-            .await;
-
-        let completed_at = self.clock.utc();
-        let duration = (completed_at - request.initiated_at())
-            .to_std()
-            .unwrap_or_default();
-
-        let (outcome, stderr_output, host_error) = match execute_result {
-            Ok(host_result) => (
-                ToolCallOutcome::Success {
-                    content: host_result.content,
-                },
-                host_result.stderr_output,
-                None,
-            ),
-            Err(host_err) => {
-                let outcome = ToolCallOutcome::Failure {
-                    error: host_err.to_string(),
-                };
-                (outcome, None, Some(host_err))
+        let entry = match self.resolve_and_validate(request).await {
+            Ok(entry) => entry,
+            Err((maybe_entry, err)) => {
+                if let Some(entry) = maybe_entry {
+                    self.audit_rejection(request, entry.server_id(), &err).await;
+                }
+                return Err(err);
             }
         };
 
-        let timing = ToolCallTiming {
-            duration,
-            completed_at,
-        };
-        let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
-
-        self.capture_and_audit(request, &result, stderr_output)
-            .await;
-
-        if let Some(host_err) = host_error {
-            return Err(host_err.into());
-        }
-        Ok(result)
+        self.execute_and_audit(request, &entry).await
     }
 
     /// Resolves a tool from the catalog, checks availability, validates
-    /// parameters, and enforces policy.
+    /// parameters, and enforces policy. On failure returns the catalog
+    /// entry (if resolved) alongside the error for audit purposes.
     async fn resolve_and_validate(
         &self,
         request: &ToolCallRequest,
-    ) -> ToolDiscoveryRoutingServiceResult<CatalogEntry> {
-        let entry = self
-            .catalog
-            .find_by_tool_name(request.tool_name())
-            .await?
-            .ok_or_else(|| ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned()))?;
+    ) -> Result<CatalogEntry, (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError)> {
+        let entry = match self.catalog.find_by_tool_name(request.tool_name()).await {
+            Ok(Some(e)) => e,
+            Ok(None) => {
+                let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
+                return Err((None, err.into()));
+            }
+            Err(err) => return Err((None, err.into())),
+        };
 
+        if let Err(err) = self.validate_entry(&entry, request).await {
+            return Err((Some(entry), err));
+        }
+        Ok(entry)
+    }
+
+    /// Validates availability, schema, and policy for a resolved entry.
+    async fn validate_entry(
+        &self,
+        entry: &CatalogEntry,
+        request: &ToolCallRequest,
+    ) -> ToolDiscoveryRoutingServiceResult<()> {
         if !entry.available() {
             return Err(ToolRegistryDomainError::ToolUnavailable {
                 tool_name: request.tool_name().to_owned(),
@@ -251,7 +238,6 @@ where
             }
             .into());
         }
-
         validate_parameters(entry.tool().input_schema(), request.parameters()).map_err(|err| {
             match err {
                 ToolRegistryDomainError::SchemaValidationFailed { reason, .. } => {
@@ -263,7 +249,6 @@ where
                 other => other,
             }
         })?;
-
         let decision = self
             .policy
             .evaluate(request.tool_name(), request.parameters())
@@ -275,8 +260,52 @@ where
             }
             .into());
         }
+        Ok(())
+    }
 
-        Ok(entry)
+    /// Executes a validated tool call and records the audit trail.
+    async fn execute_and_audit(
+        &self,
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+    ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
+        let server = self.find_running_server(entry.server_id()).await?;
+        let execute_result = self
+            .host
+            .call_tool(&server, request.tool_name(), request.parameters())
+            .await;
+
+        let completed_at = self.clock.utc();
+        let duration = (completed_at - request.initiated_at())
+            .to_std()
+            .unwrap_or_default();
+        let (outcome, stderr_output, host_error) = match execute_result {
+            Ok(r) => (
+                ToolCallOutcome::Success { content: r.content },
+                r.stderr_output,
+                None,
+            ),
+            Err(e) => (
+                ToolCallOutcome::Failure {
+                    error: e.to_string(),
+                },
+                None,
+                Some(e),
+            ),
+        };
+
+        let timing = ToolCallTiming {
+            duration,
+            completed_at,
+        };
+        let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
+        self.capture_and_audit(request, &result, stderr_output)
+            .await;
+
+        if let Some(host_err) = host_error {
+            return Err(host_err.into());
+        }
+        Ok(result)
     }
 
     /// Loads a server from the registry and verifies it is running.
@@ -294,8 +323,18 @@ where
         Ok(server)
     }
 
-    /// Best-effort stderr capture and audit recording for a completed
-    /// tool call.
+    /// Best-effort audit recording for a pre-execution rejection.
+    async fn audit_rejection(
+        &self,
+        request: &ToolCallRequest,
+        server_id: McpServerId,
+        err: &ToolDiscoveryRoutingServiceError,
+    ) {
+        let audit = ToolCallAuditRecord::for_rejection(request, server_id, err, self.clock.utc());
+        let _audit_result = self.catalog.record_audit(&audit).await;
+    }
+
+    /// Best-effort stderr capture and audit recording for a completed call.
     async fn capture_and_audit(
         &self,
         request: &ToolCallRequest,
@@ -305,7 +344,6 @@ where
         let stderr_log_path = self
             .try_capture_tool_call_stderr(result.server_id(), request.call_id(), stderr_output)
             .await;
-
         let mut audit = ToolCallAuditRecord::from_result(
             result,
             request.parameters().clone(),
@@ -336,27 +374,19 @@ where
         self.log_store
             .store_log(&metadata, stderr, &self.retention_policy)
             .await?;
-
-        // Best-effort sweep.
         let _sweep_count = self.sweep_expired_logs(server_id).await;
-
         Ok(metadata)
     }
 
     /// Triggers a retention sweep for a specific server's logs.
     ///
     /// # Errors
-    ///
     /// Returns [`ToolLogStoreError`] when the sweep fails.
     pub async fn sweep_expired_logs(
         &self,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<usize> {
         let now = self.clock.utc();
-        // The sweep uses an empty metadata slice since the log store
-        // adapter manages its own listing internally for path-based
-        // sweeps. Full metadata-based sweeps are used by the Postgres
-        // integration where metadata is maintained externally.
         let ctx = SweepContext {
             policy: &self.retention_policy,
             now,

@@ -70,7 +70,7 @@ async fn register_and_start(
     name: &str,
 ) -> Result<crate::tool_registry::domain::McpServerRegistration> {
     let registered = service.register(stdio_request(name)?).await?;
-    Ok(service.start(registered.id()).await?)
+    Ok(service.start(registered.id()).await?.server)
 }
 
 #[rstest]
@@ -176,7 +176,7 @@ async fn lifecycle_scenarios(
             let stopped = service.stop(started.id()).await?;
             assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
 
-            let restarted = service.start(started.id()).await?;
+            let restarted = service.start(started.id()).await?.server;
             assert_eq!(
                 restarted.lifecycle_state(),
                 McpServerLifecycleState::Running
@@ -253,9 +253,18 @@ impl McpServerHost for HealthProbeFailureHost {
         &self,
         server: &crate::tool_registry::domain::McpServerRegistration,
         _tool_name: &str,
-        _parameters: serde_json::Value,
+        _parameters: &serde_json::Value,
     ) -> McpServerHostResult<ToolCallHostResult> {
-        Err(McpServerHostError::NotRunning(server.id()))
+        self.with_started_lock(|started| {
+            if started.contains(&server.id()) {
+                Ok(ToolCallHostResult {
+                    content: serde_json::Value::Null,
+                    stderr_output: None,
+                })
+            } else {
+                Err(McpServerHostError::NotRunning(server.id()))
+            }
+        })?
     }
 }
 

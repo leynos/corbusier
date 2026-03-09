@@ -479,15 +479,15 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
     );
     let registered = service.register(request).await?;
     let started = service.start(registered.id()).await?;
-    assert_eq!(started.lifecycle_state().as_str(), "running");
+    assert_eq!(started.server.lifecycle_state().as_str(), "running");
 
     let servers = service.list_all().await?;
     assert_eq!(servers.len(), 1);
 
-    let tools = service.list_tools(started.id()).await?;
+    let tools = service.list_tools(started.server.id()).await?;
     assert_eq!(tools.len(), 1);
 
-    let stopped = service.stop(started.id()).await?;
+    let stopped = service.stop(started.server.id()).await?;
     assert_eq!(stopped.lifecycle_state().as_str(), "stopped");
 
     let after_stop = service.list_tools(stopped.id()).await;
@@ -501,20 +501,21 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
 
 After starting an MCP server via the lifecycle service, use
 `ToolDiscoveryRoutingService` to discover its tools, persist them in a durable
-catalog, and route tool calls by name. The service validates parameters against
-the tool's input schema, enforces a pluggable policy check, routes the call to
-the correct hosting server, and records a complete audit trail.
+catalogue, and route tool calls by name. The service validates parameters
+against the tool's input schema, enforces a pluggable policy check, routes the
+call to the correct hosting server, and records a complete audit trail.
 
 ### Discovering tools
 
 Call `discover_and_persist_tools()` after starting a server. This queries the
-running server for its tool definitions and persists them in the catalog.
-Rediscovery is idempotent -- calling it again replaces the existing entries.
+running server for its tool definitions and persists them in the catalogue.
+Rediscovery is idempotent — calling it again replaces the existing entries.
 
 ### Querying the catalog
 
 Call `list_catalog()` to see all tools across all registered servers, including
-their schemas and availability status.
+their schemas and availability status. The method name uses the code identifier
+`catalog`; the surrounding prose uses the en-GB-oxendict spelling "catalogue".
 
 ### Calling a tool
 
@@ -563,7 +564,7 @@ use corbusier::tool_registry::{
         ToolCallRequest,
     },
     services::{
-        McpServerLifecycleService, RegisterMcpServerRequest,
+        McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
         ToolDiscoveryRoutingService,
     },
 };
@@ -597,9 +598,15 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
         registry.clone(), host.clone(), clock.clone(),
     );
     let discovery = ToolDiscoveryRoutingService::new(
-        catalog, registry, host, Arc::new(AllowAllPolicy),
-        Arc::new(ObjectStoreLogAdapter::in_memory()),
-        LogRetentionPolicy::default(), clock,
+        ServicePorts {
+            catalog,
+            registry,
+            host,
+            policy: Arc::new(AllowAllPolicy),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
+        LogRetentionPolicy::default(),
+        clock,
     );
 
     // Register, start, and discover tools.

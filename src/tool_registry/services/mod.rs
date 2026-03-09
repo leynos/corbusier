@@ -9,5 +9,6 @@ pub use discovery::{
     ToolDiscoveryRoutingServiceResult,
 };
 pub use lifecycle::{
-    McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest,
+    LifecycleStartResult, McpServerLifecycleService, McpServerLifecycleServiceError,
+    RegisterMcpServerRequest,
 };

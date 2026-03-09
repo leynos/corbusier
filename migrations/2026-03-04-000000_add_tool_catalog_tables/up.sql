@@ -50,6 +50,10 @@ CREATE TABLE tool_call_audit_log (
     stderr_log_path VARCHAR(512),
     CONSTRAINT tool_call_audit_log_outcome_check CHECK (
         outcome IN ('success', 'failure')
+    ),
+    CONSTRAINT tool_call_audit_log_outcome_content_check CHECK (
+        (outcome = 'success' AND outcome_content IS NOT NULL AND outcome_error IS NULL)
+        OR (outcome = 'failure' AND outcome_error IS NOT NULL AND outcome_content IS NULL)
     )
 );
 
@@ -69,6 +73,10 @@ CREATE TABLE tool_log_metadata (
     expires_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT tool_log_metadata_kind_check CHECK (
         kind IN ('startup', 'tool_call')
+    ),
+    CONSTRAINT tool_log_metadata_call_id_check CHECK (
+        (kind = 'tool_call' AND call_id IS NOT NULL)
+        OR (kind = 'startup' AND call_id IS NULL)
     )
 );
 

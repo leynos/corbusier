@@ -221,19 +221,17 @@ async fn audit_log_persisted(
 
     // Verify audit row in PostgreSQL via raw SQL.
     let audit_pool = ctx.pool.clone();
-    let audit_count = tokio::task::spawn_blocking(move || {
+    let audit_count: i64 = tokio::task::spawn_blocking(move || -> Result<i64, BoxError> {
         use diesel::prelude::*;
-        let mut conn = audit_pool.get().expect("pool connection should succeed");
-        let count: i64 = diesel::sql_query(
+        let mut conn = audit_pool.get()?;
+        let row = diesel::sql_query(
             "SELECT COUNT(*) AS count FROM tool_call_audit_log WHERE tool_name = 'read_file'",
         )
-        .get_result::<CountResult>(&mut conn)
-        .expect("audit query should succeed")
-        .count;
-        count
+        .get_result::<CountResult>(&mut conn)?;
+        Ok(row.count)
     })
     .await
-    .expect("spawn_blocking should succeed");
+    .expect("spawn_blocking should not panic")?;
 
     assert_eq!(audit_count, 1);
 

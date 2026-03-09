@@ -66,7 +66,7 @@ pub trait McpServerHost: Send + Sync {
         &self,
         server: &McpServerRegistration,
         tool_name: &str,
-        parameters: Value,
+        parameters: &Value,
     ) -> McpServerHostResult<ToolCallHostResult>;
 }
 

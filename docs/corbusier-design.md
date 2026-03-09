@@ -1219,9 +1219,17 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   (`tool_logs/{server_id}/{kind}/{log_entry_id}.stderr`). References are
   recorded in audit records. The `tool_log_metadata` table indexes stored blobs
   for retention sweeps.
-- **Log retention policy**: 7-day default retention, 10 MiB per-log cap
-  (truncated with a marker), 100 logs per server maximum. Retention sweeps run
-  during `store_startup_stderr` and can be triggered explicitly.
+- **Stderr log retention policy**: the following limits apply **only** to
+  stderr blobs stored via `ToolLogStore` (i.e. files under
+  `tool_logs/{server_id}/…` and their `tool_log_metadata` rows). They do
+  **not** affect the `tool_call_audit_log` table, which follows the
+  longer-lived audit and compliance retention defined elsewhere in this
+  document.
+  - 7-day default retention period; expired blobs are swept automatically.
+  - 10 MiB per-log cap (truncated with a marker).
+  - 100 logs per server maximum; oldest logs are deleted first.
+  - Retention sweeps run during `store_startup_stderr` and can be triggered
+    explicitly via `sweep_expired_logs`.
 
 _Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
 persistence model. The `mcp_servers` table is the parent entity; each server
@@ -1789,20 +1797,22 @@ you to also send your logs for further analysis.
 
 #### 3.3.1 Core Dependencies
 
-| Crate       | Version | Purpose                          | Registry  |
-| ----------- | ------- | -------------------------------- | --------- |
-| serde       | 1.0.228 | Serialization framework          | crates.io |
-| serde_json  | 1.0.149 | JSON serialization               | crates.io |
-| chrono      | 0.4.43  | Date/time handling               | crates.io |
-| uuid        | 1.19.0  | UUID generation                  | crates.io |
-| thiserror   | 2.0.17  | Error derive macros              | crates.io |
-| sha2        | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
-| minijinja   | 2.16.0  | Template rendering               | crates.io |
-| async-trait | 0.1.89  | Async trait support              | crates.io |
-| mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
-| diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
-| cap-std     | 3.4.5   | Capability-based filesystem      | crates.io |
-| tokio       | 1.49.0  | Async runtime                    | crates.io |
+| Crate        | Version | Purpose                          | Registry  |
+| ------------ | ------- | -------------------------------- | --------- |
+| serde        | 1.0.228 | Serialization framework          | crates.io |
+| serde_json   | 1.0.149 | JSON serialization               | crates.io |
+| chrono       | 0.4.43  | Date/time handling               | crates.io |
+| uuid         | 1.19.0  | UUID generation                  | crates.io |
+| thiserror    | 2.0.17  | Error derive macros              | crates.io |
+| sha2         | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
+| minijinja    | 2.16.0  | Template rendering               | crates.io |
+| async-trait  | 0.1.89  | Async trait support              | crates.io |
+| mockable     | 3.0.0   | Clock abstraction for testing    | crates.io |
+| diesel       | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
+| bytes        | 1.10.1  | Byte buffer utilities            | crates.io |
+| object_store | 0.12.0  | Object storage abstraction       | crates.io |
+| cap-std      | 3.4.5   | Capability-based filesystem      | crates.io |
+| tokio        | 1.49.0  | Async runtime                    | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)
 

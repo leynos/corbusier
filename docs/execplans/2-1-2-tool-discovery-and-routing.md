@@ -9,13 +9,13 @@ Status: DONE
 
 ## Purpose / big picture
 
-Roadmap item 2.1.1 gave Corbusier the ability to register MCP servers, manage
-their lifecycle (start/stop/health), and list tools exposed by running servers.
-However, tools discovered from MCP servers are not persisted -- they exist only
-as transient query results from the live process. There is no mechanism to
-route a tool call by name to the correct hosting server, no parameter
-validation against the tool's declared schema, no policy enforcement before
-execution, and no audit trail of tool invocations.
+Roadmap item 2.1.1 gave Corbusier the ability to register Model Context
+Protocol (MCP) servers, manage their lifecycle (start/stop/health), and list
+tools exposed by running servers. However, tools discovered from MCP servers
+are not persisted -- they exist only as transient query results from the live
+process. There is no mechanism to route a tool call by name to the correct
+hosting server, no parameter validation against the tool's declared schema, no
+policy enforcement before execution, and no audit trail of tool invocations.
 
 After this change, a developer or operator can:
 
@@ -62,7 +62,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
 - Use existing `pg-embed-setup-unpriv` harness patterns for PostgreSQL
   tests.[^4]
 - Use en-GB-oxendict spelling in comments and documentation.[^5]
-- The `object_store` crate is an authorised new dependency for this feature
+- The `object_store` crate is an authorized new dependency for this feature
   (user-requested). Use caret version requirement per `AGENTS.md` guidance. No
   other new external crate dependencies without escalation.
 - Update documentation as part of the feature: record implementation decisions
@@ -82,7 +82,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   lines, stop and escalate with a reduced-scope option.
 - API surface: if implementing 2.1.2 requires incompatible changes to existing
   public APIs outside the `tool_registry` module, stop and escalate.
-- Dependencies: the `object_store` crate is pre-authorised for this feature.
+- Dependencies: the `object_store` crate is pre-authorized for this feature.
   If any additional new external crate is required (e.g., `jsonschema` for full
   JSON Schema validation), stop and escalate with rationale and alternatives.
 - Iterations: if a failing test remains unresolved after 4 focused
@@ -211,7 +211,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   port contract. Date/Author: 2026-03-04 / plan author.
 
 - Decision: provide `AllowAllPolicy` as the default `ToolPolicyEnforcer`
-  adapter. The policy port is an extensibility point; real authorisation will
+  adapter. The policy port is an extensibility point; real authorization will
   be implemented when the workspace and user permission systems exist.
   Rationale: delivers the enforcement architecture without blocking on
   unimplemented bounded contexts. Date/Author: 2026-03-04 / plan author.
@@ -236,7 +236,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
 
 - Decision: capture stderr from two lifecycle points: (a) MCP server startup
   (the `start` operation on `McpServerHost`), and (b) individual tool calls
-  (the `call_tool` operation). Startup logs capture the server's initialisation
+  (the `call_tool` operation). Startup logs capture the server's initialization
   output; tool call logs capture per-invocation diagnostic output. Both are
   stored as opaque byte blobs in `object_store` with structured path keys, and
   references (object store paths) are recorded in the principal audit log.
@@ -399,7 +399,7 @@ Design references:
   subgraphs; design types `ToolDefinition`, `ToolProvider` trait,
   `ToolExecutionContext`.
 - `docs/corbusier-design.md` §4.4.2.2: three-layer tool call validation
-  (schema, authorisation, runtime).
+  (schema, authorization, runtime).
 - `docs/corbusier-design.md` §6.4.2.4: policy enforcement points with
   `PolicyEnforcementPoint` trait and `EnforcementResult` enum.
 
@@ -458,9 +458,11 @@ a specific tool call invocation). `LogEntryMetadata` holds `id: LogEntryId`,
 `server_id: McpServerId`, `kind: LogEntryKind`, `object_path: String` (the key
 in `object_store`), `byte_count: u64`, `captured_at: DateTime<Utc>`, and
 `expires_at: DateTime<Utc>` (computed from retention policy at capture time).
-Constructors:
-`for_startup(server_id, object_path, byte_count, clock, retention)` and
-`for_tool_call(server_id, call_id, object_path, byte_count, clock, retention)`.
+`LogCaptureContext` bundles a `clock: &dyn Clock` and
+`retention: &LogRetentionPolicy` for log capture operations. Constructors:
+`for_startup(server_id, byte_count, ctx: &LogCaptureContext)` and
+`for_tool_call(server_id, call_id, byte_count, ctx: &LogCaptureContext)`. The
+object path is generated internally from the server ID, kind, and entry ID.
 
 `LogRetentionPolicy` holds three configurable parameters:
 `max_bytes_per_log: u64` (default 10 MiB = `10 * 1024 * 1024`),
@@ -509,9 +511,10 @@ alias.
 `log_store.rs` defines the `ToolLogStore` async trait -- the hexagonal port
 wrapping `object_store` operations. Methods:
 
-`store_log(&self, metadata: &LogEntryMetadata, content: bytes::Bytes) -> ToolLogStoreResult<()>`
- -- writes a log blob to the object store at `metadata.object_path()`. If the
-content exceeds `LogRetentionPolicy::max_bytes_per_log`, the implementation
+`store_log(&self, metadata, content: bytes::Bytes, retention: &LogRetentionPolicy)`
+ `-> ToolLogStoreResult<()>` -- writes a log blob to the object store at
+`metadata.object_path()`. The `retention` parameter provides
+`max_bytes_per_log`; if content exceeds that limit, the implementation
 truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
@@ -521,13 +524,14 @@ a log blob by path.
 `delete_log(&self, path: &str) -> ToolLogStoreResult<()>` -- deletes a single
 log blob.
 
-`list_logs_for_server(&self, server_id: McpServerId) -> ToolLogStoreResult<Vec<LogEntryMetadata>>`
- -- lists all log entries for a server by prefix scan on
+`list_logs_for_server(&self, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
+ -- lists all log blob paths for a server by prefix scan on
 `tool_logs/{server_id}/`.
 
-`sweep_expired(&self, server_id, policy, now)` `-> ToolLogStoreResult<usize>`
--- deletes logs that are past their `expires_at` or exceed
-`max_logs_per_server` (oldest first). Returns the count of deleted entries.
+`sweep_expired(&self, server_id: McpServerId, ctx: &SweepContext<'_>) -> ToolLogStoreResult<usize>`
+ -- deletes logs that are past their `expires_at` or exceed
+`max_logs_per_server` (oldest first). `SweepContext` bundles the policy,
+wall-clock timestamp, and entry metadata. Returns the count of deleted entries.
 
 Define `ToolLogStoreError` with variants: `StoreFailed(String)`,
 `RetrieveFailed(String)`, `DeleteFailed(String)`, `ListFailed(String)`. All
@@ -617,12 +621,9 @@ reconstructs `LogEntryMetadata` from the stored path convention. The
 The constructor `ObjectStoreLogAdapter::new(store: Arc<dyn ObjectStore>)`
 accepts any `ObjectStore` implementation. Factory helpers:
 
-`ObjectStoreLogAdapter::local_filesystem(root_path: &Path) -> Result<Self, ToolLogStoreError>`
- creates a `LocalFileSystem`-backed adapter rooted at the given directory
-(e.g., `~/.corbusier/tool-logs/` or a configurable path).
-
 `ObjectStoreLogAdapter::in_memory() -> Self` creates an
-`object_store::memory::InMemory`-backed adapter for tests.
+`object_store::memory::InMemory`-backed adapter for tests. Production callers
+use `ObjectStoreLogAdapter::new(store)` with a suitable `ObjectStore` backend.
 
 In `src/tool_registry/adapters/mod.rs`, add `mod log_store;` and
 `pub use log_store::ObjectStoreLogAdapter;`.
@@ -718,7 +719,7 @@ existing test count.
 Create the `ToolDiscoveryRoutingService` and its unit tests.
 
 In `src/tool_registry/services/discovery/mod.rs`, define
-`ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterised over
+`ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over
 `ToolCatalogRepository`, `McpServerRegistryRepository`, `McpServerHost`,
 `ToolPolicyEnforcer`, `ToolLogStore`, and `Clock`. The service holds `Arc`
 references to each dependency plus a `LogRetentionPolicy` value.
@@ -774,15 +775,17 @@ delegate to `catalog.list_all()`.
 
 `store_startup_stderr(&self, server_id: McpServerId, stderr: bytes::Bytes) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`:
  stores startup stderr captured from `McpServerHost::start`. Called by the
-caller after `lifecycle_service.start()` returns a `StartHostResult` with
-non-empty stderr. Builds `LogEntryMetadata::for_startup(...)`, stores via
-`log_store`, and returns the metadata. This method also triggers
-`sweep_expired` for the server to enforce rotation.
+caller after `lifecycle_service.start()` returns a `LifecycleStartResult` with
+non-empty `startup_stderr`. Builds
+`LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
+stores via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
+returns the metadata. This method also triggers `sweep_expired` for the server
+to enforce rotation.
 
 `sweep_expired_logs(&self, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
  triggers a retention sweep for a specific server. Delegates to
-`log_store.sweep_expired(server_id, policy, now)`. Returns the count of deleted
-log entries.
+`log_store.sweep_expired(server_id, &SweepContext { … })`. Returns the count of
+deleted log entries.
 
 Define `ToolDiscoveryRoutingServiceError` with variants:
 `Domain(from ToolRegistryDomainError)`, `Catalog(from ToolCatalogError)`,
@@ -1103,7 +1106,7 @@ Quality criteria:
 
 ## Interfaces and dependencies
 
-New external crate dependencies (authorised):
+New external crate dependencies (authorized):
 
 - `object_store = "0.12.0"` -- unified object storage API with
   `LocalFileSystem` and `InMemory` backends. Part of the Apache Arrow
@@ -1175,6 +1178,7 @@ pub trait ToolLogStore: Send + Sync {
         &self,
         metadata: &LogEntryMetadata,
         content: bytes::Bytes,
+        retention: &LogRetentionPolicy,
     ) -> ToolLogStoreResult<()>;
 
     async fn retrieve_log(
@@ -1190,13 +1194,12 @@ pub trait ToolLogStore: Send + Sync {
     async fn list_logs_for_server(
         &self,
         server_id: McpServerId,
-    ) -> ToolLogStoreResult<Vec<LogEntryMetadata>>;
+    ) -> ToolLogStoreResult<Vec<String>>;
 
     async fn sweep_expired(
         &self,
         server_id: McpServerId,
-        policy: &LogRetentionPolicy,
-        now: DateTime<Utc>,
+        ctx: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize>;
 }
 ```
@@ -1320,7 +1323,7 @@ Modified files (estimated 14-16):
   testing/architecture conventions. Based on completed 2.1.1 foundation.
 
 - 2026-03-04: Added stderr log capture requirements per user request.
-  Integrated `object_store` crate (authorised new dependency) for log blob
+  Integrated `object_store` crate (authorized new dependency) for log blob
   storage. Added `ToolLogStore` port, `ObjectStoreLogAdapter` adapter,
   `LogEntryMetadata` and `LogRetentionPolicy` domain types, `tool_log_metadata`
   table, `stderr_log_path` field on audit records, startup stderr capture on

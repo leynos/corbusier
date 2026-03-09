@@ -1,4 +1,4 @@
-//! Policy decision domain types for tool call authorisation.
+//! Policy decision domain types for tool call authorization.
 //!
 //! A [`PolicyDecision`] represents the outcome of evaluating a tool call
 //! against a pluggable policy enforcement point.

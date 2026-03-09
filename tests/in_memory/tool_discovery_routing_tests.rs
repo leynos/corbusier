@@ -89,223 +89,184 @@ fn search_code_tool() -> Result<McpToolDefinition> {
     )?)
 }
 
+/// Registers a server, starts it, sets up the tool catalog, and discovers
+/// tools. Returns the server identifier for further assertions.
+async fn register_start_discover(
+    ctx: &IntegrationContext,
+    server_name: &str,
+    tools: Vec<McpToolDefinition>,
+) -> Result<corbusier::tool_registry::domain::McpServerId> {
+    ctx.host
+        .set_tool_catalog(McpServerName::new(server_name)?, tools)?;
+    let registered = ctx.lifecycle.register(stdio_request(server_name)?).await?;
+    ctx.lifecycle.start(registered.id()).await?;
+    ctx.discovery
+        .discover_and_persist_tools(registered.id())
+        .await?;
+    Ok(registered.id())
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-#[expect(
-    clippy::indexing_slicing,
-    reason = "test asserts on elements after verifying counts"
-)]
 async fn discover_and_call_tool_end_to_end(ctx: IntegrationContext) -> Result<()> {
-    ctx.host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    let server_id =
+        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello world"}),
     )?;
 
-    let registered = ctx
-        .lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    ctx.lifecycle.start(registered.id()).await?;
-
-    let entries = ctx
-        .discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].tool().name(), "read_file");
-
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     let result = ctx.discovery.call_tool(&request).await?;
-
     assert!(result.outcome().is_success());
-    assert_eq!(result.server_id(), registered.id());
+    assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
 
-    let audit_records = ctx.catalog.audit_records()?;
-    assert_eq!(audit_records.len(), 1);
-    assert_eq!(audit_records[0].tool_name(), "read_file");
-
+    let audits = ctx.catalog.audit_records()?;
+    assert_eq!(audits.len(), 1);
+    assert_eq!(
+        audits.first().expect("audit record").tool_name(),
+        "read_file"
+    );
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn two_servers_route_correctly(ctx: IntegrationContext) -> Result<()> {
-    // Set up server 1 with read_file.
-    ctx.host
-        .set_tool_catalog(McpServerName::new("file_tools")?, vec![read_file_tool()?])?;
+    let reg1 = register_start_discover(&ctx, "file_tools", vec![read_file_tool()?]).await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("file_tools")?,
         "read_file",
         json!({"content": "file contents"}),
     )?;
 
-    // Set up server 2 with search_code.
-    ctx.host.set_tool_catalog(
-        McpServerName::new("search_tools")?,
-        vec![search_code_tool()?],
-    )?;
+    let reg2 = register_start_discover(&ctx, "search_tools", vec![search_code_tool()?]).await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("search_tools")?,
         "search_code",
         json!({"matches": 3}),
     )?;
 
-    let reg1 = ctx.lifecycle.register(stdio_request("file_tools")?).await?;
-    ctx.lifecycle.start(reg1.id()).await?;
-    ctx.discovery.discover_and_persist_tools(reg1.id()).await?;
-
-    let reg2 = ctx
-        .lifecycle
-        .register(stdio_request("search_tools")?)
-        .await?;
-    ctx.lifecycle.start(reg2.id()).await?;
-    ctx.discovery.discover_and_persist_tools(reg2.id()).await?;
-
-    // Call read_file -- should route to file_tools.
     let read_req =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let read_result = ctx.discovery.call_tool(&read_req).await?;
-    assert_eq!(read_result.server_id(), reg1.id());
+    assert_eq!(ctx.discovery.call_tool(&read_req).await?.server_id(), reg1);
 
-    // Call search_code -- should route to search_tools.
     let search_req = ToolCallRequest::new("search_code", json!({"query": "hello"}), &DefaultClock);
-    let search_result = ctx.discovery.call_tool(&search_req).await?;
-    assert_eq!(search_result.server_id(), reg2.id());
-
+    assert_eq!(
+        ctx.discovery.call_tool(&search_req).await?.server_id(),
+        reg2
+    );
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn tool_unavailable_after_stop(ctx: IntegrationContext) -> Result<()> {
-    ctx.host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-
-    let registered = ctx
-        .lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    ctx.lifecycle.start(registered.id()).await?;
-    ctx.discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
-    ctx.lifecycle.stop(registered.id()).await?;
-    ctx.discovery
-        .mark_tools_unavailable(registered.id())
-        .await?;
+    let server_id =
+        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
+    ctx.lifecycle.stop(server_id).await?;
+    ctx.discovery.mark_tools_unavailable(server_id).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = ctx.discovery.call_tool(&request).await;
-
     assert!(matches!(
-        result,
+        ctx.discovery.call_tool(&request).await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::ToolUnavailable { .. }
         ))
     ));
-
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn rediscovery_after_restart(ctx: IntegrationContext) -> Result<()> {
-    ctx.host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    let server_id =
+        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
     )?;
 
-    let registered = ctx
-        .lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    ctx.lifecycle.start(registered.id()).await?;
-    ctx.discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
     // Stop and mark unavailable.
-    ctx.lifecycle.stop(registered.id()).await?;
-    ctx.discovery
-        .mark_tools_unavailable(registered.id())
-        .await?;
+    ctx.lifecycle.stop(server_id).await?;
+    ctx.discovery.mark_tools_unavailable(server_id).await?;
 
     // Restart and rediscover.
-    ctx.lifecycle.start(registered.id()).await?;
-    ctx.discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
+    ctx.lifecycle.start(server_id).await?;
+    ctx.discovery.discover_and_persist_tools(server_id).await?;
 
-    // Call should succeed again.
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = ctx.discovery.call_tool(&request).await?;
-    assert!(result.outcome().is_success());
-
+    assert!(
+        ctx.discovery
+            .call_tool(&request)
+            .await?
+            .outcome()
+            .is_success()
+    );
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn audit_trail_accumulates(ctx: IntegrationContext) -> Result<()> {
-    ctx.host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
+    register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
     )?;
 
-    let registered = ctx
-        .lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    ctx.lifecycle.start(registered.id()).await?;
-    ctx.discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
-
     for _ in 0..3 {
         let request =
             ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
         ctx.discovery.call_tool(&request).await?;
     }
-
-    let audit_records = ctx.catalog.audit_records()?;
-    assert_eq!(audit_records.len(), 3);
-
+    assert_eq!(ctx.catalog.audit_records()?.len(), 3);
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-#[expect(
-    clippy::indexing_slicing,
-    reason = "test asserts on elements after verifying counts"
-)]
 async fn stderr_captured_for_startup_and_tool_calls(ctx: IntegrationContext) -> Result<()> {
+    // Configure startup stderr on the host before starting.
+    let startup_bytes = bytes::Bytes::from("server initialising...");
     ctx.host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
+    ctx.host.set_startup_stderr(
+        McpServerName::new("workspace_tools")?,
+        startup_bytes.clone(),
+    )?;
+
+    // Start via lifecycle — startup stderr flows through StartHostResult.
+    let registered = ctx
+        .lifecycle
+        .register(stdio_request("workspace_tools")?)
+        .await?;
+    let start_result = ctx.lifecycle.start(registered.id()).await?;
+    let captured = start_result
+        .startup_stderr
+        .expect("startup stderr should be captured");
+    assert_eq!(captured, startup_bytes);
+
+    // Persist startup stderr via discovery service.
+    let startup_meta = ctx
+        .discovery
+        .store_startup_stderr(registered.id(), captured)
+        .await?;
+    assert!(startup_meta.object_path().contains("startup"));
+
+    // Discover tools and configure tool call results.
+    ctx.discovery
+        .discover_and_persist_tools(registered.id())
+        .await?;
     ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
@@ -317,34 +278,19 @@ async fn stderr_captured_for_startup_and_tool_calls(ctx: IntegrationContext) -> 
         bytes::Bytes::from("debug: reading file"),
     )?;
 
-    let registered = ctx
-        .lifecycle
-        .register(stdio_request("workspace_tools")?)
-        .await?;
-    ctx.lifecycle.start(registered.id()).await?;
-
-    // Store startup stderr.
-    let startup_meta = ctx
-        .discovery
-        .store_startup_stderr(
-            registered.id(),
-            bytes::Bytes::from("server initialising..."),
-        )
-        .await?;
-    assert!(startup_meta.object_path().contains("startup"));
-
-    // Discover and call tool.
-    ctx.discovery
-        .discover_and_persist_tools(registered.id())
-        .await?;
+    // Call tool and verify audit trail references stderr.
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     ctx.discovery.call_tool(&request).await?;
 
-    // Verify audit trail references stderr.
-    let audit_records = ctx.catalog.audit_records()?;
-    assert_eq!(audit_records.len(), 1);
-    assert!(audit_records[0].stderr_log_path().is_some());
-
+    let audits = ctx.catalog.audit_records()?;
+    assert_eq!(audits.len(), 1);
+    assert!(
+        audits
+            .first()
+            .expect("audit record")
+            .stderr_log_path()
+            .is_some()
+    );
     Ok(())
 }

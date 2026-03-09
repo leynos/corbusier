@@ -9,12 +9,12 @@ use thiserror::Error;
 /// Result type for policy evaluation operations.
 pub type ToolPolicyResult<T> = Result<T, ToolPolicyError>;
 
-/// Contract for evaluating tool call authorisation policies.
+/// Contract for evaluating tool call authorization policies.
 ///
 /// Implementations check whether a given tool call should be permitted
-/// before execution. The default adapter (`AllowAllPolicy`) permits all
-/// calls; real authorisation will be layered in when workspace and user
-/// permission systems exist.
+/// before execution. The default wiring permits all calls; real
+/// authorization will be layered in when workspace and user permission
+/// systems exist.
 #[async_trait]
 pub trait ToolPolicyEnforcer: Send + Sync {
     /// Evaluates whether the given tool call should be permitted.

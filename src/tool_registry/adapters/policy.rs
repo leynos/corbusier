@@ -1,4 +1,4 @@
-//! Policy enforcement adapters for tool call authorisation.
+//! Policy enforcement adapters for tool call authorization.
 
 use crate::tool_registry::{
     domain::PolicyDecision,
@@ -6,11 +6,12 @@ use crate::tool_registry::{
 };
 use async_trait::async_trait;
 use serde_json::Value;
+use std::sync::Arc;
 
 /// Policy adapter that unconditionally allows all tool calls.
 ///
 /// This is the default policy adapter, providing an extensibility point
-/// for future authorisation logic without blocking current functionality.
+/// for future authorization logic without blocking current functionality.
 #[derive(Debug, Clone, Default)]
 pub struct AllowAllPolicy;
 
@@ -53,5 +54,37 @@ impl ToolPolicyEnforcer for DenyAllPolicy {
         Ok(PolicyDecision::Deny {
             reason: self.reason.clone(),
         })
+    }
+}
+
+/// Policy adapter that simulates a policy evaluation failure.
+///
+/// Intended for testing error propagation when the policy engine
+/// itself fails (distinct from a policy denial decision).
+#[derive(Debug, Clone)]
+pub struct FailingPolicy {
+    message: String,
+}
+
+impl FailingPolicy {
+    /// Creates a failing policy with the given error message.
+    #[must_use]
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl ToolPolicyEnforcer for FailingPolicy {
+    async fn evaluate(
+        &self,
+        _tool_name: &str,
+        _parameters: &Value,
+    ) -> Result<PolicyDecision, ToolPolicyError> {
+        Err(ToolPolicyError::EvaluationFailed(Arc::from(
+            std::io::Error::other(&*self.message),
+        )))
     }
 }

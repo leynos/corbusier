@@ -26,6 +26,7 @@ enum LifecycleCompensationAction {
 struct LifecycleChange {
     updated_server: McpServerRegistration,
     compensation: Option<LifecycleCompensationAction>,
+    startup_stderr: Option<bytes::Bytes>,
 }
 
 impl LifecycleChange {
@@ -33,6 +34,7 @@ impl LifecycleChange {
         Self {
             updated_server,
             compensation: None,
+            startup_stderr: None,
         }
     }
 
@@ -43,7 +45,13 @@ impl LifecycleChange {
         Self {
             updated_server,
             compensation: Some(compensation),
+            startup_stderr: None,
         }
+    }
+
+    fn with_startup_stderr(mut self, stderr: Option<bytes::Bytes>) -> Self {
+        self.startup_stderr = stderr;
+        self
     }
 }
 
@@ -65,6 +73,15 @@ impl RegisterMcpServerRequest {
             transport,
         }
     }
+}
+
+/// Result of starting an MCP server, including captured startup stderr.
+#[derive(Debug, Clone)]
+pub struct LifecycleStartResult {
+    /// The updated server registration after starting.
+    pub server: McpServerRegistration,
+    /// Stderr output captured during server startup, if any.
+    pub startup_stderr: Option<bytes::Bytes>,
 }
 
 /// Service-level errors for MCP server lifecycle operations.
@@ -115,6 +132,21 @@ impl LifecycleHostAction {
             Self::Stop => LifecycleCompensationAction::Start,
         }
     }
+
+    /// Executes the host action, returning any startup stderr captured.
+    async fn execute<H: McpServerHost>(
+        self,
+        host: &H,
+        server: &McpServerRegistration,
+    ) -> Result<Option<bytes::Bytes>, McpServerHostError> {
+        match self {
+            Self::Start => Ok(host.start(server).await?.stderr_output),
+            Self::Stop => {
+                host.stop(server).await?;
+                Ok(None)
+            }
+        }
+    }
 }
 
 struct LifecycleTransition<DomainMut> {
@@ -161,7 +193,7 @@ where
         &self,
         server_id: McpServerId,
         apply_change: F,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    ) -> McpServerLifecycleServiceResult<LifecycleChange>
     where
         F: for<'a> FnOnce(&'a McpServerRegistration, &'a Self) -> LifecycleChangeFuture<'a>,
     {
@@ -180,7 +212,7 @@ where
             }
             return Err(McpServerLifecycleServiceError::Repository(repository_error));
         }
-        Ok(change.updated_server)
+        Ok(change)
     }
 
     async fn apply_compensation_if_needed(
@@ -207,7 +239,7 @@ where
         &self,
         server_id: McpServerId,
         transition: LifecycleTransition<DomainMut>,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    ) -> McpServerLifecycleServiceResult<LifecycleChange>
     where
         DomainMut:
             FnOnce(&mut McpServerRegistration, &C) -> Result<(), ToolRegistryDomainError> + 'static,
@@ -221,14 +253,11 @@ where
             Box::pin(async move {
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
-                match host_action {
-                    LifecycleHostAction::Start => drop(service.host.start(server).await?),
-                    LifecycleHostAction::Stop => service.host.stop(server).await?,
-                }
-                Ok(LifecycleChange::with_compensation(
-                    updated_server,
-                    compensation,
-                ))
+                let stderr = host_action.execute(&*service.host, server).await?;
+                Ok(
+                    LifecycleChange::with_compensation(updated_server, compensation)
+                        .with_startup_stderr(stderr),
+                )
             })
         })
         .await
@@ -252,6 +281,9 @@ where
 
     /// Starts a registered MCP server.
     ///
+    /// Returns a [`LifecycleStartResult`] containing the updated server
+    /// registration and any startup stderr captured from the host.
+    ///
     /// # Errors
     ///
     /// Returns [`McpServerLifecycleServiceError::NotFound`] when no server has
@@ -260,16 +292,22 @@ where
     pub async fn start(
         &self,
         server_id: McpServerId,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
+    ) -> McpServerLifecycleServiceResult<LifecycleStartResult> {
         let transition = LifecycleTransition::new(
             LifecycleHostAction::Start,
             |server: &mut McpServerRegistration, clock: &C| {
                 server.mark_started(McpServerHealthSnapshot::unknown(clock.utc()), clock)
             },
         );
-        self.execute_transition_with_compensation(server_id, transition)
+        let change = self
+            .execute_transition_with_compensation(server_id, transition)
             .await?;
-        self.refresh_health(server_id).await
+        let startup_stderr = change.startup_stderr;
+        let server = self.refresh_health(server_id).await?;
+        Ok(LifecycleStartResult {
+            server,
+            startup_stderr,
+        })
     }
 
     /// Stops a registered MCP server.
@@ -287,8 +325,10 @@ where
             LifecycleHostAction::Stop,
             |server: &mut McpServerRegistration, clock: &C| server.mark_stopped(clock),
         );
-        self.execute_transition_with_compensation(server_id, transition)
-            .await
+        Ok(self
+            .execute_transition_with_compensation(server_id, transition)
+            .await?
+            .updated_server)
     }
 
     /// Refreshes and persists server health.
@@ -301,15 +341,17 @@ where
         &self,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_lifecycle_change(server_id, |server, service| {
-            Box::pin(async move {
-                let health_snapshot = service.host.health(server).await?;
-                let mut refreshed_server = server.clone();
-                refreshed_server.update_health(health_snapshot, &*service.clock);
-                Ok(LifecycleChange::without_compensation(refreshed_server))
+        Ok(self
+            .execute_lifecycle_change(server_id, |server, service| {
+                Box::pin(async move {
+                    let health_snapshot = service.host.health(server).await?;
+                    let mut refreshed_server = server.clone();
+                    refreshed_server.update_health(health_snapshot, &*service.clock);
+                    Ok(LifecycleChange::without_compensation(refreshed_server))
+                })
             })
-        })
-        .await
+            .await?
+            .updated_server)
     }
 
     /// Lists all registered MCP servers.

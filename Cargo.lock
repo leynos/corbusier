@@ -461,6 +461,7 @@ dependencies = [
  "chrono",
  "diesel",
  "eyre",
+ "futures",
  "minijinja",
  "mockable",
  "mockall",

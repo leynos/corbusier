@@ -117,22 +117,16 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         &self,
         server_id: McpServerId,
     ) -> ToolLogStoreResult<Vec<String>> {
+        use futures::TryStreamExt;
+
         let prefix = Path::from(format!("tool_logs/{server_id}/"));
 
-        // Use list_with_delimiter to avoid needing futures::TryStreamExt.
-        let list_result = self
-            .store
-            .list_with_delimiter(Some(&prefix))
+        self.store
+            .list(Some(&prefix))
+            .map_ok(|meta| meta.location.to_string())
+            .try_collect()
             .await
-            .map_err(|err| ToolLogStoreError::ListFailed(err.to_string()))?;
-
-        let paths = list_result
-            .objects
-            .iter()
-            .map(|meta| meta.location.to_string())
-            .collect();
-
-        Ok(paths)
+            .map_err(|err| ToolLogStoreError::ListFailed(err.to_string()))
     }
 
     async fn sweep_expired(
@@ -157,6 +151,10 @@ fn truncate_if_needed(content: Bytes, max_bytes: u64) -> Bytes {
         return content;
     }
     let marker = b"\n--- truncated at max_bytes_per_log ---\n";
+    if max <= marker.len() {
+        // Cap is too small for the marker; just hard-truncate.
+        return content.slice(..max);
+    }
     let truncation_point = max.saturating_sub(marker.len());
     let mut truncated = content.slice(..truncation_point).to_vec();
     truncated.extend_from_slice(marker);

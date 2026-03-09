@@ -72,12 +72,9 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
             .write()
             .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
 
-        // Remove existing entries for this server.
-        state
-            .entries
-            .retain(|_, entry| entry.server_id() != server_id);
-
-        // Check for duplicate tool names from other servers.
+        // Stage the new entries, checking for cross-server duplicates
+        // before mutating live state.
+        let mut staged: HashMap<String, CatalogEntry> = HashMap::new();
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
             if let Some(existing) = state.entries.get(&tool_name)
@@ -85,8 +82,14 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
             {
                 return Err(ToolCatalogError::DuplicateEntry(entry.id()));
             }
-            state.entries.insert(tool_name, entry.clone());
+            staged.insert(tool_name, entry.clone());
         }
+
+        // Validation passed -- swap atomically.
+        state
+            .entries
+            .retain(|_, entry| entry.server_id() != server_id);
+        state.entries.extend(staged);
 
         Ok(())
     }

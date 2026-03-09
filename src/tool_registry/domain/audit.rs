@@ -49,6 +49,34 @@ impl ToolCallAuditRecord {
         }
     }
 
+    /// Builds an audit record for a pre-execution rejection (e.g.
+    /// unavailable tool, schema validation failure, or policy denial).
+    #[must_use]
+    pub fn for_rejection(
+        request: &super::routing::ToolCallRequest,
+        server_id: McpServerId,
+        error: &dyn std::fmt::Display,
+        completed_at: DateTime<Utc>,
+    ) -> Self {
+        let duration = (completed_at - request.initiated_at())
+            .to_std()
+            .unwrap_or_default();
+        Self {
+            id: Uuid::new_v4(),
+            call_id: request.call_id(),
+            tool_name: request.tool_name().to_owned(),
+            server_id,
+            parameters: request.parameters().clone(),
+            outcome: ToolCallOutcome::Failure {
+                error: error.to_string(),
+            },
+            duration,
+            initiated_at: request.initiated_at(),
+            completed_at,
+            stderr_log_path: None,
+        }
+    }
+
     /// Attaches the object store path of captured stderr output.
     #[must_use]
     pub fn with_stderr_log_path(mut self, path: impl Into<String>) -> Self {

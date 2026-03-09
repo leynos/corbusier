@@ -138,9 +138,9 @@ fn start_server(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
 
-    let started =
+    let start_result =
         run_async(world.service()?.start(server.id())).wrap_err("start should succeed")?;
-    world.registered_server = Some(started);
+    world.registered_server = Some(start_result.server);
     Ok(())
 }
 

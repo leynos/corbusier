@@ -195,9 +195,9 @@ fn tool_call_stderr_configured(
 fn register_and_start_server(world: &mut ToolDiscoveryWorld) -> Result<(), eyre::Report> {
     let registered = run_async(world.lifecycle()?.register(request_from_world(world)?))
         .wrap_err("registration should succeed")?;
-    let started =
+    let start_result =
         run_async(world.lifecycle()?.start(registered.id())).wrap_err("start should succeed")?;
-    world.registered_server = Some(started);
+    world.registered_server = Some(start_result.server);
     Ok(())
 }
 

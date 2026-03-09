@@ -30,8 +30,8 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    /// Sets the `available` flag for every catalog entry belonging to
-    /// `server_id`.
+    /// Sets the `available` flag and refreshes `updated_at` for every
+    /// catalog entry belonging to `server_id`.
     async fn set_server_tools_availability(
         &self,
         server_id: McpServerId,
@@ -40,7 +40,10 @@ impl PostgresToolCatalog {
         let sid = server_id.into_inner();
         self.run_blocking(move |connection| {
             diesel::update(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
-                .set(mcp_tool_catalog::available.eq(available))
+                .set((
+                    mcp_tool_catalog::available.eq(available),
+                    mcp_tool_catalog::updated_at.eq(diesel::dsl::now),
+                ))
                 .execute(connection)
                 .map_err(ToolCatalogError::persistence)?;
             Ok(())
@@ -74,24 +77,30 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let rows: Vec<NewCatalogEntryRow> = entries.iter().map(entry_to_new_row).collect();
 
         self.run_blocking(move |connection| {
-            // Delete existing entries for this server, then insert new ones.
-            diesel::delete(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
-                .execute(connection)
-                .map_err(ToolCatalogError::persistence)?;
+            connection
+                .transaction(|conn| {
+                    diesel::delete(
+                        mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)),
+                    )
+                    .execute(conn)?;
 
-            for row in &rows {
-                diesel::insert_into(mcp_tool_catalog::table)
-                    .values(row)
-                    .execute(connection)
-                    .map_err(|err| match err {
-                        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
-                            ToolCatalogError::DuplicateEntry(CatalogEntryId::from_uuid(row.id))
-                        }
-                        other => ToolCatalogError::persistence(other),
-                    })?;
-            }
-
-            Ok(())
+                    for row in &rows {
+                        diesel::insert_into(mcp_tool_catalog::table)
+                            .values(row)
+                            .execute(conn)?;
+                    }
+                    Ok(())
+                })
+                .map_err(|err: DieselError| match err {
+                    DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
+                        // Find the conflicting row for the error message.
+                        rows.first().map_or_else(
+                            || ToolCatalogError::persistence(err),
+                            |r| ToolCatalogError::DuplicateEntry(CatalogEntryId::from_uuid(r.id)),
+                        )
+                    }
+                    other => ToolCatalogError::persistence(other),
+                })
         })
         .await
     }

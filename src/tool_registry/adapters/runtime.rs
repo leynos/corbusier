@@ -60,17 +60,6 @@ impl InMemoryMcpServerHost {
         Ok(())
     }
 
-    fn set_tool_entry<V>(
-        &self,
-        key: (McpServerName, String),
-        value: V,
-        select: impl FnOnce(&mut InMemoryHostState) -> &mut HashMap<(McpServerName, String), V>,
-    ) -> McpServerHostResult<()> {
-        self.modify_state(|s| {
-            select(s).insert(key, value);
-        })
-    }
-
     /// Associates a tool catalog with a server name.
     ///
     /// Existing catalog entries are replaced.
@@ -116,8 +105,9 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         result: Value,
     ) -> McpServerHostResult<()> {
-        self.set_tool_entry((server_name, tool_name.into()), result, |s| {
-            &mut s.tool_call_results
+        let key = (server_name, tool_name.into());
+        self.modify_state(|s| {
+            s.tool_call_results.insert(key, result);
         })
     }
 
@@ -133,8 +123,9 @@ impl InMemoryMcpServerHost {
         tool_name: impl Into<String>,
         stderr: bytes::Bytes,
     ) -> McpServerHostResult<()> {
-        self.set_tool_entry((server_name, tool_name.into()), stderr, |s| {
-            &mut s.tool_call_stderr
+        let key = (server_name, tool_name.into());
+        self.modify_state(|s| {
+            s.tool_call_stderr.insert(key, stderr);
         })
     }
 
@@ -214,7 +205,7 @@ impl McpServerHost for InMemoryMcpServerHost {
         &self,
         server: &McpServerRegistration,
         tool_name: &str,
-        _parameters: Value,
+        _parameters: &Value,
     ) -> McpServerHostResult<ToolCallHostResult> {
         let state = self.read_state()?;
 

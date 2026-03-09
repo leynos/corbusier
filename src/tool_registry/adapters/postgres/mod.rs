@@ -1,4 +1,4 @@
-//! `PostgreSQL` adapters for MCP server registry persistence.
+//! `PostgreSQL` adapters for MCP server registry and tool catalogue persistence.
 
 mod catalog_models;
 mod catalog_repository;

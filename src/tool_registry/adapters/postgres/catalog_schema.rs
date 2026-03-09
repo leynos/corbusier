@@ -10,7 +10,7 @@ diesel::table! {
         /// Server name at discovery time.
         #[max_length = 100]
         server_name -> Varchar,
-        /// Unique tool name.
+        /// Tool name (unique per server, see `idx_mcp_tool_catalog_tool_name`).
         #[max_length = 255]
         tool_name -> Varchar,
         /// Tool description.

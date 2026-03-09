@@ -56,7 +56,7 @@ async fn register_start_and_stop_server(context: TestContext) {
         .start(registered.id())
         .await
         .expect("start should succeed");
-    assert_eq!(started.lifecycle_state().as_str(), "running");
+    assert_eq!(started.server.lifecycle_state().as_str(), "running");
 
     let stopped = context
         .service
