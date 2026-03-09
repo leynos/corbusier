@@ -1,5 +1,6 @@
 //! Port contract for tool catalog persistence and audit trail.
 
+use crate::context::RequestContext;
 use crate::tool_registry::domain::{
     CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord,
 };
@@ -26,6 +27,7 @@ pub trait ToolCatalogRepository: Send + Sync {
     /// failures.
     async fn sync_server_tools(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()>;
@@ -35,35 +37,51 @@ pub trait ToolCatalogRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] on persistence failures.
-    async fn mark_server_tools_unavailable(&self, server_id: McpServerId) -> ToolCatalogResult<()>;
+    async fn mark_server_tools_unavailable(
+        &self,
+        ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()>;
 
     /// Marks all tools for the given server as available.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] on persistence failures.
-    async fn mark_server_tools_available(&self, server_id: McpServerId) -> ToolCatalogResult<()>;
+    async fn mark_server_tools_available(
+        &self,
+        ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()>;
 
     /// Finds a catalog entry by tool name.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] on persistence failures.
-    async fn find_by_tool_name(&self, tool_name: &str) -> ToolCatalogResult<Option<CatalogEntry>>;
+    async fn find_by_tool_name(
+        &self,
+        ctx: &RequestContext,
+        tool_name: &str,
+    ) -> ToolCatalogResult<Option<CatalogEntry>>;
 
     /// Returns the complete tool catalog.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] on persistence failures.
-    async fn list_all(&self) -> ToolCatalogResult<Vec<CatalogEntry>>;
+    async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>>;
 
     /// Persists a tool call audit trail record.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] on persistence failures.
-    async fn record_audit(&self, record: &ToolCallAuditRecord) -> ToolCatalogResult<()>;
+    async fn record_audit(
+        &self,
+        ctx: &RequestContext,
+        record: &ToolCallAuditRecord,
+    ) -> ToolCatalogResult<()>;
 }
 
 /// Errors returned by tool catalog persistence operations.

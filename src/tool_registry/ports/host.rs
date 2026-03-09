@@ -1,5 +1,6 @@
 //! Runtime host port for MCP server lifecycle operations.
 
+use crate::context::RequestContext;
 use crate::tool_registry::domain::{
     McpServerHealthSnapshot, McpServerId, McpServerRegistration, McpToolDefinition,
 };
@@ -34,20 +35,30 @@ pub trait McpServerHost: Send + Sync {
     ///
     /// Returns a [`StartHostResult`] containing any captured startup
     /// stderr output.
-    async fn start(&self, server: &McpServerRegistration) -> McpServerHostResult<StartHostResult>;
+    async fn start(
+        &self,
+        ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerHostResult<StartHostResult>;
 
     /// Stops the server runtime.
-    async fn stop(&self, server: &McpServerRegistration) -> McpServerHostResult<()>;
+    async fn stop(
+        &self,
+        ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerHostResult<()>;
 
     /// Reports current health for a server.
     async fn health(
         &self,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<McpServerHealthSnapshot>;
 
     /// Lists tools exposed by the running server.
     async fn list_tools(
         &self,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<Vec<McpToolDefinition>>;
 
@@ -64,6 +75,7 @@ pub trait McpServerHost: Send + Sync {
     /// the call exceeds the timeout.
     async fn call_tool(
         &self,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
         tool_name: &str,
         parameters: &Value,

@@ -1,5 +1,6 @@
 //! Port contract for tool call policy enforcement.
 
+use crate::context::RequestContext;
 use crate::tool_registry::domain::PolicyDecision;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -26,6 +27,7 @@ pub trait ToolPolicyEnforcer: Send + Sync {
     /// yielding [`PolicyDecision::Deny`]).
     async fn evaluate(
         &self,
+        ctx: &RequestContext,
         tool_name: &str,
         parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError>;

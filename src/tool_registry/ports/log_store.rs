@@ -4,6 +4,7 @@
 //! the hexagonal boundary, using domain types and `bytes::Bytes`
 //! rather than infrastructure-specific types.
 
+use crate::context::RequestContext;
 use crate::tool_registry::domain::{LogEntryMetadata, LogRetentionPolicy, McpServerId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -43,6 +44,7 @@ pub trait ToolLogStore: Send + Sync {
     /// Returns [`ToolLogStoreError::StoreFailed`] when the write fails.
     async fn store_log(
         &self,
+        ctx: &RequestContext,
         metadata: &LogEntryMetadata,
         content: bytes::Bytes,
         retention: &LogRetentionPolicy,
@@ -54,7 +56,11 @@ pub trait ToolLogStore: Send + Sync {
     ///
     /// Returns [`ToolLogStoreError::RetrieveFailed`] when the read
     /// fails.
-    async fn retrieve_log(&self, path: &str) -> ToolLogStoreResult<bytes::Bytes>;
+    async fn retrieve_log(
+        &self,
+        ctx: &RequestContext,
+        path: &str,
+    ) -> ToolLogStoreResult<bytes::Bytes>;
 
     /// Deletes a single log blob by path.
     ///
@@ -62,7 +68,7 @@ pub trait ToolLogStore: Send + Sync {
     ///
     /// Returns [`ToolLogStoreError::DeleteFailed`] when the deletion
     /// fails.
-    async fn delete_log(&self, path: &str) -> ToolLogStoreResult<()>;
+    async fn delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>;
 
     /// Lists all log blob paths for a server by prefix scan.
     ///
@@ -70,8 +76,11 @@ pub trait ToolLogStore: Send + Sync {
     ///
     /// Returns [`ToolLogStoreError::ListFailed`] when the listing
     /// fails.
-    async fn list_logs_for_server(&self, server_id: McpServerId)
-    -> ToolLogStoreResult<Vec<String>>;
+    async fn list_logs_for_server(
+        &self,
+        ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolLogStoreResult<Vec<String>>;
 
     /// Deletes expired logs and enforces the per-server count limit.
     ///
@@ -86,8 +95,9 @@ pub trait ToolLogStore: Send + Sync {
     /// Returns [`ToolLogStoreError`] when individual deletions fail.
     async fn sweep_expired(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
-        ctx: &SweepContext<'_>,
+        sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize>;
 }
 

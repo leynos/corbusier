@@ -1,5 +1,6 @@
 //! Repository port for MCP server registry persistence and discovery.
 
+use crate::context::RequestContext;
 use crate::tool_registry::domain::{McpServerId, McpServerName, McpServerRegistration};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -18,7 +19,11 @@ pub trait McpServerRegistryRepository: Send + Sync {
     /// Returns [`McpServerRegistryError::DuplicateServer`] when the ID already
     /// exists or [`McpServerRegistryError::DuplicateServerName`] when the name
     /// is already registered.
-    async fn register(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()>;
+    async fn register(
+        &self,
+        ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()>;
 
     /// Persists updates to an existing registration.
     ///
@@ -26,22 +31,31 @@ pub trait McpServerRegistryRepository: Send + Sync {
     ///
     /// Returns [`McpServerRegistryError::NotFound`] when the server does not
     /// exist.
-    async fn update(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()>;
+    async fn update(
+        &self,
+        ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()>;
 
     /// Finds a registration by internal identifier.
     async fn find_by_id(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>>;
 
     /// Finds a registration by unique server name.
     async fn find_by_name(
         &self,
+        ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>>;
 
     /// Returns all registrations regardless of lifecycle state.
-    async fn list_all(&self) -> McpServerRegistryResult<Vec<McpServerRegistration>>;
+    async fn list_all(
+        &self,
+        ctx: &RequestContext,
+    ) -> McpServerRegistryResult<Vec<McpServerRegistration>>;
 }
 
 /// Errors returned by MCP server registry repository implementations.
