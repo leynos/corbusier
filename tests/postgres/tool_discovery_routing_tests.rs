@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -37,6 +38,15 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
+
+fn test_request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 struct PgTestContext {
     host: Arc<InMemoryMcpServerHost>,
@@ -119,6 +129,7 @@ async fn catalog_round_trip(
     #[future] context: Result<PgTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     ctx.host
         .set_tool_catalog(
@@ -129,11 +140,14 @@ async fn catalog_round_trip(
 
     let registered = ctx
         .lifecycle
-        .register(stdio_request("workspace_tools").expect("valid request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid request"),
+        )
         .await
         .expect("registration should succeed");
     ctx.lifecycle
-        .start(registered.id())
+        .start(&request_ctx, registered.id())
         .await
         .expect("start should succeed");
 
@@ -179,6 +193,7 @@ async fn audit_log_persisted(
     #[future] context: Result<PgTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     ctx.host
         .set_tool_catalog(
@@ -196,11 +211,14 @@ async fn audit_log_persisted(
 
     let registered = ctx
         .lifecycle
-        .register(stdio_request("workspace_tools").expect("valid request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid request"),
+        )
         .await
         .expect("registration should succeed");
     ctx.lifecycle
-        .start(registered.id())
+        .start(&request_ctx, registered.id())
         .await
         .expect("start should succeed");
     ctx.discovery
@@ -251,6 +269,7 @@ async fn catalog_survives_service_reconstruction(
     #[future] context: Result<PgTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     ctx.host
         .set_tool_catalog(
@@ -261,11 +280,14 @@ async fn catalog_survives_service_reconstruction(
 
     let registered = ctx
         .lifecycle
-        .register(stdio_request("workspace_tools").expect("valid request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid request"),
+        )
         .await
         .expect("registration should succeed");
     ctx.lifecycle
-        .start(registered.id())
+        .start(&request_ctx, registered.id())
         .await
         .expect("start should succeed");
     ctx.discovery

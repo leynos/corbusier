@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
     domain::{McpServerName, McpServerRegistration, McpToolDefinition, McpTransport},
@@ -19,10 +20,10 @@ use serde_json::json;
 type TestService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
 
-#[derive(Default)]
 struct McpLifecycleWorld {
     host: Arc<InMemoryMcpServerHost>,
     service: Option<TestService>,
+    request_ctx: RequestContext,
     pending_name: Option<String>,
     pending_command: Option<String>,
     registered_server: Option<McpServerRegistration>,
@@ -43,6 +44,12 @@ impl McpLifecycleWorld {
         Self {
             host,
             service: Some(service),
+            request_ctx: RequestContext::new(
+                TenantId::new(),
+                CorrelationId::new(),
+                UserId::new(),
+                SessionId::new(),
+            ),
             pending_name: None,
             pending_command: None,
             registered_server: None,
@@ -116,17 +123,29 @@ fn tool_available_on_server(
 
 #[when("the server is registered")]
 fn register_server(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
-    let registered = run_async(world.service()?.register(request_from_world(world)?))
-        .wrap_err("registration should succeed")?;
+    let registered = run_async(
+        world
+            .service()?
+            .register(&world.request_ctx, request_from_world(world)?),
+    )
+    .wrap_err("registration should succeed")?;
     world.registered_server = Some(registered);
     Ok(())
 }
 
 #[when("the server is registered twice")]
 fn register_server_twice(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
-    run_async(world.service()?.register(request_from_world(world)?))
-        .wrap_err("first registration should succeed")?;
-    let second_result = run_async(world.service()?.register(request_from_world(world)?));
+    run_async(
+        world
+            .service()?
+            .register(&world.request_ctx, request_from_world(world)?),
+    )
+    .wrap_err("first registration should succeed")?;
+    let second_result = run_async(
+        world
+            .service()?
+            .register(&world.request_ctx, request_from_world(world)?),
+    );
     world.last_error = second_result.err();
     Ok(())
 }
@@ -138,8 +157,8 @@ fn start_server(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
 
-    let start_result =
-        run_async(world.service()?.start(server.id())).wrap_err("start should succeed")?;
+    let start_result = run_async(world.service()?.start(&world.request_ctx, server.id()))
+        .wrap_err("start should succeed")?;
     world.registered_server = Some(start_result.server);
     Ok(())
 }
@@ -151,7 +170,8 @@ fn stop_server(world: &mut McpLifecycleWorld) -> Result<(), eyre::Report> {
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
 
-    let stopped = run_async(world.service()?.stop(server.id())).wrap_err("stop should succeed")?;
+    let stopped = run_async(world.service()?.stop(&world.request_ctx, server.id()))
+        .wrap_err("stop should succeed")?;
     world.registered_server = Some(stopped);
     Ok(())
 }
@@ -160,7 +180,8 @@ fn list_servers_returns_count_impl(
     world: &mut McpLifecycleWorld,
     count: usize,
 ) -> Result<(), eyre::Report> {
-    let servers = run_async(world.service()?.list_all()).wrap_err("listing should succeed")?;
+    let servers = run_async(world.service()?.list_all(&world.request_ctx))
+        .wrap_err("listing should succeed")?;
     world.last_servers = Some(servers.clone());
     if servers.len() != count {
         return Err(eyre!("expected {count} servers, got {}", servers.len()));
@@ -208,7 +229,7 @@ fn query_tools_returns_count_impl(
         .as_ref()
         .ok_or_else(|| eyre!("registered server should exist"))?;
 
-    let tools = run_async(world.service()?.list_tools(server.id()))
+    let tools = run_async(world.service()?.list_tools(&world.request_ctx, server.id()))
         .wrap_err("tool query should succeed")?;
     world.last_tools_count = Some(tools.len());
     if tools.len() != count {
@@ -256,7 +277,7 @@ fn query_tools_rejected_when_not_running(world: &McpLifecycleWorld) -> Result<()
         .as_ref()
         .ok_or_else(|| eyre!("registered server should exist"))?;
 
-    let result = run_async(world.service()?.list_tools(server.id()));
+    let result = run_async(world.service()?.list_tools(&world.request_ctx, server.id()));
     if !matches!(
         result,
         Err(McpServerLifecycleServiceError::Domain(

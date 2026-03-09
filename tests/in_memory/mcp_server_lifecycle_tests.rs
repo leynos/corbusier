@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
     domain::{
@@ -35,6 +36,16 @@ fn context() -> TestContext {
     TestContext { host, service }
 }
 
+#[fixture]
+fn request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
     Ok(RegisterMcpServerRequest::new(
         name,
@@ -44,23 +55,26 @@ fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDom
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn register_start_and_stop_server(context: TestContext) {
+async fn register_start_and_stop_server(context: TestContext, request_ctx: RequestContext) {
     let registered = context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     let started = context
         .service
-        .start(registered.id())
+        .start(&request_ctx, registered.id())
         .await
         .expect("start should succeed");
     assert_eq!(started.server.lifecycle_state().as_str(), "running");
 
     let stopped = context
         .service
-        .stop(registered.id())
+        .stop(&request_ctx, registered.id())
         .await
         .expect("stop should succeed");
     assert_eq!(stopped.lifecycle_state().as_str(), "stopped");
@@ -75,16 +89,22 @@ async fn register_start_and_stop_server(context: TestContext) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn duplicate_server_name_is_rejected(context: TestContext) {
+async fn duplicate_server_name_is_rejected(context: TestContext, request_ctx: RequestContext) {
     context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("first registration should succeed");
 
     let result = context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await;
 
     assert!(matches!(
@@ -97,21 +117,30 @@ async fn duplicate_server_name_is_rejected(context: TestContext) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_servers_returns_registered_entries(context: TestContext) {
+async fn list_servers_returns_registered_entries(
+    context: TestContext,
+    request_ctx: RequestContext,
+) {
     context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
     context
         .service
-        .register(stdio_request("analysis_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("analysis_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     let servers = context
         .service
-        .list_all()
+        .list_all(&request_ctx)
         .await
         .expect("listing should succeed");
 
@@ -120,7 +149,7 @@ async fn list_servers_returns_registered_entries(context: TestContext) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_tools_for_running_server(context: TestContext) {
+async fn list_tools_for_running_server(context: TestContext, request_ctx: RequestContext) {
     let tool = McpToolDefinition::new(
         "search_code",
         "Searches the workspace source tree",
@@ -137,19 +166,22 @@ async fn list_tools_for_running_server(context: TestContext) {
 
     let registered = context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     context
         .service
-        .start(registered.id())
+        .start(&request_ctx, registered.id())
         .await
         .expect("start should succeed");
 
     let tools = context
         .service
-        .list_tools(registered.id())
+        .list_tools(&request_ctx, registered.id())
         .await
         .expect("tool listing should succeed");
 
@@ -160,14 +192,23 @@ async fn list_tools_for_running_server(context: TestContext) {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_tools_for_stopped_server_is_rejected(context: TestContext) {
+async fn list_tools_for_stopped_server_is_rejected(
+    context: TestContext,
+    request_ctx: RequestContext,
+) {
     let registered = context
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
-    let result = context.service.list_tools(registered.id()).await;
+    let result = context
+        .service
+        .list_tools(&request_ctx, registered.id())
+        .await;
 
     assert!(matches!(
         result,

@@ -1,16 +1,19 @@
 //! Unit tests for tool discovery and routing service.
 
 use super::{ServicePorts, ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError};
-use crate::tool_registry::{
-    adapters::{
-        AllowAllPolicy, DenyAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
-        memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
+use crate::{
+    context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
+    tool_registry::{
+        adapters::{
+            AllowAllPolicy, DenyAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+            memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
+        },
+        domain::{
+            LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport, ToolCallRequest,
+            ToolRegistryDomainError,
+        },
+        services::{McpServerLifecycleService, RegisterMcpServerRequest},
     },
-    domain::{
-        LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport, ToolCallRequest,
-        ToolRegistryDomainError,
-    },
-    services::{McpServerLifecycleService, RegisterMcpServerRequest},
 };
 use eyre::Result;
 use mockable::DefaultClock;
@@ -28,6 +31,15 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
+
+fn test_request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 struct TestBundle {
     host: Arc<InMemoryMcpServerHost>,
@@ -89,14 +101,15 @@ async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnf
         DefaultClock,
     >,
 ) -> Result<crate::tool_registry::domain::McpServerId> {
+    let ctx = test_request_ctx();
     host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
     let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
+        .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
-    lifecycle.start(registered.id()).await?;
+    lifecycle.start(&ctx, registered.id()).await?;
     discovery
         .discover_and_persist_tools(registered.id())
         .await?;
@@ -121,15 +134,16 @@ async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicy
     crate::tool_registry::domain::McpServerId,
     Option<bytes::Bytes>,
 )> {
+    let ctx = test_request_ctx();
     host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
     host.set_startup_stderr(McpServerName::new("workspace_tools")?, startup_stderr)?;
     let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
+        .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = lifecycle.start(registered.id()).await?;
+    let start_result = lifecycle.start(&ctx, registered.id()).await?;
     discovery
         .discover_and_persist_tools(registered.id())
         .await?;
@@ -233,8 +247,9 @@ async fn discover_tools_requires_running_server(bundle: TestBundle) -> Result<()
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
+        .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
     assert!(matches!(
         discovery.discover_and_persist_tools(registered.id()).await,
@@ -298,10 +313,11 @@ async fn call_tool_unknown_tool_returns_not_found(bundle: TestBundle) -> Result<
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let registered = lifecycle
-        .register(stdio_request("workspace_tools")?)
+        .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
-    lifecycle.start(registered.id()).await?;
+    lifecycle.start(&ctx, registered.id()).await?;
 
     let request = ToolCallRequest::new("nonexistent", json!({}), &DefaultClock);
     assert!(matches!(

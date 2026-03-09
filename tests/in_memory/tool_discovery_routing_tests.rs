@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -41,7 +42,17 @@ struct IntegrationContext {
 }
 
 #[fixture]
-fn ctx() -> IntegrationContext {
+fn request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
+
+#[fixture]
+fn integration_ctx() -> IntegrationContext {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
     let catalog = Arc::new(InMemoryToolCatalog::new());
@@ -92,14 +103,18 @@ fn search_code_tool() -> Result<McpToolDefinition> {
 /// Registers a server, starts it, sets up the tool catalog, and discovers
 /// tools. Returns the server identifier for further assertions.
 async fn register_start_discover(
+    request_ctx: &RequestContext,
     ctx: &IntegrationContext,
     server_name: &str,
     tools: Vec<McpToolDefinition>,
 ) -> Result<corbusier::tool_registry::domain::McpServerId> {
     ctx.host
         .set_tool_catalog(McpServerName::new(server_name)?, tools)?;
-    let registered = ctx.lifecycle.register(stdio_request(server_name)?).await?;
-    ctx.lifecycle.start(registered.id()).await?;
+    let registered = ctx
+        .lifecycle
+        .register(request_ctx, stdio_request(server_name)?)
+        .await?;
+    ctx.lifecycle.start(request_ctx, registered.id()).await?;
     ctx.discovery
         .discover_and_persist_tools(registered.id())
         .await?;
@@ -108,10 +123,18 @@ async fn register_start_discover(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn discover_and_call_tool_end_to_end(ctx: IntegrationContext) -> Result<()> {
-    let server_id =
-        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
-    ctx.host.set_tool_call_result(
+async fn discover_and_call_tool_end_to_end(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
+    let server_id = register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "workspace_tools",
+        vec![read_file_tool()?],
+    )
+    .await?;
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello world"}),
@@ -119,12 +142,12 @@ async fn discover_and_call_tool_end_to_end(ctx: IntegrationContext) -> Result<()
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = ctx.discovery.call_tool(&request).await?;
+    let result = integration_ctx.discovery.call_tool(&request).await?;
     assert!(result.outcome().is_success());
     assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
 
-    let audits = ctx.catalog.audit_records()?;
+    let audits = integration_ctx.catalog.audit_records()?;
     assert_eq!(audits.len(), 1);
     assert_eq!(
         audits.first().expect("audit record").tool_name(),
@@ -135,16 +158,31 @@ async fn discover_and_call_tool_end_to_end(ctx: IntegrationContext) -> Result<()
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn two_servers_route_correctly(ctx: IntegrationContext) -> Result<()> {
-    let reg1 = register_start_discover(&ctx, "file_tools", vec![read_file_tool()?]).await?;
-    ctx.host.set_tool_call_result(
+async fn two_servers_route_correctly(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
+    let reg1 = register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "file_tools",
+        vec![read_file_tool()?],
+    )
+    .await?;
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("file_tools")?,
         "read_file",
         json!({"content": "file contents"}),
     )?;
 
-    let reg2 = register_start_discover(&ctx, "search_tools", vec![search_code_tool()?]).await?;
-    ctx.host.set_tool_call_result(
+    let reg2 = register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "search_tools",
+        vec![search_code_tool()?],
+    )
+    .await?;
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("search_tools")?,
         "search_code",
         json!({"matches": 3}),
@@ -152,11 +190,22 @@ async fn two_servers_route_correctly(ctx: IntegrationContext) -> Result<()> {
 
     let read_req =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    assert_eq!(ctx.discovery.call_tool(&read_req).await?.server_id(), reg1);
+    assert_eq!(
+        integration_ctx
+            .discovery
+            .call_tool(&read_req)
+            .await?
+            .server_id(),
+        reg1
+    );
 
     let search_req = ToolCallRequest::new("search_code", json!({"query": "hello"}), &DefaultClock);
     assert_eq!(
-        ctx.discovery.call_tool(&search_req).await?.server_id(),
+        integration_ctx
+            .discovery
+            .call_tool(&search_req)
+            .await?
+            .server_id(),
         reg2
     );
     Ok(())
@@ -164,16 +213,30 @@ async fn two_servers_route_correctly(ctx: IntegrationContext) -> Result<()> {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn tool_unavailable_after_stop(ctx: IntegrationContext) -> Result<()> {
-    let server_id =
-        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
-    ctx.lifecycle.stop(server_id).await?;
-    ctx.discovery.mark_tools_unavailable(server_id).await?;
+async fn tool_unavailable_after_stop(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
+    let server_id = register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "workspace_tools",
+        vec![read_file_tool()?],
+    )
+    .await?;
+    integration_ctx
+        .lifecycle
+        .stop(&request_ctx, server_id)
+        .await?;
+    integration_ctx
+        .discovery
+        .mark_tools_unavailable(server_id)
+        .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
-        ctx.discovery.call_tool(&request).await,
+        integration_ctx.discovery.call_tool(&request).await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::ToolUnavailable { .. }
         ))
@@ -183,40 +246,64 @@ async fn tool_unavailable_after_stop(ctx: IntegrationContext) -> Result<()> {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn rediscovery_after_restart(ctx: IntegrationContext) -> Result<()> {
-    let server_id =
-        register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
-    ctx.host.set_tool_call_result(
+async fn rediscovery_after_restart(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
+    let server_id = register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "workspace_tools",
+        vec![read_file_tool()?],
+    )
+    .await?;
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
     )?;
 
     // Stop and mark unavailable.
-    ctx.lifecycle.stop(server_id).await?;
-    ctx.discovery.mark_tools_unavailable(server_id).await?;
+    integration_ctx
+        .lifecycle
+        .stop(&request_ctx, server_id)
+        .await?;
+    integration_ctx
+        .discovery
+        .mark_tools_unavailable(server_id)
+        .await?;
 
     // Restart and rediscover.
-    ctx.lifecycle.start(server_id).await?;
-    ctx.discovery.discover_and_persist_tools(server_id).await?;
+    integration_ctx
+        .lifecycle
+        .start(&request_ctx, server_id)
+        .await?;
+    integration_ctx
+        .discovery
+        .discover_and_persist_tools(server_id)
+        .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    assert!(
-        ctx.discovery
-            .call_tool(&request)
-            .await?
-            .outcome()
-            .is_success()
-    );
+    let result = integration_ctx.discovery.call_tool(&request).await?;
+    assert!(result.outcome().is_success());
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn audit_trail_accumulates(ctx: IntegrationContext) -> Result<()> {
-    register_start_discover(&ctx, "workspace_tools", vec![read_file_tool()?]).await?;
-    ctx.host.set_tool_call_result(
+async fn audit_trail_accumulates(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
+    register_start_discover(
+        &request_ctx,
+        &integration_ctx,
+        "workspace_tools",
+        vec![read_file_tool()?],
+    )
+    .await?;
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
@@ -225,54 +312,61 @@ async fn audit_trail_accumulates(ctx: IntegrationContext) -> Result<()> {
     for _ in 0..3 {
         let request =
             ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-        ctx.discovery.call_tool(&request).await?;
+        integration_ctx.discovery.call_tool(&request).await?;
     }
-    assert_eq!(ctx.catalog.audit_records()?.len(), 3);
+    assert_eq!(integration_ctx.catalog.audit_records()?.len(), 3);
     Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn stderr_captured_for_startup_and_tool_calls(ctx: IntegrationContext) -> Result<()> {
+async fn stderr_captured_for_startup_and_tool_calls(
+    request_ctx: RequestContext,
+    integration_ctx: IntegrationContext,
+) -> Result<()> {
     // Configure startup stderr on the host before starting.
     let startup_bytes = bytes::Bytes::from("server initialising...");
-    ctx.host.set_tool_catalog(
+    integration_ctx.host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
-    ctx.host.set_startup_stderr(
+    integration_ctx.host.set_startup_stderr(
         McpServerName::new("workspace_tools")?,
         startup_bytes.clone(),
     )?;
 
-    // Start via lifecycle — startup stderr flows through StartHostResult.
-    let registered = ctx
+    // Start via lifecycle -- startup stderr flows through StartHostResult.
+    let registered = integration_ctx
         .lifecycle
-        .register(stdio_request("workspace_tools")?)
+        .register(&request_ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = ctx.lifecycle.start(registered.id()).await?;
+    let start_result = integration_ctx
+        .lifecycle
+        .start(&request_ctx, registered.id())
+        .await?;
     let captured = start_result
         .startup_stderr
         .expect("startup stderr should be captured");
     assert_eq!(captured, startup_bytes);
 
     // Persist startup stderr via discovery service.
-    let startup_meta = ctx
+    let startup_meta = integration_ctx
         .discovery
         .store_startup_stderr(registered.id(), captured)
         .await?;
     assert!(startup_meta.object_path().contains("startup"));
 
     // Discover tools and configure tool call results.
-    ctx.discovery
+    integration_ctx
+        .discovery
         .discover_and_persist_tools(registered.id())
         .await?;
-    ctx.host.set_tool_call_result(
+    integration_ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
         "read_file",
         json!({"content": "hello"}),
     )?;
-    ctx.host.set_tool_call_stderr(
+    integration_ctx.host.set_tool_call_stderr(
         McpServerName::new("workspace_tools")?,
         "read_file",
         bytes::Bytes::from("debug: reading file"),
@@ -281,16 +375,11 @@ async fn stderr_captured_for_startup_and_tool_calls(ctx: IntegrationContext) -> 
     // Call tool and verify audit trail references stderr.
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    ctx.discovery.call_tool(&request).await?;
+    integration_ctx.discovery.call_tool(&request).await?;
 
-    let audits = ctx.catalog.audit_records()?;
+    let audits = integration_ctx.catalog.audit_records()?;
     assert_eq!(audits.len(), 1);
-    assert!(
-        audits
-            .first()
-            .expect("audit record")
-            .stderr_log_path()
-            .is_some()
-    );
+    let record = audits.first().expect("audit record");
+    assert!(record.stderr_log_path().is_some());
     Ok(())
 }

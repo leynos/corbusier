@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{
         InMemoryMcpServerHost,
@@ -26,6 +27,15 @@ use crate::postgres::helpers::{
 
 type TestService =
     McpServerLifecycleService<PostgresMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
+
+fn test_request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 struct McpServerTestContext {
     host: Arc<InMemoryMcpServerHost>,
@@ -82,16 +92,20 @@ async fn postgres_register_and_find_by_name(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     let found = ctx
         .service
-        .find_by_name("workspace_tools")
+        .find_by_name(&request_ctx, "workspace_tools")
         .await
         .expect("lookup should succeed")
         .expect("server should exist");
@@ -106,20 +120,24 @@ async fn postgres_start_persists_running_state(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
 
     let found = ctx
         .service
-        .find_by_name("workspace_tools")
+        .find_by_name(&request_ctx, "workspace_tools")
         .await
         .expect("lookup should succeed")
         .expect("server should exist");
@@ -134,14 +152,18 @@ async fn postgres_refresh_health_persists_unhealthy_status(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
     ctx.host
@@ -150,7 +172,7 @@ async fn postgres_refresh_health_persists_unhealthy_status(
 
     let refreshed = ctx
         .service
-        .refresh_health(created.id())
+        .refresh_health(&request_ctx, created.id())
         .await
         .expect("health refresh should succeed");
 
@@ -170,15 +192,22 @@ async fn postgres_duplicate_name_is_rejected(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     ctx.service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("first registration should succeed");
 
     let result = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await;
 
     assert!(matches!(
@@ -197,6 +226,7 @@ async fn postgres_list_tools_for_running_server(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let tool = McpToolDefinition::new(
         "search_code",
         "Searches the workspace source tree",
@@ -212,18 +242,21 @@ async fn postgres_list_tools_for_running_server(
 
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
 
     let tools = ctx
         .service
-        .list_tools(created.id())
+        .list_tools(&request_ctx, created.id())
         .await
         .expect("tool listing should succeed");
 

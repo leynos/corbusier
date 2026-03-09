@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -34,12 +35,12 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     DefaultClock,
 >;
 
-#[derive(Default)]
 struct ToolDiscoveryWorld {
     host: Arc<InMemoryMcpServerHost>,
     lifecycle: Option<TestLifecycleService>,
     discovery: Option<TestDiscoveryService>,
     catalog: Arc<InMemoryToolCatalog>,
+    request_ctx: RequestContext,
     pending_name: Option<String>,
     pending_command: Option<String>,
     registered_server: Option<McpServerRegistration>,
@@ -73,6 +74,12 @@ impl ToolDiscoveryWorld {
             lifecycle: Some(lifecycle),
             discovery: Some(discovery),
             catalog,
+            request_ctx: RequestContext::new(
+                TenantId::new(),
+                CorrelationId::new(),
+                UserId::new(),
+                SessionId::new(),
+            ),
             pending_name: None,
             pending_command: None,
             registered_server: None,
@@ -193,10 +200,18 @@ fn tool_call_stderr_configured(
 
 #[when("the server is registered and started")]
 fn register_and_start_server(world: &mut ToolDiscoveryWorld) -> Result<(), eyre::Report> {
-    let registered = run_async(world.lifecycle()?.register(request_from_world(world)?))
-        .wrap_err("registration should succeed")?;
-    let start_result =
-        run_async(world.lifecycle()?.start(registered.id())).wrap_err("start should succeed")?;
+    let registered = run_async(
+        world
+            .lifecycle()?
+            .register(&world.request_ctx, request_from_world(world)?),
+    )
+    .wrap_err("registration should succeed")?;
+    let start_result = run_async(
+        world
+            .lifecycle()?
+            .start(&world.request_ctx, registered.id()),
+    )
+    .wrap_err("start should succeed")?;
     world.registered_server = Some(start_result.server);
     Ok(())
 }
@@ -218,8 +233,8 @@ fn stop_server(world: &mut ToolDiscoveryWorld) -> Result<(), eyre::Report> {
         .registered_server
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
-    let stopped =
-        run_async(world.lifecycle()?.stop(server.id())).wrap_err("stop should succeed")?;
+    let stopped = run_async(world.lifecycle()?.stop(&world.request_ctx, server.id()))
+        .wrap_err("stop should succeed")?;
     world.registered_server = Some(stopped);
     Ok(())
 }
