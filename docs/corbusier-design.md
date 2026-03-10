@@ -1205,7 +1205,7 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   with a crate-backed implementation later.
 - **`AllowAllPolicy` default**: the `ToolPolicyEnforcer` port is an
   extensibility point. The default adapter permits all calls; real
-  authorisation will be implemented when the workspace and permission systems
+  authorization will be implemented when the workspace and permission systems
   exist.
 - **Unique tool names per tenant**: a database unique index on
   `(tenant_id, tool_name)` enforces unambiguous routing within a tenant.
@@ -1216,7 +1216,7 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
   duration, outcome, and optional stderr log path. All string-valued parameter
   and outcome content fields are redacted with `[REDACTED]` before persistence
-  to minimise sensitive data exposure in the audit trail.
+  to minimize sensitive data exposure in the audit trail.
 - **Stderr log capture** via a `ToolLogStore` port backed by the Rust
   `object_store` crate. Startup stderr and per-tool-call stderr are stored as
   opaque blobs with structured path keys
@@ -1825,6 +1825,7 @@ you to also send your logs for further analysis.
 | bytes        | 1.10.1  | Byte buffer utilities            | crates.io |
 | object_store | 0.12.0  | Object storage abstraction       | crates.io |
 | cap-std      | 3.4.5   | Capability-based filesystem      | crates.io |
+| futures      | 0.3.31  | Async utilities / combinators    | crates.io |
 | tokio        | 1.49.0  | Async runtime                    | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)

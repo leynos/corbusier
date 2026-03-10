@@ -62,29 +62,28 @@ impl ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
     }
 
-    /// Collects metadata entries for `server_id` from the internal
-    /// index, falling back to `sweep.entry_metadata` when the index
-    /// is empty (e.g. for the Postgres adapter path).
+    /// Collects metadata entries for `server_id` by merging the
+    /// internal in-memory index with `sweep.entry_metadata`.
+    ///
+    /// In-memory entries take precedence when both sources contain
+    /// the same `object_path`.
     async fn collect_server_metadata(
         &self,
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> Vec<LogEntryMetadata> {
         let guard = self.metadata.read().await;
-        if guard.is_empty() {
-            // Fallback: use externally supplied metadata (Postgres path).
-            return sweep
-                .entry_metadata
-                .iter()
-                .filter(|e| e.server_id() == server_id)
-                .cloned()
-                .collect();
-        }
-        guard
-            .values()
+        let mut merged: HashMap<String, LogEntryMetadata> = sweep
+            .entry_metadata
+            .iter()
             .filter(|e| e.server_id() == server_id)
-            .cloned()
-            .collect()
+            .map(|e| (e.object_path().to_owned(), e.clone()))
+            .collect();
+        // In-memory entries override externally supplied duplicates.
+        for entry in guard.values().filter(|e| e.server_id() == server_id) {
+            merged.insert(entry.object_path().to_owned(), entry.clone());
+        }
+        merged.into_values().collect()
     }
 
     /// Deletes log entries whose retention period has elapsed.

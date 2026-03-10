@@ -14,8 +14,8 @@ use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_t
 use crate::tool_registry::{
     domain::{
         CatalogEntry, CatalogEntryId, McpServerId, McpServerName, McpToolDefinition,
-        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome, redact_outcome_content,
-        redact_parameters,
+        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome, redact_error_message,
+        redact_outcome_content, redact_parameters,
     },
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
@@ -258,7 +258,11 @@ fn audit_to_new_row(record: &ToolCallAuditRecord, tenant_id: uuid::Uuid) -> NewA
             Some(redact_outcome_content(content)),
             None,
         ),
-        ToolCallOutcome::Failure { error } => ("failure".to_owned(), None, Some(error.clone())),
+        ToolCallOutcome::Failure { error } => (
+            "failure".to_owned(),
+            None,
+            Some(redact_error_message(error)),
+        ),
     };
 
     NewAuditLogRow {

@@ -1,6 +1,8 @@
 -- Revert tenant_id additions to tool registry tables.
 
 DROP INDEX idx_mcp_tool_catalog_tenant_tool_name;
+DROP INDEX idx_tool_call_audit_log_tenant_id;
+DROP INDEX idx_tool_log_metadata_tenant_id;
 
 CREATE UNIQUE INDEX idx_mcp_tool_catalog_tool_name
     ON mcp_tool_catalog (tool_name);

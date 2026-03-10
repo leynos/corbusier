@@ -208,8 +208,11 @@ where
             Ok(entry) => entry,
             Err((maybe_entry, err)) => {
                 if let Some(entry) = maybe_entry {
-                    self.audit_rejection(ctx, request, entry.server_id(), &err)
-                        .await;
+                    let rejected = log_and_audit::RejectedCallContext {
+                        request,
+                        server_id: entry.server_id(),
+                    };
+                    self.audit_rejection(ctx, &rejected, &err).await;
                 }
                 return Err(err);
             }
@@ -291,11 +294,18 @@ where
         request: &ToolCallRequest,
         entry: &CatalogEntry,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let server = self.find_running_server(ctx, entry.server_id()).await?;
-        let execute_result = self
-            .host
-            .call_tool(ctx, &server, request.tool_name(), request.parameters())
-            .await;
+        let server = match self.find_running_server(ctx, entry.server_id()).await {
+            Ok(s) => s,
+            Err(err) => {
+                let rejected = log_and_audit::RejectedCallContext {
+                    request,
+                    server_id: entry.server_id(),
+                };
+                self.audit_rejection(ctx, &rejected, &err).await;
+                return Err(err);
+            }
+        };
+        let execute_result = self.host.call_tool(ctx, &server, request).await;
 
         let completed_at = self.clock.utc();
         let duration = (completed_at - request.initiated_at())
@@ -321,8 +331,11 @@ where
             completed_at,
         };
         let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
-        self.capture_and_audit(ctx, request, &result, stderr_output)
-            .await;
+        let completed = log_and_audit::CompletedCallContext {
+            request,
+            result: &result,
+        };
+        self.capture_and_audit(ctx, &completed, stderr_output).await;
 
         if let Some(host_err) = host_error {
             return Err(host_err.into());

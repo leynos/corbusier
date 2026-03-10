@@ -422,14 +422,25 @@ and `updated_at: DateTime<Utc>`. Constructors:
 Mutations: `mark_available(clock)`, `mark_unavailable(clock)`,
 `update_tool(tool, clock)`. Accessors for all fields.
 
-`routing.rs` defines `ToolCallId` (UUID newtype), `ToolCallRequest` (tool_name,
-parameters as `Value`, call_id, initiated_at), `ToolCallOutcome` (enum:
-`Success { content: Value }`, `Failure { error: String }`), and
-`ToolCallResult` (call_id, tool_name, server_id, outcome, duration as
-`std::time::Duration`, completed_at).
-`ToolCallRequest::new(tool_name, parameters, clock)` generates a fresh
-`ToolCallId`. `ToolCallOutcome::is_success()` and `is_failure()` convenience
-methods.
+`routing.rs` defines the tool call lifecycle types with timing separated from
+outcomes:
+
+- `ToolCallId` (UUID newtype) uniquely identifies an invocation.
+- `ToolCallRequest` holds `call_id: ToolCallId`, `tool_name: String`,
+  `parameters: Value`, and `initiated_at: DateTime<Utc>`.
+  `ToolCallRequest::new(tool_name, parameters, clock)` generates a fresh
+  `ToolCallId` and captures the current timestamp.
+- `ToolCallOutcome` is an enum: `Success { content: Value }` or
+  `Failure { error: String }`. Convenience methods `is_success()` and
+  `is_failure()`.
+- `ToolCallTiming` carries `duration: std::time::Duration` and
+  `completed_at: DateTime<Utc>`, computed after the host call returns.
+- `ToolCallResult` combines routing and timing metadata: `call_id`, `tool_name`,
+  `server_id: McpServerId`, `outcome: ToolCallOutcome`,
+  `duration: std::time::Duration`, and `completed_at: DateTime<Utc>`.
+  Constructed via
+  `ToolCallResult::from_request(request, server_id, outcome, timing)` which
+  copies fields from the request and timing structs.
 
 `audit.rs` defines `ToolCallAuditRecord` holding `id: Uuid`,
 `call_id: ToolCallId`, `tool_name: String`, `server_id: McpServerId`,
@@ -546,7 +557,7 @@ infrastructure-agnostic: tests use the in-memory backend, production uses
 port.
 
 In `src/tool_registry/ports/host.rs`, add `call_tool` to the `McpServerHost`
-trait: `async fn call_tool(&self, server, tool_name, parameters)`
+trait: `async fn call_tool(&self, ctx, server, request: &ToolCallRequest)`
 `-> McpServerHostResult<ToolCallHostResult>` where `ToolCallHostResult` is a
 new struct holding `content: Value` and `stderr_output: Option<bytes::Bytes>`
 (the captured stderr from the tool call, if any). Similarly, extend the return
@@ -718,11 +729,15 @@ existing test count.
 
 Create the `ToolDiscoveryRoutingService` and its unit tests.
 
-In `src/tool_registry/services/discovery/mod.rs`, define
-`ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over
-`ToolCatalogRepository`, `McpServerRegistryRepository`, `McpServerHost`,
-`ToolPolicyEnforcer`, `ToolLogStore`, and `Clock`. The service holds `Arc`
-references to each dependency plus a `LogRetentionPolicy` value.
+In `src/tool_registry/services/discovery/mod.rs`, define a
+`ServicePorts<Cat, Reg, H, Pol, Log>` struct grouping the five port
+dependencies as `Arc` references (`catalog`, `registry`, `host`, `policy`,
+`log_store`). Then define
+`ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over the
+same port types plus `Clock`. The constructor
+`new(ports: ServicePorts<...>, retention_policy: LogRetentionPolicy, clock: Arc<C>)`
+ destructures the grouped ports into individual fields. Internally the service
+stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
@@ -760,9 +775,11 @@ delegate to `catalog.list_all()`.
    `stderr_output: Option<bytes::Bytes>`.
 7. Stderr capture: if `host_result.stderr_output` is `Some(bytes)` and
    non-empty, store the log:
-   - Build `LogEntryMetadata::for_tool_call(server_id, call_id, path,
-     byte_count, clock, retention_policy)`.
-   - Call `log_store.store_log(metadata, bytes)`.
+   - Build a `LogCaptureContext` carrying the clock reference, the retention
+     policy reference, and the `tenant_id` from `RequestContext`.
+   - Call `LogEntryMetadata::for_tool_call(server_id, call_id, byte_count,
+     &capture_ctx)` to compute the object path and metadata.
+   - Call `log_store.store_log(ctx, &metadata, bytes, &retention_policy)`.
    - Record the `object_path` for inclusion in the audit record.
    - Stderr storage is best-effort: a failed write logs a warning but does
      not fail the tool call.
@@ -1223,9 +1240,9 @@ pub struct ToolCallHostResult {
 // Added to McpServerHost trait:
 async fn call_tool(
     &self,
+    ctx: &RequestContext,
     server: &McpServerRegistration,
-    tool_name: &str,
-    parameters: Value,
+    request: &ToolCallRequest,
 ) -> McpServerHostResult<ToolCallHostResult>;
 ```
 

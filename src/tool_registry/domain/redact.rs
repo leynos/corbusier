@@ -29,6 +29,17 @@ pub fn redact_outcome_content(content: &Value) -> Value {
     redact_value(content)
 }
 
+/// Redacts a tool-call error message for audit persistence.
+///
+/// Error strings may contain file paths, internal identifiers, or
+/// other sensitive context.  This replaces the full error text with
+/// `"[REDACTED]"` to match the redaction applied to parameters and
+/// outcome content.
+#[must_use]
+pub fn redact_error_message(_error: &str) -> String {
+    REDACTED.to_owned()
+}
+
 fn redact_value(value: &Value) -> Value {
     match value {
         Value::String(_) => Value::String(REDACTED.to_owned()),

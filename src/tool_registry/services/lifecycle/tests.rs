@@ -279,8 +279,7 @@ impl McpServerHost for HealthProbeFailureHost {
         &self,
         _ctx: &RequestContext,
         server: &crate::tool_registry::domain::McpServerRegistration,
-        _tool_name: &str,
-        _parameters: &serde_json::Value,
+        _request: &crate::tool_registry::domain::ToolCallRequest,
     ) -> McpServerHostResult<ToolCallHostResult> {
         self.with_started_lock(|started| {
             if started.contains(&server.id()) {
@@ -308,23 +307,15 @@ async fn start_persists_running_state_when_health_probe_fails() -> Result<()> {
     let registered = service
         .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = service.start(&ctx, registered.id()).await;
+    let start_result = service.start(&ctx, registered.id()).await?;
 
-    assert!(matches!(
-        start_result,
-        Err(McpServerLifecycleServiceError::Host(_))
-    ));
-
-    let persisted_server = service
-        .find_by_name(&ctx, "workspace_tools")
-        .await?
-        .expect("server should exist");
     assert_eq!(
-        persisted_server.lifecycle_state(),
+        start_result.server.lifecycle_state(),
         McpServerLifecycleState::Running
     );
     assert_eq!(
-        persisted_server
+        start_result
+            .server
             .last_health()
             .expect("health snapshot should exist")
             .status(),

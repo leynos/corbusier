@@ -2,7 +2,7 @@
 
 use crate::context::RequestContext;
 use crate::tool_registry::domain::{
-    McpServerHealthSnapshot, McpServerId, McpServerRegistration, McpToolDefinition,
+    McpServerHealthSnapshot, McpServerId, McpServerRegistration, McpToolDefinition, ToolCallRequest,
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -73,16 +73,11 @@ pub trait McpServerHost: Send + Sync {
     /// running, [`McpServerHostError::ToolCallFailed`] when the tool
     /// invocation fails, or [`McpServerHostError::ToolCallTimeout`] when
     /// the call exceeds the timeout.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     async fn call_tool(
         &self,
         ctx: &RequestContext,
         server: &McpServerRegistration,
-        tool_name: &str,
-        parameters: &Value,
+        request: &ToolCallRequest,
     ) -> McpServerHostResult<ToolCallHostResult>;
 }
 

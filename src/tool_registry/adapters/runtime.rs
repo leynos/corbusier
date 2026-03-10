@@ -4,7 +4,7 @@ use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
         McpServerHealthSnapshot, McpServerId, McpServerName, McpServerRegistration,
-        McpToolDefinition,
+        McpToolDefinition, ToolCallRequest,
     },
     ports::{
         McpServerHost, McpServerHostError, McpServerHostResult, StartHostResult, ToolCallHostResult,
@@ -216,8 +216,7 @@ impl McpServerHost for InMemoryMcpServerHost {
         &self,
         _ctx: &RequestContext,
         server: &McpServerRegistration,
-        tool_name: &str,
-        _parameters: &Value,
+        request: &ToolCallRequest,
     ) -> McpServerHostResult<ToolCallHostResult> {
         let state = self.read_state()?;
 
@@ -225,6 +224,7 @@ impl McpServerHost for InMemoryMcpServerHost {
             return Err(McpServerHostError::NotRunning(server.id()));
         }
 
+        let tool_name = request.tool_name();
         let key = (server.name().clone(), tool_name.to_owned());
         let content = state.tool_call_results.get(&key).cloned().ok_or_else(|| {
             McpServerHostError::ToolCallFailed {

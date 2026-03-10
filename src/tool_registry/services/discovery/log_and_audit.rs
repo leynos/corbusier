@@ -3,8 +3,8 @@
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        LogCaptureContext, LogEntryMetadata, McpServerId, ToolCallAuditRecord, ToolCallId,
-        ToolCallRequest, ToolCallResult,
+        LogCaptureContext, LogEntryMetadata, McpServerId, ToolCallAuditRecord, ToolCallRequest,
+        ToolCallResult,
     },
     ports::{
         McpServerHost, McpServerRegistryRepository, SweepContext, ToolCatalogRepository,
@@ -18,6 +18,24 @@ use super::{
     ToolDiscoveryRoutingServiceResult,
 };
 
+/// Bundled context for a pre-execution rejection audit record.
+///
+/// Groups `request` and `server_id`, which are always used together
+/// when recording a call that was rejected before reaching the host.
+pub(super) struct RejectedCallContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub server_id: McpServerId,
+}
+
+/// Bundled context for a completed-call audit and stderr capture.
+///
+/// Groups `request` and `result`, which jointly describe the call that
+/// was executed and whose outcome is being recorded.
+pub(super) struct CompletedCallContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub result: &'a ToolCallResult,
+}
+
 impl<Cat, Reg, H, Pol, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
 where
     Cat: ToolCatalogRepository,
@@ -28,41 +46,32 @@ where
     C: Clock + Send + Sync,
 {
     /// Best-effort audit recording for a pre-execution rejection.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     pub(super) async fn audit_rejection(
         &self,
         ctx: &RequestContext,
-        request: &ToolCallRequest,
-        server_id: McpServerId,
+        call: &RejectedCallContext<'_>,
         err: &ToolDiscoveryRoutingServiceError,
     ) {
-        let audit = ToolCallAuditRecord::for_rejection(request, server_id, err, self.clock.utc());
+        let audit =
+            ToolCallAuditRecord::for_rejection(call.request, call.server_id, err, self.clock.utc());
         let _audit_result = self.catalog.record_audit(ctx, &audit).await;
     }
 
     /// Best-effort stderr capture and audit recording for a completed
     /// call.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     pub(super) async fn capture_and_audit(
         &self,
         ctx: &RequestContext,
-        request: &ToolCallRequest,
-        result: &ToolCallResult,
+        call: &CompletedCallContext<'_>,
         stderr_output: Option<bytes::Bytes>,
     ) {
         let stderr_log_path = self
-            .try_capture_tool_call_stderr(ctx, result.server_id(), request.call_id(), stderr_output)
+            .try_capture_tool_call_stderr(ctx, call.result, stderr_output)
             .await;
         let mut audit = ToolCallAuditRecord::from_result(
-            result,
-            request.parameters().clone(),
-            request.initiated_at(),
+            call.result,
+            call.request.parameters().clone(),
+            call.request.initiated_at(),
         );
         if let Some(path) = &stderr_log_path {
             audit = audit.with_stderr_log_path(path);
@@ -117,15 +126,10 @@ where
 
     /// Best-effort stderr capture for a tool call.  Returns the object
     /// store path on success, or `None` on failure.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     async fn try_capture_tool_call_stderr(
         &self,
         ctx: &RequestContext,
-        server_id: McpServerId,
-        call_id: ToolCallId,
+        result: &ToolCallResult,
         stderr_output: Option<bytes::Bytes>,
     ) -> Option<String> {
         let stderr = stderr_output.filter(|b| !b.is_empty())?;
@@ -135,8 +139,12 @@ where
             retention: &self.retention_policy,
             tenant_id: ctx.tenant_id(),
         };
-        let metadata =
-            LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &capture_ctx);
+        let metadata = LogEntryMetadata::for_tool_call(
+            result.server_id(),
+            result.call_id(),
+            byte_count,
+            &capture_ctx,
+        );
         let path = metadata.object_path().to_owned();
         match self
             .log_store

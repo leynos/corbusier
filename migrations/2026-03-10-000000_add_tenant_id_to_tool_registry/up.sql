@@ -26,6 +26,9 @@ ALTER TABLE tool_call_audit_log
 ALTER TABLE tool_call_audit_log
     ALTER COLUMN tenant_id DROP DEFAULT;
 
+CREATE INDEX idx_tool_call_audit_log_tenant_id
+    ON tool_call_audit_log (tenant_id);
+
 -- 3. tool_log_metadata
 ALTER TABLE tool_log_metadata
     ADD COLUMN tenant_id UUID NOT NULL
@@ -33,3 +36,6 @@ ALTER TABLE tool_log_metadata
 
 ALTER TABLE tool_log_metadata
     ALTER COLUMN tenant_id DROP DEFAULT;
+
+CREATE INDEX idx_tool_log_metadata_tenant_id
+    ON tool_log_metadata (tenant_id);

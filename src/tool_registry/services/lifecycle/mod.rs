@@ -240,7 +240,10 @@ where
             .execute_transition_with_compensation(ctx, server_id, transition)
             .await?;
         let startup_stderr = change.startup_stderr;
-        let server = self.refresh_health(ctx, server_id).await?;
+        let server = self
+            .refresh_health(ctx, server_id)
+            .await
+            .unwrap_or(change.updated_server);
         Ok(LifecycleStartResult {
             server,
             startup_stderr,

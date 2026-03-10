@@ -102,6 +102,9 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
             {
                 return Err(ToolCatalogError::DuplicateEntry(entry.id()));
             }
+            if staged.contains_key(&tool_name) {
+                return Err(ToolCatalogError::DuplicateEntry(entry.id()));
+            }
             staged.insert(tool_name, entry.clone());
         }
 

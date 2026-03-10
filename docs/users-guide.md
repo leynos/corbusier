@@ -511,7 +511,7 @@ Call `discover_and_persist_tools()` after starting a server. This queries the
 running server for its tool definitions and persists them in the catalogue.
 Rediscovery is idempotent — calling it again replaces the existing entries.
 
-### Querying the catalog
+### Querying the catalogue
 
 Call `list_catalog()` to see all tools across all registered servers, including
 their schemas and availability status. The method name uses the code identifier

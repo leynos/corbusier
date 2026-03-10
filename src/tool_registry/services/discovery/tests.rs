@@ -1,232 +1,26 @@
 //! Unit tests for tool discovery and routing service.
 
-use super::{ServicePorts, ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError};
-use crate::{
-    context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
-    tool_registry::{
-        adapters::{
-            AllowAllPolicy, DenyAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
-            memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
-        },
-        domain::{
-            LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport, ToolCallRequest,
-            ToolRegistryDomainError,
-        },
-        services::{McpServerLifecycleService, RegisterMcpServerRequest},
+#[path = "test_helpers.rs"]
+mod test_helpers;
+
+use super::ToolDiscoveryRoutingServiceError;
+use crate::tool_registry::{
+    adapters::{
+        DenyAllPolicy, FailingPolicy, InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry,
     },
+    domain::{McpServerName, ToolCallRequest, ToolRegistryDomainError},
+    services::McpServerLifecycleService,
 };
 use eyre::Result;
 use mockable::DefaultClock;
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use serde_json::json;
 use std::sync::Arc;
-
-type TestLifecycleService =
-    McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
-type TestDiscoveryService = ToolDiscoveryRoutingService<
-    InMemoryToolCatalog,
-    InMemoryMcpServerRegistry,
-    InMemoryMcpServerHost,
-    AllowAllPolicy,
-    ObjectStoreLogAdapter,
-    DefaultClock,
->;
-
-fn test_request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
-
-struct TestBundle {
-    host: Arc<InMemoryMcpServerHost>,
-    lifecycle: TestLifecycleService,
-    discovery: TestDiscoveryService,
-    catalog: Arc<InMemoryToolCatalog>,
-}
-
-#[fixture]
-fn bundle() -> TestBundle {
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let catalog = Arc::new(InMemoryToolCatalog::new());
-    let clock = Arc::new(DefaultClock);
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let discovery = ToolDiscoveryRoutingService::new(
-        ServicePorts {
-            catalog: catalog.clone(),
-            registry,
-            host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
-            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
-        },
-        LogRetentionPolicy::default(),
-        clock,
-    );
-    TestBundle {
-        host,
-        lifecycle,
-        discovery,
-        catalog,
-    }
-}
-
-fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
-    Ok(RegisterMcpServerRequest::new(
-        name,
-        McpTransport::stdio("mcp-server")?,
-    ))
-}
-
-fn read_file_tool() -> Result<McpToolDefinition> {
-    Ok(McpToolDefinition::new(
-        "read_file",
-        "Reads a file from the workspace",
-        json!({"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}),
-    )?)
-}
-
-async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
-    host: &InMemoryMcpServerHost,
-    lifecycle: &TestLifecycleService,
-    discovery: &ToolDiscoveryRoutingService<
-        InMemoryToolCatalog,
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        Pol,
-        ObjectStoreLogAdapter,
-        DefaultClock,
-    >,
-    ctx: &RequestContext,
-) -> Result<crate::tool_registry::domain::McpServerId> {
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-    let registered = lifecycle
-        .register(ctx, stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(ctx, registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(ctx, registered.id())
-        .await?;
-    Ok(registered.id())
-}
-
-/// Registers, starts (with startup stderr), and discovers tools. Returns
-/// the server identifier and the captured startup stderr bytes.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper that threads through all service components plus context"
-)]
-async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
-    host: &InMemoryMcpServerHost,
-    lifecycle: &TestLifecycleService,
-    discovery: &ToolDiscoveryRoutingService<
-        InMemoryToolCatalog,
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        Pol,
-        ObjectStoreLogAdapter,
-        DefaultClock,
-    >,
-    ctx: &RequestContext,
-    startup_stderr: bytes::Bytes,
-) -> Result<(
-    crate::tool_registry::domain::McpServerId,
-    Option<bytes::Bytes>,
-)> {
-    host.set_tool_catalog(
-        McpServerName::new("workspace_tools")?,
-        vec![read_file_tool()?],
-    )?;
-    host.set_startup_stderr(McpServerName::new("workspace_tools")?, startup_stderr)?;
-    let registered = lifecycle
-        .register(ctx, stdio_request("workspace_tools")?)
-        .await?;
-    let start_result = lifecycle.start(ctx, registered.id()).await?;
-    discovery
-        .discover_and_persist_tools(ctx, registered.id())
-        .await?;
-    Ok((registered.id(), start_result.startup_stderr))
-}
-
-async fn call_read_file(
-    ctx: &RequestContext,
-    discovery: &TestDiscoveryService,
-    params: serde_json::Value,
-) -> super::ToolDiscoveryRoutingServiceResult<crate::tool_registry::domain::ToolCallResult> {
-    discovery
-        .call_tool(
-            ctx,
-            &ToolCallRequest::new("read_file", params, &DefaultClock),
-        )
-        .await
-}
-
-async fn call_read_file_expecting_error(
-    ctx: &RequestContext,
-    discovery: &TestDiscoveryService,
-    params: serde_json::Value,
-) -> ToolDiscoveryRoutingServiceError {
-    call_read_file(ctx, discovery, params)
-        .await
-        .expect_err("expected call_tool to return an error")
-}
-
-fn setup_success_result(host: &InMemoryMcpServerHost) -> Result<()> {
-    host.set_tool_call_result(
-        McpServerName::new("workspace_tools")?,
-        "read_file",
-        json!({"content": "hello"}),
-    )?;
-    Ok(())
-}
-
-fn assert_single_audit_stderr_path(catalog: &InMemoryToolCatalog, expected_some: bool) {
-    let audits = catalog
-        .audit_records()
-        .expect("failed to retrieve audit records");
-    assert_eq!(audits.len(), 1);
-    assert_eq!(
-        audits
-            .first()
-            .expect("audit record")
-            .stderr_log_path()
-            .is_some(),
-        expected_some
-    );
-}
-
-/// Builds a discovery service wired to a custom policy adapter.
-fn discovery_with_policy<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
-    registry: &Arc<InMemoryMcpServerRegistry>,
-    host: &Arc<InMemoryMcpServerHost>,
-    policy: Pol,
-    clock: &Arc<DefaultClock>,
-) -> ToolDiscoveryRoutingService<
-    InMemoryToolCatalog,
-    InMemoryMcpServerRegistry,
-    InMemoryMcpServerHost,
-    Pol,
-    ObjectStoreLogAdapter,
-    DefaultClock,
-> {
-    ToolDiscoveryRoutingService::new(
-        ServicePorts {
-            catalog: Arc::new(InMemoryToolCatalog::new()),
-            registry: registry.clone(),
-            host: host.clone(),
-            policy: Arc::new(policy),
-            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
-        },
-        LogRetentionPolicy::default(),
-        clock.clone(),
-    )
-}
+use test_helpers::{
+    TestBundle, assert_single_audit_stderr_path, bundle, call_read_file,
+    call_read_file_expecting_error, discovery_with_policy, register_start_discover,
+    register_start_with_stderr, setup_success_result, stdio_request, test_request_ctx,
+};
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
@@ -323,15 +117,13 @@ async fn call_tool_routes_to_correct_server(bundle: TestBundle) -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_unknown_tool_returns_not_found(bundle: TestBundle) -> Result<()> {
     let TestBundle {
+        host,
         lifecycle,
         discovery,
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let registered = lifecycle
-        .register(&ctx, stdio_request("workspace_tools")?)
-        .await?;
-    lifecycle.start(&ctx, registered.id()).await?;
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
     let request = ToolCallRequest::new("nonexistent", json!({}), &DefaultClock);
     assert!(matches!(
@@ -394,7 +186,8 @@ async fn call_tool_policy_denied() -> Result<()> {
     let host = Arc::new(InMemoryMcpServerHost::new());
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let disc = discovery_with_policy(&registry, &host, DenyAllPolicy::new("forbidden"), &clock);
+    let (disc, _catalog) =
+        discovery_with_policy(&registry, &host, DenyAllPolicy::new("forbidden"), &clock);
 
     let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
@@ -412,12 +205,12 @@ async fn call_tool_policy_denied() -> Result<()> {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_evaluation_failed() -> Result<()> {
-    use crate::tool_registry::adapters::FailingPolicy;
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let disc = discovery_with_policy(&registry, &host, FailingPolicy::new("engine down"), &clock);
+    let (disc, _catalog) =
+        discovery_with_policy(&registry, &host, FailingPolicy::new("engine down"), &clock);
 
     let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
@@ -474,7 +267,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
 
     let result = call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert!(result.outcome().is_success());
-    assert_single_audit_stderr_path(&catalog, true);
+    assert_single_audit_stderr_path(&catalog, true)?;
     Ok(())
 }
 
@@ -492,7 +285,7 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
     call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
-    assert_single_audit_stderr_path(&catalog, false);
+    assert_single_audit_stderr_path(&catalog, false)?;
     Ok(())
 }
 
@@ -530,8 +323,12 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
     json!({"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}),
     json!({}), false,
 )]
-#[case::non_object_params(json!({"type": "object"}), json!("not an object"), false)]
-#[case::empty_required_array(json!({"type": "object", "required": []}), json!({}), true)]
+#[case::non_object_params(
+    json!({"type": "object"}), json!("not an object"), false,
+)]
+#[case::empty_required_array(
+    json!({"type": "object", "required": []}), json!({}), true,
+)]
 #[case::extra_fields_allowed(
     json!({"type": "object", "required": ["path"]}),
     json!({"path": "/tmp/test.txt", "extra": "value"}), true,
