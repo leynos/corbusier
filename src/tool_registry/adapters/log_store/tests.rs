@@ -34,7 +34,11 @@ async fn store_startup_entry(
     clock: &dyn Clock,
     retention: &LogRetentionPolicy,
 ) -> LogEntryMetadata {
-    let capture_ctx = LogCaptureContext { clock, retention };
+    let capture_ctx = LogCaptureContext {
+        clock,
+        retention,
+        tenant_id: ctx.tenant_id(),
+    };
     let content = Bytes::from("test stderr output");
     let metadata = LogEntryMetadata::for_startup(server_id, content.len() as u64, &capture_ctx);
     adapter

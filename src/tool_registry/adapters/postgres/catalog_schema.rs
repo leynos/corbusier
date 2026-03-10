@@ -5,12 +5,14 @@ diesel::table! {
     mcp_tool_catalog (id) {
         /// Catalog entry identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Owning MCP server identifier.
         server_id -> Uuid,
         /// Server name at discovery time.
         #[max_length = 100]
         server_name -> Varchar,
-        /// Tool name (unique per server, see `idx_mcp_tool_catalog_tool_name`).
+        /// Tool name (unique per tenant, see `idx_mcp_tool_catalog_tenant_tool_name`).
         #[max_length = 255]
         tool_name -> Varchar,
         /// Tool description.
@@ -33,6 +35,8 @@ diesel::table! {
     tool_call_audit_log (id) {
         /// Audit record identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Tool call invocation identifier.
         call_id -> Uuid,
         /// Tool name invoked.
@@ -66,6 +70,8 @@ diesel::table! {
     tool_log_metadata (id) {
         /// Log entry identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Owning MCP server identifier.
         server_id -> Uuid,
         /// Log kind (`startup` or `tool_call`).

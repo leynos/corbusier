@@ -13,6 +13,13 @@ pub struct CatalogEntryRow {
     /// Catalog entry identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub id: uuid::Uuid,
+    /// Owning tenant identifier (populated by Diesel's `Queryable` derive).
+    #[expect(
+        dead_code,
+        reason = "field is read by Diesel Queryable derive, not application code"
+    )]
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub tenant_id: uuid::Uuid,
     /// Owning MCP server identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub server_id: uuid::Uuid,
@@ -48,6 +55,8 @@ pub struct CatalogEntryRow {
 pub struct NewCatalogEntryRow {
     /// Catalog entry identifier.
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Owning MCP server identifier.
     pub server_id: uuid::Uuid,
     /// Server name at discovery time.
@@ -74,6 +83,8 @@ pub struct NewCatalogEntryRow {
 pub struct NewAuditLogRow {
     /// Audit record identifier.
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Tool call invocation identifier.
     pub call_id: uuid::Uuid,
     /// Tool name invoked.
@@ -104,6 +115,8 @@ pub struct NewAuditLogRow {
 pub struct NewLogMetadataRow {
     /// Log entry identifier.
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Owning MCP server identifier.
     pub server_id: uuid::Uuid,
     /// Log kind (`startup` or `tool_call`).

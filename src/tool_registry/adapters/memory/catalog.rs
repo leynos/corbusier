@@ -1,6 +1,6 @@
 //! In-memory repository for tool catalog entries and audit records.
 
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::tool_registry::{
     domain::{CatalogEntry, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
@@ -8,12 +8,12 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use mockable::DefaultClock;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Thread-safe in-memory tool catalog repository.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryToolCatalog {
-    state: Arc<RwLock<InMemoryToolCatalogState>>,
+    state: Arc<RwLock<HashMap<TenantId, InMemoryToolCatalogState>>>,
 }
 
 #[derive(Debug, Default)]
@@ -29,35 +29,55 @@ impl InMemoryToolCatalog {
         Self::default()
     }
 
+    fn read_state(
+        &self,
+    ) -> ToolCatalogResult<RwLockReadGuard<'_, HashMap<TenantId, InMemoryToolCatalogState>>> {
+        self.state
+            .read()
+            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))
+    }
+
+    fn write_state(
+        &self,
+    ) -> ToolCatalogResult<RwLockWriteGuard<'_, HashMap<TenantId, InMemoryToolCatalogState>>> {
+        self.state
+            .write()
+            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))
+    }
+
     fn apply_to_server_entries(
         &self,
+        tenant_id: TenantId,
         server_id: McpServerId,
         apply: fn(&mut CatalogEntry, &DefaultClock),
     ) -> ToolCatalogResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
+        let mut tenants = self.write_state()?;
         let clock = DefaultClock;
-        for entry in state.entries.values_mut() {
-            if entry.server_id() == server_id {
-                apply(entry, &clock);
-            }
+        let Some(state) = tenants.get_mut(&tenant_id) else {
+            return Ok(());
+        };
+        for entry in state
+            .entries
+            .values_mut()
+            .filter(|e| e.server_id() == server_id)
+        {
+            apply(entry, &clock);
         }
         Ok(())
     }
 
-    /// Returns a snapshot of audit records for test assertions.
+    /// Returns a snapshot of all audit records across all tenants.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError::Persistence`] if the lock is poisoned.
     pub fn audit_records(&self) -> ToolCatalogResult<Vec<ToolCallAuditRecord>> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
-        Ok(state.audit_records.clone())
+        let tenants = self.read_state()?;
+        let records = tenants
+            .values()
+            .flat_map(|s| s.audit_records.iter().cloned())
+            .collect();
+        Ok(records)
     }
 }
 
@@ -65,17 +85,15 @@ impl InMemoryToolCatalog {
 impl ToolCatalogRepository for InMemoryToolCatalog {
     async fn sync_server_tools(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
+        let mut tenants = self.write_state()?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         // Stage the new entries, checking for cross-server duplicates
-        // before mutating live state.
+        // within the same tenant before mutating live state.
         let mut staged: HashMap<String, CatalogEntry> = HashMap::new();
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
@@ -98,49 +116,48 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
 
     async fn mark_server_tools_unavailable(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()> {
-        self.apply_to_server_entries(server_id, CatalogEntry::mark_unavailable)
+        self.apply_to_server_entries(ctx.tenant_id(), server_id, CatalogEntry::mark_unavailable)
     }
 
     async fn mark_server_tools_available(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()> {
-        self.apply_to_server_entries(server_id, CatalogEntry::mark_available)
+        self.apply_to_server_entries(ctx.tenant_id(), server_id, CatalogEntry::mark_available)
     }
 
     async fn find_by_tool_name(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         tool_name: &str,
     ) -> ToolCatalogResult<Option<CatalogEntry>> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
-        Ok(state.entries.get(tool_name).cloned())
+        let tenants = self.read_state()?;
+        let entry = tenants
+            .get(&ctx.tenant_id())
+            .and_then(|s| s.entries.get(tool_name).cloned());
+        Ok(entry)
     }
 
-    async fn list_all(&self, _ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
-        Ok(state.entries.values().cloned().collect())
+    async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
+        let tenants = self.read_state()?;
+        let entries = tenants
+            .get(&ctx.tenant_id())
+            .map(|s| s.entries.values().cloned().collect())
+            .unwrap_or_default();
+        Ok(entries)
     }
 
     async fn record_audit(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         record: &ToolCallAuditRecord,
     ) -> ToolCatalogResult<()> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))?;
+        let mut tenants = self.write_state()?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
         state.audit_records.push(record.clone());
         Ok(())
     }

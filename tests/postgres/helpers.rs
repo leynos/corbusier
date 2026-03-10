@@ -53,7 +53,7 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v3";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v4";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -109,12 +109,17 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
     Ok(())
 }
 
 /// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
 pub const ADD_TOOL_CATALOG_SQL: &str =
     include_str!("../../migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql");
+
+/// SQL to add `tenant_id` to tool registry tables for tenant isolation.
+pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
+    include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
 
 /// Builds a Diesel `r2d2` connection pool for the given database URL.
 ///

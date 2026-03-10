@@ -1207,22 +1207,26 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   extensibility point. The default adapter permits all calls; real
   authorisation will be implemented when the workspace and permission systems
   exist.
-- **Unique tool names**: a database unique index on `tool_name` enforces
-  unambiguous routing. If two servers advertise the same tool name, the second
+- **Unique tool names per tenant**: a database unique index on
+  `(tenant_id, tool_name)` enforces unambiguous routing within a tenant.
+  Different tenants may register the same tool name without conflict. If two
+  servers within the same tenant advertise the same tool name, the second
   discovery attempt replaces the first server's entry via `sync_server_tools`.
 - **Audit trail**: every tool call (success or failure) produces a
   `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
-  duration, parameters, outcome, and optional stderr log path.
+  duration, outcome, and optional stderr log path. All string-valued parameter
+  and outcome content fields are redacted with `[REDACTED]` before persistence
+  to minimise sensitive data exposure in the audit trail.
 - **Stderr log capture** via a `ToolLogStore` port backed by the Rust
   `object_store` crate. Startup stderr and per-tool-call stderr are stored as
   opaque blobs with structured path keys
-  (`tool_logs/{server_id}/{kind}/{log_entry_id}.stderr`). References are
-  recorded in audit records. The `tool_log_metadata` table indexes stored blobs
-  for retention sweeps.
+  (`tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`).
+  References are recorded in audit records. The `tool_log_metadata` table
+  indexes stored blobs for retention sweeps.
 - **Stderr log retention policy**: the following limits apply **only** to
   stderr blobs stored via `ToolLogStore` (i.e. files under
-  `tool_logs/{server_id}/…` and their `tool_log_metadata` rows). They do
-  **not** affect the `tool_call_audit_log` table, which follows the
+  `tool_logs/{tenant_id}/{server_id}/…` and their `tool_log_metadata` rows).
+  They do **not** affect the `tool_call_audit_log` table, which follows the
   longer-lived audit and compliance retention defined elsewhere in this
   document.
   - 7-day default retention period; expired blobs are swept automatically.
@@ -1230,6 +1234,12 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   - 100 logs per server maximum; oldest logs are deleted first.
   - Retention sweeps run during `store_startup_stderr` and can be triggered
     explicitly via `sweep_expired_logs`.
+- **Tenant scoping**: all three tool registry child tables carry a `tenant_id`
+  column. The `mcp_servers` table does **not** carry a `tenant_id` column;
+  consequently the foreign keys on the child tables reference only
+  `mcp_servers(id)`, not a composite `(server_id, tenant_id)`. Tenant isolation
+  is enforced at the application layer through `RequestContext` propagation
+  and, in the PostgreSQL adapter, via `SET LOCAL app.tenant_id`.
 
 _Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
 persistence model. The `mcp_servers` table is the parent entity; each server
@@ -1247,6 +1257,7 @@ erDiagram
 
     mcp_tool_catalog {
         uuid id PK
+        uuid tenant_id
         uuid server_id FK
         varchar server_name
         varchar tool_name
@@ -1260,6 +1271,7 @@ erDiagram
 
     tool_call_audit_log {
         uuid id PK
+        uuid tenant_id
         uuid call_id
         varchar tool_name
         uuid server_id FK
@@ -1275,6 +1287,7 @@ erDiagram
 
     tool_log_metadata {
         uuid id PK
+        uuid tenant_id
         uuid server_id FK
         varchar kind
         uuid call_id

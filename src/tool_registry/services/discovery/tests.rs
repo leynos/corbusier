@@ -100,24 +100,28 @@ async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnf
         ObjectStoreLogAdapter,
         DefaultClock,
     >,
+    ctx: &RequestContext,
 ) -> Result<crate::tool_registry::domain::McpServerId> {
-    let ctx = test_request_ctx();
     host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
     let registered = lifecycle
-        .register(&ctx, stdio_request("workspace_tools")?)
+        .register(ctx, stdio_request("workspace_tools")?)
         .await?;
-    lifecycle.start(&ctx, registered.id()).await?;
+    lifecycle.start(ctx, registered.id()).await?;
     discovery
-        .discover_and_persist_tools(&ctx, registered.id())
+        .discover_and_persist_tools(ctx, registered.id())
         .await?;
     Ok(registered.id())
 }
 
 /// Registers, starts (with startup stderr), and discovers tools. Returns
 /// the server identifier and the captured startup stderr bytes.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper that threads through all service components plus context"
+)]
 async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
     host: &InMemoryMcpServerHost,
     lifecycle: &TestLifecycleService,
@@ -129,23 +133,23 @@ async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicy
         ObjectStoreLogAdapter,
         DefaultClock,
     >,
+    ctx: &RequestContext,
     startup_stderr: bytes::Bytes,
 ) -> Result<(
     crate::tool_registry::domain::McpServerId,
     Option<bytes::Bytes>,
 )> {
-    let ctx = test_request_ctx();
     host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
     host.set_startup_stderr(McpServerName::new("workspace_tools")?, startup_stderr)?;
     let registered = lifecycle
-        .register(&ctx, stdio_request("workspace_tools")?)
+        .register(ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = lifecycle.start(&ctx, registered.id()).await?;
+    let start_result = lifecycle.start(ctx, registered.id()).await?;
     discovery
-        .discover_and_persist_tools(&ctx, registered.id())
+        .discover_and_persist_tools(ctx, registered.id())
         .await?;
     Ok((registered.id(), start_result.startup_stderr))
 }
@@ -234,7 +238,7 @@ async fn discover_tools_persists_catalog(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
     let entries = discovery.list_catalog(&ctx).await?;
     assert_eq!(entries.len(), 1);
@@ -278,7 +282,7 @@ async fn mark_unavailable_updates_catalog(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     discovery.mark_tools_unavailable(&ctx, server_id).await?;
 
     let entries = discovery.list_catalog(&ctx).await?;
@@ -298,7 +302,7 @@ async fn call_tool_routes_to_correct_server(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
 
     let result = call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
@@ -349,7 +353,7 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
+    let server_id = register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     discovery.mark_tools_unavailable(&ctx, server_id).await?;
 
     let err =
@@ -371,7 +375,7 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &discovery).await?;
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
     let err = call_read_file_expecting_error(&ctx, &discovery, json!({})).await;
     assert!(matches!(
@@ -393,7 +397,7 @@ async fn call_tool_policy_denied() -> Result<()> {
     let disc = discovery_with_policy(&registry, &host, DenyAllPolicy::new("forbidden"), &clock);
 
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &disc).await?;
+    register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
@@ -416,7 +420,7 @@ async fn call_tool_policy_evaluation_failed() -> Result<()> {
     let disc = discovery_with_policy(&registry, &host, FailingPolicy::new("engine down"), &clock);
 
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &disc).await?;
+    register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
@@ -437,7 +441,7 @@ async fn call_tool_host_failure_still_records_audit(bundle: TestBundle) -> Resul
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &discovery).await?;
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
@@ -460,7 +464,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &discovery).await?;
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
     host.set_tool_call_stderr(
         McpServerName::new("workspace_tools")?,
@@ -485,7 +489,7 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &discovery).await?;
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
     call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert_single_audit_stderr_path(&catalog, false);
@@ -501,13 +505,14 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let stderr_bytes = bytes::Bytes::from("server initialising...");
     let (server_id, captured_stderr) =
-        register_start_with_stderr(&host, &lifecycle, &discovery, stderr_bytes.clone()).await?;
+        register_start_with_stderr(&host, &lifecycle, &discovery, &ctx, stderr_bytes.clone())
+            .await?;
     let captured = captured_stderr.expect("startup stderr should be captured");
     assert_eq!(captured, stderr_bytes);
 
-    let ctx = test_request_ctx();
     let metadata = discovery
         .store_startup_stderr(&ctx, server_id, captured)
         .await?;

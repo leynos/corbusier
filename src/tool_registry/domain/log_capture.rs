@@ -6,6 +6,7 @@
 
 use super::McpServerId;
 use super::routing::ToolCallId;
+use crate::context::TenantId;
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use std::fmt;
@@ -79,13 +80,16 @@ impl LogEntryKind {
     }
 }
 
-/// Bundles the clock and retention policy used to derive timestamps
-/// and expiry for log capture operations.
+/// Bundles the clock, retention policy, and tenant identity used to
+/// derive timestamps, expiry, and object paths for log capture
+/// operations.
 pub struct LogCaptureContext<'a> {
     /// Clock used to obtain the current time.
     pub clock: &'a dyn Clock,
     /// Retention policy governing log expiry.
     pub retention: &'a LogRetentionPolicy,
+    /// Tenant that owns this log capture operation.
+    pub tenant_id: TenantId,
 }
 
 /// Metadata for a captured stderr log blob stored in the object store.
@@ -109,7 +113,11 @@ impl LogEntryMetadata {
         ctx: &LogCaptureContext<'_>,
     ) -> Self {
         let id = LogEntryId::new();
-        let object_path = format!("tool_logs/{server_id}/{}/{id}.stderr", kind.path_segment());
+        let tenant_id = ctx.tenant_id;
+        let object_path = format!(
+            "tool_logs/{tenant_id}/{server_id}/{}/{id}.stderr",
+            kind.path_segment()
+        );
         let captured_at = ctx.clock.utc();
         let expires_at = captured_at + ctx.retention.retention_period;
         Self {

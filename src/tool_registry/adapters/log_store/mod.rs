@@ -186,12 +186,13 @@ impl ToolLogStore for ObjectStoreLogAdapter {
 
     async fn list_logs_for_server(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolLogStoreResult<Vec<String>> {
         use futures::TryStreamExt;
 
-        let prefix = Path::from(format!("tool_logs/{server_id}/"));
+        let tenant_id = ctx.tenant_id();
+        let prefix = Path::from(format!("tool_logs/{tenant_id}/{server_id}/"));
 
         self.store
             .list(Some(&prefix))
@@ -210,9 +211,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         let entries = self.collect_server_metadata(server_id, sweep).await;
 
         let swept = self.delete_expired_entries(&entries, sweep).await?;
-        let excess = self
-            .enforce_count_limit(&entries, &swept, sweep)
-            .await?;
+        let excess = self.enforce_count_limit(&entries, &swept, sweep).await?;
 
         // Purge swept keys from the internal metadata index.
         let total_keys: Vec<String> = swept.into_iter().chain(excess).collect();

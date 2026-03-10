@@ -1,15 +1,21 @@
 //! `PostgreSQL` repository for tool catalog and audit trail persistence.
+//!
+//! Tenant context is propagated via `SET LOCAL app.tenant_id`, which sets
+//! a `PostgreSQL` session variable scoped to the current transaction.
 
 use super::{
     catalog_models::{CatalogEntryRow, NewAuditLogRow, NewCatalogEntryRow},
     catalog_schema::{mcp_tool_catalog, tool_call_audit_log},
     repository::McpServerPgPool,
 };
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
+use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
+use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use crate::tool_registry::{
     domain::{
         CatalogEntry, CatalogEntryId, McpServerId, McpServerName, McpToolDefinition,
-        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome,
+        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome, redact_outcome_content,
+        redact_parameters,
     },
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
@@ -17,6 +23,23 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
+
+// ---------------------------------------------------------------------------
+// Error bridging for the shared transaction helper
+// ---------------------------------------------------------------------------
+
+impl FromTxError<Self> for ToolCatalogError {
+    fn from_tx_error(err: TxError<Self>) -> Self {
+        match err {
+            TxError::Domain(e) => e,
+            TxError::Diesel(e) => Self::persistence(e),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Adapter
+// ---------------------------------------------------------------------------
 
 /// `PostgreSQL`-backed repository for tool catalog entries and audit records.
 #[derive(Debug, Clone)]
@@ -31,39 +54,48 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    /// Sets the `available` flag and refreshes `updated_at` for every
-    /// catalog entry belonging to `server_id`.
-    async fn set_server_tools_availability(
-        &self,
-        server_id: McpServerId,
-        available: bool,
-    ) -> ToolCatalogResult<()> {
-        let sid = server_id.into_inner();
-        self.run_blocking(move |connection| {
-            diesel::update(mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)))
-                .set((
-                    mcp_tool_catalog::available.eq(available),
-                    mcp_tool_catalog::updated_at.eq(diesel::dsl::now),
-                ))
-                .execute(connection)
-                .map_err(ToolCatalogError::persistence)?;
-            Ok(())
-        })
-        .await
-    }
-
-    async fn run_blocking<F, T>(&self, operation: F) -> ToolCatalogResult<T>
+    /// Executes a query inside a transaction with tenant context.
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
         let pool = self.pool.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut connection = pool.get().map_err(ToolCatalogError::persistence)?;
-            operation(&mut connection)
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, ToolCatalogError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            ToolCatalogError::persistence,
+        )
+        .await
+    }
+
+    /// Sets the `available` flag and refreshes `updated_at` for every
+    /// catalog entry belonging to `server_id` within the tenant scope.
+    async fn set_server_tools_availability(
+        &self,
+        tenant_id: TenantId,
+        server_id: McpServerId,
+        available: bool,
+    ) -> ToolCatalogResult<()> {
+        let sid = server_id.into_inner();
+        let tid = tenant_id.into_inner();
+        self.execute_query(tenant_id, move |connection| {
+            diesel::update(
+                mcp_tool_catalog::table
+                    .filter(mcp_tool_catalog::server_id.eq(sid))
+                    .filter(mcp_tool_catalog::tenant_id.eq(tid)),
+            )
+            .set((
+                mcp_tool_catalog::available.eq(available),
+                mcp_tool_catalog::updated_at.eq(diesel::dsl::now),
+            ))
+            .execute(connection)
+            .map_err(ToolCatalogError::persistence)?;
+            Ok(())
         })
         .await
-        .map_err(ToolCatalogError::persistence)?
     }
 }
 
@@ -71,67 +103,71 @@ impl PostgresToolCatalog {
 impl ToolCatalogRepository for PostgresToolCatalog {
     async fn sync_server_tools(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
+        let tenant_id = ctx.tenant_id();
         let sid = server_id.into_inner();
-        let rows: Vec<NewCatalogEntryRow> = entries.iter().map(entry_to_new_row).collect();
+        let tid = tenant_id.into_inner();
+        let rows: Vec<NewCatalogEntryRow> =
+            entries.iter().map(|e| entry_to_new_row(e, tid)).collect();
 
-        self.run_blocking(move |connection| {
-            connection
-                .transaction(|conn| {
-                    diesel::delete(
-                        mcp_tool_catalog::table.filter(mcp_tool_catalog::server_id.eq(sid)),
-                    )
-                    .execute(conn)?;
+        self.execute_query(tenant_id, move |connection| {
+            diesel::delete(
+                mcp_tool_catalog::table
+                    .filter(mcp_tool_catalog::server_id.eq(sid))
+                    .filter(mcp_tool_catalog::tenant_id.eq(tid)),
+            )
+            .execute(connection)
+            .map_err(ToolCatalogError::persistence)?;
 
-                    for row in &rows {
-                        diesel::insert_into(mcp_tool_catalog::table)
-                            .values(row)
-                            .execute(conn)?;
-                    }
-                    Ok(())
-                })
-                .map_err(|err: DieselError| match err {
-                    DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
-                        // Find the conflicting row for the error message.
-                        rows.first().map_or_else(
-                            || ToolCatalogError::persistence(err),
-                            |r| ToolCatalogError::DuplicateEntry(CatalogEntryId::from_uuid(r.id)),
-                        )
-                    }
-                    other => ToolCatalogError::persistence(other),
-                })
+            for row in &rows {
+                diesel::insert_into(mcp_tool_catalog::table)
+                    .values(row)
+                    .execute(connection)
+                    .map_err(|err| match err {
+                        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
+                            ToolCatalogError::DuplicateEntry(CatalogEntryId::from_uuid(row.id))
+                        }
+                        other => ToolCatalogError::persistence(other),
+                    })?;
+            }
+            Ok(())
         })
         .await
     }
 
     async fn mark_server_tools_unavailable(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()> {
-        self.set_server_tools_availability(server_id, false).await
+        self.set_server_tools_availability(ctx.tenant_id(), server_id, false)
+            .await
     }
 
     async fn mark_server_tools_available(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()> {
-        self.set_server_tools_availability(server_id, true).await
+        self.set_server_tools_availability(ctx.tenant_id(), server_id, true)
+            .await
     }
 
     async fn find_by_tool_name(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         tool_name: &str,
     ) -> ToolCatalogResult<Option<CatalogEntry>> {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
-        self.run_blocking(move |connection| {
+        self.execute_query(tenant_id, move |connection| {
             let row = mcp_tool_catalog::table
                 .filter(mcp_tool_catalog::tool_name.eq(&name))
+                .filter(mcp_tool_catalog::tenant_id.eq(tid))
                 .select(CatalogEntryRow::as_select())
                 .first::<CatalogEntryRow>(connection)
                 .optional()
@@ -141,9 +177,12 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         .await
     }
 
-    async fn list_all(&self, _ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
-        self.run_blocking(move |connection| {
+    async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
+        self.execute_query(tenant_id, move |connection| {
             let rows = mcp_tool_catalog::table
+                .filter(mcp_tool_catalog::tenant_id.eq(tid))
                 .select(CatalogEntryRow::as_select())
                 .load::<CatalogEntryRow>(connection)
                 .map_err(ToolCatalogError::persistence)?;
@@ -154,11 +193,13 @@ impl ToolCatalogRepository for PostgresToolCatalog {
 
     async fn record_audit(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         record: &ToolCallAuditRecord,
     ) -> ToolCatalogResult<()> {
-        let row = audit_to_new_row(record);
-        self.run_blocking(move |connection| {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
+        let row = audit_to_new_row(record, tid);
+        self.execute_query(tenant_id, move |connection| {
             diesel::insert_into(tool_call_audit_log::table)
                 .values(&row)
                 .execute(connection)
@@ -169,10 +210,11 @@ impl ToolCatalogRepository for PostgresToolCatalog {
     }
 }
 
-fn entry_to_new_row(entry: &CatalogEntry) -> NewCatalogEntryRow {
+fn entry_to_new_row(entry: &CatalogEntry, tenant_id: uuid::Uuid) -> NewCatalogEntryRow {
     let tool = entry.tool();
     NewCatalogEntryRow {
         id: entry.id().into_inner(),
+        tenant_id,
         server_id: entry.server_id().into_inner(),
         server_name: entry.server_name().as_str().to_owned(),
         tool_name: tool.name().to_owned(),
@@ -209,18 +251,23 @@ fn row_to_entry(row: CatalogEntryRow) -> ToolCatalogResult<CatalogEntry> {
     clippy::cast_possible_truncation,
     reason = "duration_ms is always positive and within i64 range for tool calls"
 )]
-fn audit_to_new_row(record: &ToolCallAuditRecord) -> NewAuditLogRow {
+fn audit_to_new_row(record: &ToolCallAuditRecord, tenant_id: uuid::Uuid) -> NewAuditLogRow {
     let (outcome_str, outcome_content, outcome_error) = match record.outcome() {
-        ToolCallOutcome::Success { content } => ("success".to_owned(), Some(content.clone()), None),
+        ToolCallOutcome::Success { content } => (
+            "success".to_owned(),
+            Some(redact_outcome_content(content)),
+            None,
+        ),
         ToolCallOutcome::Failure { error } => ("failure".to_owned(), None, Some(error.clone())),
     };
 
     NewAuditLogRow {
         id: record.id(),
+        tenant_id,
         call_id: record.call_id().into_inner(),
         tool_name: record.tool_name().to_owned(),
         server_id: record.server_id().into_inner(),
-        parameters: record.parameters().clone(),
+        parameters: redact_parameters(record.parameters()),
         outcome: outcome_str,
         outcome_content,
         outcome_error,

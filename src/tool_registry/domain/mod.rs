@@ -13,6 +13,7 @@ mod health;
 mod ids;
 mod log_capture;
 mod policy;
+mod redact;
 pub mod routing;
 mod server;
 mod tool;
@@ -30,6 +31,7 @@ pub use log_capture::{
     LogCaptureContext, LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy,
 };
 pub use policy::PolicyDecision;
+pub use redact::{redact_outcome_content, redact_parameters};
 pub use routing::{ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming};
 pub use server::{McpServerLifecycleState, McpServerRegistration, PersistedMcpServerData};
 pub use tool::McpToolDefinition;
