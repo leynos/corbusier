@@ -19,10 +19,10 @@ use crate::tool_registry::{
     },
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
+
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
@@ -32,7 +32,7 @@ impl FromTxError<Self> for ToolCatalogError {
     fn from_tx_error(err: TxError<Self>) -> Self {
         match err {
             TxError::Domain(e) => e,
-            TxError::Diesel(e) => Self::persistence(e),
+            TxError::Diesel(e) => Self::persistence("transaction", e),
         }
     }
 }
@@ -63,10 +63,11 @@ impl PostgresToolCatalog {
         let pool = self.pool.clone();
         run_blocking_with(
             move || {
-                let mut conn = get_conn_with(&pool, ToolCatalogError::persistence)?;
+                let mut conn =
+                    get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
-            ToolCatalogError::persistence,
+            |e| ToolCatalogError::persistence("spawn_blocking", e),
         )
         .await
     }
@@ -92,7 +93,7 @@ impl PostgresToolCatalog {
                 mcp_tool_catalog::updated_at.eq(diesel::dsl::now),
             ))
             .execute(connection)
-            .map_err(ToolCatalogError::persistence)?;
+            .map_err(|e| ToolCatalogError::persistence("update", e))?;
             Ok(())
         })
         .await
@@ -107,6 +108,16 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
+        if let Some(bad) = entries.iter().find(|e| e.server_id() != server_id) {
+            return Err(ToolCatalogError::MixedServerBatch {
+                reason: format!(
+                    "entry '{}' belongs to server {} but batch targets {}",
+                    bad.tool().name(),
+                    bad.server_id(),
+                    server_id,
+                ),
+            });
+        }
         let tenant_id = ctx.tenant_id();
         let sid = server_id.into_inner();
         let tid = tenant_id.into_inner();
@@ -120,18 +131,13 @@ impl ToolCatalogRepository for PostgresToolCatalog {
                     .filter(mcp_tool_catalog::tenant_id.eq(tid)),
             )
             .execute(connection)
-            .map_err(ToolCatalogError::persistence)?;
+            .map_err(|e| ToolCatalogError::persistence("delete", e))?;
 
             for row in &rows {
                 diesel::insert_into(mcp_tool_catalog::table)
                     .values(row)
                     .execute(connection)
-                    .map_err(|err| match err {
-                        DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => {
-                            ToolCatalogError::DuplicateEntry(CatalogEntryId::from_uuid(row.id))
-                        }
-                        other => ToolCatalogError::persistence(other),
-                    })?;
+                    .map_err(|e| ToolCatalogError::persistence("insert", e))?;
             }
             Ok(())
         })
@@ -160,19 +166,18 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         &self,
         ctx: &RequestContext,
         tool_name: &str,
-    ) -> ToolCatalogResult<Option<CatalogEntry>> {
+    ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
         self.execute_query(tenant_id, move |connection| {
-            let row = mcp_tool_catalog::table
+            let rows = mcp_tool_catalog::table
                 .filter(mcp_tool_catalog::tool_name.eq(&name))
                 .filter(mcp_tool_catalog::tenant_id.eq(tid))
                 .select(CatalogEntryRow::as_select())
-                .first::<CatalogEntryRow>(connection)
-                .optional()
-                .map_err(ToolCatalogError::persistence)?;
-            row.map(row_to_entry).transpose()
+                .load::<CatalogEntryRow>(connection)
+                .map_err(|e| ToolCatalogError::persistence("select", e))?;
+            rows.into_iter().map(row_to_entry).collect()
         })
         .await
     }
@@ -185,7 +190,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
                 .filter(mcp_tool_catalog::tenant_id.eq(tid))
                 .select(CatalogEntryRow::as_select())
                 .load::<CatalogEntryRow>(connection)
-                .map_err(ToolCatalogError::persistence)?;
+                .map_err(|e| ToolCatalogError::persistence("select", e))?;
             rows.into_iter().map(row_to_entry).collect()
         })
         .await
@@ -203,7 +208,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
             diesel::insert_into(tool_call_audit_log::table)
                 .values(&row)
                 .execute(connection)
-                .map_err(ToolCatalogError::persistence)?;
+                .map_err(|e| ToolCatalogError::persistence("insert", e))?;
             Ok(())
         })
         .await
@@ -229,9 +234,9 @@ fn entry_to_new_row(entry: &CatalogEntry, tenant_id: uuid::Uuid) -> NewCatalogEn
 
 fn row_to_entry(row: CatalogEntryRow) -> ToolCatalogResult<CatalogEntry> {
     let server_name = McpServerName::new(&row.server_name)
-        .map_err(ToolCatalogError::invalid_persisted_data)?;
+        .map_err(|e| ToolCatalogError::invalid_persisted_data("server_name", e))?;
     let mut tool = McpToolDefinition::new(row.tool_name, row.tool_description, row.input_schema)
-        .map_err(ToolCatalogError::invalid_persisted_data)?;
+        .map_err(|e| ToolCatalogError::invalid_persisted_data("tool_definition", e))?;
     if let Some(output) = row.output_schema {
         tool = tool.with_output_schema(output);
     }

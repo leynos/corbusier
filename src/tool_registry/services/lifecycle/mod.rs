@@ -24,6 +24,14 @@ use transitions::{
 type LifecycleChangeFuture<'a> =
     Pin<Box<dyn Future<Output = McpServerLifecycleServiceResult<LifecycleChange>> + 'a>>;
 
+/// Bundles the arguments for [`McpServerLifecycleService::apply_compensation_if_needed`].
+struct CompensationArgs<'a> {
+    ctx: &'a RequestContext,
+    compensation: Option<LifecycleCompensationAction>,
+    server: &'a McpServerRegistration,
+    repository_error: &'a McpServerRegistryError,
+}
+
 /// Request payload for registering an MCP server.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisterMcpServerRequest {
@@ -65,6 +73,14 @@ pub enum McpServerLifecycleServiceError {
     /// Host operation failed.
     #[error(transparent)]
     Host(#[from] McpServerHostError),
+    /// Health refresh failed after starting the server.
+    #[error("health refresh failed after start: {source}")]
+    HealthRefreshFailed {
+        /// The underlying host error.
+        source: McpServerHostError,
+        /// Startup stderr captured before the health probe failed.
+        startup_stderr: Option<bytes::Bytes>,
+    },
     /// No server exists with the given identifier.
     #[error("MCP server {0} not found")]
     NotFound(McpServerId),
@@ -125,15 +141,13 @@ where
         let server = self.find_server_or_error(ctx, server_id).await?;
         let change = apply_change(&server, self).await?;
         if let Err(repository_error) = self.repository.update(ctx, &change.updated_server).await {
-            if let Some(compensation_error) = self
-                .apply_compensation_if_needed(
-                    ctx,
-                    change.compensation,
-                    &change.updated_server,
-                    &repository_error,
-                )
-                .await
-            {
+            let args = CompensationArgs {
+                ctx,
+                compensation: change.compensation,
+                server: &change.updated_server,
+                repository_error: &repository_error,
+            };
+            if let Some(compensation_error) = self.apply_compensation_if_needed(args).await {
                 return Err(compensation_error);
             }
             return Err(McpServerLifecycleServiceError::Repository(repository_error));
@@ -141,27 +155,25 @@ where
         Ok(change)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     async fn apply_compensation_if_needed(
         &self,
-        ctx: &RequestContext,
-        compensation: Option<LifecycleCompensationAction>,
-        server: &McpServerRegistration,
-        repository_error: &McpServerRegistryError,
+        args: CompensationArgs<'_>,
     ) -> Option<McpServerLifecycleServiceError> {
-        let compensation_action = compensation?;
+        let compensation_action = args.compensation?;
         let compensation_result = match compensation_action {
-            LifecycleCompensationAction::Start => self.host.start(ctx, server).await.map(|_| ()),
-            LifecycleCompensationAction::Stop => self.host.stop(ctx, server).await,
+            LifecycleCompensationAction::Start => {
+                self.host.start(args.ctx, args.server).await.map(|_| ())
+            }
+            LifecycleCompensationAction::Stop => self.host.stop(args.ctx, args.server).await,
         };
         compensation_result.err().map(|host_error| {
-            let combined_error = std::io::Error::other(format!(
-                "lifecycle persistence failed: {repository_error}; compensation failed: {host_error}"
-            ));
-            McpServerLifecycleServiceError::Host(McpServerHostError::runtime(combined_error))
+            McpServerLifecycleServiceError::Host(McpServerHostError::CommunicationError {
+                server_id: args.server.id(),
+                reason: format!(
+                    "lifecycle persistence failed: {}; compensation failed: {host_error}",
+                    args.repository_error,
+                ),
+            })
         })
     }
 
@@ -240,14 +252,19 @@ where
             .execute_transition_with_compensation(ctx, server_id, transition)
             .await?;
         let startup_stderr = change.startup_stderr;
-        let server = self
-            .refresh_health(ctx, server_id)
-            .await
-            .unwrap_or(change.updated_server);
-        Ok(LifecycleStartResult {
-            server,
-            startup_stderr,
-        })
+        match self.refresh_health(ctx, server_id).await {
+            Ok(server) => Ok(LifecycleStartResult {
+                server,
+                startup_stderr,
+            }),
+            Err(McpServerLifecycleServiceError::Host(source)) => {
+                Err(McpServerLifecycleServiceError::HealthRefreshFailed {
+                    source,
+                    startup_stderr,
+                })
+            }
+            Err(other) => Err(other),
+        }
     }
 
     /// Stops a registered MCP server.

@@ -184,9 +184,10 @@ pub fn setup_success_result(host: &InMemoryMcpServerHost) -> Result<()> {
 
 pub fn assert_single_audit_stderr_path(
     catalog: &InMemoryToolCatalog,
+    tenant_id: crate::context::TenantId,
     expected_some: bool,
 ) -> Result<()> {
-    let audits = catalog.audit_records()?;
+    let audits = catalog.audit_records(tenant_id)?;
     eyre::ensure!(
         audits.len() == 1,
         "expected 1 audit record, got {}",

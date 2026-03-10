@@ -6,7 +6,6 @@ use crate::tool_registry::domain::{
 };
 use async_trait::async_trait;
 use serde_json::Value;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for runtime MCP host operations.
@@ -117,14 +116,30 @@ pub enum McpServerHostError {
         tool_name: String,
     },
 
-    /// Generic runtime failure.
-    #[error("MCP host runtime error: {0}")]
-    Runtime(Arc<dyn std::error::Error + Send + Sync>),
-}
+    /// The MCP host process failed to spawn.
+    #[error("MCP host process failed to spawn for server {server_id}: {reason}")]
+    ProcessSpawnFailed {
+        /// Server identifier.
+        server_id: McpServerId,
+        /// Reason string.
+        reason: String,
+    },
 
-impl McpServerHostError {
-    /// Wraps a runtime error from the host adapter.
-    pub fn runtime(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Runtime(Arc::new(err))
-    }
+    /// Communication with the MCP host process failed.
+    #[error("MCP host communication error for server {server_id}: {reason}")]
+    CommunicationError {
+        /// Server identifier.
+        server_id: McpServerId,
+        /// Reason string.
+        reason: String,
+    },
+
+    /// The MCP protocol exchange failed.
+    #[error("MCP protocol error for server {server_id}: {reason}")]
+    ProtocolError {
+        /// Server identifier.
+        server_id: McpServerId,
+        /// Reason string.
+        reason: String,
+    },
 }

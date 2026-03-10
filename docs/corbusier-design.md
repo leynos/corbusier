@@ -1835,7 +1835,6 @@ MCP protocol support will require additional dependencies when implemented:
 | Crate        | Version | Purpose                     | Registry  |
 | ------------ | ------- | --------------------------- | --------- |
 | jsonrpc-core | 18.x    | JSON-RPC 2.0 implementation | crates.io |
-| futures      | 0.3.x   | Future utilities            | crates.io |
 | tokio-util   | 0.7.x   | Tokio utilities             | crates.io |
 
 #### 3.3.3 Development and Testing Dependencies
@@ -2022,7 +2021,11 @@ graph TB
 
 - **Tool Stderr Logs**: MCP server startup and tool call stderr captured
   via `ObjectStoreLogAdapter` (backed by the Rust `object_store` crate;
-  `InMemory` for tests, cloud backends for production)
+  `InMemory` for tests, cloud backends for production). Blobs are stored
+  at paths `tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`.
+  The `tool_log_metadata` table indexes these blobs for retention sweeps,
+  while `tool_call_audit_log` records the structured call audit trail
+  (the two tables serve distinct purposes and should not be conflated)
 - **Artifact Storage** (future): Large tool outputs and build artifacts
 - **Backup Storage** (future): Database backups and disaster recovery
 - **Static Assets** (future): Documentation and configuration templates

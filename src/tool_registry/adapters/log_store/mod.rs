@@ -134,15 +134,28 @@ impl ObjectStoreLogAdapter {
     }
 }
 
+/// Validates that `path` belongs to the expected tenant.
+fn validate_tenant_prefix(ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()> {
+    let expected_prefix = format!("tool_logs/{}/", ctx.tenant_id());
+    if !path.starts_with(&expected_prefix) {
+        return Err(ToolLogStoreError::TenantMismatch {
+            path: path.to_owned(),
+            expected_prefix,
+        });
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl ToolLogStore for ObjectStoreLogAdapter {
     async fn store_log(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         metadata: &LogEntryMetadata,
         content: Bytes,
         retention: &LogRetentionPolicy,
     ) -> ToolLogStoreResult<()> {
+        validate_tenant_prefix(ctx, metadata.object_path())?;
         let path = Path::from(metadata.object_path());
         let truncated = truncate_if_needed(content, retention.max_bytes_per_log);
         self.store
@@ -158,7 +171,8 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         Ok(())
     }
 
-    async fn retrieve_log(&self, _ctx: &RequestContext, path: &str) -> ToolLogStoreResult<Bytes> {
+    async fn retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<Bytes> {
+        validate_tenant_prefix(ctx, path)?;
         let object_path = Path::from(path);
         let result = self
             .store
@@ -171,7 +185,8 @@ impl ToolLogStore for ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::RetrieveFailed(err.to_string()))
     }
 
-    async fn delete_log(&self, _ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()> {
+    async fn delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()> {
+        validate_tenant_prefix(ctx, path)?;
         let object_path = Path::from(path);
         self.store
             .delete(&object_path)

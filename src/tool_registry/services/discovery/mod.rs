@@ -229,17 +229,37 @@ where
         ctx: &RequestContext,
         request: &ToolCallRequest,
     ) -> Result<CatalogEntry, (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError)> {
-        let entry = match self
+        let entries = match self
             .catalog
             .find_by_tool_name(ctx, request.tool_name())
             .await
         {
-            Ok(Some(e)) => e,
-            Ok(None) => {
+            Ok(e) => e,
+            Err(err) => return Err((None, err.into())),
+        };
+
+        let entry = match entries.len() {
+            0 => {
                 let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
                 return Err((None, err.into()));
             }
-            Err(err) => return Err((None, err.into())),
+            1 => {
+                // SAFETY: into_iter().next() always yields Some when
+                // len() == 1; the else branch is structurally
+                // unreachable.
+                let Some(entry) = entries.into_iter().next() else {
+                    let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
+                    return Err((None, err.into()));
+                };
+                entry
+            }
+            n => {
+                let err = ToolRegistryDomainError::AmbiguousToolName {
+                    tool_name: request.tool_name().to_owned(),
+                    server_count: n,
+                };
+                return Err((None, err.into()));
+            }
         };
 
         if let Err(err) = self.validate_entry(ctx, &entry, request).await {

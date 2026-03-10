@@ -65,7 +65,7 @@ fn audit_log_contains_entry(
 ) -> Result<(), eyre::Report> {
     let records = world
         .catalog
-        .audit_records()
+        .audit_records(world.request_ctx.tenant_id())
         .map_err(|err| eyre!("audit records retrieval failed: {err}"))?;
     let matching: Vec<_> = records
         .iter()
@@ -123,11 +123,12 @@ fn audit_entry_has_stderr_log_path(
 ) -> Result<(), eyre::Report> {
     let records = world
         .catalog
-        .audit_records()
+        .audit_records(world.request_ctx.tenant_id())
         .map_err(|err| eyre!("audit records retrieval failed: {err}"))?;
     let entry = records
         .iter()
-        .find(|r| r.tool_name() == tool_name)
+        .filter(|r| r.tool_name() == tool_name)
+        .max_by_key(|r| r.completed_at())
         .ok_or_else(|| eyre!("no audit entry for tool '{tool_name}'"))?;
     if entry.stderr_log_path().is_none() {
         return Err(eyre!(

@@ -15,7 +15,7 @@ ALTER TABLE mcp_tool_catalog
 
 DROP INDEX idx_mcp_tool_catalog_tool_name;
 
-CREATE UNIQUE INDEX idx_mcp_tool_catalog_tenant_tool_name
+CREATE INDEX idx_mcp_tool_catalog_tenant_tool_name
     ON mcp_tool_catalog (tenant_id, tool_name);
 
 -- 2. tool_call_audit_log

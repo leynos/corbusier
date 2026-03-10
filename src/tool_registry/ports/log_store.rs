@@ -123,4 +123,15 @@ pub enum ToolLogStoreError {
     /// Listing log entries failed.
     #[error("log store list failed: {0}")]
     ListFailed(String),
+
+    /// The object path does not belong to the expected tenant.
+    #[error(
+        "tenant mismatch: path '{path}' does not start with expected prefix '{expected_prefix}'"
+    )]
+    TenantMismatch {
+        /// The object path that was rejected.
+        path: String,
+        /// The expected tenant-scoped prefix.
+        expected_prefix: String,
+    },
 }

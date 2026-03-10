@@ -53,7 +53,10 @@ pub trait ToolCatalogRepository: Send + Sync {
         server_id: McpServerId,
     ) -> ToolCatalogResult<()>;
 
-    /// Finds a catalog entry by tool name.
+    /// Returns all catalog entries matching a tool name.
+    ///
+    /// Multiple entries are returned when more than one server advertises
+    /// a tool with the same name; callers must handle the ambiguity.
     ///
     /// # Errors
     ///
@@ -62,7 +65,7 @@ pub trait ToolCatalogRepository: Send + Sync {
         &self,
         ctx: &RequestContext,
         tool_name: &str,
-    ) -> ToolCatalogResult<Option<CatalogEntry>>;
+    ) -> ToolCatalogResult<Vec<CatalogEntry>>;
 
     /// Returns the complete tool catalog.
     ///
@@ -94,23 +97,46 @@ pub enum ToolCatalogError {
     #[error("catalog entry not found: {0}")]
     NotFound(String),
 
+    /// A batch of entries contained invalid or inconsistent data.
+    #[error("mixed server batch: {reason}")]
+    MixedServerBatch {
+        /// Reason for the rejection.
+        reason: String,
+    },
+
     /// Persisted data could not be reconstructed into domain types.
-    #[error("invalid persisted catalog data: {0}")]
-    InvalidPersistedData(String),
+    #[error("invalid persisted catalog data for field '{field}': {reason}")]
+    InvalidPersistedData {
+        /// Name of the field that failed reconstruction.
+        field: String,
+        /// Reason for the failure.
+        reason: String,
+    },
 
     /// A persistence-layer operation failed.
-    #[error("catalog persistence error: {0}")]
-    Persistence(String),
+    #[error("catalog persistence error during '{operation}': {reason}")]
+    Persistence {
+        /// Operation that failed (e.g. "insert", "select").
+        operation: String,
+        /// Reason for the failure.
+        reason: String,
+    },
 }
 
 impl ToolCatalogError {
     /// Wraps a persistence error from the catalogue adapter.
-    pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Persistence(err.to_string())
+    pub fn persistence(operation: impl Into<String>, err: impl std::fmt::Display) -> Self {
+        Self::Persistence {
+            operation: operation.into(),
+            reason: err.to_string(),
+        }
     }
 
     /// Wraps an invalid-persisted-data error from the catalogue adapter.
-    pub fn invalid_persisted_data(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InvalidPersistedData(err.to_string())
+    pub fn invalid_persisted_data(field: impl Into<String>, err: impl std::fmt::Display) -> Self {
+        Self::InvalidPersistedData {
+            field: field.into(),
+            reason: err.to_string(),
+        }
     }
 }

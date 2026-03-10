@@ -18,7 +18,7 @@ use serde_json::json;
 use std::sync::Arc;
 use test_helpers::{
     TestBundle, assert_single_audit_stderr_path, bundle, call_read_file,
-    call_read_file_expecting_error, discovery_with_policy, register_start_discover,
+    call_read_file_expecting_error, discovery_with_policy, read_file_tool, register_start_discover,
     register_start_with_stderr, setup_success_result, stdio_request, test_request_ctx,
 };
 
@@ -104,7 +104,7 @@ async fn call_tool_routes_to_correct_server(bundle: TestBundle) -> Result<()> {
     assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
 
-    let audits = catalog.audit_records()?;
+    let audits = catalog.audit_records(ctx.tenant_id())?;
     assert_eq!(audits.len(), 1);
     assert_eq!(
         audits.first().expect("audit record").tool_name(),
@@ -240,7 +240,7 @@ async fn call_tool_host_failure_still_records_audit(bundle: TestBundle) -> Resul
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(discovery.call_tool(&ctx, &request).await.is_err());
 
-    let audits = catalog.audit_records()?;
+    let audits = catalog.audit_records(ctx.tenant_id())?;
     assert_eq!(audits.len(), 1);
     assert!(audits.first().expect("audit record").outcome().is_failure());
     Ok(())
@@ -267,7 +267,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
 
     let result = call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert!(result.outcome().is_success());
-    assert_single_audit_stderr_path(&catalog, true)?;
+    assert_single_audit_stderr_path(&catalog, ctx.tenant_id(), true)?;
     Ok(())
 }
 
@@ -285,7 +285,7 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
     call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
-    assert_single_audit_stderr_path(&catalog, false)?;
+    assert_single_audit_stderr_path(&catalog, ctx.tenant_id(), false)?;
     Ok(())
 }
 
@@ -311,6 +311,46 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
         .await?;
     assert!(metadata.object_path().contains("startup"));
     assert_eq!(metadata.server_id(), server_id);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn call_tool_ambiguous_returns_error(bundle: TestBundle) -> Result<()> {
+    let TestBundle {
+        host,
+        lifecycle,
+        discovery,
+        ..
+    } = bundle;
+    let ctx = test_request_ctx();
+
+    // Register and discover the first server with read_file.
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
+
+    // Register a second server that also exposes read_file.
+    host.set_tool_catalog(McpServerName::new("code_tools")?, vec![read_file_tool()?])?;
+    let second = lifecycle
+        .register(&ctx, stdio_request("code_tools")?)
+        .await?;
+    lifecycle.start(&ctx, second.id()).await?;
+    discovery
+        .discover_and_persist_tools(&ctx, second.id())
+        .await?;
+
+    // Calling read_file should now be ambiguous.
+    let err =
+        call_read_file_expecting_error(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await;
+    assert!(
+        matches!(
+            err,
+            ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::AmbiguousToolName {
+                server_count: 2,
+                ..
+            })
+        ),
+        "expected AmbiguousToolName with server_count=2, got {err:?}",
+    );
     Ok(())
 }
 

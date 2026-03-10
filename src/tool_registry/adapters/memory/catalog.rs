@@ -2,7 +2,7 @@
 
 use crate::context::{RequestContext, TenantId};
 use crate::tool_registry::{
-    domain::{CatalogEntry, McpServerId, ToolCallAuditRecord},
+    domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
 use async_trait::async_trait;
@@ -18,7 +18,7 @@ pub struct InMemoryToolCatalog {
 
 #[derive(Debug, Default)]
 struct InMemoryToolCatalogState {
-    entries: HashMap<String, CatalogEntry>,
+    entries: HashMap<CatalogEntryId, CatalogEntry>,
     audit_records: Vec<ToolCallAuditRecord>,
 }
 
@@ -34,7 +34,7 @@ impl InMemoryToolCatalog {
     ) -> ToolCatalogResult<RwLockReadGuard<'_, HashMap<TenantId, InMemoryToolCatalogState>>> {
         self.state
             .read()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))
+            .map_err(|err| ToolCatalogError::persistence("read_lock", err))
     }
 
     fn write_state(
@@ -42,7 +42,7 @@ impl InMemoryToolCatalog {
     ) -> ToolCatalogResult<RwLockWriteGuard<'_, HashMap<TenantId, InMemoryToolCatalogState>>> {
         self.state
             .write()
-            .map_err(|err| ToolCatalogError::persistence(std::io::Error::other(err.to_string())))
+            .map_err(|err| ToolCatalogError::persistence("write_lock", err))
     }
 
     fn apply_to_server_entries(
@@ -66,17 +66,20 @@ impl InMemoryToolCatalog {
         Ok(())
     }
 
-    /// Returns a snapshot of all audit records across all tenants.
+    /// Returns a snapshot of audit records for a specific tenant.
     ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError::Persistence`] if the lock is poisoned.
-    pub fn audit_records(&self) -> ToolCatalogResult<Vec<ToolCallAuditRecord>> {
+    pub fn audit_records(
+        &self,
+        tenant_id: TenantId,
+    ) -> ToolCatalogResult<Vec<ToolCallAuditRecord>> {
         let tenants = self.read_state()?;
         let records = tenants
-            .values()
-            .flat_map(|s| s.audit_records.iter().cloned())
-            .collect();
+            .get(&tenant_id)
+            .map(|s| s.audit_records.clone())
+            .unwrap_or_default();
         Ok(records)
     }
 }
@@ -89,26 +92,30 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
+        if let Some(bad) = entries.iter().find(|e| e.server_id() != server_id) {
+            return Err(ToolCatalogError::MixedServerBatch {
+                reason: format!(
+                    "entry '{}' belongs to server {} but batch targets {}",
+                    bad.tool().name(),
+                    bad.server_id(),
+                    server_id,
+                ),
+            });
+        }
         let mut tenants = self.write_state()?;
         let state = tenants.entry(ctx.tenant_id()).or_default();
 
-        // Stage the new entries, checking for cross-server duplicates
-        // within the same tenant before mutating live state.
-        let mut staged: HashMap<String, CatalogEntry> = HashMap::new();
+        // Stage the new entries, rejecting within-batch duplicates only.
+        let mut staged: HashMap<CatalogEntryId, CatalogEntry> = HashMap::new();
+        let mut seen_names = std::collections::HashSet::new();
         for entry in entries {
-            let tool_name = entry.tool().name().to_owned();
-            if let Some(existing) = state.entries.get(&tool_name)
-                && existing.server_id() != server_id
-            {
+            if !seen_names.insert(entry.tool().name().to_owned()) {
                 return Err(ToolCatalogError::DuplicateEntry(entry.id()));
             }
-            if staged.contains_key(&tool_name) {
-                return Err(ToolCatalogError::DuplicateEntry(entry.id()));
-            }
-            staged.insert(tool_name, entry.clone());
+            staged.insert(entry.id(), entry.clone());
         }
 
-        // Validation passed -- swap atomically.
+        // Remove previous entries for this server, then insert new ones.
         state
             .entries
             .retain(|_, entry| entry.server_id() != server_id);
@@ -137,12 +144,19 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         &self,
         ctx: &RequestContext,
         tool_name: &str,
-    ) -> ToolCatalogResult<Option<CatalogEntry>> {
+    ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenants = self.read_state()?;
-        let entry = tenants
+        let entries = tenants
             .get(&ctx.tenant_id())
-            .and_then(|s| s.entries.get(tool_name).cloned());
-        Ok(entry)
+            .map(|s| {
+                s.entries
+                    .values()
+                    .filter(|e| e.tool().name() == tool_name)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(entries)
     }
 
     async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {

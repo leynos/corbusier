@@ -473,24 +473,26 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(DefaultClock),
     );
 
+    let ctx = RequestContext::new(TenantId::default());
+
     let request = RegisterMcpServerRequest::new(
         "workspace_tools",
         McpTransport::stdio("mcp-server")?,
     );
-    let registered = service.register(request).await?;
-    let started = service.start(registered.id()).await?;
+    let registered = service.register(&ctx, request).await?;
+    let started = service.start(&ctx, registered.id()).await?;
     assert_eq!(started.server.lifecycle_state().as_str(), "running");
 
-    let servers = service.list_all().await?;
+    let servers = service.list_all(&ctx).await?;
     assert_eq!(servers.len(), 1);
 
-    let tools = service.list_tools(started.server.id()).await?;
+    let tools = service.list_tools(&ctx, started.server.id()).await?;
     assert_eq!(tools.len(), 1);
 
-    let stopped = service.stop(started.server.id()).await?;
+    let stopped = service.stop(&ctx, started.server.id()).await?;
     assert_eq!(stopped.lifecycle_state().as_str(), "stopped");
 
-    let after_stop = service.list_tools(stopped.id()).await;
+    let after_stop = service.list_tools(&ctx, stopped.id()).await;
     assert!(after_stop.is_err());
 
     Ok(())
@@ -609,14 +611,16 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
         clock,
     );
 
+    let ctx = RequestContext::new(TenantId::default());
+
     // Register, start, and discover tools.
     let request = RegisterMcpServerRequest::new(
         "workspace_tools", McpTransport::stdio("mcp-server")?,
     );
-    let registered = lifecycle.register(request).await?;
-    lifecycle.start(registered.id()).await?;
+    let registered = lifecycle.register(&ctx, request).await?;
+    lifecycle.start(&ctx, registered.id()).await?;
     let entries = discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&ctx, registered.id())
         .await?;
     assert_eq!(entries.len(), 1);
 
@@ -624,18 +628,18 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
     let call = ToolCallRequest::new(
         "read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock,
     );
-    let result = discovery.call_tool(&call).await?;
+    let result = discovery.call_tool(&ctx, &call).await?;
     assert!(result.outcome().is_success());
 
     // Stop the server and mark tools unavailable.
-    lifecycle.stop(registered.id()).await?;
-    discovery.mark_tools_unavailable(registered.id()).await?;
+    lifecycle.stop(&ctx, registered.id()).await?;
+    discovery.mark_tools_unavailable(&ctx, registered.id()).await?;
 
     // Subsequent calls are rejected.
     let retry = ToolCallRequest::new(
         "read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock,
     );
-    assert!(discovery.call_tool(&retry).await.is_err());
+    assert!(discovery.call_tool(&ctx, &retry).await.is_err());
 
     Ok(())
 }

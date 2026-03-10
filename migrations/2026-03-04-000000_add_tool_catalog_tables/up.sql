@@ -15,8 +15,9 @@ CREATE TABLE mcp_tool_catalog (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Unique tool name constraint: routing requires unambiguous resolution.
-CREATE UNIQUE INDEX idx_mcp_tool_catalog_tool_name ON mcp_tool_catalog (tool_name);
+-- Tool name lookup index: routing resolves by name; ambiguity is handled
+-- in the service layer when multiple servers advertise the same tool.
+CREATE INDEX idx_mcp_tool_catalog_tool_name ON mcp_tool_catalog (tool_name);
 CREATE INDEX idx_mcp_tool_catalog_server_id ON mcp_tool_catalog (server_id);
 CREATE INDEX idx_mcp_tool_catalog_available_tool ON mcp_tool_catalog (available, tool_name);
 

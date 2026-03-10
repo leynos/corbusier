@@ -53,7 +53,7 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v5";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v6";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]

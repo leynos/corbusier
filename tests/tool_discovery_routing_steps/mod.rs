@@ -64,6 +64,12 @@ pub fn discovery_service(
     )
 }
 
+/// Blocks the current thread on a future using [`tokio::task::block_in_place`].
+///
+/// This calls [`tokio::runtime::Handle::current`] and
+/// [`block_in_place`](tokio::task::block_in_place), so it **must** be
+/// executed on a multi-threaded Tokio runtime.  Calling it from a
+/// single-threaded (`current_thread`) runtime will panic.
 pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }

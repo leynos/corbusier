@@ -3,24 +3,20 @@
 use super::{McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest};
 use crate::{
     context::RequestContext,
+    test_support::HealthProbeFailureHost,
     tool_registry::{
         adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
         domain::{
-            McpServerHealthSnapshot, McpServerHealthStatus, McpServerId, McpServerLifecycleState,
-            McpServerName, McpToolDefinition, McpTransport, ToolRegistryDomainError,
-        },
-        ports::{
-            McpServerHost, McpServerHostError, McpServerHostResult, StartHostResult,
-            ToolCallHostResult,
+            McpServerHealthStatus, McpServerId, McpServerLifecycleState, McpServerName,
+            McpToolDefinition, McpTransport, ToolRegistryDomainError,
         },
     },
 };
-use async_trait::async_trait;
 use eyre::Result;
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 use serde_json::json;
-use std::{collections::HashSet, io::Error, sync::Arc};
+use std::sync::Arc;
 
 type TestService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
@@ -202,94 +198,9 @@ async fn lifecycle_scenarios(
     Ok(())
 }
 
-#[derive(Debug, Clone, Default)]
-struct HealthProbeFailureHost {
-    started: std::sync::Arc<std::sync::Mutex<HashSet<McpServerId>>>,
-}
-
-impl HealthProbeFailureHost {
-    /// Helper to acquire the lock on started servers and handle errors.
-    fn with_started_lock<F, T>(&self, operation: F) -> McpServerHostResult<T>
-    where
-        F: FnOnce(&mut HashSet<McpServerId>) -> T,
-    {
-        let mut started = self
-            .started
-            .lock()
-            .map_err(|err| McpServerHostError::runtime(Error::other(err.to_string())))?;
-        Ok(operation(&mut started))
-    }
-}
-
-#[async_trait]
-impl McpServerHost for HealthProbeFailureHost {
-    async fn start(
-        &self,
-        _ctx: &RequestContext,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<StartHostResult> {
-        self.with_started_lock(|started| {
-            started.insert(server.id());
-        })?;
-        Ok(StartHostResult::default())
-    }
-
-    async fn stop(
-        &self,
-        _ctx: &RequestContext,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<()> {
-        self.with_started_lock(|started| {
-            started.remove(&server.id());
-        })
-    }
-
-    async fn health(
-        &self,
-        _ctx: &RequestContext,
-        _server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<McpServerHealthSnapshot> {
-        Err(McpServerHostError::runtime(Error::other(
-            "health probe unavailable",
-        )))
-    }
-
-    async fn list_tools(
-        &self,
-        _ctx: &RequestContext,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<Vec<McpToolDefinition>> {
-        self.with_started_lock(|started| {
-            if started.contains(&server.id()) {
-                Ok(vec![])
-            } else {
-                Err(McpServerHostError::NotRunning(server.id()))
-            }
-        })?
-    }
-
-    async fn call_tool(
-        &self,
-        _ctx: &RequestContext,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-        _request: &crate::tool_registry::domain::ToolCallRequest,
-    ) -> McpServerHostResult<ToolCallHostResult> {
-        self.with_started_lock(|started| {
-            if started.contains(&server.id()) {
-                Ok(ToolCallHostResult {
-                    content: serde_json::Value::Null,
-                    stderr_output: None,
-                })
-            } else {
-                Err(McpServerHostError::NotRunning(server.id()))
-            }
-        })?
-    }
-}
-
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_persists_running_state_when_health_probe_fails() -> Result<()> {
+async fn start_returns_health_refresh_failed_when_health_probe_fails() -> Result<()> {
     let service = McpServerLifecycleService::new(
         Arc::new(InMemoryMcpServerRegistry::new()),
         Arc::new(HealthProbeFailureHost::default()),
@@ -300,19 +211,11 @@ async fn start_persists_running_state_when_health_probe_fails() -> Result<()> {
     let registered = service
         .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = service.start(&ctx, registered.id()).await?;
+    let result = service.start(&ctx, registered.id()).await;
 
-    assert_eq!(
-        start_result.server.lifecycle_state(),
-        McpServerLifecycleState::Running
-    );
-    assert_eq!(
-        start_result
-            .server
-            .last_health()
-            .expect("health snapshot should exist")
-            .status(),
-        McpServerHealthStatus::Unknown
-    );
+    assert!(matches!(
+        result,
+        Err(McpServerLifecycleServiceError::HealthRefreshFailed { .. })
+    ));
     Ok(())
 }

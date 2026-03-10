@@ -46,13 +46,19 @@ impl InMemoryMcpServerHost {
     fn read_state(&self) -> McpServerHostResult<RwLockReadGuard<'_, InMemoryHostState>> {
         self.state
             .read()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))
+            .map_err(|err| McpServerHostError::CommunicationError {
+                server_id: McpServerId::from_uuid(uuid::Uuid::nil()),
+                reason: err.to_string(),
+            })
     }
 
     fn write_state(&self) -> McpServerHostResult<RwLockWriteGuard<'_, InMemoryHostState>> {
         self.state
             .write()
-            .map_err(|err| McpServerHostError::runtime(std::io::Error::other(err.to_string())))
+            .map_err(|err| McpServerHostError::CommunicationError {
+                server_id: McpServerId::from_uuid(uuid::Uuid::nil()),
+                reason: err.to_string(),
+            })
     }
 
     fn modify_state(&self, f: impl FnOnce(&mut InMemoryHostState)) -> McpServerHostResult<()> {

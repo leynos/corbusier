@@ -14,26 +14,16 @@ fn adapter() -> ObjectStoreLogAdapter {
 }
 
 /// Stores a startup log entry and returns its metadata.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper bundles all dependencies for concise call sites"
-)]
 async fn store_startup_entry(
     adapter: &ObjectStoreLogAdapter,
     ctx: &RequestContext,
     server_id: McpServerId,
-    clock: &dyn Clock,
-    retention: &LogRetentionPolicy,
+    capture_ctx: &LogCaptureContext<'_>,
 ) -> LogEntryMetadata {
-    let capture_ctx = LogCaptureContext {
-        clock,
-        retention,
-        tenant_id: ctx.tenant_id(),
-    };
     let content = Bytes::from("test stderr output");
-    let metadata = LogEntryMetadata::for_startup(server_id, content.len() as u64, &capture_ctx);
+    let metadata = LogEntryMetadata::for_startup(server_id, content.len() as u64, capture_ctx);
     adapter
-        .store_log(ctx, &metadata, content, retention)
+        .store_log(ctx, &metadata, content, capture_ctx.retention)
         .await
         .expect("store_log should succeed");
     metadata
@@ -53,7 +43,12 @@ async fn sweep_deletes_expired_entries(adapter: ObjectStoreLogAdapter) {
         retention_period: Duration::seconds(1),
     };
 
-    let metadata = store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+    let metadata = store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
 
     // Advance time past expiry.
     let now = metadata.expires_at() + Duration::seconds(1);
@@ -82,7 +77,12 @@ async fn sweep_does_not_delete_unexpired_entries(adapter: ObjectStoreLogAdapter)
     let clock = DefaultClock;
 
     let retention = LogRetentionPolicy::default();
-    let metadata = store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+    let metadata = store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
 
     // Sweep with current time — entry should not be expired.
     let now = metadata.captured_at();
@@ -119,10 +119,16 @@ async fn sweep_enforces_count_limit(adapter: ObjectStoreLogAdapter) {
         retention_period: Duration::days(7),
     };
 
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+
     // Store three entries — one should be swept as excess.
-    store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
-    store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
-    store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
+    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
+    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
+    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
 
     let now = clock.utc();
     let sweep = SweepContext {
@@ -158,7 +164,12 @@ async fn delete_log_removes_metadata(adapter: ObjectStoreLogAdapter) {
         retention_period: Duration::seconds(1),
     };
 
-    let metadata = store_startup_entry(&adapter, &ctx, server_id, &clock, &retention).await;
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+    let metadata = store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await;
 
     // Delete via the trait method.
     adapter
@@ -195,8 +206,13 @@ async fn sweep_only_affects_target_server(adapter: ObjectStoreLogAdapter) {
         retention_period: Duration::seconds(1),
     };
 
-    let meta_a = store_startup_entry(&adapter, &ctx, server_a, &clock, &retention).await;
-    store_startup_entry(&adapter, &ctx, server_b, &clock, &retention).await;
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+    let meta_a = store_startup_entry(&adapter, &ctx, server_a, &capture_ctx).await;
+    store_startup_entry(&adapter, &ctx, server_b, &capture_ctx).await;
 
     // Sweep only server A with expired time.
     let now = meta_a.expires_at() + Duration::seconds(1);

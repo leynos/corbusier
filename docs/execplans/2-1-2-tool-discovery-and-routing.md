@@ -749,22 +749,22 @@ stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
-`discover_and_persist_tools(&self, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
+`discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
  load server from registry (fail with `NotFound` if absent), verify lifecycle
 state allows tool queries, call `host.list_tools()` to get tool definitions,
 map each to a `CatalogEntry`, call `catalog.sync_server_tools()` to persist,
 return the entries.
 
-`mark_tools_unavailable(&self, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
+`mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
  delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
-`mark_tools_available(&self, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
+`mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
  delegate to `catalog.mark_server_tools_available(server_id)`.
 
-`list_catalog(&self) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
+`list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
 delegate to `catalog.list_all()`.
 
-`call_tool(&self, request: ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
+`call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
  the core routing method. Flow:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
@@ -798,7 +798,8 @@ delegate to `catalog.list_all()`.
    call.
 9. Return `ToolCallResult`.
 
-`store_startup_stderr(&self, server_id: McpServerId, stderr: bytes::Bytes) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`:
+`store_startup_stderr(&self, ctx, server_id, stderr)`
+`-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`:
  stores startup stderr captured from `McpServerHost::start`. Called by the
 caller after `lifecycle_service.start()` returns a `LifecycleStartResult` with
 non-empty `startup_stderr`. Builds
@@ -807,7 +808,7 @@ stores via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
 returns the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
-`sweep_expired_logs(&self, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
+`sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
  triggers a retention sweep for a specific server. Delegates to
 `log_store.sweep_expired(server_id, &SweepContext { … })`. Returns the count of
 deleted log entries.
@@ -964,9 +965,11 @@ Feature: Tool discovery and routing
     And the stored stderr log contains 'debug: opening file'
 ```
 
-In `tests/tool_discovery_routing_steps.rs`, implement step definitions
-following the pattern established in `tests/mcp_server_lifecycle_steps.rs`: a
-`ToolDiscoveryWorld` struct holding shared state, `run_async` helper,
+In `tests/tool_discovery_routing_steps/` (directory module with
+`mod.rs`, `given.rs`, `when.rs`, `then.rs`, `world.rs`), implement step
+definitions following the pattern established in
+`tests/mcp_server_lifecycle_steps.rs`: a `ToolDiscoveryWorld` struct
+holding shared state, `run_async` helper,
 `#[given]`/`#[when]`/`#[then]` step functions, and `#[scenario]` bindings.
 
 Go/no-go checkpoint: run `make all`. Must pass with all new and existing tests.
@@ -1323,10 +1326,10 @@ New files (estimated 23-26):
 | `src/tool_registry/adapters/postgres/log_metadata_repository.rs` | `PostgresLogMetadataRepository`                                        |
 | `migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql`    | Migration (3 tables)                                                   |
 | `migrations/2026-03-04-000000_add_tool_catalog_tables/down.sql`  | Migration down                                                         |
-| `tests/in_memory/tool_discovery_routing_tests.rs`                | In-memory integration                                                  |
+| `tests/in_memory/tool_discovery_routing_tests/`                  | In-memory integration (directory module)                               |
 | `tests/postgres/tool_discovery_routing_tests.rs`                 | Postgres integration                                                   |
 | `tests/features/tool_discovery_routing.feature`                  | BDD scenarios                                                          |
-| `tests/tool_discovery_routing_steps.rs`                          | BDD step definitions                                                   |
+| `tests/tool_discovery_routing_steps/`                            | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.)    |
 
 Modified files (estimated 14-16):
 
