@@ -3,7 +3,6 @@
 
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -24,7 +23,7 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_ctx,
 };
 
 type TestLifecycleService =
@@ -38,15 +37,6 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
-
-fn test_request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
 
 struct PgTestContext {
     host: Arc<InMemoryMcpServerHost>,

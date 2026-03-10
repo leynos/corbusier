@@ -522,7 +522,7 @@ their schemas and availability status. The method name uses the code identifier
 Call `call_tool()` with a `ToolCallRequest` containing the tool name and
 parameters. The service:
 
-1. Resolves the tool name to a catalog entry.
+1. Resolves the tool name to a catalogue entry.
 2. Checks that the tool is available (its hosting server is running).
 3. Validates parameters against the tool's declared input schema.
 4. Enforces the configured policy (default: `AllowAllPolicy` permits all).

@@ -29,3 +29,6 @@ pub mod message;
 pub mod task;
 pub mod tool_registry;
 pub mod worker;
+
+#[cfg(test)]
+pub(crate) mod test_support;

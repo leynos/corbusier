@@ -5,7 +5,6 @@ use crate::tool_registry::domain::{
     CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord,
 };
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for tool catalog operations.
@@ -97,16 +96,21 @@ pub enum ToolCatalogError {
 
     /// Persisted data could not be reconstructed into domain types.
     #[error("invalid persisted catalog data: {0}")]
-    InvalidPersistedData(Arc<dyn std::error::Error + Send + Sync>),
+    InvalidPersistedData(String),
 
     /// A persistence-layer operation failed.
     #[error("catalog persistence error: {0}")]
-    Persistence(Arc<dyn std::error::Error + Send + Sync>),
+    Persistence(String),
 }
 
 impl ToolCatalogError {
-    /// Wraps a persistence error from the catalog adapter.
+    /// Wraps a persistence error from the catalogue adapter.
     pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Persistence(Arc::new(err))
+        Self::Persistence(err.to_string())
+    }
+
+    /// Wraps an invalid-persisted-data error from the catalogue adapter.
+    pub fn invalid_persisted_data(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::InvalidPersistedData(err.to_string())
     }
 }

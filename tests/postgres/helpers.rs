@@ -72,6 +72,11 @@ pub fn test_request_context() -> RequestContext {
     )
 }
 
+/// Alias for [`test_request_context`] used in tool-discovery and lifecycle tests.
+pub fn test_request_ctx() -> RequestContext {
+    test_request_context()
+}
+
 /// Ensures the template database exists with the schema applied.
 ///
 /// # Errors

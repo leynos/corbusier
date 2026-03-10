@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use super::helpers::request_ctx;
+use corbusier::context::RequestContext;
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -39,16 +40,6 @@ struct IntegrationContext {
     lifecycle: TestLifecycleService,
     discovery: TestDiscoveryService,
     catalog: Arc<InMemoryToolCatalog>,
-}
-
-#[fixture]
-fn request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
 }
 
 #[fixture]

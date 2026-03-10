@@ -229,9 +229,9 @@ fn entry_to_new_row(entry: &CatalogEntry, tenant_id: uuid::Uuid) -> NewCatalogEn
 
 fn row_to_entry(row: CatalogEntryRow) -> ToolCatalogResult<CatalogEntry> {
     let server_name = McpServerName::new(&row.server_name)
-        .map_err(|err| ToolCatalogError::InvalidPersistedData(std::sync::Arc::new(err)))?;
+        .map_err(ToolCatalogError::invalid_persisted_data)?;
     let mut tool = McpToolDefinition::new(row.tool_name, row.tool_description, row.input_schema)
-        .map_err(|err| ToolCatalogError::InvalidPersistedData(std::sync::Arc::new(err)))?;
+        .map_err(ToolCatalogError::invalid_persisted_data)?;
     if let Some(output) = row.output_schema {
         tool = tool.with_output_schema(output);
     }

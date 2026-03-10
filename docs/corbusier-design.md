@@ -339,7 +339,7 @@ Corbusier implements this through:
 
 ## 2. Product Requirements
 
-### 2.1 Feature Catalog
+### 2.1 Feature Catalogue
 
 #### 2.1.1 Core Orchestration Features
 
@@ -755,7 +755,7 @@ Corbusier implements this through:
 
 #### 2.1.5 Tenancy and Identity Features
 
-_Table 2.1.5.1: Tenancy and identity feature catalog._
+_Table 2.1.5.1: Tenancy and identity feature catalogue._
 
 | Feature ID | Feature Name                          | Category             | Priority | Status   |
 | ---------- | ------------------------------------- | -------------------- | -------- | -------- |
@@ -1158,7 +1158,7 @@ _Figure: MCP server start and `tools/list` lifecycle interaction sequence._
 
 - **Technical Specifications:**
   - Input Parameters: Tool metadata including JSON Schema input/output contracts
-  - Output/Response: Registered tool catalog with capability descriptions
+  - Output/Response: Registered tool catalogue with capability descriptions
   - Performance Criteria: <5s tool discovery, real-time tool availability
     updates
   - Data Requirements: Tool schemas, capability annotations, access control
@@ -1193,8 +1193,8 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
 - **`ToolDiscoveryRoutingService`** is a sibling service to
   `McpServerLifecycleService` rather than an extension of it. The lifecycle
   service manages server state transitions; the discovery/routing service
-  manages the tool catalog and call routing. Composition at the call site keeps
-  each service focused and testable.
+  manages the tool catalogue and call routing. Composition at the call site
+  keeps each service focused and testable.
 - **Composition-based integration**: when a server starts, the caller
   invokes `discover_and_persist_tools()`; when it stops, the caller invokes
   `mark_tools_unavailable()`. The services share port instances but do not
@@ -1304,7 +1304,7 @@ erDiagram
 
 _Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within
 `ToolDiscoveryRoutingService`. The caller submits a `ToolCallRequest`; the
-service resolves the tool from the catalog, validates parameters against the
+service resolves the tool from the catalogue, validates parameters against the
 declared schema, evaluates the policy, locates the hosting server, executes the
 tool call via the host adapter, optionally captures stderr in the log store,
 and records an audit trail before returning._
@@ -2018,11 +2018,14 @@ graph TB
 - **Change Logs**: Weaver-generated change sets and diffs
 - **Temporary Files**: Tool execution artifacts and build outputs
 
-##### Object Storage (Future)
+##### Object Storage
 
-- **Artifact Storage**: Large tool outputs and build artifacts
-- **Backup Storage**: Database backups and disaster recovery
-- **Static Assets**: Documentation and configuration templates
+- **Tool Stderr Logs**: MCP server startup and tool call stderr captured
+  via `ObjectStoreLogAdapter` (backed by the Rust `object_store` crate;
+  `InMemory` for tests, cloud backends for production)
+- **Artifact Storage** (future): Large tool outputs and build artifacts
+- **Backup Storage** (future): Database backups and disaster recovery
+- **Static Assets** (future): Documentation and configuration templates
 
 #### 3.5.5 Database Configuration
 

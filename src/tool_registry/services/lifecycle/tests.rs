@@ -2,7 +2,7 @@
 
 use super::{McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest};
 use crate::{
-    context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
+    context::RequestContext,
     tool_registry::{
         adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
         domain::{
@@ -33,14 +33,7 @@ enum LifecycleScenario {
     StartStopStart,
 }
 
-fn test_request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
+use crate::test_support::test_request_ctx;
 
 #[fixture]
 fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {

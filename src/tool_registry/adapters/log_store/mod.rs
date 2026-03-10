@@ -14,7 +14,7 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use object_store::{ObjectStore, path::Path};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -109,11 +109,11 @@ impl ObjectStoreLogAdapter {
         swept_keys: &[String],
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<Vec<String>> {
+        let swept_set: HashSet<&str> = swept_keys.iter().map(String::as_str).collect();
         let mut remaining: Vec<&LogEntryMetadata> = entries
             .iter()
             .filter(|e| {
-                !sweep.policy.is_expired(e, sweep.now)
-                    && !swept_keys.contains(&e.object_path().to_owned())
+                !sweep.policy.is_expired(e, sweep.now) && !swept_set.contains(e.object_path())
             })
             .collect();
 

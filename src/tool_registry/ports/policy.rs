@@ -4,7 +4,6 @@ use crate::context::RequestContext;
 use crate::tool_registry::domain::PolicyDecision;
 use async_trait::async_trait;
 use serde_json::Value;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for policy evaluation operations.
@@ -37,6 +36,9 @@ pub trait ToolPolicyEnforcer: Send + Sync {
 #[derive(Debug, Error)]
 pub enum ToolPolicyError {
     /// The policy evaluation mechanism itself failed.
-    #[error("policy evaluation failed: {0}")]
-    EvaluationFailed(Arc<dyn std::error::Error + Send + Sync>),
+    #[error("policy evaluation failed: {message}")]
+    EvaluationFailed {
+        /// Human-readable description of the failure.
+        message: String,
+    },
 }

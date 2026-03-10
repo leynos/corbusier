@@ -1,7 +1,8 @@
 //! Shared test infrastructure for tool discovery and routing tests.
 
+pub use crate::test_support::test_request_ctx;
 use crate::{
-    context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
+    context::RequestContext,
     tool_registry::{
         adapters::{
             AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
@@ -34,15 +35,6 @@ pub type TestDiscoveryService = ToolDiscoveryRoutingService<
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
-
-pub fn test_request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
 
 pub struct TestBundle {
     pub host: Arc<InMemoryMcpServerHost>,
@@ -195,7 +187,11 @@ pub fn assert_single_audit_stderr_path(
     expected_some: bool,
 ) -> Result<()> {
     let audits = catalog.audit_records()?;
-    eyre::ensure!(audits.len() == 1, "expected 1 audit record, got {}", audits.len());
+    eyre::ensure!(
+        audits.len() == 1,
+        "expected 1 audit record, got {}",
+        audits.len()
+    );
     let record = audits
         .first()
         .ok_or_else(|| eyre::eyre!("expected at least one audit record"))?;

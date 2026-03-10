@@ -50,6 +50,12 @@ pub fn ctx() -> RequestContext {
     )
 }
 
+/// Alias for [`ctx`] used in tool-discovery and lifecycle tests.
+#[fixture]
+pub fn request_ctx() -> RequestContext {
+    ctx()
+}
+
 /// Creates a second `RequestContext` with a distinct `TenantId`.
 ///
 /// Use this alongside `ctx()` when testing cross-tenant isolation.

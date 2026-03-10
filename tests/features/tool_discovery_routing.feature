@@ -5,7 +5,7 @@ Feature: Tool discovery and routing
     And tool "read_file" is available on that server
     When the server is registered and started
     And tools are discovered
-    Then the tool catalog contains 1 entry
+    Then the tool catalogue contains 1 entry
     And tool "read_file" is marked as available
 
   Scenario: Route a tool call to the correct server

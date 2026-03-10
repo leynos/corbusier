@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use super::helpers::request_ctx;
+use corbusier::context::RequestContext;
 use corbusier::tool_registry::{
     adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
     domain::{
@@ -34,16 +35,6 @@ fn context() -> TestContext {
         Arc::new(DefaultClock),
     );
     TestContext { host, service }
-}
-
-#[fixture]
-fn request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
 }
 
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {

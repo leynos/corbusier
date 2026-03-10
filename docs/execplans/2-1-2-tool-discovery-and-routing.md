@@ -20,15 +20,15 @@ policy enforcement before execution, and no audit trail of tool invocations.
 After this change, a developer or operator can:
 
 1. Start an MCP server and have its tools automatically persisted in a
-   durable catalog that survives process restarts.
-2. Query the tool catalog to see all available tools across all registered
+   durable catalogue that survives process restarts.
+2. Query the tool catalogue to see all available tools across all registered
    MCP servers, with their schemas and availability status.
 3. Execute a tool call by name and have the system resolve which MCP server
    hosts that tool, validate call parameters against the tool's input schema,
    enforce a pluggable policy check, route the call to the correct server, and
    record a complete audit trail of the invocation.
 4. Stop an MCP server and have all its tools automatically marked as
-   unavailable in the catalog.
+   unavailable in the catalogue.
 5. Have MCP server startup stderr and tool call stderr automatically captured
    and stored via the Rust `object_store` crate, with log references recorded
    in the tool call audit trail. Logs are subject to a configurable rotation
@@ -108,11 +108,12 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   validation module. This can be replaced with the `jsonschema` crate later
   without changing the port contract.
 
-- Risk: Ambiguous tool names across servers could cause routing confusion.
-  Severity: medium Likelihood: medium Mitigation: enforce a unique index on
-  `tool_name` in the catalog table. If a second server registers a tool with a
-  name already in the catalog, the discover operation returns an error. This is
-  explicit and safe; first-wins semantics can be added later if needed.
+- Risk: Ambiguous tool names across servers within a tenant could cause routing
+  confusion. Severity: medium Likelihood: medium Mitigation: enforce a unique
+  index on `(tenant_id, tool_name)` in the catalogue table, scoped per tenant.
+  If a second server within the same tenant registers a tool with a name
+  already in that tenant's catalogue, the discover operation returns an error.
+  This is explicit and safe; first-wins semantics can be added later if needed.
 
 - Risk: New PostgreSQL migration may be omitted from
   `tests/postgres/helpers.rs`, causing false negatives. Severity: medium
@@ -154,7 +155,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
 
 - PostgreSQL integration tests failed on first run because the template
   database (`corbusier_test_template`) had been created by a prior test run
-  before the tool catalog migration was added to `apply_migrations()`. The
+  before the tool catalogue migration was added to `apply_migrations()`. The
   `ensure_template_exists` function checks for existence and returns early, so
   the stale template (missing `mcp_tool_catalog`, `tool_call_audit_log`, and
   `tool_log_metadata` tables) was reused. Fix: introduced a versioned template
@@ -182,7 +183,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
 - Decision: introduce `ToolDiscoveryRoutingService` as a sibling service to
   `McpServerLifecycleService` rather than extending the existing service.
   Rationale: the lifecycle service manages server state transitions; the
-  discovery/routing service manages tool catalog and call routing. These are
+  discovery/routing service manages tool catalogue and call routing. These are
   distinct responsibilities. Composing them at the call site (caller invokes
   lifecycle service then discovery service) keeps each service focused and
   testable. Date/Author: 2026-03-04 / plan author.
@@ -196,12 +197,14 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   not know about consumers of its state changes. Date/Author: 2026-03-04 / plan
   author.
 
-- Decision: enforce unique tool names across all servers via a database unique
-  index. If two servers advertise the same tool name, the second discovery
-  attempt returns `AmbiguousToolName`. Rationale: routing by tool name requires
-  unambiguous resolution. A first-wins or priority-based strategy adds
-  complexity without clear requirements. The explicit error is safe and can be
-  relaxed later. Date/Author: 2026-03-04 / plan author.
+- Decision: enforce unique tool names within each tenant via a database unique
+  index on `(tenant_id, tool_name)`. If two servers within the same tenant
+  advertise the same tool name, the second discovery attempt returns
+  `AmbiguousToolName`. Different tenants can reuse tool names independently.
+  Rationale: routing by tool name requires unambiguous resolution within a
+  tenant; a first-wins or priority-based strategy adds complexity without clear
+  requirements. The explicit error is safe and can be relaxed later.
+  Date/Author: 2026-03-04 / plan author.
 
 - Decision: implement lightweight schema validation (required fields + object
   type check) rather than full JSON Schema validation via a crate dependency.
@@ -483,7 +486,7 @@ with these values. Provides
 `is_expired(&self, entry: &LogEntryMetadata, now: DateTime<Utc>) -> bool`.
 
 The object store path convention is:
-`tool_logs/{server_id}/{kind}/{log_entry_id}.stderr`
+`tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`
 
 where `{kind}` is `startup` or `call/{call_id}`.
 
@@ -502,47 +505,50 @@ and `pub use` re-exports for all new public types.
 In `src/tool_registry/ports/`, create three new files:
 
 `catalog.rs` defines the `ToolCatalogRepository` async trait with methods:
-`sync_server_tools(server_id, entries)` to persist/update a batch of catalog
-entries for a server; `mark_server_tools_unavailable(server_id)` and
-`mark_server_tools_available(server_id)` to toggle availability for all of a
-server's tools; `find_by_tool_name(tool_name)` to resolve a tool to its catalog
-entry (returning available entries preferentially); `list_all()` to return the
-complete catalog; and `record_audit(record)` to persist an audit trail entry.
-Define `ToolCatalogError` (variants: `DuplicateEntry(CatalogEntryId)`,
-`NotFound(String)`, `InvalidPersistedData(Arc<dyn Error + Send + Sync>)`,
-`Persistence(Arc<dyn Error + Send + Sync>)`) and `ToolCatalogResult<T>` type
-alias.
+`sync_server_tools(ctx, server_id, entries)` to persist/update a batch of
+catalogue entries for a server; `mark_server_tools_unavailable(ctx, server_id)`
+and `mark_server_tools_available(ctx, server_id)` to toggle availability for
+all of a server's tools; `find_by_tool_name(ctx, tool_name)` to resolve a tool
+to its catalogue entry (returning available entries preferentially);
+`list_all(ctx)` to return the complete catalogue; and
+`record_audit(ctx, record)` to persist an audit trail entry. All methods take
+`ctx: &RequestContext` for tenant scoping. Define `ToolCatalogError` (variants:
+`DuplicateEntry(CatalogEntryId)`, `NotFound(String)`,
+`InvalidPersistedData(String)`, `Persistence(String)`) and
+`ToolCatalogResult<T>` type alias.
 
 `policy.rs` defines the `ToolPolicyEnforcer` async trait with one method:
-`evaluate(tool_name, parameters) -> Result<PolicyDecision, ToolPolicyError>`.
-Define `ToolPolicyError` with a single variant
-`EvaluationFailed(Arc<dyn Error + Send + Sync>)` and `ToolPolicyResult<T>` type
-alias.
+`evaluate(ctx, tool_name, parameters) -> Result<PolicyDecision, ToolPolicyError>`.
+ Define `ToolPolicyError` with a single variant
+`EvaluationFailed { message: String }` and `ToolPolicyResult<T>` type alias.
 
 `log_store.rs` defines the `ToolLogStore` async trait -- the hexagonal port
 wrapping `object_store` operations. Methods:
 
-`store_log(&self, metadata, content: bytes::Bytes, retention: &LogRetentionPolicy)`
- `-> ToolLogStoreResult<()>` -- writes a log blob to the object store at
+`store_log(&self, ctx: &RequestContext, metadata,`
+`content: bytes::Bytes, retention: &LogRetentionPolicy)`
+`-> ToolLogStoreResult<()>` -- writes a log blob to the object store at
 `metadata.object_path()`. The `retention` parameter provides
 `max_bytes_per_log`; if content exceeds that limit, the implementation
 truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
-`retrieve_log(&self, path: &str) -> ToolLogStoreResult<bytes::Bytes>` -- reads
-a log blob by path.
+`retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
+ -- reads a log blob by path.
 
-`delete_log(&self, path: &str) -> ToolLogStoreResult<()>` -- deletes a single
-log blob.
+`delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
+-- deletes a single log blob.
 
-`list_logs_for_server(&self, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
+`list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
  -- lists all log blob paths for a server by prefix scan on
-`tool_logs/{server_id}/`.
+`tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
 
-`sweep_expired(&self, server_id: McpServerId, ctx: &SweepContext<'_>) -> ToolLogStoreResult<usize>`
- -- deletes logs that are past their `expires_at` or exceed
-`max_logs_per_server` (oldest first). `SweepContext` bundles the policy,
-wall-clock timestamp, and entry metadata. Returns the count of deleted entries.
+`sweep_expired(&self, ctx: &RequestContext,`
+`server_id: McpServerId, sweep: &SweepContext<'_>)`
+`-> ToolLogStoreResult<usize>` -- deletes logs that are past their `expires_at`
+or exceed `max_logs_per_server` (oldest first). `SweepContext` bundles the
+policy, wall-clock timestamp, and entry metadata. Returns the count of deleted
+entries.
 
 Define `ToolLogStoreError` with variants: `StoreFailed(String)`,
 `RetrieveFailed(String)`, `DeleteFailed(String)`, `ListFailed(String)`. All
@@ -580,9 +586,9 @@ clearly marked with a `// TODO(2.1.2): implement in Stage B` comment.
 
 ### Stage B: Adapter implementations and migration
 
-Implement all adapter code: in-memory catalog, allow-all policy, in-memory host
-`call_tool` and startup stderr, log store adapters, Postgres catalog adapter,
-and the database migration.
+Implement all adapter code: in-memory catalogue, allow-all policy, in-memory
+host `call_tool` and startup stderr, log store adapters, Postgres catalogue
+adapter, and the database migration.
 
 In `Cargo.toml`, add the `object_store` dependency under `[dependencies]`:
 
@@ -624,10 +630,11 @@ implements `ToolLogStore` by delegating to the underlying store. The
 `store_log` method enforces truncation via
 `LogRetentionPolicy::max_bytes_per_log` before writing. The
 `list_logs_for_server` method uses `ObjectStore::list` with the prefix
-`object_store::path::Path::from(format!("tool_logs/{server_id}/"))` and
-reconstructs `LogEntryMetadata` from the stored path convention. The
-`sweep_expired` method lists entries, filters by `expires_at < now` and count >
-`max_logs_per_server`, and deletes the excess.
+`object_store::path::Path::from(format!("tool_logs/{tenant_id}/{server_id}/"))`
+(tenant extracted from `RequestContext`) and reconstructs `LogEntryMetadata`
+from the stored path convention. The `sweep_expired` method lists entries,
+filters by `expires_at < now` and count > `max_logs_per_server`, and deletes
+the excess.
 
 The constructor `ObjectStoreLogAdapter::new(store: Arc<dyn ObjectStore>)`
 accepts any `ObjectStore` implementation. Factory helpers:
@@ -665,9 +672,10 @@ Create migration directory
 `tool_description TEXT NOT NULL`, `input_schema JSONB NOT NULL`,
 `output_schema JSONB`, `available BOOLEAN NOT NULL DEFAULT true`,
 `discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
-`updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`. Adds unique index
-`idx_mcp_tool_catalog_tool_name` on `tool_name`, index on `server_id`, index on
-`(available, tool_name)`, and an `updated_at` trigger.
+`updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`, `tenant_id UUID NOT NULL`.
+Adds unique index `idx_mcp_tool_catalog_tenant_tool_name` on
+`(tenant_id, tool_name)` (enforces uniqueness per tenant), index on
+`server_id`, index on `(available, tool_name)`, and an `updated_at` trigger.
 
 Also creates table `tool_call_audit_log` with columns: `id UUID PRIMARY KEY`,
 `call_id UUID NOT NULL`, `tool_name VARCHAR(255) NOT NULL`,
@@ -685,11 +693,11 @@ Also creates table `tool_log_metadata` with columns: `id UUID PRIMARY KEY`,
 `call_id UUID` (nullable -- populated only when `kind = 'tool_call'`),
 `object_path VARCHAR(512) NOT NULL`, `byte_count BIGINT NOT NULL`,
 `captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
-`expires_at TIMESTAMPTZ NOT NULL`. Adds indexes on `(server_id, kind)`,
-`expires_at`, and a unique index on `object_path`. This table is the
-authoritative index of all stderr log blobs stored in `object_store`; the
-actual bytes live in the object store, and this table tracks metadata and
-expiry for retention sweeps.
+`expires_at TIMESTAMPTZ NOT NULL`, `tenant_id UUID NOT NULL`. Adds indexes on
+`(server_id, kind)`, `expires_at`, and a unique index on `object_path`. This
+table is the authoritative index of all stderr log blobs stored in
+`object_store`; the actual bytes live in the object store, and this table
+tracks metadata and expiry for retention sweeps.
 
 `down.sql` drops the trigger, function, and all three tables.
 
@@ -815,7 +823,7 @@ In `src/tool_registry/services/discovery/tests.rs`, write unit tests using
 `AllowAllPolicy`, `ObjectStoreLogAdapter::in_memory()`, and `DefaultClock`:
 
 - `discover_tools_persists_catalog`: register + start server with tool
-  catalog, call `discover_and_persist_tools`, verify catalog has entries.
+  catalogue, call `discover_and_persist_tools`, verify catalogue has entries.
 - `discover_tools_requires_running_server`: call on non-running server,
   expect domain error.
 - `mark_unavailable_updates_catalog`: discover, then mark unavailable,
@@ -823,7 +831,7 @@ In `src/tool_registry/services/discovery/tests.rs`, write unit tests using
 - `call_tool_routes_to_correct_server`: discover tools, configure call
   result, call tool, verify result and audit record.
 - `call_tool_unknown_tool_returns_not_found`: call with tool name not in
-  catalog.
+  catalogue.
 - `call_tool_unavailable_tool_returns_error`: mark tools unavailable, then
   call.
 - `call_tool_schema_validation_failure`: call with parameters missing a
@@ -898,7 +906,7 @@ integration tests:
   and verify availability updated.
 - `audit_log_persisted`: call tool, verify audit log row.
 - `catalog_survives_service_reconstruction`: discover tools, construct a
-  new service instance from the same pool, verify catalog entries are still
+  new service instance from the same pool, verify catalogue entries are still
   present (proving persistence).
 
 Register the module in `tests/postgres.rs` as
@@ -914,7 +922,7 @@ Feature: Tool discovery and routing
     And tool "read_file" is available on that server
     When the server is registered and started
     And tools are discovered
-    Then the tool catalog contains 1 entry
+    Then the tool catalogue contains 1 entry
     And tool "read_file" is marked as available
 
   Scenario: Route a tool call to the correct server
@@ -980,12 +988,12 @@ documenting:
   server max, with sweep-on-start rotation.
 - `tool_log_metadata` table for log index and expiry tracking.
 - Object store path convention:
-  `tool_logs/{server_id}/{kind}/{log_entry_id}.stderr`.
+  `tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`.
 
 Update `docs/users-guide.md` with a new section covering:
 
 - Discovering tools after starting an MCP server.
-- Querying the tool catalog.
+- Querying the tool catalogue.
 - Calling a tool by name (routing, validation, policy).
 - Viewing the audit trail.
 - Tool availability lifecycle (available when server running, unavailable
@@ -1073,7 +1081,7 @@ Run all commands from repository root: `/home/user/project`.
 
 Acceptance is behavioural:
 
-1. Tools discovered from a running MCP server are persisted in the catalog
+1. Tools discovered from a running MCP server are persisted in the catalogue
    and survive service reconstruction (verified by PostgreSQL integration test
    `catalog_survives_service_reconstruction`).
 2. Calling a tool by name routes the request to the correct MCP server and
@@ -1085,7 +1093,7 @@ Acceptance is behavioural:
    execution (verified by unit test `call_tool_policy_denied`).
 5. Every tool call (success or failure) produces an audit trail record
    (verified by integration tests and BDD scenario).
-6. Stopping a server marks its tools as unavailable in the catalog, and
+6. Stopping a server marks its tools as unavailable in the catalogue, and
    subsequent tool calls for those tools are rejected (verified by BDD scenario
    "Tool becomes unavailable when server stops").
 7. Calling a tool that does not exist returns a typed error (verified by
@@ -1116,8 +1124,8 @@ Quality criteria:
   tables); if migration/testing fails, recreate temporary databases via the
   existing PostgreSQL test harness.
 - Tool discovery is idempotent: running `discover_and_persist_tools` twice
-  for the same server replaces existing catalog entries via `sync_server_tools`
-  upsert semantics.
+  for the same server replaces existing catalogue entries via
+  `sync_server_tools` upsert semantics.
 - `mark_tools_unavailable` / `mark_tools_available` are idempotent: calling
   when already in the target state is a no-op.
 
@@ -1145,29 +1153,37 @@ In `src/tool_registry/ports/catalog.rs`:
 pub trait ToolCatalogRepository: Send + Sync {
     async fn sync_server_tools(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()>;
 
     async fn mark_server_tools_unavailable(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()>;
 
     async fn mark_server_tools_available(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolCatalogResult<()>;
 
     async fn find_by_tool_name(
         &self,
+        ctx: &RequestContext,
         tool_name: &str,
     ) -> ToolCatalogResult<Option<CatalogEntry>>;
 
-    async fn list_all(&self) -> ToolCatalogResult<Vec<CatalogEntry>>;
+    async fn list_all(
+        &self,
+        ctx: &RequestContext,
+    ) -> ToolCatalogResult<Vec<CatalogEntry>>;
 
     async fn record_audit(
         &self,
+        ctx: &RequestContext,
         record: &ToolCallAuditRecord,
     ) -> ToolCatalogResult<()>;
 }
@@ -1180,6 +1196,7 @@ In `src/tool_registry/ports/policy.rs`:
 pub trait ToolPolicyEnforcer: Send + Sync {
     async fn evaluate(
         &self,
+        ctx: &RequestContext,
         tool_name: &str,
         parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError>;
@@ -1193,6 +1210,7 @@ In `src/tool_registry/ports/log_store.rs`:
 pub trait ToolLogStore: Send + Sync {
     async fn store_log(
         &self,
+        ctx: &RequestContext,
         metadata: &LogEntryMetadata,
         content: bytes::Bytes,
         retention: &LogRetentionPolicy,
@@ -1200,23 +1218,27 @@ pub trait ToolLogStore: Send + Sync {
 
     async fn retrieve_log(
         &self,
+        ctx: &RequestContext,
         path: &str,
     ) -> ToolLogStoreResult<bytes::Bytes>;
 
     async fn delete_log(
         &self,
+        ctx: &RequestContext,
         path: &str,
     ) -> ToolLogStoreResult<()>;
 
     async fn list_logs_for_server(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolLogStoreResult<Vec<String>>;
 
     async fn sweep_expired(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
-        ctx: &SweepContext<'_>,
+        sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize>;
 }
 ```

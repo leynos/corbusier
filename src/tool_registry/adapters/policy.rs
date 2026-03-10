@@ -7,7 +7,6 @@ use crate::tool_registry::{
 };
 use async_trait::async_trait;
 use serde_json::Value;
-use std::sync::Arc;
 
 /// Policy adapter that unconditionally allows all tool calls.
 ///
@@ -87,8 +86,8 @@ impl ToolPolicyEnforcer for FailingPolicy {
         _tool_name: &str,
         _parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError> {
-        Err(ToolPolicyError::EvaluationFailed(Arc::from(
-            std::io::Error::other(&*self.message),
-        )))
+        Err(ToolPolicyError::EvaluationFailed {
+            message: self.message.clone(),
+        })
     }
 }

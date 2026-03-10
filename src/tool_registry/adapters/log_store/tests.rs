@@ -1,21 +1,12 @@
 //! Unit tests for [`ObjectStoreLogAdapter`].
 
 use super::*;
-use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use crate::test_support::test_request_ctx;
 use crate::tool_registry::domain::{LogCaptureContext, LogRetentionPolicy, McpServerId};
 use crate::tool_registry::ports::SweepContext;
 use chrono::Duration;
 use mockable::{Clock, DefaultClock};
 use rstest::{fixture, rstest};
-
-fn test_request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
 
 #[fixture]
 fn adapter() -> ObjectStoreLogAdapter {
