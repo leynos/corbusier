@@ -87,22 +87,33 @@ impl ObjectStoreLogAdapter {
     }
 
     /// Deletes log entries whose retention period has elapsed.
+    ///
+    /// On partial failure the metadata index is purged for entries
+    /// that were successfully deleted before the error occurred.
     async fn delete_expired_entries(
         &self,
         entries: &[LogEntryMetadata],
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<Vec<String>> {
+        let expired: Vec<&LogEntryMetadata> = entries
+            .iter()
+            .filter(|e| sweep.policy.is_expired(e, sweep.now))
+            .collect();
         let mut swept_keys = Vec::new();
-        for entry in entries {
-            if sweep.policy.is_expired(entry, sweep.now) {
-                self.delete_blob(entry.object_path()).await?;
-                swept_keys.push(entry.object_path().to_owned());
+        for entry in expired {
+            if let Err(err) = self.delete_blob(entry.object_path()).await {
+                self.purge_metadata_keys(&swept_keys).await;
+                return Err(err);
             }
+            swept_keys.push(entry.object_path().to_owned());
         }
         Ok(swept_keys)
     }
 
     /// Removes the oldest logs when a server exceeds its count limit.
+    ///
+    /// On partial failure the metadata index is purged for entries
+    /// that were successfully deleted before the error occurred.
     async fn enforce_count_limit(
         &self,
         entries: &[LogEntryMetadata],
@@ -127,10 +138,24 @@ impl ObjectStoreLogAdapter {
 
         let mut excess_keys = Vec::new();
         for entry in remaining.into_iter().take(excess) {
-            self.delete_blob(entry.object_path()).await?;
+            if let Err(err) = self.delete_blob(entry.object_path()).await {
+                self.purge_metadata_keys(&excess_keys).await;
+                return Err(err);
+            }
             excess_keys.push(entry.object_path().to_owned());
         }
         Ok(excess_keys)
+    }
+
+    /// Removes the given keys from the in-memory metadata index.
+    async fn purge_metadata_keys(&self, keys: &[String]) {
+        if keys.is_empty() {
+            return;
+        }
+        let mut guard = self.metadata.write().await;
+        for key in keys {
+            guard.remove(key);
+        }
     }
 }
 
@@ -218,14 +243,23 @@ impl ToolLogStore for ObjectStoreLogAdapter {
 
     async fn sweep_expired(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
         let entries = self.collect_server_metadata(server_id, sweep).await;
 
-        let swept = self.delete_expired_entries(&entries, sweep).await?;
-        let excess = self.enforce_count_limit(&entries, &swept, sweep).await?;
+        // Filter entries to those belonging to the calling tenant.
+        let expected_prefix = format!("tool_logs/{}/", ctx.tenant_id());
+        let tenant_entries: Vec<LogEntryMetadata> = entries
+            .into_iter()
+            .filter(|e| e.object_path().starts_with(&expected_prefix))
+            .collect();
+
+        let swept = self.delete_expired_entries(&tenant_entries, sweep).await?;
+        let excess = self
+            .enforce_count_limit(&tenant_entries, &swept, sweep)
+            .await?;
 
         // Purge swept keys from the internal metadata index.
         let total_keys: Vec<String> = swept.into_iter().chain(excess).collect();

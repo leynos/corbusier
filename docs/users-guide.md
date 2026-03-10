@@ -473,7 +473,12 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(DefaultClock),
     );
 
-    let ctx = RequestContext::new(TenantId::default());
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     let request = RegisterMcpServerRequest::new(
         "workspace_tools",
@@ -515,9 +520,13 @@ Rediscovery is idempotent — calling it again replaces the existing entries.
 
 ### Querying the catalogue
 
-Call `list_catalog()` to see all tools across all registered servers, including
-their schemas and availability status. The method name uses the code identifier
-`catalog`; the surrounding prose uses the en-GB-oxendict spelling "catalogue".
+Call `list_catalog(&ctx)` to see all tools across all registered servers for
+the current tenant, including their schemas and availability status. The tool
+registry is tenant-scoped: each tenant has an isolated view of tools, and
+`tenant_id` is enforced at both the application layer (via `RequestContext`)
+and, in the PostgreSQL adapter, via `SET LOCAL app.tenant_id`. The method name
+uses the code identifier `catalog`; the surrounding prose uses the
+en-GB-oxendict spelling "catalogue".
 
 ### Calling a tool
 
@@ -611,7 +620,12 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
         clock,
     );
 
-    let ctx = RequestContext::new(TenantId::default());
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     // Register, start, and discover tools.
     let request = RegisterMcpServerRequest::new(

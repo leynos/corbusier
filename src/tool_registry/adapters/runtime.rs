@@ -163,8 +163,8 @@ impl McpServerHost for InMemoryMcpServerHost {
         let mut state = self.write_state()?;
         state.running_servers.insert(server.id());
         state.unhealthy_servers.remove(&server.id());
-        let stderr_output = state.startup_stderr.get(server.name()).cloned();
-        Ok(StartHostResult { stderr_output })
+        let startup_stderr = state.startup_stderr.get(server.name()).cloned();
+        Ok(StartHostResult { startup_stderr })
     }
 
     async fn stop(

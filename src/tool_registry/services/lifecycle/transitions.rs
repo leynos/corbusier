@@ -69,7 +69,7 @@ impl LifecycleHostAction {
         server: &McpServerRegistration,
     ) -> Result<Option<bytes::Bytes>, McpServerHostError> {
         match self {
-            Self::Start => Ok(host.start(ctx, server).await?.stderr_output),
+            Self::Start => Ok(host.start(ctx, server).await?.startup_stderr),
             Self::Stop => {
                 host.stop(ctx, server).await?;
                 Ok(None)

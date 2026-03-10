@@ -112,39 +112,41 @@ pub async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolic
 }
 
 /// Registers, starts (with startup stderr), and discovers tools.
-/// Returns the server identifier and the captured startup stderr
-/// bytes.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper that threads through all service components plus context"
-)]
+/// Service triplet used by helpers that are generic over the policy
+/// adapter.
+pub struct TestServices<'a, Pol: crate::tool_registry::ports::ToolPolicyEnforcer> {
+    /// The in-memory host adapter.
+    pub host: &'a InMemoryMcpServerHost,
+    /// The lifecycle service.
+    pub lifecycle: &'a TestLifecycleService,
+    /// The discovery service.
+    pub discovery: &'a PolicyDiscoveryService<Pol>,
+}
+
+/// Registers a server, starts it, configures startup stderr, discovers
+/// tools, and returns the server identifier and captured startup stderr.
 pub async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
-    host: &InMemoryMcpServerHost,
-    lifecycle: &TestLifecycleService,
-    discovery: &ToolDiscoveryRoutingService<
-        InMemoryToolCatalog,
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        Pol,
-        ObjectStoreLogAdapter,
-        DefaultClock,
-    >,
+    services: &TestServices<'_, Pol>,
     ctx: &RequestContext,
     startup_stderr: bytes::Bytes,
 ) -> Result<(
     crate::tool_registry::domain::McpServerId,
     Option<bytes::Bytes>,
 )> {
-    host.set_tool_catalog(
+    services.host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,
         vec![read_file_tool()?],
     )?;
-    host.set_startup_stderr(McpServerName::new("workspace_tools")?, startup_stderr)?;
-    let registered = lifecycle
+    services
+        .host
+        .set_startup_stderr(McpServerName::new("workspace_tools")?, startup_stderr)?;
+    let registered = services
+        .lifecycle
         .register(ctx, stdio_request("workspace_tools")?)
         .await?;
-    let start_result = lifecycle.start(ctx, registered.id()).await?;
-    discovery
+    let start_result = services.lifecycle.start(ctx, registered.id()).await?;
+    services
+        .discovery
         .discover_and_persist_tools(ctx, registered.id())
         .await?;
     Ok((registered.id(), start_result.startup_stderr))
@@ -203,29 +205,25 @@ pub fn assert_single_audit_stderr_path(
     Ok(())
 }
 
+/// Discovery service parameterised by a custom policy adapter.
+pub type PolicyDiscoveryService<Pol> = ToolDiscoveryRoutingService<
+    InMemoryToolCatalog,
+    InMemoryMcpServerRegistry,
+    InMemoryMcpServerHost,
+    Pol,
+    ObjectStoreLogAdapter,
+    DefaultClock,
+>;
+
 /// Builds a discovery service wired to a custom policy adapter.
 ///
 /// Returns both the service and the catalogue for test assertions.
-#[expect(
-    clippy::type_complexity,
-    reason = "Generic Pol prevents a meaningful type alias for the return tuple"
-)]
 pub fn discovery_with_policy<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
     registry: &Arc<InMemoryMcpServerRegistry>,
     host: &Arc<InMemoryMcpServerHost>,
     policy: Pol,
     clock: &Arc<DefaultClock>,
-) -> (
-    ToolDiscoveryRoutingService<
-        InMemoryToolCatalog,
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        Pol,
-        ObjectStoreLogAdapter,
-        DefaultClock,
-    >,
-    Arc<InMemoryToolCatalog>,
-) {
+) -> (PolicyDiscoveryService<Pol>, Arc<InMemoryToolCatalog>) {
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let service = ToolDiscoveryRoutingService::new(
         ServicePorts {

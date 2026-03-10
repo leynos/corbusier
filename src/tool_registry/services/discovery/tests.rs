@@ -17,7 +17,7 @@ use rstest::rstest;
 use serde_json::json;
 use std::sync::Arc;
 use test_helpers::{
-    TestBundle, assert_single_audit_stderr_path, bundle, call_read_file,
+    TestBundle, TestServices, assert_single_audit_stderr_path, bundle, call_read_file,
     call_read_file_expecting_error, discovery_with_policy, read_file_tool, register_start_discover,
     register_start_with_stderr, setup_success_result, stdio_request, test_request_ctx,
 };
@@ -299,10 +299,14 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
         ..
     } = bundle;
     let ctx = test_request_ctx();
-    let stderr_bytes = bytes::Bytes::from("server initialising...");
+    let stderr_bytes = bytes::Bytes::from("server initializing...");
+    let services = TestServices {
+        host: &host,
+        lifecycle: &lifecycle,
+        discovery: &discovery,
+    };
     let (server_id, captured_stderr) =
-        register_start_with_stderr(&host, &lifecycle, &discovery, &ctx, stderr_bytes.clone())
-            .await?;
+        register_start_with_stderr(&services, &ctx, stderr_bytes.clone()).await?;
     let captured = captured_stderr.expect("startup stderr should be captured");
     assert_eq!(captured, stderr_bytes);
 

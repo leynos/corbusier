@@ -568,8 +568,8 @@ trait: `async fn call_tool(&self, ctx, server, request: &ToolCallRequest)`
 new struct holding `content: Value` and `stderr_output: Option<bytes::Bytes>`
 (the captured stderr from the tool call, if any). Similarly, extend the return
 type of `start` to `McpServerHostResult<StartHostResult>` where
-`StartHostResult` holds `stderr_output: Option<bytes::Bytes>` (captured startup
-stderr). Define these result structs in `host.rs`.
+`StartHostResult` holds `startup_stderr: Option<bytes::Bytes>` (captured
+startup stderr). Define these result structs in `host.rs`.
 
 Add two new variants to `McpServerHostError`:
 `ToolCallFailed { server_id: McpServerId, tool_name: String, reason: String }`
@@ -762,7 +762,7 @@ return the entries.
  delegate to `catalog.mark_server_tools_available(server_id)`.
 
 `list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
-delegate to `catalog.list_all()`.
+ delegate to `catalog.list_all()`.
 
 `call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
  the core routing method. Flow:
@@ -799,10 +799,10 @@ delegate to `catalog.list_all()`.
 9. Return `ToolCallResult`.
 
 `store_startup_stderr(&self, ctx, server_id, stderr)`
-`-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`:
- stores startup stderr captured from `McpServerHost::start`. Called by the
-caller after `lifecycle_service.start()` returns a `LifecycleStartResult` with
-non-empty `startup_stderr`. Builds
+`-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`: stores startup stderr
+captured from `McpServerHost::start`. Called by the caller after
+`lifecycle_service.start()` returns a `LifecycleStartResult` with non-empty
+`startup_stderr`. Builds
 `LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
 stores via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
 returns the metadata. This method also triggers `sweep_expired` for the server
@@ -965,11 +965,10 @@ Feature: Tool discovery and routing
     And the stored stderr log contains 'debug: opening file'
 ```
 
-In `tests/tool_discovery_routing_steps/` (directory module with
-`mod.rs`, `given.rs`, `when.rs`, `then.rs`, `world.rs`), implement step
-definitions following the pattern established in
-`tests/mcp_server_lifecycle_steps.rs`: a `ToolDiscoveryWorld` struct
-holding shared state, `run_async` helper,
+In `tests/tool_discovery_routing_steps/` (directory module with `mod.rs`,
+`given.rs`, `when.rs`, `then.rs`, `world.rs`), implement step definitions
+following the pattern established in `tests/mcp_server_lifecycle_steps.rs`: a
+`ToolDiscoveryWorld` struct holding shared state, `run_async` helper,
 `#[given]`/`#[when]`/`#[then]` step functions, and `#[scenario]` bindings.
 
 Go/no-go checkpoint: run `make all`. Must pass with all new and existing tests.
@@ -1253,7 +1252,7 @@ In `src/tool_registry/ports/host.rs`, added methods and result types:
 ```rust
 /// Result of starting an MCP server, including captured stderr.
 pub struct StartHostResult {
-    pub stderr_output: Option<bytes::Bytes>,
+    pub startup_stderr: Option<bytes::Bytes>,
 }
 
 /// Result of a tool call, including content and captured stderr.

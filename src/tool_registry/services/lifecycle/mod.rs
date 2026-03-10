@@ -74,10 +74,10 @@ pub enum McpServerLifecycleServiceError {
     #[error(transparent)]
     Host(#[from] McpServerHostError),
     /// Health refresh failed after starting the server.
-    #[error("health refresh failed after start: {source}")]
+    #[error("health refresh failed after start: {reason}")]
     HealthRefreshFailed {
-        /// The underlying host error.
-        source: McpServerHostError,
+        /// Description of the underlying error.
+        reason: String,
         /// Startup stderr captured before the health probe failed.
         startup_stderr: Option<bytes::Bytes>,
     },
@@ -257,13 +257,10 @@ where
                 server,
                 startup_stderr,
             }),
-            Err(McpServerLifecycleServiceError::Host(source)) => {
-                Err(McpServerLifecycleServiceError::HealthRefreshFailed {
-                    source,
-                    startup_stderr,
-                })
-            }
-            Err(other) => Err(other),
+            Err(err) => Err(McpServerLifecycleServiceError::HealthRefreshFailed {
+                reason: err.to_string(),
+                startup_stderr,
+            }),
         }
     }
 

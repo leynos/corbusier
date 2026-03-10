@@ -14,8 +14,8 @@ pub type McpServerHostResult<T> = Result<T, McpServerHostError>;
 /// Result of starting an MCP server, including captured stderr.
 #[derive(Debug, Clone, Default)]
 pub struct StartHostResult {
-    /// Stderr output captured during server startup, if any.
-    pub stderr_output: Option<bytes::Bytes>,
+    /// Stderr captured during server startup, if any.
+    pub startup_stderr: Option<bytes::Bytes>,
 }
 
 /// Result of a tool call, including content and captured stderr.

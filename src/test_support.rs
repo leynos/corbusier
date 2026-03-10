@@ -32,7 +32,11 @@ pub struct HealthProbeFailureHost {
 
 impl HealthProbeFailureHost {
     /// Acquires the lock on started servers and applies `operation`.
-    fn with_started_lock<F, T>(&self, operation: F) -> McpServerHostResult<T>
+    fn with_started_lock<F, T>(
+        &self,
+        server_id: McpServerId,
+        operation: F,
+    ) -> McpServerHostResult<T>
     where
         F: FnOnce(&mut HashSet<McpServerId>) -> T,
     {
@@ -40,14 +44,14 @@ impl HealthProbeFailureHost {
             self.started
                 .lock()
                 .map_err(|err| McpServerHostError::CommunicationError {
-                    server_id: McpServerId::from_uuid(uuid::Uuid::nil()),
+                    server_id,
                     reason: err.to_string(),
                 })?;
         Ok(operation(&mut started))
     }
 
     fn modify_started(&self, server_id: McpServerId, insert: bool) -> McpServerHostResult<()> {
-        self.with_started_lock(|started| {
+        self.with_started_lock(server_id, |started| {
             if insert {
                 started.insert(server_id);
             } else {
@@ -92,7 +96,7 @@ impl McpServerHost for HealthProbeFailureHost {
         _ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<Vec<McpToolDefinition>> {
-        self.with_started_lock(|started| {
+        self.with_started_lock(server.id(), |started| {
             if started.contains(&server.id()) {
                 Ok(vec![])
             } else {
@@ -107,7 +111,7 @@ impl McpServerHost for HealthProbeFailureHost {
         server: &McpServerRegistration,
         _request: &ToolCallRequest,
     ) -> McpServerHostResult<ToolCallHostResult> {
-        self.with_started_lock(|started| {
+        self.with_started_lock(server.id(), |started| {
             if started.contains(&server.id()) {
                 Ok(ToolCallHostResult {
                     content: serde_json::Value::Null,
