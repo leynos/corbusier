@@ -1,4 +1,10 @@
 //! Object store adapter for tool stderr log capture and retrieval.
+//!
+//! The adapter maintains an in-memory metadata index alongside the
+//! blob store so that [`ToolLogStore::sweep_expired`] can identify
+//! expired or excess entries without relying on the caller to supply
+//! the full metadata slice (which the service layer cannot provide
+//! for the object-store backend).
 
 use crate::context::RequestContext;
 use crate::tool_registry::{
@@ -8,23 +14,33 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use object_store::{ObjectStore, path::Path};
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Adapter wrapping an [`ObjectStore`] backend for tool stderr log storage.
 ///
 /// Supports any `object_store` backend: `InMemory` for tests,
 /// `LocalFileSystem` for development, and cloud backends (S3, GCS)
 /// for production use.
+///
+/// An in-memory metadata index tracks every stored entry so that
+/// retention sweeps can operate without external metadata.
 #[derive(Debug, Clone)]
 pub struct ObjectStoreLogAdapter {
     store: Arc<dyn ObjectStore>,
+    /// In-memory metadata index keyed by `object_path`.
+    metadata: Arc<RwLock<HashMap<String, LogEntryMetadata>>>,
 }
 
 impl ObjectStoreLogAdapter {
     /// Creates a new log adapter from any [`ObjectStore`] implementation.
     #[must_use]
     pub fn new(store: Arc<dyn ObjectStore>) -> Self {
-        Self { store }
+        Self {
+            store,
+            metadata: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     /// Creates an in-memory backed adapter for tests.
@@ -32,6 +48,7 @@ impl ObjectStoreLogAdapter {
     pub fn in_memory() -> Self {
         Self {
             store: Arc::new(object_store::memory::InMemory::new()),
+            metadata: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -45,44 +62,76 @@ impl ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
     }
 
+    /// Collects metadata entries for `server_id` from the internal
+    /// index, falling back to `sweep.entry_metadata` when the index
+    /// is empty (e.g. for the Postgres adapter path).
+    async fn collect_server_metadata(
+        &self,
+        server_id: McpServerId,
+        sweep: &SweepContext<'_>,
+    ) -> Vec<LogEntryMetadata> {
+        let guard = self.metadata.read().await;
+        if guard.is_empty() {
+            // Fallback: use externally supplied metadata (Postgres path).
+            return sweep
+                .entry_metadata
+                .iter()
+                .filter(|e| e.server_id() == server_id)
+                .cloned()
+                .collect();
+        }
+        guard
+            .values()
+            .filter(|e| e.server_id() == server_id)
+            .cloned()
+            .collect()
+    }
+
     /// Deletes log entries whose retention period has elapsed.
-    async fn delete_expired_entries(&self, sweep: &SweepContext<'_>) -> ToolLogStoreResult<usize> {
-        let mut deleted = 0usize;
-        for entry in sweep.entry_metadata {
+    async fn delete_expired_entries(
+        &self,
+        entries: &[LogEntryMetadata],
+        sweep: &SweepContext<'_>,
+    ) -> ToolLogStoreResult<Vec<String>> {
+        let mut swept_keys = Vec::new();
+        for entry in entries {
             if sweep.policy.is_expired(entry, sweep.now) {
                 self.delete_blob(entry.object_path()).await?;
-                deleted = deleted.saturating_add(1);
+                swept_keys.push(entry.object_path().to_owned());
             }
         }
-        Ok(deleted)
+        Ok(swept_keys)
     }
 
     /// Removes the oldest logs when a server exceeds its count limit.
     async fn enforce_count_limit(
         &self,
-        server_id: McpServerId,
+        entries: &[LogEntryMetadata],
+        swept_keys: &[String],
         sweep: &SweepContext<'_>,
-    ) -> ToolLogStoreResult<usize> {
-        let mut remaining: Vec<&LogEntryMetadata> = sweep
-            .entry_metadata
+    ) -> ToolLogStoreResult<Vec<String>> {
+        let mut remaining: Vec<&LogEntryMetadata> = entries
             .iter()
-            .filter(|e| e.server_id() == server_id && !sweep.policy.is_expired(e, sweep.now))
+            .filter(|e| {
+                !sweep.policy.is_expired(e, sweep.now)
+                    && !swept_keys.contains(&e.object_path().to_owned())
+            })
             .collect();
 
         let max = sweep.policy.max_logs_per_server;
         if remaining.len() <= max {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let excess = remaining.len().saturating_sub(max);
         remaining.sort_by_key(|e| e.captured_at());
 
-        let mut deleted = 0usize;
+        let mut excess_keys = Vec::new();
         for entry in remaining.into_iter().take(excess) {
             self.delete_blob(entry.object_path()).await?;
-            deleted = deleted.saturating_add(1);
+            excess_keys.push(entry.object_path().to_owned());
         }
-        Ok(deleted)
+        Ok(excess_keys)
     }
 }
 
@@ -101,6 +150,12 @@ impl ToolLogStore for ObjectStoreLogAdapter {
             .put(&path, truncated.into())
             .await
             .map_err(|err| ToolLogStoreError::StoreFailed(err.to_string()))?;
+
+        // Track metadata for retention sweeps.
+        self.metadata
+            .write()
+            .await
+            .insert(metadata.object_path().to_owned(), metadata.clone());
         Ok(())
     }
 
@@ -122,7 +177,11 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         self.store
             .delete(&object_path)
             .await
-            .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
+            .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))?;
+
+        // Remove from internal metadata index.
+        self.metadata.write().await.remove(path);
+        Ok(())
     }
 
     async fn list_logs_for_server(
@@ -148,9 +207,23 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let expired = self.delete_expired_entries(sweep).await?;
-        let excess = self.enforce_count_limit(server_id, sweep).await?;
-        Ok(expired.saturating_add(excess))
+        let entries = self.collect_server_metadata(server_id, sweep).await;
+
+        let swept = self.delete_expired_entries(&entries, sweep).await?;
+        let excess = self
+            .enforce_count_limit(&entries, &swept, sweep)
+            .await?;
+
+        // Purge swept keys from the internal metadata index.
+        let total_keys: Vec<String> = swept.into_iter().chain(excess).collect();
+        if !total_keys.is_empty() {
+            let mut guard = self.metadata.write().await;
+            for key in &total_keys {
+                guard.remove(key);
+            }
+        }
+
+        Ok(total_keys.len())
     }
 }
 
@@ -174,3 +247,6 @@ fn truncate_if_needed(content: Bytes, max_bytes: u64) -> Bytes {
     truncated.extend_from_slice(marker);
     Bytes::from(truncated)
 }
+
+#[cfg(test)]
+mod tests;
