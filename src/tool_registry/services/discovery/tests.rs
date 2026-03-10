@@ -111,7 +111,7 @@ async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnf
         .await?;
     lifecycle.start(&ctx, registered.id()).await?;
     discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&ctx, registered.id())
         .await?;
     Ok(registered.id())
 }
@@ -145,25 +145,30 @@ async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicy
         .await?;
     let start_result = lifecycle.start(&ctx, registered.id()).await?;
     discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&ctx, registered.id())
         .await?;
     Ok((registered.id(), start_result.startup_stderr))
 }
 
 async fn call_read_file(
+    ctx: &RequestContext,
     discovery: &TestDiscoveryService,
     params: serde_json::Value,
 ) -> super::ToolDiscoveryRoutingServiceResult<crate::tool_registry::domain::ToolCallResult> {
     discovery
-        .call_tool(&ToolCallRequest::new("read_file", params, &DefaultClock))
+        .call_tool(
+            ctx,
+            &ToolCallRequest::new("read_file", params, &DefaultClock),
+        )
         .await
 }
 
 async fn call_read_file_expecting_error(
+    ctx: &RequestContext,
     discovery: &TestDiscoveryService,
     params: serde_json::Value,
 ) -> ToolDiscoveryRoutingServiceError {
-    call_read_file(discovery, params)
+    call_read_file(ctx, discovery, params)
         .await
         .expect_err("expected call_tool to return an error")
 }
@@ -228,9 +233,10 @@ async fn discover_tools_persists_catalog(bundle: TestBundle) -> Result<()> {
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
 
-    let entries = discovery.list_catalog().await?;
+    let entries = discovery.list_catalog(&ctx).await?;
     assert_eq!(entries.len(), 1);
     let first = entries.first().expect("expected single catalog entry");
     assert_eq!(first.tool().name(), "read_file");
@@ -252,7 +258,9 @@ async fn discover_tools_requires_running_server(bundle: TestBundle) -> Result<()
         .register(&ctx, stdio_request("workspace_tools")?)
         .await?;
     assert!(matches!(
-        discovery.discover_and_persist_tools(registered.id()).await,
+        discovery
+            .discover_and_persist_tools(&ctx, registered.id())
+            .await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::ToolQueryRequiresRunning { .. }
         ))
@@ -269,10 +277,11 @@ async fn mark_unavailable_updates_catalog(bundle: TestBundle) -> Result<()> {
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
-    discovery.mark_tools_unavailable(server_id).await?;
+    discovery.mark_tools_unavailable(&ctx, server_id).await?;
 
-    let entries = discovery.list_catalog().await?;
+    let entries = discovery.list_catalog(&ctx).await?;
     assert_eq!(entries.len(), 1);
     assert!(!entries.first().expect("catalog entry").available());
     Ok(())
@@ -288,10 +297,11 @@ async fn call_tool_routes_to_correct_server(bundle: TestBundle) -> Result<()> {
         catalog,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
     setup_success_result(&host)?;
 
-    let result = call_read_file(&discovery, json!({"path": "/tmp/test.txt"})).await?;
+    let result = call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert!(result.outcome().is_success());
     assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
@@ -321,7 +331,7 @@ async fn call_tool_unknown_tool_returns_not_found(bundle: TestBundle) -> Result<
 
     let request = ToolCallRequest::new("nonexistent", json!({}), &DefaultClock);
     assert!(matches!(
-        discovery.call_tool(&request).await,
+        discovery.call_tool(&ctx, &request).await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::ToolNotFound(_)
         ))
@@ -338,10 +348,12 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     let server_id = register_start_discover(&host, &lifecycle, &discovery).await?;
-    discovery.mark_tools_unavailable(server_id).await?;
+    discovery.mark_tools_unavailable(&ctx, server_id).await?;
 
-    let err = call_read_file_expecting_error(&discovery, json!({"path": "/tmp/test.txt"})).await;
+    let err =
+        call_read_file_expecting_error(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::ToolUnavailable { .. })
@@ -358,9 +370,10 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
         discovery,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &discovery).await?;
 
-    let err = call_read_file_expecting_error(&discovery, json!({})).await;
+    let err = call_read_file_expecting_error(&ctx, &discovery, json!({})).await;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(
@@ -379,11 +392,12 @@ async fn call_tool_policy_denied() -> Result<()> {
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let disc = discovery_with_policy(&registry, &host, DenyAllPolicy::new("forbidden"), &clock);
 
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &disc).await?;
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
-        disc.call_tool(&request).await,
+        disc.call_tool(&ctx, &request).await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::PolicyDenied { .. }
         ))
@@ -401,11 +415,12 @@ async fn call_tool_policy_evaluation_failed() -> Result<()> {
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let disc = discovery_with_policy(&registry, &host, FailingPolicy::new("engine down"), &clock);
 
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &disc).await?;
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
-        disc.call_tool(&request).await,
+        disc.call_tool(&ctx, &request).await,
         Err(ToolDiscoveryRoutingServiceError::Policy(_))
     ));
     Ok(())
@@ -421,11 +436,12 @@ async fn call_tool_host_failure_still_records_audit(bundle: TestBundle) -> Resul
         catalog,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &discovery).await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    assert!(discovery.call_tool(&request).await.is_err());
+    assert!(discovery.call_tool(&ctx, &request).await.is_err());
 
     let audits = catalog.audit_records()?;
     assert_eq!(audits.len(), 1);
@@ -443,6 +459,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
         catalog,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &discovery).await?;
     setup_success_result(&host)?;
     host.set_tool_call_stderr(
@@ -451,7 +468,7 @@ async fn call_tool_captures_stderr_in_log_store(bundle: TestBundle) -> Result<()
         bytes::Bytes::from("debug: opening file"),
     )?;
 
-    let result = call_read_file(&discovery, json!({"path": "/tmp/test.txt"})).await?;
+    let result = call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert!(result.outcome().is_success());
     assert_single_audit_stderr_path(&catalog, true);
     Ok(())
@@ -467,9 +484,10 @@ async fn call_tool_without_stderr_has_no_log_path(bundle: TestBundle) -> Result<
         catalog,
         ..
     } = bundle;
+    let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &discovery).await?;
     setup_success_result(&host)?;
-    call_read_file(&discovery, json!({"path": "/tmp/test.txt"})).await?;
+    call_read_file(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert_single_audit_stderr_path(&catalog, false);
     Ok(())
 }
@@ -489,7 +507,10 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
     let captured = captured_stderr.expect("startup stderr should be captured");
     assert_eq!(captured, stderr_bytes);
 
-    let metadata = discovery.store_startup_stderr(server_id, captured).await?;
+    let ctx = test_request_ctx();
+    let metadata = discovery
+        .store_startup_stderr(&ctx, server_id, captured)
+        .await?;
     assert!(metadata.object_path().contains("startup"));
     assert_eq!(metadata.server_id(), server_id);
     Ok(())

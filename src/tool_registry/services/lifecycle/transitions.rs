@@ -1,5 +1,6 @@
 //! Internal types for lifecycle state transitions and compensation.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::McpServerRegistration,
     ports::{McpServerHost, McpServerHostError},
@@ -63,13 +64,14 @@ impl LifecycleHostAction {
     /// Executes the host action, returning any startup stderr captured.
     pub(super) async fn execute<H: McpServerHost>(
         self,
+        ctx: &RequestContext,
         host: &H,
         server: &McpServerRegistration,
     ) -> Result<Option<bytes::Bytes>, McpServerHostError> {
         match self {
-            Self::Start => Ok(host.start(server).await?.stderr_output),
+            Self::Start => Ok(host.start(ctx, server).await?.stderr_output),
             Self::Stop => {
-                host.stop(server).await?;
+                host.stop(ctx, server).await?;
                 Ok(None)
             }
         }

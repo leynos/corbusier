@@ -1,5 +1,6 @@
 //! Object store adapter for tool stderr log capture and retrieval.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{LogEntryMetadata, LogRetentionPolicy, McpServerId},
     ports::{SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
@@ -34,12 +35,22 @@ impl ObjectStoreLogAdapter {
         }
     }
 
+    /// Deletes a blob directly from the object store, bypassing the
+    /// trait method (which requires `&RequestContext`).
+    async fn delete_blob(&self, path: &str) -> ToolLogStoreResult<()> {
+        let object_path = Path::from(path);
+        self.store
+            .delete(&object_path)
+            .await
+            .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
+    }
+
     /// Deletes log entries whose retention period has elapsed.
-    async fn delete_expired_entries(&self, ctx: &SweepContext<'_>) -> ToolLogStoreResult<usize> {
+    async fn delete_expired_entries(&self, sweep: &SweepContext<'_>) -> ToolLogStoreResult<usize> {
         let mut deleted = 0usize;
-        for entry in ctx.entry_metadata {
-            if ctx.policy.is_expired(entry, ctx.now) {
-                self.delete_log(entry.object_path()).await?;
+        for entry in sweep.entry_metadata {
+            if sweep.policy.is_expired(entry, sweep.now) {
+                self.delete_blob(entry.object_path()).await?;
                 deleted = deleted.saturating_add(1);
             }
         }
@@ -50,15 +61,15 @@ impl ObjectStoreLogAdapter {
     async fn enforce_count_limit(
         &self,
         server_id: McpServerId,
-        ctx: &SweepContext<'_>,
+        sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let mut remaining: Vec<&LogEntryMetadata> = ctx
+        let mut remaining: Vec<&LogEntryMetadata> = sweep
             .entry_metadata
             .iter()
-            .filter(|e| e.server_id() == server_id && !ctx.policy.is_expired(e, ctx.now))
+            .filter(|e| e.server_id() == server_id && !sweep.policy.is_expired(e, sweep.now))
             .collect();
 
-        let max = ctx.policy.max_logs_per_server;
+        let max = sweep.policy.max_logs_per_server;
         if remaining.len() <= max {
             return Ok(0);
         }
@@ -68,7 +79,7 @@ impl ObjectStoreLogAdapter {
 
         let mut deleted = 0usize;
         for entry in remaining.into_iter().take(excess) {
-            self.delete_log(entry.object_path()).await?;
+            self.delete_blob(entry.object_path()).await?;
             deleted = deleted.saturating_add(1);
         }
         Ok(deleted)
@@ -79,6 +90,7 @@ impl ObjectStoreLogAdapter {
 impl ToolLogStore for ObjectStoreLogAdapter {
     async fn store_log(
         &self,
+        _ctx: &RequestContext,
         metadata: &LogEntryMetadata,
         content: Bytes,
         retention: &LogRetentionPolicy,
@@ -92,7 +104,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         Ok(())
     }
 
-    async fn retrieve_log(&self, path: &str) -> ToolLogStoreResult<Bytes> {
+    async fn retrieve_log(&self, _ctx: &RequestContext, path: &str) -> ToolLogStoreResult<Bytes> {
         let object_path = Path::from(path);
         let result = self
             .store
@@ -105,7 +117,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::RetrieveFailed(err.to_string()))
     }
 
-    async fn delete_log(&self, path: &str) -> ToolLogStoreResult<()> {
+    async fn delete_log(&self, _ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()> {
         let object_path = Path::from(path);
         self.store
             .delete(&object_path)
@@ -115,6 +127,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
 
     async fn list_logs_for_server(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolLogStoreResult<Vec<String>> {
         use futures::TryStreamExt;
@@ -131,11 +144,12 @@ impl ToolLogStore for ObjectStoreLogAdapter {
 
     async fn sweep_expired(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
-        ctx: &SweepContext<'_>,
+        sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let expired = self.delete_expired_entries(ctx).await?;
-        let excess = self.enforce_count_limit(server_id, ctx).await?;
+        let expired = self.delete_expired_entries(sweep).await?;
+        let excess = self.enforce_count_limit(server_id, sweep).await?;
         Ok(expired.saturating_add(excess))
     }
 }

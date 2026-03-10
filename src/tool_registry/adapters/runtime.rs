@@ -1,5 +1,6 @@
 //! In-memory runtime host adapter for MCP server lifecycle tests.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
         McpServerHealthSnapshot, McpServerId, McpServerName, McpServerRegistration,
@@ -148,7 +149,11 @@ impl InMemoryMcpServerHost {
 
 #[async_trait]
 impl McpServerHost for InMemoryMcpServerHost {
-    async fn start(&self, server: &McpServerRegistration) -> McpServerHostResult<StartHostResult> {
+    async fn start(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerHostResult<StartHostResult> {
         let mut state = self.write_state()?;
         state.running_servers.insert(server.id());
         state.unhealthy_servers.remove(&server.id());
@@ -156,7 +161,11 @@ impl McpServerHost for InMemoryMcpServerHost {
         Ok(StartHostResult { stderr_output })
     }
 
-    async fn stop(&self, server: &McpServerRegistration) -> McpServerHostResult<()> {
+    async fn stop(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerHostResult<()> {
         let mut state = self.write_state()?;
         state.running_servers.remove(&server.id());
         state.unhealthy_servers.remove(&server.id());
@@ -165,6 +174,7 @@ impl McpServerHost for InMemoryMcpServerHost {
 
     async fn health(
         &self,
+        _ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<McpServerHealthSnapshot> {
         let state = self.read_state()?;
@@ -186,6 +196,7 @@ impl McpServerHost for InMemoryMcpServerHost {
 
     async fn list_tools(
         &self,
+        _ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerHostResult<Vec<McpToolDefinition>> {
         let state = self.read_state()?;
@@ -203,6 +214,7 @@ impl McpServerHost for InMemoryMcpServerHost {
 
     async fn call_tool(
         &self,
+        _ctx: &RequestContext,
         server: &McpServerRegistration,
         tool_name: &str,
         _parameters: &Value,

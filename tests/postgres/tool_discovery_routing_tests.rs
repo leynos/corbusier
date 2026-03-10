@@ -154,7 +154,7 @@ async fn catalog_round_trip(
     // Discover and persist tools.
     let entries = ctx
         .discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&request_ctx, registered.id())
         .await
         .expect("discovery should succeed");
     assert_eq!(entries.len(), 1);
@@ -162,7 +162,7 @@ async fn catalog_round_trip(
     // Verify via catalog list.
     let catalog_entries = ctx
         .discovery
-        .list_catalog()
+        .list_catalog(&request_ctx)
         .await
         .expect("catalog list should succeed");
     assert_eq!(catalog_entries.len(), 1);
@@ -172,13 +172,13 @@ async fn catalog_round_trip(
 
     // Mark unavailable and verify.
     ctx.discovery
-        .mark_tools_unavailable(registered.id())
+        .mark_tools_unavailable(&request_ctx, registered.id())
         .await
         .expect("mark unavailable should succeed");
 
     let after_mark = ctx
         .discovery
-        .list_catalog()
+        .list_catalog(&request_ctx)
         .await
         .expect("catalog list should succeed");
     let updated = after_mark.first().expect("first entry should exist");
@@ -222,7 +222,7 @@ async fn audit_log_persisted(
         .await
         .expect("start should succeed");
     ctx.discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&request_ctx, registered.id())
         .await
         .expect("discovery should succeed");
 
@@ -230,7 +230,7 @@ async fn audit_log_persisted(
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     let result = ctx
         .discovery
-        .call_tool(&request)
+        .call_tool(&request_ctx, &request)
         .await
         .expect("tool call should succeed");
 
@@ -291,7 +291,7 @@ async fn catalog_survives_service_reconstruction(
         .await
         .expect("start should succeed");
     ctx.discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&request_ctx, registered.id())
         .await
         .expect("discovery should succeed");
 
@@ -313,7 +313,7 @@ async fn catalog_survives_service_reconstruction(
 
     // The new service instance should see the catalog entries persisted by the first.
     let entries = discovery2
-        .list_catalog()
+        .list_catalog(&request_ctx)
         .await
         .expect("catalog list should succeed");
     assert_eq!(entries.len(), 1);

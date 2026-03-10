@@ -1,5 +1,6 @@
 //! In-memory repository for tool catalog entries and audit records.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{CatalogEntry, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
@@ -64,6 +65,7 @@ impl InMemoryToolCatalog {
 impl ToolCatalogRepository for InMemoryToolCatalog {
     async fn sync_server_tools(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
@@ -94,15 +96,27 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         Ok(())
     }
 
-    async fn mark_server_tools_unavailable(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
+    async fn mark_server_tools_unavailable(
+        &self,
+        _ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()> {
         self.apply_to_server_entries(server_id, CatalogEntry::mark_unavailable)
     }
 
-    async fn mark_server_tools_available(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
+    async fn mark_server_tools_available(
+        &self,
+        _ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()> {
         self.apply_to_server_entries(server_id, CatalogEntry::mark_available)
     }
 
-    async fn find_by_tool_name(&self, tool_name: &str) -> ToolCatalogResult<Option<CatalogEntry>> {
+    async fn find_by_tool_name(
+        &self,
+        _ctx: &RequestContext,
+        tool_name: &str,
+    ) -> ToolCatalogResult<Option<CatalogEntry>> {
         let state = self
             .state
             .read()
@@ -110,7 +124,7 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         Ok(state.entries.get(tool_name).cloned())
     }
 
-    async fn list_all(&self) -> ToolCatalogResult<Vec<CatalogEntry>> {
+    async fn list_all(&self, _ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let state = self
             .state
             .read()
@@ -118,7 +132,11 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         Ok(state.entries.values().cloned().collect())
     }
 
-    async fn record_audit(&self, record: &ToolCallAuditRecord) -> ToolCatalogResult<()> {
+    async fn record_audit(
+        &self,
+        _ctx: &RequestContext,
+        record: &ToolCallAuditRecord,
+    ) -> ToolCatalogResult<()> {
         let mut state = self
             .state
             .write()

@@ -1,5 +1,6 @@
 //! In-memory repository for MCP server registrations.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{McpServerId, McpServerName, McpServerRegistration},
     ports::{McpServerRegistryError, McpServerRegistryRepository, McpServerRegistryResult},
@@ -30,7 +31,11 @@ impl InMemoryMcpServerRegistry {
 
 #[async_trait]
 impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
-    async fn register(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()> {
+    async fn register(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -50,7 +55,11 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
         Ok(())
     }
 
-    async fn update(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()> {
+    async fn update(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -81,6 +90,7 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
 
     async fn find_by_id(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
         let state = self.state.read().map_err(|err| {
@@ -91,6 +101,7 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
 
     async fn find_by_name(
         &self,
+        _ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
         let state = self.state.read().map_err(|err| {
@@ -104,7 +115,10 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
         Ok(server)
     }
 
-    async fn list_all(&self) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
+    async fn list_all(
+        &self,
+        _ctx: &RequestContext,
+    ) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
         let state = self.state.read().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;

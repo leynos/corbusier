@@ -1,5 +1,6 @@
 //! Policy enforcement adapters for tool call authorization.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::PolicyDecision,
     ports::{ToolPolicyEnforcer, ToolPolicyError},
@@ -19,6 +20,7 @@ pub struct AllowAllPolicy;
 impl ToolPolicyEnforcer for AllowAllPolicy {
     async fn evaluate(
         &self,
+        _ctx: &RequestContext,
         _tool_name: &str,
         _parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError> {
@@ -48,6 +50,7 @@ impl DenyAllPolicy {
 impl ToolPolicyEnforcer for DenyAllPolicy {
     async fn evaluate(
         &self,
+        _ctx: &RequestContext,
         _tool_name: &str,
         _parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError> {
@@ -80,6 +83,7 @@ impl FailingPolicy {
 impl ToolPolicyEnforcer for FailingPolicy {
     async fn evaluate(
         &self,
+        _ctx: &RequestContext,
         _tool_name: &str,
         _parameters: &Value,
     ) -> Result<PolicyDecision, ToolPolicyError> {

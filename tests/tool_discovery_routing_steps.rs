@@ -222,8 +222,12 @@ fn discover_tools(world: &mut ToolDiscoveryWorld) -> Result<(), eyre::Report> {
         .registered_server
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
-    run_async(world.discovery()?.discover_and_persist_tools(server.id()))
-        .wrap_err("tool discovery should succeed")?;
+    run_async(
+        world
+            .discovery()?
+            .discover_and_persist_tools(&world.request_ctx, server.id()),
+    )
+    .wrap_err("tool discovery should succeed")?;
     Ok(())
 }
 
@@ -245,8 +249,12 @@ fn mark_tools_unavailable(world: &mut ToolDiscoveryWorld) -> Result<(), eyre::Re
         .registered_server
         .as_ref()
         .ok_or_else(|| eyre!("server should be registered"))?;
-    run_async(world.discovery()?.mark_tools_unavailable(server.id()))
-        .wrap_err("mark unavailable should succeed")?;
+    run_async(
+        world
+            .discovery()?
+            .mark_tools_unavailable(&world.request_ctx, server.id()),
+    )
+    .wrap_err("mark unavailable should succeed")?;
     Ok(())
 }
 
@@ -259,7 +267,7 @@ fn call_tool_with_params(
     let parameters: serde_json::Value =
         serde_json::from_str(&params).wrap_err("parameters should be valid JSON")?;
     let request = ToolCallRequest::new(&tool_name, parameters, &DefaultClock);
-    match run_async(world.discovery()?.call_tool(&request)) {
+    match run_async(world.discovery()?.call_tool(&world.request_ctx, &request)) {
         Ok(_) => {
             world.last_call_succeeded = Some(true);
         }
@@ -278,8 +286,8 @@ fn catalog_contains_count(
     world: &mut ToolDiscoveryWorld,
     count: usize,
 ) -> Result<(), eyre::Report> {
-    let entries =
-        run_async(world.discovery()?.list_catalog()).wrap_err("catalog listing should succeed")?;
+    let entries = run_async(world.discovery()?.list_catalog(&world.request_ctx))
+        .wrap_err("catalog listing should succeed")?;
     if entries.len() != count {
         return Err(eyre!(
             "expected {count} catalog entries, got {}",
@@ -294,8 +302,8 @@ fn tool_is_available(
     world: &mut ToolDiscoveryWorld,
     tool_name: String,
 ) -> Result<(), eyre::Report> {
-    let entries =
-        run_async(world.discovery()?.list_catalog()).wrap_err("catalog listing should succeed")?;
+    let entries = run_async(world.discovery()?.list_catalog(&world.request_ctx))
+        .wrap_err("catalog listing should succeed")?;
     let entry = entries
         .iter()
         .find(|e| e.tool().name() == tool_name)
@@ -347,7 +355,7 @@ fn tool_call_rejected_unavailable(
     tool_name: String,
 ) -> Result<(), eyre::Report> {
     let request = ToolCallRequest::new(&tool_name, json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = run_async(world.discovery()?.call_tool(&request));
+    let result = run_async(world.discovery()?.call_tool(&world.request_ctx, &request));
     if !matches!(
         result,
         Err(ToolDiscoveryRoutingServiceError::Domain(
@@ -365,7 +373,7 @@ fn tool_call_rejected_not_found(
     tool_name: String,
 ) -> Result<(), eyre::Report> {
     let request = ToolCallRequest::new(&tool_name, json!({}), &DefaultClock);
-    let result = run_async(world.discovery()?.call_tool(&request));
+    let result = run_async(world.discovery()?.call_tool(&world.request_ctx, &request));
     if !matches!(
         result,
         Err(ToolDiscoveryRoutingServiceError::Domain(

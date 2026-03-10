@@ -232,6 +232,7 @@ impl HealthProbeFailureHost {
 impl McpServerHost for HealthProbeFailureHost {
     async fn start(
         &self,
+        _ctx: &RequestContext,
         server: &crate::tool_registry::domain::McpServerRegistration,
     ) -> McpServerHostResult<StartHostResult> {
         self.with_started_lock(|started| {
@@ -242,6 +243,7 @@ impl McpServerHost for HealthProbeFailureHost {
 
     async fn stop(
         &self,
+        _ctx: &RequestContext,
         server: &crate::tool_registry::domain::McpServerRegistration,
     ) -> McpServerHostResult<()> {
         self.with_started_lock(|started| {
@@ -251,6 +253,7 @@ impl McpServerHost for HealthProbeFailureHost {
 
     async fn health(
         &self,
+        _ctx: &RequestContext,
         _server: &crate::tool_registry::domain::McpServerRegistration,
     ) -> McpServerHostResult<McpServerHealthSnapshot> {
         Err(McpServerHostError::runtime(Error::other(
@@ -260,6 +263,7 @@ impl McpServerHost for HealthProbeFailureHost {
 
     async fn list_tools(
         &self,
+        _ctx: &RequestContext,
         server: &crate::tool_registry::domain::McpServerRegistration,
     ) -> McpServerHostResult<Vec<McpToolDefinition>> {
         self.with_started_lock(|started| {
@@ -273,6 +277,7 @@ impl McpServerHost for HealthProbeFailureHost {
 
     async fn call_tool(
         &self,
+        _ctx: &RequestContext,
         server: &crate::tool_registry::domain::McpServerRegistration,
         _tool_name: &str,
         _parameters: &serde_json::Value,

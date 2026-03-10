@@ -5,6 +5,7 @@ use super::{
     catalog_schema::{mcp_tool_catalog, tool_call_audit_log},
     repository::McpServerPgPool,
 };
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
         CatalogEntry, CatalogEntryId, McpServerId, McpServerName, McpToolDefinition,
@@ -70,6 +71,7 @@ impl PostgresToolCatalog {
 impl ToolCatalogRepository for PostgresToolCatalog {
     async fn sync_server_tools(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
@@ -105,15 +107,27 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         .await
     }
 
-    async fn mark_server_tools_unavailable(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
+    async fn mark_server_tools_unavailable(
+        &self,
+        _ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()> {
         self.set_server_tools_availability(server_id, false).await
     }
 
-    async fn mark_server_tools_available(&self, server_id: McpServerId) -> ToolCatalogResult<()> {
+    async fn mark_server_tools_available(
+        &self,
+        _ctx: &RequestContext,
+        server_id: McpServerId,
+    ) -> ToolCatalogResult<()> {
         self.set_server_tools_availability(server_id, true).await
     }
 
-    async fn find_by_tool_name(&self, tool_name: &str) -> ToolCatalogResult<Option<CatalogEntry>> {
+    async fn find_by_tool_name(
+        &self,
+        _ctx: &RequestContext,
+        tool_name: &str,
+    ) -> ToolCatalogResult<Option<CatalogEntry>> {
         let name = tool_name.to_owned();
         self.run_blocking(move |connection| {
             let row = mcp_tool_catalog::table
@@ -127,7 +141,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         .await
     }
 
-    async fn list_all(&self) -> ToolCatalogResult<Vec<CatalogEntry>> {
+    async fn list_all(&self, _ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         self.run_blocking(move |connection| {
             let rows = mcp_tool_catalog::table
                 .select(CatalogEntryRow::as_select())
@@ -138,7 +152,11 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         .await
     }
 
-    async fn record_audit(&self, record: &ToolCallAuditRecord) -> ToolCatalogResult<()> {
+    async fn record_audit(
+        &self,
+        _ctx: &RequestContext,
+        record: &ToolCallAuditRecord,
+    ) -> ToolCatalogResult<()> {
         let row = audit_to_new_row(record);
         self.run_blocking(move |connection| {
             diesel::insert_into(tool_call_audit_log::table)

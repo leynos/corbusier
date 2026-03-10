@@ -42,6 +42,10 @@ pub trait ToolLogStore: Send + Sync {
     /// # Errors
     ///
     /// Returns [`ToolLogStoreError::StoreFailed`] when the write fails.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
+    )]
     async fn store_log(
         &self,
         ctx: &RequestContext,

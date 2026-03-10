@@ -4,6 +4,7 @@ use super::{
     models::{McpServerRow, NewMcpServerRow},
     schema::mcp_servers,
 };
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
         McpServerHealthSnapshot, McpServerHealthStatus, McpServerId, McpServerLifecycleState,
@@ -65,7 +66,11 @@ impl PostgresMcpServerRegistry {
 
 #[async_trait]
 impl McpServerRegistryRepository for PostgresMcpServerRegistry {
-    async fn register(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()> {
+    async fn register(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()> {
         let server_id = server.id();
         let server_name = server.name().clone();
         let new_row = to_new_row(server)?;
@@ -90,7 +95,11 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         .await
     }
 
-    async fn update(&self, server: &McpServerRegistration) -> McpServerRegistryResult<()> {
+    async fn update(
+        &self,
+        _ctx: &RequestContext,
+        server: &McpServerRegistration,
+    ) -> McpServerRegistryResult<()> {
         let server_id = server.id().into_inner();
         let serialized = serialize_server_fields(server)?;
 
@@ -120,6 +129,7 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn find_by_id(
         &self,
+        _ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
         self.execute_find_query(move |connection| {
@@ -134,6 +144,7 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn find_by_name(
         &self,
+        _ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
         let name = server_name.as_str().to_owned();
@@ -147,7 +158,10 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         .await
     }
 
-    async fn list_all(&self) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
+    async fn list_all(
+        &self,
+        _ctx: &RequestContext,
+    ) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
         self.run_blocking(move |connection| {
             let rows = mcp_servers::table
                 .select(McpServerRow::as_select())

@@ -4,6 +4,7 @@
 //! validation, policy enforcement, call routing, stderr capture, and
 //! audit recording.
 
+use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
         CatalogEntry, LogCaptureContext, LogEntryMetadata, LogRetentionPolicy, McpServerId,
@@ -122,22 +123,25 @@ where
     /// catalog persistence fails.
     pub async fn discover_and_persist_tools(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>> {
         let server = self
             .registry
-            .find_by_id(server_id)
+            .find_by_id(ctx, server_id)
             .await?
             .ok_or(ToolDiscoveryRoutingServiceError::NotFound(server_id))?;
         server.ensure_can_query_tools()?;
 
-        let tools = self.host.list_tools(&server).await?;
+        let tools = self.host.list_tools(ctx, &server).await?;
         let entries: Vec<CatalogEntry> = tools
             .into_iter()
             .map(|tool| CatalogEntry::new(server_id, server.name().clone(), tool, &*self.clock))
             .collect();
 
-        self.catalog.sync_server_tools(server_id, &entries).await?;
+        self.catalog
+            .sync_server_tools(ctx, server_id, &entries)
+            .await?;
         Ok(entries)
     }
 
@@ -147,10 +151,11 @@ where
     /// Returns [`ToolCatalogError`] on persistence failures.
     pub async fn mark_tools_unavailable(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<()> {
         self.catalog
-            .mark_server_tools_unavailable(server_id)
+            .mark_server_tools_unavailable(ctx, server_id)
             .await?;
         Ok(())
     }
@@ -161,9 +166,12 @@ where
     /// Returns [`ToolCatalogError`] on persistence failures.
     pub async fn mark_tools_available(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<()> {
-        self.catalog.mark_server_tools_available(server_id).await?;
+        self.catalog
+            .mark_server_tools_available(ctx, server_id)
+            .await?;
         Ok(())
     }
 
@@ -171,8 +179,11 @@ where
     ///
     /// # Errors
     /// Returns [`ToolCatalogError`] on persistence failures.
-    pub async fn list_catalog(&self) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>> {
-        Ok(self.catalog.list_all().await?)
+    pub async fn list_catalog(
+        &self,
+        ctx: &RequestContext,
+    ) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>> {
+        Ok(self.catalog.list_all(ctx).await?)
     }
 
     /// Routes a tool call through validation, policy, execution, stderr
@@ -188,19 +199,21 @@ where
     /// denial, host execution failures, or timeout.
     pub async fn call_tool(
         &self,
+        ctx: &RequestContext,
         request: &ToolCallRequest,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let entry = match self.resolve_and_validate(request).await {
+        let entry = match self.resolve_and_validate(ctx, request).await {
             Ok(entry) => entry,
             Err((maybe_entry, err)) => {
                 if let Some(entry) = maybe_entry {
-                    self.audit_rejection(request, entry.server_id(), &err).await;
+                    self.audit_rejection(ctx, request, entry.server_id(), &err)
+                        .await;
                 }
                 return Err(err);
             }
         };
 
-        self.execute_and_audit(request, &entry).await
+        self.execute_and_audit(ctx, request, &entry).await
     }
 
     /// Resolves a tool from the catalog, checks availability, validates
@@ -208,9 +221,14 @@ where
     /// entry (if resolved) alongside the error for audit purposes.
     async fn resolve_and_validate(
         &self,
+        ctx: &RequestContext,
         request: &ToolCallRequest,
     ) -> Result<CatalogEntry, (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError)> {
-        let entry = match self.catalog.find_by_tool_name(request.tool_name()).await {
+        let entry = match self
+            .catalog
+            .find_by_tool_name(ctx, request.tool_name())
+            .await
+        {
             Ok(Some(e)) => e,
             Ok(None) => {
                 let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
@@ -219,7 +237,7 @@ where
             Err(err) => return Err((None, err.into())),
         };
 
-        if let Err(err) = self.validate_entry(&entry, request).await {
+        if let Err(err) = self.validate_entry(ctx, &entry, request).await {
             return Err((Some(entry), err));
         }
         Ok(entry)
@@ -228,6 +246,7 @@ where
     /// Validates availability, schema, and policy for a resolved entry.
     async fn validate_entry(
         &self,
+        ctx: &RequestContext,
         entry: &CatalogEntry,
         request: &ToolCallRequest,
     ) -> ToolDiscoveryRoutingServiceResult<()> {
@@ -251,7 +270,7 @@ where
         })?;
         let decision = self
             .policy
-            .evaluate(request.tool_name(), request.parameters())
+            .evaluate(ctx, request.tool_name(), request.parameters())
             .await?;
         if let PolicyDecision::Deny { reason } = decision {
             return Err(ToolRegistryDomainError::PolicyDenied {
@@ -266,13 +285,14 @@ where
     /// Executes a validated tool call and records the audit trail.
     async fn execute_and_audit(
         &self,
+        ctx: &RequestContext,
         request: &ToolCallRequest,
         entry: &CatalogEntry,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let server = self.find_running_server(entry.server_id()).await?;
+        let server = self.find_running_server(ctx, entry.server_id()).await?;
         let execute_result = self
             .host
-            .call_tool(&server, request.tool_name(), request.parameters())
+            .call_tool(ctx, &server, request.tool_name(), request.parameters())
             .await;
 
         let completed_at = self.clock.utc();
@@ -299,7 +319,7 @@ where
             completed_at,
         };
         let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
-        self.capture_and_audit(request, &result, stderr_output)
+        self.capture_and_audit(ctx, request, &result, stderr_output)
             .await;
 
         if let Some(host_err) = host_error {
@@ -311,12 +331,13 @@ where
     /// Loads a server from the registry and verifies it is running.
     async fn find_running_server(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<crate::tool_registry::domain::McpServerRegistration>
     {
         let server = self
             .registry
-            .find_by_id(server_id)
+            .find_by_id(ctx, server_id)
             .await?
             .ok_or(ToolDiscoveryRoutingServiceError::NotFound(server_id))?;
         server.ensure_can_query_tools()?;
@@ -324,25 +345,35 @@ where
     }
 
     /// Best-effort audit recording for a pre-execution rejection.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
+    )]
     async fn audit_rejection(
         &self,
+        ctx: &RequestContext,
         request: &ToolCallRequest,
         server_id: McpServerId,
         err: &ToolDiscoveryRoutingServiceError,
     ) {
         let audit = ToolCallAuditRecord::for_rejection(request, server_id, err, self.clock.utc());
-        let _audit_result = self.catalog.record_audit(&audit).await;
+        let _audit_result = self.catalog.record_audit(ctx, &audit).await;
     }
 
     /// Best-effort stderr capture and audit recording for a completed call.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
+    )]
     async fn capture_and_audit(
         &self,
+        ctx: &RequestContext,
         request: &ToolCallRequest,
         result: &ToolCallResult,
         stderr_output: Option<bytes::Bytes>,
     ) {
         let stderr_log_path = self
-            .try_capture_tool_call_stderr(result.server_id(), request.call_id(), stderr_output)
+            .try_capture_tool_call_stderr(ctx, result.server_id(), request.call_id(), stderr_output)
             .await;
         let mut audit = ToolCallAuditRecord::from_result(
             result,
@@ -352,7 +383,7 @@ where
         if let Some(path) = &stderr_log_path {
             audit = audit.with_stderr_log_path(path);
         }
-        let _audit_result = self.catalog.record_audit(&audit).await;
+        let _audit_result = self.catalog.record_audit(ctx, &audit).await;
     }
 
     /// Stores startup stderr captured from `McpServerHost::start`.
@@ -362,19 +393,20 @@ where
     /// Returns [`ToolLogStoreError`] when the store operation fails.
     pub async fn store_startup_stderr(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         stderr: bytes::Bytes,
     ) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata> {
         let byte_count = stderr.len() as u64;
-        let ctx = LogCaptureContext {
+        let capture_ctx = LogCaptureContext {
             clock: &*self.clock,
             retention: &self.retention_policy,
         };
-        let metadata = LogEntryMetadata::for_startup(server_id, byte_count, &ctx);
+        let metadata = LogEntryMetadata::for_startup(server_id, byte_count, &capture_ctx);
         self.log_store
-            .store_log(&metadata, stderr, &self.retention_policy)
+            .store_log(ctx, &metadata, stderr, &self.retention_policy)
             .await?;
-        let _sweep_count = self.sweep_expired_logs(server_id).await;
+        let _sweep_count = self.sweep_expired_logs(ctx, server_id).await;
         Ok(metadata)
     }
 
@@ -384,36 +416,43 @@ where
     /// Returns [`ToolLogStoreError`] when the sweep fails.
     pub async fn sweep_expired_logs(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<usize> {
         let now = self.clock.utc();
-        let ctx = SweepContext {
+        let sweep = SweepContext {
             policy: &self.retention_policy,
             now,
             entry_metadata: &[],
         };
-        Ok(self.log_store.sweep_expired(server_id, &ctx).await?)
+        Ok(self.log_store.sweep_expired(ctx, server_id, &sweep).await?)
     }
 
     /// Best-effort stderr capture for a tool call. Returns the object
     /// store path on success, or `None` on failure.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
+    )]
     async fn try_capture_tool_call_stderr(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         call_id: ToolCallId,
         stderr_output: Option<bytes::Bytes>,
     ) -> Option<String> {
         let stderr = stderr_output.filter(|b| !b.is_empty())?;
         let byte_count = stderr.len() as u64;
-        let ctx = LogCaptureContext {
+        let capture_ctx = LogCaptureContext {
             clock: &*self.clock,
             retention: &self.retention_policy,
         };
-        let metadata = LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &ctx);
+        let metadata =
+            LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &capture_ctx);
         let path = metadata.object_path().to_owned();
         match self
             .log_store
-            .store_log(&metadata, stderr, &self.retention_policy)
+            .store_log(ctx, &metadata, stderr, &self.retention_policy)
             .await
         {
             Ok(()) => Some(path),

@@ -116,7 +116,7 @@ async fn register_start_discover(
         .await?;
     ctx.lifecycle.start(request_ctx, registered.id()).await?;
     ctx.discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(request_ctx, registered.id())
         .await?;
     Ok(registered.id())
 }
@@ -142,7 +142,10 @@ async fn discover_and_call_tool_end_to_end(
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = integration_ctx.discovery.call_tool(&request).await?;
+    let result = integration_ctx
+        .discovery
+        .call_tool(&request_ctx, &request)
+        .await?;
     assert!(result.outcome().is_success());
     assert_eq!(result.server_id(), server_id);
     assert_eq!(result.tool_name(), "read_file");
@@ -193,7 +196,7 @@ async fn two_servers_route_correctly(
     assert_eq!(
         integration_ctx
             .discovery
-            .call_tool(&read_req)
+            .call_tool(&request_ctx, &read_req)
             .await?
             .server_id(),
         reg1
@@ -203,7 +206,7 @@ async fn two_servers_route_correctly(
     assert_eq!(
         integration_ctx
             .discovery
-            .call_tool(&search_req)
+            .call_tool(&request_ctx, &search_req)
             .await?
             .server_id(),
         reg2
@@ -230,13 +233,16 @@ async fn tool_unavailable_after_stop(
         .await?;
     integration_ctx
         .discovery
-        .mark_tools_unavailable(server_id)
+        .mark_tools_unavailable(&request_ctx, server_id)
         .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
     assert!(matches!(
-        integration_ctx.discovery.call_tool(&request).await,
+        integration_ctx
+            .discovery
+            .call_tool(&request_ctx, &request)
+            .await,
         Err(ToolDiscoveryRoutingServiceError::Domain(
             ToolRegistryDomainError::ToolUnavailable { .. }
         ))
@@ -270,7 +276,7 @@ async fn rediscovery_after_restart(
         .await?;
     integration_ctx
         .discovery
-        .mark_tools_unavailable(server_id)
+        .mark_tools_unavailable(&request_ctx, server_id)
         .await?;
 
     // Restart and rediscover.
@@ -280,12 +286,15 @@ async fn rediscovery_after_restart(
         .await?;
     integration_ctx
         .discovery
-        .discover_and_persist_tools(server_id)
+        .discover_and_persist_tools(&request_ctx, server_id)
         .await?;
 
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    let result = integration_ctx.discovery.call_tool(&request).await?;
+    let result = integration_ctx
+        .discovery
+        .call_tool(&request_ctx, &request)
+        .await?;
     assert!(result.outcome().is_success());
     Ok(())
 }
@@ -312,7 +321,10 @@ async fn audit_trail_accumulates(
     for _ in 0..3 {
         let request =
             ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-        integration_ctx.discovery.call_tool(&request).await?;
+        integration_ctx
+            .discovery
+            .call_tool(&request_ctx, &request)
+            .await?;
     }
     assert_eq!(integration_ctx.catalog.audit_records()?.len(), 3);
     Ok(())
@@ -352,14 +364,14 @@ async fn stderr_captured_for_startup_and_tool_calls(
     // Persist startup stderr via discovery service.
     let startup_meta = integration_ctx
         .discovery
-        .store_startup_stderr(registered.id(), captured)
+        .store_startup_stderr(&request_ctx, registered.id(), captured)
         .await?;
     assert!(startup_meta.object_path().contains("startup"));
 
     // Discover tools and configure tool call results.
     integration_ctx
         .discovery
-        .discover_and_persist_tools(registered.id())
+        .discover_and_persist_tools(&request_ctx, registered.id())
         .await?;
     integration_ctx.host.set_tool_call_result(
         McpServerName::new("workspace_tools")?,
@@ -375,7 +387,10 @@ async fn stderr_captured_for_startup_and_tool_calls(
     // Call tool and verify audit trail references stderr.
     let request =
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    integration_ctx.discovery.call_tool(&request).await?;
+    integration_ctx
+        .discovery
+        .call_tool(&request_ctx, &request)
+        .await?;
 
     let audits = integration_ctx.catalog.audit_records()?;
     assert_eq!(audits.len(), 1);

@@ -73,6 +73,10 @@ pub trait McpServerHost: Send + Sync {
     /// running, [`McpServerHostError::ToolCallFailed`] when the tool
     /// invocation fails, or [`McpServerHostError::ToolCallTimeout`] when
     /// the call exceeds the timeout.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
+    )]
     async fn call_tool(
         &self,
         ctx: &RequestContext,
