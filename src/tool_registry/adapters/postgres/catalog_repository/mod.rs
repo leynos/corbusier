@@ -3,8 +3,11 @@
 //! Tenant context is propagated via `SET LOCAL app.tenant_id`, which sets
 //! a `PostgreSQL` session variable scoped to the current transaction.
 
+mod audit_helpers;
+mod mappers;
+
 use super::{
-    catalog_models::{CatalogEntryRow, NewAuditLogRow, NewCatalogEntryRow},
+    catalog_models::{CatalogEntryRow, NewCatalogEntryRow},
     catalog_schema::{mcp_tool_catalog, tool_call_audit_log},
     repository::McpServerPgPool,
 };
@@ -12,11 +15,7 @@ use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
 use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use crate::tool_registry::{
-    domain::{
-        CatalogEntry, CatalogEntryId, McpServerId, McpServerName, McpToolDefinition,
-        PersistedCatalogEntryData, ToolCallAuditRecord, ToolCallOutcome, redact_error_message,
-        redact_outcome_content, redact_parameters,
-    },
+    domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
 
@@ -25,6 +24,9 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use std::collections::{HashMap, HashSet};
+
+use self::audit_helpers::audit_to_new_row;
+use self::mappers::{entry_to_new_row, row_to_entry};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
@@ -123,10 +125,10 @@ impl PostgresToolCatalog {
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
             if !seen_names.insert(tool_name.clone()) {
-                return Some(ToolCatalogError::DuplicateEntry {
+                return Some(ToolCatalogError::DuplicateWithinBatch {
                     id: entry.id(),
                     tool_name,
-                    server_count: 2,
+                    entry_count: 2,
                 });
             }
         }
@@ -175,18 +177,21 @@ impl PostgresToolCatalog {
         server_id: uuid::Uuid,
         candidate_names: &HashSet<String>,
     ) -> ToolCatalogResult<HashMap<String, usize>> {
+        let candidate_name_list: Vec<&str> = candidate_names.iter().map(String::as_str).collect();
         mcp_tool_catalog::table
             .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
             .filter(mcp_tool_catalog::server_id.ne(server_id))
-            .select(mcp_tool_catalog::tool_name)
-            .load::<String>(connection)
+            .filter(mcp_tool_catalog::tool_name.eq_any(candidate_name_list))
+            .group_by(mcp_tool_catalog::tool_name)
+            .select((mcp_tool_catalog::tool_name, diesel::dsl::count_star()))
+            .load::<(String, i64)>(connection)
             .map_err(|e| ToolCatalogError::persistence("select", e))
             .map(|tool_names| {
                 tool_names
                     .into_iter()
-                    .filter(|tool_name| candidate_names.contains(tool_name))
-                    .fold(HashMap::new(), |mut counts, tool_name| {
-                        *counts.entry(tool_name).or_insert(0usize) += 1;
+                    .fold(HashMap::new(), |mut counts, (tool_name, count)| {
+                        *counts.entry(tool_name).or_insert(0usize) =
+                            usize::try_from(count).unwrap_or_default();
                         counts
                     })
             })
@@ -337,77 +342,5 @@ impl ToolCatalogRepository for PostgresToolCatalog {
             Ok(())
         })
         .await
-    }
-}
-
-fn entry_to_new_row(entry: &CatalogEntry, tenant_id: uuid::Uuid) -> NewCatalogEntryRow {
-    let tool = entry.tool();
-    NewCatalogEntryRow {
-        id: entry.id().into_inner(),
-        tenant_id,
-        server_id: entry.server_id().into_inner(),
-        server_name: entry.server_name().as_str().to_owned(),
-        tool_name: tool.name().to_owned(),
-        tool_description: tool.description().to_owned(),
-        input_schema: tool.input_schema().clone(),
-        output_schema: tool.output_schema().cloned(),
-        available: entry.available(),
-        discovered_at: entry.discovered_at(),
-        updated_at: entry.updated_at(),
-    }
-}
-
-fn row_to_entry(row: CatalogEntryRow) -> ToolCatalogResult<CatalogEntry> {
-    let server_name = McpServerName::new(&row.server_name)
-        .map_err(|e| ToolCatalogError::invalid_persisted_data("server_name", e))?;
-    let mut tool = McpToolDefinition::new(row.tool_name, row.tool_description, row.input_schema)
-        .map_err(|e| ToolCatalogError::invalid_persisted_data("tool_definition", e))?;
-    if let Some(output) = row.output_schema {
-        tool = tool.with_output_schema(output);
-    }
-
-    Ok(CatalogEntry::from_persisted(PersistedCatalogEntryData {
-        id: CatalogEntryId::from_uuid(row.id),
-        server_id: McpServerId::from_uuid(row.server_id),
-        server_name,
-        tool,
-        available: row.available,
-        discovered_at: row.discovered_at,
-        updated_at: row.updated_at,
-    }))
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "duration_ms is always positive and within i64 range for tool calls"
-)]
-fn audit_to_new_row(record: &ToolCallAuditRecord, tenant_id: uuid::Uuid) -> NewAuditLogRow {
-    let (outcome_str, outcome_content, outcome_error) = match record.outcome() {
-        ToolCallOutcome::Success { content } => (
-            "success".to_owned(),
-            Some(redact_outcome_content(content)),
-            None,
-        ),
-        ToolCallOutcome::Failure { error } => (
-            "failure".to_owned(),
-            None,
-            Some(redact_error_message(error)),
-        ),
-    };
-
-    NewAuditLogRow {
-        id: record.id(),
-        tenant_id,
-        call_id: record.call_id().into_inner(),
-        tool_name: record.tool_name().to_owned(),
-        server_id: record.server_id().into_inner(),
-        parameters: redact_parameters(record.parameters()),
-        outcome: outcome_str,
-        outcome_content,
-        outcome_error,
-        duration_ms: record.duration().as_millis() as i64,
-        initiated_at: record.initiated_at(),
-        completed_at: record.completed_at(),
-        stderr_log_path: record.stderr_log_path().map(str::to_owned),
     }
 }

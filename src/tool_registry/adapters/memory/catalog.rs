@@ -121,10 +121,10 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
             if !seen_names.insert(tool_name.clone()) {
-                return Err(ToolCatalogError::DuplicateEntry {
+                return Err(ToolCatalogError::DuplicateWithinBatch {
                     id: entry.id(),
                     tool_name,
-                    server_count: 2,
+                    entry_count: 2,
                 });
             }
             if let Some(existing_count) = existing_name_counts.get(&tool_name) {

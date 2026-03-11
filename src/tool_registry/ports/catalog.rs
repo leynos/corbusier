@@ -100,6 +100,17 @@ pub enum ToolCatalogError {
         server_count: usize,
     },
 
+    /// A single server reported the same tool name more than once in a batch.
+    #[error("duplicate tool '{tool_name}' appeared {entry_count} times in one batch (entry: {id})")]
+    DuplicateWithinBatch {
+        /// Identifier of the entry that triggered the duplicate detection.
+        id: CatalogEntryId,
+        /// Conflicting tool name.
+        tool_name: String,
+        /// Number of times the tool name appeared in the batch.
+        entry_count: usize,
+    },
+
     /// No catalog entry matched the query.
     #[error("catalog entry not found: {0}")]
     NotFound(String),

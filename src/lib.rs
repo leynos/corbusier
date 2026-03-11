@@ -28,7 +28,7 @@ pub mod tenant;
 pub mod agent_backend;
 pub mod message;
 pub mod task;
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(feature = "test-support")]
 pub mod test_support;
 pub mod tool_registry;
 pub mod worker;

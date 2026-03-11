@@ -755,7 +755,7 @@ Corbusier implements this through:
 
 #### 2.1.5 Tenancy and Identity Features
 
-_Table 2.1.5.1: Tenancy and identity feature catalogue._
+Table 2.1.5.1: Tenancy and identity feature catalogue.
 
 | Feature ID | Feature Name                          | Category             | Priority | Status   |
 | ---------- | ------------------------------------- | -------------------- | -------- | -------- |
@@ -1103,6 +1103,9 @@ For screen readers: The following sequence diagram shows how starting an MCP
 server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
+Figure 2.2.3.1: MCP server start and `tools/list` lifecycle interaction
+sequence.
+
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -1151,8 +1154,6 @@ sequenceDiagram
     RegistryRepo-->>McpServerLifecycleService: ok
     McpServerLifecycleService-->>Operator: List ToolDefinition
 ```
-
-_Figure: MCP server start and `tools/list` lifecycle interaction sequence._
 
 ##### F-005-RQ-002: Tool Discovery and Registration
 
@@ -1243,11 +1244,8 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   enforcing cross-tenant isolation at the database boundary in addition to
   `RequestContext` scoping and `SET LOCAL app.tenant_id`.
 
-_Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
-persistence model. The `mcp_servers` table is the parent entity; each server
-can host many tools (via `mcp_tool_catalog`), produce many audit log entries
-(via `tool_call_audit_log`), and generate many stderr log blobs (tracked via
-`tool_log_metadata`)._
+Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
+persistence model.
 
 ```mermaid
 erDiagram
@@ -1305,12 +1303,8 @@ erDiagram
     mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
 ```
 
-_Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within
-`ToolDiscoveryRoutingService`. The caller submits a `ToolCallRequest`; the
-service resolves the tool from the catalogue, validates parameters against the
-declared schema, evaluates the policy, locates the hosting server, executes the
-tool call via the host adapter, optionally captures stderr in the log store,
-and records an audit trail before returning._
+Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within
+`ToolDiscoveryRoutingService`.
 
 ```mermaid
 sequenceDiagram
@@ -1342,7 +1336,7 @@ sequenceDiagram
     Service-->>Service: build ToolCallResult
 
     alt stderr_output present
-        Service->>LogStore: store_log(request_context, LogEntryMetadata::for_tool_call, stderr, LogRetentionPolicy)
+        Service->>LogStore: store_log(request_context, StoreLogRequest{metadata, stderr, retention_policy})
         LogStore-->>Service: result
     end
 
@@ -1370,7 +1364,7 @@ sequenceDiagram
 
 #### 2.2.5 Tenancy and Identity Requirements
 
-_Table 2.2.5.1: Tenancy and identity requirement matrix._
+Table 2.2.5.1: Tenancy and identity requirement matrix.
 
 | Requirement ID | Description                          | Acceptance Criteria                                                           | Priority  | Complexity |
 | -------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------- | ---------- |
