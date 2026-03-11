@@ -6,7 +6,9 @@ use crate::tool_registry::domain::{LogCaptureContext, LogRetentionPolicy, McpSer
 use crate::tool_registry::ports::SweepContext;
 use chrono::Duration;
 use mockable::{Clock, DefaultClock};
+use object_store::memory::InMemory;
 use rstest::{fixture, rstest};
+use std::sync::Arc;
 
 #[fixture]
 fn adapter() -> ObjectStoreLogAdapter {
@@ -210,4 +212,47 @@ async fn sweep_only_affects_target_server(
     let remaining = adapter.list_logs_for_server(&ctx, server_b).await?;
     assert_eq!(remaining.len(), 1, "server B's log should remain");
     Ok(())
+}
+
+#[tokio::test]
+async fn sweep_rebuilds_metadata_from_object_store_after_restart() {
+    let store = Arc::new(InMemory::new());
+    let writer = ObjectStoreLogAdapter::new(store.clone());
+    let reader = ObjectStoreLogAdapter::new(store);
+    let ctx = test_request_ctx();
+    let server_id = McpServerId::new();
+    let clock = DefaultClock;
+
+    let retention = LogRetentionPolicy {
+        max_bytes_per_log: 1024,
+        max_logs_per_server: 100,
+        retention_period: Duration::seconds(1),
+    };
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: &retention,
+        tenant_id: ctx.tenant_id(),
+    };
+    let metadata = store_startup_entry(&writer, &ctx, server_id, &capture_ctx)
+        .await
+        .expect("startup log should be stored");
+
+    let sweep = SweepContext {
+        policy: &retention,
+        now: metadata.expires_at() + Duration::seconds(1),
+    };
+    let swept = reader
+        .sweep_expired(&ctx, server_id, &sweep)
+        .await
+        .expect("rebuilt metadata should allow sweep");
+    assert_eq!(
+        swept, 1,
+        "rebuilt metadata should allow the expired log to be swept"
+    );
+
+    let result = writer.retrieve_log(&ctx, metadata.object_path()).await;
+    assert!(
+        result.is_err(),
+        "rebuilt sweep should delete the persisted blob"
+    );
 }

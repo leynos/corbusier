@@ -27,8 +27,6 @@ pub mod tenant;
 pub mod agent_backend;
 pub mod message;
 pub mod task;
+pub mod test_support;
 pub mod tool_registry;
 pub mod worker;
-
-#[cfg(test)]
-pub(crate) mod test_support;

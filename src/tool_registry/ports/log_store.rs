@@ -35,7 +35,8 @@ pub trait ToolLogStore: Send + Sync {
     ///
     /// If the content exceeds the retention policy's
     /// `max_bytes_per_log`, the implementation truncates at the byte
-    /// boundary and appends a truncation marker.
+    /// boundary. A truncation marker is appended only when the byte
+    /// limit is larger than the marker itself.
     ///
     /// # Errors
     ///

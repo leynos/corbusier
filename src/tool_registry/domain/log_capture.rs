@@ -104,6 +104,26 @@ pub struct LogEntryMetadata {
     expires_at: DateTime<Utc>,
 }
 
+/// All fields needed to reconstruct a [`LogEntryMetadata`] from
+/// persisted storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistedLogEntryData {
+    /// Log entry identifier.
+    pub id: LogEntryId,
+    /// Owning MCP server identifier.
+    pub server_id: McpServerId,
+    /// Lifecycle point classification.
+    pub kind: LogEntryKind,
+    /// Object-store path for the blob.
+    pub object_path: String,
+    /// Stored blob size in bytes.
+    pub byte_count: u64,
+    /// Capture timestamp reconstructed from storage metadata.
+    pub captured_at: DateTime<Utc>,
+    /// Expiry timestamp derived from retention policy.
+    pub expires_at: DateTime<Utc>,
+}
+
 impl LogEntryMetadata {
     /// Shared construction logic for all log entry kinds.
     fn build(
@@ -155,6 +175,20 @@ impl LogEntryMetadata {
             byte_count,
             ctx,
         )
+    }
+
+    /// Reconstructs persisted metadata from an existing object-store entry.
+    #[must_use]
+    pub fn from_persisted(data: PersistedLogEntryData) -> Self {
+        Self {
+            id: data.id,
+            server_id: data.server_id,
+            kind: data.kind,
+            object_path: data.object_path,
+            byte_count: data.byte_count,
+            captured_at: data.captured_at,
+            expires_at: data.expires_at,
+        }
     }
 
     /// Returns the log entry identifier.

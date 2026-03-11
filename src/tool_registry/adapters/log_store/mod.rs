@@ -8,15 +8,20 @@
 
 use crate::context::RequestContext;
 use crate::tool_registry::{
-    domain::{LogEntryMetadata, LogRetentionPolicy, McpServerId},
+    domain::{
+        LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy, McpServerId,
+        PersistedLogEntryData, ToolCallId,
+    },
     ports::{SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::TryStreamExt;
 use object_store::{ObjectStore, path::Path};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 /// Adapter wrapping an [`ObjectStore`] backend for tool stderr log storage.
 ///
@@ -62,15 +67,52 @@ impl ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
     }
 
-    /// Collects metadata entries for `server_id` from the internal
-    /// in-memory index.
-    async fn collect_server_metadata(&self, server_id: McpServerId) -> Vec<LogEntryMetadata> {
-        let guard = self.metadata.read().await;
-        guard
-            .values()
-            .filter(|e| e.server_id() == server_id)
-            .cloned()
-            .collect()
+    /// Collects metadata entries for `server_id`.
+    ///
+    /// Falls back to rebuilding the in-memory index from object-store
+    /// listings when the current process has not yet observed this
+    /// server's blobs.
+    async fn collect_server_metadata(
+        &self,
+        ctx: &RequestContext,
+        server_id: McpServerId,
+        sweep: &SweepContext<'_>,
+    ) -> ToolLogStoreResult<Vec<LogEntryMetadata>> {
+        let existing_entries: Vec<LogEntryMetadata> = {
+            let guard = self.metadata.read().await;
+            guard
+                .values()
+                .filter(|e| e.server_id() == server_id)
+                .cloned()
+                .collect()
+        };
+        if !existing_entries.is_empty() {
+            return Ok(existing_entries);
+        }
+
+        let prefix = Path::from(format!("tool_logs/{}/{server_id}/", ctx.tenant_id()));
+        let rebuilt_entries: Vec<LogEntryMetadata> = self
+            .store
+            .list(Some(&prefix))
+            .try_filter_map(|meta| async move {
+                Ok(rebuild_metadata_from_object_meta(
+                    &meta,
+                    server_id,
+                    sweep.policy.retention_period,
+                ))
+            })
+            .try_collect()
+            .await
+            .map_err(|err| ToolLogStoreError::ListFailed(err.to_string()))?;
+        if rebuilt_entries.is_empty() {
+            return Ok(rebuilt_entries);
+        }
+
+        let mut guard = self.metadata.write().await;
+        for entry in &rebuilt_entries {
+            guard.insert(entry.object_path().to_owned(), entry.clone());
+        }
+        Ok(rebuilt_entries)
     }
 
     /// Deletes log entries whose retention period has elapsed.
@@ -215,8 +257,6 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolLogStoreResult<Vec<String>> {
-        use futures::TryStreamExt;
-
         let tenant_id = ctx.tenant_id();
         let prefix = Path::from(format!("tool_logs/{tenant_id}/{server_id}/"));
 
@@ -234,7 +274,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let entries = self.collect_server_metadata(server_id).await;
+        let entries = self.collect_server_metadata(ctx, server_id, sweep).await?;
 
         // Filter entries to those belonging to the calling tenant.
         let expected_prefix = format!("tool_logs/{}/", ctx.tenant_id());
@@ -261,7 +301,41 @@ impl ToolLogStore for ObjectStoreLogAdapter {
     }
 }
 
-/// Truncates content if it exceeds `max_bytes`, appending a truncation marker.
+fn rebuild_metadata_from_object_meta(
+    meta: &object_store::ObjectMeta,
+    server_id: McpServerId,
+    retention_period: chrono::Duration,
+) -> Option<LogEntryMetadata> {
+    let path = meta.location.to_string();
+    let segments: Vec<&str> = path.split('/').collect();
+    let file_name = *segments.last()?;
+    let id_segment = file_name.strip_suffix(".stderr")?;
+    let id = LogEntryId::from_uuid(Uuid::parse_str(id_segment).ok()?);
+    let kind = match segments.as_slice() {
+        ["tool_logs", _, _, "startup", _] => LogEntryKind::ServerStartup,
+        ["tool_logs", _, _, "call", call_id, _] => LogEntryKind::ToolCall {
+            call_id: ToolCallId::from_uuid(Uuid::parse_str(call_id).ok()?),
+        },
+        _ => return None,
+    };
+    let byte_count = meta.size;
+    let captured_at = meta.last_modified;
+    let expires_at = captured_at + retention_period;
+    Some(LogEntryMetadata::from_persisted(PersistedLogEntryData {
+        id,
+        server_id,
+        kind,
+        object_path: path,
+        byte_count,
+        captured_at,
+        expires_at,
+    }))
+}
+
+/// Truncates content if it exceeds `max_bytes`.
+///
+/// Appends a truncation marker only when the configured byte cap is
+/// larger than the marker itself.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "log sizes are well within usize range on all supported platforms"

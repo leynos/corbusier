@@ -7,7 +7,7 @@ use crate::tool_registry::{
 };
 use async_trait::async_trait;
 use mockable::DefaultClock;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Thread-safe in-memory tool catalog repository.
@@ -106,18 +106,33 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let state = tenants.entry(ctx.tenant_id()).or_default();
 
         // Stage the new entries, rejecting within-batch and cross-server duplicates.
-        let existing_names: std::collections::HashSet<String> = state
+        let existing_name_counts = state
             .entries
             .values()
             .filter(|e| e.server_id() != server_id)
-            .map(|e| e.tool().name().to_owned())
-            .collect();
+            .fold(HashMap::new(), |mut counts, entry| {
+                *counts
+                    .entry(entry.tool().name().to_owned())
+                    .or_insert(0usize) += 1;
+                counts
+            });
         let mut staged: HashMap<CatalogEntryId, CatalogEntry> = HashMap::new();
-        let mut seen_names = std::collections::HashSet::new();
+        let mut seen_names: HashSet<String> = HashSet::new();
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
-            if !seen_names.insert(tool_name.clone()) || existing_names.contains(&tool_name) {
-                return Err(ToolCatalogError::DuplicateEntry(entry.id()));
+            if !seen_names.insert(tool_name.clone()) {
+                return Err(ToolCatalogError::DuplicateEntry {
+                    id: entry.id(),
+                    tool_name,
+                    server_count: 2,
+                });
+            }
+            if let Some(existing_count) = existing_name_counts.get(&tool_name) {
+                return Err(ToolCatalogError::DuplicateEntry {
+                    id: entry.id(),
+                    tool_name,
+                    server_count: existing_count + 1,
+                });
             }
             staged.insert(entry.id(), entry.clone());
         }
@@ -241,6 +256,13 @@ mod tests {
             )
             .await;
 
-        assert!(matches!(result, Err(ToolCatalogError::DuplicateEntry(_))));
+        assert!(matches!(
+            result,
+            Err(ToolCatalogError::DuplicateEntry {
+                tool_name,
+                server_count: 2,
+                ..
+            }) if tool_name == "read_file"
+        ));
     }
 }

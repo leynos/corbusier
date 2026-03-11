@@ -2,8 +2,8 @@
 
 use super::{McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest};
 use crate::{
-    context::{RequestContext, TenantId},
-    test_support::HealthProbeFailureHost,
+    context::RequestContext,
+    test_support::{HealthProbeFailureHost, other_tenant_ctx, test_request_ctx},
     tool_registry::{
         adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
         domain::{
@@ -29,8 +29,6 @@ enum LifecycleScenario {
     StartStopStart,
 }
 
-use crate::test_support::test_request_ctx;
-
 #[fixture]
 fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {
     let host = Arc::new(InMemoryMcpServerHost::new());
@@ -45,15 +43,6 @@ fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
     let transport = McpTransport::stdio("mcp-server")?;
     Ok(RegisterMcpServerRequest::new(name, transport))
-}
-
-fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        source.correlation_id(),
-        source.user_id(),
-        source.session_id(),
-    )
 }
 
 /// Creates a standard `read_file` tool definition.

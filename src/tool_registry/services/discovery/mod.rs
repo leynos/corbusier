@@ -140,19 +140,18 @@ where
             .into_iter()
             .map(|tool| CatalogEntry::new(server_id, server.name().clone(), tool, &*self.clock))
             .collect();
-        let duplicate_tool_name = entries.first().map_or_else(
-            || "<duplicate>".to_owned(),
-            |entry| entry.tool().name().to_owned(),
-        );
-
         self.catalog
             .sync_server_tools(ctx, server_id, &entries)
             .await
             .map_err(|err| match err {
-                ToolCatalogError::DuplicateEntry(_) => ToolDiscoveryRoutingServiceError::Domain(
+                ToolCatalogError::DuplicateEntry {
+                    tool_name,
+                    server_count,
+                    ..
+                } => ToolDiscoveryRoutingServiceError::Domain(
                     ToolRegistryDomainError::AmbiguousToolName {
-                        tool_name: duplicate_tool_name,
-                        server_count: 2,
+                        tool_name,
+                        server_count,
                     },
                 ),
                 other => ToolDiscoveryRoutingServiceError::Catalog(other),

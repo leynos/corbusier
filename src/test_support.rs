@@ -14,12 +14,25 @@ use async_trait::async_trait;
 use std::collections::HashSet;
 
 /// Creates a [`RequestContext`] with freshly generated identifiers.
+#[must_use]
 pub fn test_request_ctx() -> RequestContext {
     RequestContext::new(
         TenantId::new(),
         CorrelationId::new(),
         UserId::new(),
         SessionId::new(),
+    )
+}
+
+/// Clones a request context into a different tenant while preserving the
+/// correlation, user, and session identifiers.
+#[must_use]
+pub fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        source.correlation_id(),
+        source.user_id(),
+        source.session_id(),
     )
 }
 

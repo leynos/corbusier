@@ -1,9 +1,10 @@
 -- Add tenant_id to tool registry tables for tenant isolation.
 --
--- NOTE: mcp_servers has no tenant_id column, so we cannot create a
--- composite FK (server_id, tenant_id) referencing mcp_servers.  The FK
--- remains server_id -> mcp_servers(id) only.  This invariant is
--- documented in corbusier-design.md.
+-- TEMPORARY: at this migration step `mcp_servers` still has no
+-- `tenant_id` column, so we cannot yet create the composite FK
+-- `(server_id, tenant_id) -> mcp_servers(id, tenant_id)`. That gap is
+-- resolved by the subsequent `2026-03-11-000000_tenant_scope_mcp_servers`
+-- migration.
 
 -- 1. mcp_tool_catalog
 ALTER TABLE mcp_tool_catalog

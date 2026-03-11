@@ -305,5 +305,5 @@ fn build_health_snapshot(
 
 fn is_name_unique_violation(info: &dyn diesel::result::DatabaseErrorInformation) -> bool {
     info.constraint_name()
-        .is_some_and(|name| matches!(name, "idx_mcp_servers_name" | "idx_mcp_servers_tenant_name"))
+        .is_some_and(|name| matches!(name, "idx_mcp_servers_tenant_name"))
 }

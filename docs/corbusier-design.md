@@ -1211,7 +1211,10 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   `(tenant_id, tool_name)` enforces unambiguous routing within a tenant.
   Different tenants may register the same tool name without conflict. If two
   servers within the same tenant advertise the same tool name, the second
-  discovery attempt replaces the first server's entry via `sync_server_tools`.
+  discovery attempt fails. The database unique index on
+  `(tenant_id, tool_name)` rejects the duplicate, and `sync_server_tools`
+  surfaces that conflict as a domain error instead of replacing the first
+  server's entry.
 - **Audit trail**: every tool call (success or failure) produces a
   `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
   duration, outcome, and optional stderr log path. All string-valued parameter
@@ -1808,6 +1811,8 @@ you to also send your logs for further analysis.
 ### 3.3 Open Source Dependencies
 
 #### 3.3.1 Core Dependencies
+
+Table 3.3.1-1: Core dependencies.
 
 | Crate        | Version | Purpose                          | Registry  |
 | ------------ | ------- | -------------------------------- | --------- |

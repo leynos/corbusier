@@ -2,11 +2,13 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
+pub use corbusier::test_support::other_tenant_ctx;
+use corbusier::test_support::test_request_ctx as shared_test_request_ctx;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -76,28 +78,12 @@ pub fn clock() -> DefaultClock {
 /// Provides a [`RequestContext`] for test fixtures.
 #[fixture]
 pub fn test_request_context() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
+    shared_test_request_ctx()
 }
 
 /// Alias for [`test_request_context`] used in tool-discovery and lifecycle tests.
 pub fn test_request_ctx() -> RequestContext {
     test_request_context()
-}
-
-/// Clones a request context into a different tenant while preserving the
-/// correlation, user, and session identifiers.
-pub fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        source.correlation_id(),
-        source.user_id(),
-        source.session_id(),
-    )
 }
 
 /// Ensures the template database exists with the schema applied.

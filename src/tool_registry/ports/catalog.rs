@@ -90,8 +90,15 @@ pub trait ToolCatalogRepository: Send + Sync {
 #[derive(Debug, Error)]
 pub enum ToolCatalogError {
     /// A catalog entry with the same identity already exists.
-    #[error("duplicate catalog entry: {0}")]
-    DuplicateEntry(CatalogEntryId),
+    #[error("duplicate catalog entry '{tool_name}' found on {server_count} servers (entry: {id})")]
+    DuplicateEntry {
+        /// Identifier of the entry that triggered the duplicate detection.
+        id: CatalogEntryId,
+        /// Conflicting tool name.
+        tool_name: String,
+        /// Number of servers advertising the conflicting tool name.
+        server_count: usize,
+    },
 
     /// No catalog entry matched the query.
     #[error("catalog entry not found: {0}")]

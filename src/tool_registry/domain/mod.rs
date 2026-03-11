@@ -29,6 +29,7 @@ pub use health::{McpServerHealthSnapshot, McpServerHealthStatus};
 pub use ids::{McpServerId, McpServerName};
 pub use log_capture::{
     LogCaptureContext, LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy,
+    PersistedLogEntryData,
 };
 pub use policy::PolicyDecision;
 pub use redact::{redact_error_message, redact_outcome_content, redact_parameters};
