@@ -18,8 +18,8 @@ mod in_memory {
     mod constraint_tests;
     mod conversation_flow_tests;
     mod handoff_tests;
-    mod mcp_server_lifecycle_tests;
     mod hook_engine_tests;
+    mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod slash_command_tests;
     mod task_lifecycle_tests;

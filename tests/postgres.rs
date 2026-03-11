@@ -30,8 +30,8 @@ mod postgres {
     mod audit_tests;
     mod backend_registry_tests;
     mod crud_tests;
-    mod mcp_server_lifecycle_tests;
     mod hook_engine_tests;
+    mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod serialization_tests;
     mod slash_command_tests;
