@@ -15,16 +15,14 @@ pub type ToolLogStoreResult<T> = Result<T, ToolLogStoreError>;
 
 /// Context bundle for a log retention sweep.
 ///
-/// Groups the policy, wall-clock timestamp, and entry metadata
-/// that [`ToolLogStore::sweep_expired`] needs, keeping the trait
-/// method to two non-`self` parameters.
+/// Groups the policy and wall-clock timestamp that
+/// [`ToolLogStore::sweep_expired`] needs, keeping the trait method
+/// to two non-`self` parameters.
 pub struct SweepContext<'a> {
     /// Retention policy governing expiry and count limits.
     pub policy: &'a LogRetentionPolicy,
     /// Current wall-clock time used for expiry checks.
     pub now: DateTime<Utc>,
-    /// Known log entry metadata maintained by the service layer.
-    pub entry_metadata: &'a [LogEntryMetadata],
 }
 
 /// Storage contract for captured stderr log blobs.
@@ -88,9 +86,9 @@ pub trait ToolLogStore: Send + Sync {
 
     /// Deletes expired logs and enforces the per-server count limit.
     ///
-    /// Accepts the full set of [`LogEntryMetadata`] for the server
-    /// (maintained by the service layer) to determine which blobs
-    /// to delete.
+    /// Implementations are responsible for maintaining any metadata
+    /// index needed to determine which blobs to delete; callers do not
+    /// supply entry metadata.
     ///
     /// Returns the number of entries deleted.
     ///

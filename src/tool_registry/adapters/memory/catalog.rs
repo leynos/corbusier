@@ -105,11 +105,18 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let mut tenants = self.write_state()?;
         let state = tenants.entry(ctx.tenant_id()).or_default();
 
-        // Stage the new entries, rejecting within-batch duplicates only.
+        // Stage the new entries, rejecting within-batch and cross-server duplicates.
+        let existing_names: std::collections::HashSet<String> = state
+            .entries
+            .values()
+            .filter(|e| e.server_id() != server_id)
+            .map(|e| e.tool().name().to_owned())
+            .collect();
         let mut staged: HashMap<CatalogEntryId, CatalogEntry> = HashMap::new();
         let mut seen_names = std::collections::HashSet::new();
         for entry in entries {
-            if !seen_names.insert(entry.tool().name().to_owned()) {
+            let tool_name = entry.tool().name().to_owned();
+            if !seen_names.insert(tool_name.clone()) || existing_names.contains(&tool_name) {
                 return Err(ToolCatalogError::DuplicateEntry(entry.id()));
             }
             staged.insert(entry.id(), entry.clone());
@@ -177,5 +184,63 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let state = tenants.entry(ctx.tenant_id()).or_default();
         state.audit_records.push(record.clone());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InMemoryToolCatalog;
+    use crate::test_support::test_request_ctx;
+    use crate::tool_registry::{
+        domain::{CatalogEntry, McpServerId, McpServerName, McpToolDefinition},
+        ports::{ToolCatalogError, ToolCatalogRepository},
+    };
+    use mockable::DefaultClock;
+    use serde_json::json;
+
+    fn catalog_entry(
+        server_id: McpServerId,
+        server_name: &str,
+        tool_name: &str,
+    ) -> Result<CatalogEntry, eyre::Report> {
+        Ok(CatalogEntry::new(
+            server_id,
+            McpServerName::new(server_name)?,
+            McpToolDefinition::new(
+                tool_name,
+                "Reads a file from the workspace",
+                json!({"type": "object", "properties": {"path": {"type": "string"}}}),
+            )?,
+            &DefaultClock,
+        ))
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn sync_server_tools_rejects_duplicate_name_from_another_server() {
+        let catalog = InMemoryToolCatalog::new();
+        let ctx = test_request_ctx();
+        let first_server = McpServerId::new();
+        let second_server = McpServerId::new();
+
+        catalog
+            .sync_server_tools(
+                &ctx,
+                first_server,
+                &[catalog_entry(first_server, "file_tools", "read_file")
+                    .expect("first catalog entry should be valid")],
+            )
+            .await
+            .expect("first sync should succeed");
+
+        let result = catalog
+            .sync_server_tools(
+                &ctx,
+                second_server,
+                &[catalog_entry(second_server, "backup_tools", "read_file")
+                    .expect("second catalog entry should be valid")],
+            )
+            .await;
+
+        assert!(matches!(result, Err(ToolCatalogError::DuplicateEntry(_))));
     }
 }

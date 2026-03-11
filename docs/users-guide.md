@@ -567,6 +567,8 @@ The `LogRetentionPolicy` controls log rotation:
 ```rust,no_run
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::tool_registry::{
     adapters::{
         AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,

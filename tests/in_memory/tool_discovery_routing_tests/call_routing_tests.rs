@@ -1,14 +1,11 @@
-//! Multi-server routing and ambiguity detection tests.
+//! Multi-server routing and duplicate rejection tests.
 
 use super::{
     IntegrationContext, integration_ctx, read_file_tool, register_start_discover, request_ctx,
     search_code_tool,
 };
 use corbusier::context::RequestContext;
-use corbusier::tool_registry::{
-    domain::{McpServerName, ToolCallRequest, ToolRegistryDomainError},
-    services::ToolDiscoveryRoutingServiceError,
-};
+use corbusier::tool_registry::domain::{McpServerName, ToolCallRequest};
 use eyre::Result;
 use mockable::DefaultClock;
 use rstest::rstest;
@@ -71,11 +68,10 @@ async fn two_servers_route_correctly(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn ambiguous_tool_name_returns_error(
+async fn duplicate_tool_name_is_rejected_during_discovery(
     request_ctx: RequestContext,
     integration_ctx: IntegrationContext,
 ) -> Result<()> {
-    // Two servers both expose read_file.
     register_start_discover(
         &request_ctx,
         &integration_ctx,
@@ -83,27 +79,13 @@ async fn ambiguous_tool_name_returns_error(
         vec![read_file_tool()?],
     )
     .await?;
-    register_start_discover(
+    let _err = register_start_discover(
         &request_ctx,
         &integration_ctx,
         "backup_tools",
         vec![read_file_tool()?],
     )
-    .await?;
-
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    assert!(matches!(
-        integration_ctx
-            .discovery
-            .call_tool(&request_ctx, &request)
-            .await,
-        Err(ToolDiscoveryRoutingServiceError::Domain(
-            ToolRegistryDomainError::AmbiguousToolName {
-                server_count: 2,
-                ..
-            }
-        ))
-    ));
+    .await
+    .expect_err("second discovery should reject duplicate tool name");
     Ok(())
 }

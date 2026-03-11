@@ -2,18 +2,15 @@
 
 use std::sync::Arc;
 
-use corbusier::{
-    context::RequestContext,
-    tool_registry::{
-        adapters::{
-            AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
-            postgres::{McpServerPgPool, PostgresMcpServerRegistry, PostgresToolCatalog},
-        },
-        domain::{LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport},
-        services::{
-            McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
-            ToolDiscoveryRoutingService,
-        },
+use corbusier::tool_registry::{
+    adapters::{
+        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        postgres::{McpServerPgPool, PostgresMcpServerRegistry, PostgresToolCatalog},
+    },
+    domain::{LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport},
+    services::{
+        McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
+        ToolDiscoveryRoutingService,
     },
 };
 use diesel::PgConnection;
@@ -26,7 +23,8 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_ctx,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
+    test_request_ctx,
 };
 
 type TestLifecycleService =
@@ -114,15 +112,6 @@ fn read_file_tool() -> Result<McpToolDefinition, eyre::Report> {
         "Reads a file from the workspace",
         json!({"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}),
     )?)
-}
-
-fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
-    RequestContext::new(
-        corbusier::context::TenantId::new(),
-        source.correlation_id(),
-        source.user_id(),
-        source.session_id(),
-    )
 }
 
 #[derive(diesel::QueryableByName, Debug)]

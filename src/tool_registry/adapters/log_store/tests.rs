@@ -54,7 +54,6 @@ async fn sweep_deletes_expired_entries(adapter: ObjectStoreLogAdapter) -> ToolLo
     let sweep = SweepContext {
         policy: &retention,
         now,
-        entry_metadata: &[], // service passes empty slice
     };
 
     let swept = adapter.sweep_expired(&ctx, server_id, &sweep).await?;
@@ -88,7 +87,6 @@ async fn sweep_does_not_delete_unexpired_entries(
     let sweep = SweepContext {
         policy: &retention,
         now,
-        entry_metadata: &[],
     };
 
     let swept = adapter.sweep_expired(&ctx, server_id, &sweep).await?;
@@ -128,7 +126,6 @@ async fn sweep_enforces_count_limit(adapter: ObjectStoreLogAdapter) -> ToolLogSt
     let sweep = SweepContext {
         policy: &retention,
         now,
-        entry_metadata: &[],
     };
 
     let swept = adapter.sweep_expired(&ctx, server_id, &sweep).await?;
@@ -168,7 +165,6 @@ async fn delete_log_removes_metadata(adapter: ObjectStoreLogAdapter) -> ToolLogS
     let sweep = SweepContext {
         policy: &retention,
         now,
-        entry_metadata: &[],
     };
 
     let swept = adapter.sweep_expired(&ctx, server_id, &sweep).await?;
@@ -205,7 +201,6 @@ async fn sweep_only_affects_target_server(
     let sweep = SweepContext {
         policy: &retention,
         now,
-        entry_metadata: &[],
     };
 
     let swept = adapter.sweep_expired(&ctx, server_a, &sweep).await?;

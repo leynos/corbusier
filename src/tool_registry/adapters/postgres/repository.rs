@@ -136,8 +136,7 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
-        let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
+        let tid = ctx.tenant_id().into_inner();
         self.execute_find_query(move |connection| {
             mcp_servers::table
                 .filter(mcp_servers::id.eq(server_id.into_inner()))
@@ -154,8 +153,7 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
-        let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
+        let tid = ctx.tenant_id().into_inner();
         let name = server_name.as_str().to_owned();
         self.execute_find_query(move |connection| {
             mcp_servers::table
@@ -172,8 +170,7 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
         &self,
         ctx: &RequestContext,
     ) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
-        let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
+        let tid = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             let rows = mcp_servers::table
                 .filter(mcp_servers::tenant_id.eq(tid))

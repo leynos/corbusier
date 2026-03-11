@@ -62,28 +62,15 @@ impl ObjectStoreLogAdapter {
             .map_err(|err| ToolLogStoreError::DeleteFailed(err.to_string()))
     }
 
-    /// Collects metadata entries for `server_id` by merging the
-    /// internal in-memory index with `sweep.entry_metadata`.
-    ///
-    /// In-memory entries take precedence when both sources contain
-    /// the same `object_path`.
-    async fn collect_server_metadata(
-        &self,
-        server_id: McpServerId,
-        sweep: &SweepContext<'_>,
-    ) -> Vec<LogEntryMetadata> {
+    /// Collects metadata entries for `server_id` from the internal
+    /// in-memory index.
+    async fn collect_server_metadata(&self, server_id: McpServerId) -> Vec<LogEntryMetadata> {
         let guard = self.metadata.read().await;
-        let mut merged: HashMap<String, LogEntryMetadata> = sweep
-            .entry_metadata
-            .iter()
+        guard
+            .values()
             .filter(|e| e.server_id() == server_id)
-            .map(|e| (e.object_path().to_owned(), e.clone()))
-            .collect();
-        // In-memory entries override externally supplied duplicates.
-        for entry in guard.values().filter(|e| e.server_id() == server_id) {
-            merged.insert(entry.object_path().to_owned(), entry.clone());
-        }
-        merged.into_values().collect()
+            .cloned()
+            .collect()
     }
 
     /// Deletes log entries whose retention period has elapsed.
@@ -247,7 +234,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<usize> {
-        let entries = self.collect_server_metadata(server_id, sweep).await;
+        let entries = self.collect_server_metadata(server_id).await;
 
         // Filter entries to those belonging to the calling tenant.
         let expected_prefix = format!("tool_logs/{}/", ctx.tenant_id());

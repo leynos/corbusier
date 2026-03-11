@@ -44,6 +44,14 @@ pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
 
+/// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
+pub const ADD_TOOL_CATALOG_SQL: &str =
+    include_str!("../../migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql");
+
+/// SQL to add `tenant_id` to tool registry tables for tenant isolation.
+pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
+    include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
+
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
@@ -57,7 +65,7 @@ pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v7";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v8";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -79,6 +87,17 @@ pub fn test_request_context() -> RequestContext {
 /// Alias for [`test_request_context`] used in tool-discovery and lifecycle tests.
 pub fn test_request_ctx() -> RequestContext {
     test_request_context()
+}
+
+/// Clones a request context into a different tenant while preserving the
+/// correlation, user, and session identifiers.
+pub fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        source.correlation_id(),
+        source.user_id(),
+        source.session_id(),
+    )
 }
 
 /// Ensures the template database exists with the schema applied.
@@ -122,14 +141,6 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
     Ok(())
 }
-
-/// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
-pub const ADD_TOOL_CATALOG_SQL: &str =
-    include_str!("../../migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql");
-
-/// SQL to add `tenant_id` to tool registry tables for tenant isolation.
-pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
-    include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
 
 /// Builds a Diesel `r2d2` connection pool for the given database URL.
 ///

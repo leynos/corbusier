@@ -64,7 +64,9 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
         let mut tenants = self.state.write().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        let state = tenants.entry(ctx.tenant_id()).or_default();
+        let Some(state) = tenants.get_mut(&ctx.tenant_id()) else {
+            return Err(McpServerRegistryError::NotFound(server.id()));
+        };
 
         let stored_name = state
             .servers

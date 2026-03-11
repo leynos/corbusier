@@ -1318,32 +1318,32 @@ sequenceDiagram
     participant Host as McpServerHost
     participant LogStore as ToolLogStore
 
-    Caller->>Service: call_tool(request: ToolCallRequest)
+    Caller->>Service: call_tool(request_context, request: ToolCallRequest)
 
     rect rgb(235, 235, 245)
-        Service->>Catalog: find_by_tool_name(tool_name)
+        Service->>Catalog: find_by_tool_name(request_context, tool_name)
         Catalog-->>Service: CatalogEntry or None
         Service-->>Service: check available
         Service-->>Service: validate_parameters(input_schema, parameters)
-        Service->>Policy: evaluate(tool_name, parameters)
+        Service->>Policy: evaluate(request_context, tool_name, parameters)
         Policy-->>Service: PolicyDecision
-        Service->>Registry: find_by_id(server_id)
+        Service->>Registry: find_by_id(request_context, server_id)
         Registry-->>Service: McpServerRegistration
     end
 
-    Service->>Host: call_tool(server, tool_name, parameters)
+    Service->>Host: call_tool(request_context, server, tool_name, parameters)
     Host-->>Service: ToolCallHostResult or McpServerHostError
 
     Service-->>Service: build ToolCallOutcome
     Service-->>Service: build ToolCallResult
 
     alt stderr_output present
-        Service->>LogStore: store_log(LogEntryMetadata::for_tool_call, stderr, LogRetentionPolicy)
+        Service->>LogStore: store_log(request_context, LogEntryMetadata::for_tool_call, stderr, LogRetentionPolicy)
         LogStore-->>Service: result
     end
 
     Service-->>Service: build ToolCallAuditRecord
-    Service->>Catalog: record_audit(audit_record)
+    Service->>Catalog: record_audit(request_context, audit_record)
     Catalog-->>Service: result
 
     Service-->>Caller: ToolCallResult or error

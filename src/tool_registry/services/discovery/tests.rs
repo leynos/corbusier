@@ -6,7 +6,8 @@ mod test_helpers;
 use super::ToolDiscoveryRoutingServiceError;
 use crate::tool_registry::{
     adapters::{
-        DenyAllPolicy, FailingPolicy, InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry,
+        AllowAllPolicy, DenyAllPolicy, FailingPolicy, InMemoryMcpServerHost,
+        memory::InMemoryMcpServerRegistry,
     },
     domain::{McpServerName, ToolCallRequest, ToolRegistryDomainError},
     services::McpServerLifecycleService,
@@ -149,7 +150,7 @@ async fn call_tool_unavailable_tool_returns_error(bundle: TestBundle) -> Result<
     discovery.mark_tools_unavailable(&ctx, server_id).await?;
 
     let err =
-        call_read_file_expecting_error(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await;
+        call_read_file_expecting_error(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await?;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::ToolUnavailable { .. })
@@ -169,7 +170,7 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
     let ctx = test_request_ctx();
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
-    let err = call_read_file_expecting_error(&ctx, &discovery, json!({})).await;
+    let err = call_read_file_expecting_error(&ctx, &discovery, json!({})).await?;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(
@@ -320,31 +321,29 @@ async fn startup_stderr_captured_end_to_end(bundle: TestBundle) -> Result<()> {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn call_tool_ambiguous_returns_error(bundle: TestBundle) -> Result<()> {
-    let TestBundle {
-        host,
-        lifecycle,
-        discovery,
-        ..
-    } = bundle;
+async fn call_tool_ambiguous_returns_error() -> Result<()> {
+    let registry = Arc::new(InMemoryMcpServerRegistry::new());
+    let host = Arc::new(InMemoryMcpServerHost::new());
     let ctx = test_request_ctx();
+    let clock = Arc::new(DefaultClock);
+    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
+    let (discovery, _catalog) = discovery_with_policy(&registry, &host, AllowAllPolicy, &clock);
 
-    // Register and discover the first server with read_file.
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
-
-    // Register a second server that also exposes read_file.
     host.set_tool_catalog(McpServerName::new("code_tools")?, vec![read_file_tool()?])?;
     let second = lifecycle
         .register(&ctx, stdio_request("code_tools")?)
-        .await?;
-    lifecycle.start(&ctx, second.id()).await?;
-    discovery
-        .discover_and_persist_tools(&ctx, second.id())
-        .await?;
+        .await
+        .expect("second registration should succeed");
+    lifecycle
+        .start(&ctx, second.id())
+        .await
+        .expect("second start should succeed");
 
-    // Calling read_file should now be ambiguous.
-    let err =
-        call_read_file_expecting_error(&ctx, &discovery, json!({"path": "/tmp/test.txt"})).await;
+    let err = discovery
+        .discover_and_persist_tools(&ctx, second.id())
+        .await
+        .expect_err("second discovery should reject duplicate tool name");
     assert!(
         matches!(
             err,
@@ -353,7 +352,7 @@ async fn call_tool_ambiguous_returns_error(bundle: TestBundle) -> Result<()> {
                 ..
             })
         ),
-        "expected AmbiguousToolName with server_count=2, got {err:?}",
+        "expected duplicate discovery to map to AmbiguousToolName, got {err:?}",
     );
     Ok(())
 }

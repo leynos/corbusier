@@ -119,7 +119,6 @@ where
         let sweep = SweepContext {
             policy: &self.retention_policy,
             now,
-            entry_metadata: &[],
         };
         Ok(self.log_store.sweep_expired(ctx, server_id, &sweep).await?)
     }

@@ -2,17 +2,14 @@
 
 use std::sync::Arc;
 
-use corbusier::{
-    context::RequestContext,
-    tool_registry::{
-        adapters::{
-            InMemoryMcpServerHost,
-            postgres::{McpServerPgPool, PostgresMcpServerRegistry},
-        },
-        domain::{McpServerHealthStatus, McpServerName, McpToolDefinition, McpTransport},
-        services::{
-            McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest,
-        },
+use corbusier::tool_registry::{
+    adapters::{
+        InMemoryMcpServerHost,
+        postgres::{McpServerPgPool, PostgresMcpServerRegistry},
+    },
+    domain::{McpServerHealthStatus, McpServerName, McpToolDefinition, McpTransport},
+    services::{
+        McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest,
     },
 };
 use diesel::PgConnection;
@@ -24,7 +21,8 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_ctx,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
+    test_request_ctx,
 };
 
 type TestService =
@@ -77,15 +75,6 @@ fn stdio_request(
         name,
         McpTransport::stdio("mcp-server")?,
     ))
-}
-
-fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
-    RequestContext::new(
-        corbusier::context::TenantId::new(),
-        source.correlation_id(),
-        source.user_id(),
-        source.session_id(),
-    )
 }
 
 #[rstest]

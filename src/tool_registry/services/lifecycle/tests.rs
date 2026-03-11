@@ -248,10 +248,15 @@ async fn duplicate_name_is_scoped_per_tenant(
     assert_ne!(first.id(), second.id());
     assert_eq!(service.list_all(&ctx_a).await?.len(), 1);
     assert_eq!(service.list_all(&ctx_b).await?.len(), 1);
+    let found_a = service
+        .find_by_name(&ctx_a, "workspace_tools")
+        .await?
+        .expect("tenant A server should exist");
     let found = service
         .find_by_name(&ctx_b, "workspace_tools")
         .await?
         .expect("tenant B server should exist");
+    assert_eq!(found_a.id(), first.id());
     assert_eq!(found.id(), second.id());
     Ok(())
 }

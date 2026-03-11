@@ -56,20 +56,9 @@ pub struct TestBundle {
 pub fn bundle() -> TestBundle {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
-    let catalog = Arc::new(InMemoryToolCatalog::new());
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let discovery = ToolDiscoveryRoutingService::new(
-        ServicePorts {
-            catalog: catalog.clone(),
-            registry,
-            host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
-            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
-        },
-        LogRetentionPolicy::default(),
-        clock,
-    );
+    let (discovery, catalog) = discovery_with_policy(&registry, &host, AllowAllPolicy, &clock);
     TestBundle {
         host,
         lifecycle,
@@ -185,10 +174,11 @@ pub async fn call_read_file_expecting_error(
     ctx: &RequestContext,
     discovery: &TestDiscoveryService,
     params: serde_json::Value,
-) -> ToolDiscoveryRoutingServiceError {
-    call_read_file(ctx, discovery, params)
-        .await
-        .expect_err("expected call_tool to return an error")
+) -> Result<ToolDiscoveryRoutingServiceError> {
+    match call_read_file(ctx, discovery, params).await {
+        Ok(_) => Err(eyre::eyre!("expected call_tool to return an error")),
+        Err(err) => Ok(err),
+    }
 }
 
 /// Configures the host to return a successful `read_file` result.
@@ -238,6 +228,15 @@ pub type PolicyDiscoveryService<Pol> = ToolDiscoveryRoutingService<
 /// Returns both the service and the catalogue for test assertions.
 /// NOTE: This helper is intended for in-memory, test-only wiring.
 pub fn discovery_with_policy<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
+    registry: &Arc<InMemoryMcpServerRegistry>,
+    host: &Arc<InMemoryMcpServerHost>,
+    policy: Pol,
+    clock: &Arc<DefaultClock>,
+) -> (PolicyDiscoveryService<Pol>, Arc<InMemoryToolCatalog>) {
+    build_discovery_service(registry, host, policy, clock)
+}
+
+fn build_discovery_service<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
     registry: &Arc<InMemoryMcpServerRegistry>,
     host: &Arc<InMemoryMcpServerHost>,
     policy: Pol,
