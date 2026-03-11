@@ -1217,9 +1217,10 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   server's entry.
 - **Audit trail**: every tool call (success or failure) produces a
   `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
-  duration, outcome, and optional stderr log path. All string-valued parameter
-  and outcome content fields are redacted with `[REDACTED]` before persistence
-  to minimize sensitive data exposure in the audit trail.
+  duration, outcome, and optional stderr log path. String-valued fields
+  persisted to `tool_call_audit_log`, including parameter strings, outcome
+  content, and `outcome_error` text, are redacted with `[REDACTED]` before
+  persistence to minimize sensitive data exposure in the audit trail.
 - **Stderr log capture** via a `ToolLogStore` port backed by the Rust
   `object_store` crate. Startup stderr and per-tool-call stderr are stored as
   opaque blobs with structured path keys
@@ -1334,7 +1335,7 @@ sequenceDiagram
         Registry-->>Service: McpServerRegistration
     end
 
-    Service->>Host: call_tool(request_context, server, tool_name, parameters)
+    Service->>Host: call_tool(request_context, server, tool_call_request)
     Host-->>Service: ToolCallHostResult or McpServerHostError
 
     Service-->>Service: build ToolCallOutcome

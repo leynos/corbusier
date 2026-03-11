@@ -8,6 +8,7 @@ use corbusier::message::{
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
 pub use corbusier::test_support::other_tenant_ctx;
+pub use corbusier::test_support::test_request_ctx;
 use corbusier::test_support::test_request_ctx as shared_test_request_ctx;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
@@ -79,11 +80,6 @@ pub fn clock() -> DefaultClock {
 #[fixture]
 pub fn test_request_context() -> RequestContext {
     shared_test_request_ctx()
-}
-
-/// Alias for [`test_request_context`] used in tool-discovery and lifecycle tests.
-pub fn test_request_ctx() -> RequestContext {
-    test_request_context()
 }
 
 /// Ensures the template database exists with the schema applied.

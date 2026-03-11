@@ -3,7 +3,7 @@
 use super::*;
 use crate::test_support::test_request_ctx;
 use crate::tool_registry::domain::{LogCaptureContext, LogRetentionPolicy, McpServerId};
-use crate::tool_registry::ports::SweepContext;
+use crate::tool_registry::ports::{StoreLogRequest, SweepContext};
 use chrono::Duration;
 use mockable::{Clock, DefaultClock};
 use object_store::memory::InMemory;
@@ -24,9 +24,12 @@ async fn store_startup_entry(
 ) -> ToolLogStoreResult<LogEntryMetadata> {
     let content = Bytes::from("test stderr output");
     let metadata = LogEntryMetadata::for_startup(server_id, content.len() as u64, capture_ctx);
-    adapter
-        .store_log(ctx, &metadata, content, capture_ctx.retention)
-        .await?;
+    let request = StoreLogRequest {
+        metadata: &metadata,
+        content,
+        retention: capture_ctx.retention,
+    };
+    adapter.store_log(ctx, &request).await?;
     Ok(metadata)
 }
 

@@ -23,6 +23,7 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,23 @@ impl PostgresToolCatalog {
         .await
     }
 
+    fn validate_same_server(
+        server_id: McpServerId,
+        entries: &[CatalogEntry],
+    ) -> ToolCatalogResult<()> {
+        if let Some(bad) = entries.iter().find(|entry| entry.server_id() != server_id) {
+            return Err(ToolCatalogError::MixedServerBatch {
+                reason: format!(
+                    "entry '{}' belongs to server {} but batch targets {}",
+                    bad.tool().name(),
+                    bad.server_id(),
+                    server_id,
+                ),
+            });
+        }
+        Ok(())
+    }
+
     fn find_duplicate_entry(entries: &[CatalogEntry]) -> Option<ToolCatalogError> {
         let mut seen_names = HashSet::new();
         for entry in entries {
@@ -114,6 +132,126 @@ impl PostgresToolCatalog {
         }
         None
     }
+
+    fn to_new_rows(
+        tenant_id: uuid::Uuid,
+        entries: &[CatalogEntry],
+    ) -> ToolCatalogResult<Vec<NewCatalogEntryRow>> {
+        if let Some(err) = Self::find_duplicate_entry(entries) {
+            return Err(err);
+        }
+        Ok(entries
+            .iter()
+            .map(|entry| entry_to_new_row(entry, tenant_id))
+            .collect())
+    }
+
+    fn sync_rows_tx(
+        conn: &mut PgConnection,
+        tenant_id: uuid::Uuid,
+        server_id: uuid::Uuid,
+        rows: &[NewCatalogEntryRow],
+    ) -> Result<(), diesel::result::Error> {
+        conn.transaction(|transaction| {
+            diesel::delete(
+                mcp_tool_catalog::table
+                    .filter(mcp_tool_catalog::server_id.eq(server_id))
+                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_id)),
+            )
+            .execute(transaction)?;
+
+            if !rows.is_empty() {
+                diesel::insert_into(mcp_tool_catalog::table)
+                    .values(rows)
+                    .execute(transaction)?;
+            }
+            Ok(())
+        })
+    }
+
+    fn load_conflicting_name_counts(
+        connection: &mut PgConnection,
+        tenant_id: uuid::Uuid,
+        server_id: uuid::Uuid,
+        candidate_names: &HashSet<String>,
+    ) -> ToolCatalogResult<HashMap<String, usize>> {
+        mcp_tool_catalog::table
+            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
+            .filter(mcp_tool_catalog::server_id.ne(server_id))
+            .select(mcp_tool_catalog::tool_name)
+            .load::<String>(connection)
+            .map_err(|e| ToolCatalogError::persistence("select", e))
+            .map(|tool_names| {
+                tool_names
+                    .into_iter()
+                    .filter(|tool_name| candidate_names.contains(tool_name))
+                    .fold(HashMap::new(), |mut counts, tool_name| {
+                        *counts.entry(tool_name).or_insert(0usize) += 1;
+                        counts
+                    })
+            })
+    }
+
+    async fn run_sync_in_pool(
+        &self,
+        tenant_id: uuid::Uuid,
+        server_id: uuid::Uuid,
+        rows: Vec<NewCatalogEntryRow>,
+    ) -> ToolCatalogResult<()> {
+        let tenant = TenantId::from_uuid(tenant_id);
+        let candidate_names: HashSet<String> =
+            rows.iter().map(|row| row.tool_name.clone()).collect();
+
+        self.execute_query(tenant, move |connection| {
+            let existing_name_counts = Self::load_conflicting_name_counts(
+                connection,
+                tenant_id,
+                server_id,
+                &candidate_names,
+            )?;
+
+            if let Some(row) = rows
+                .iter()
+                .find(|row| existing_name_counts.contains_key(&row.tool_name))
+            {
+                return Err(Self::duplicate_entry_error(row, &existing_name_counts));
+            }
+
+            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
+                Ok(()) => Ok(()),
+                Err(err @ DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => {
+                    let refreshed_name_counts = Self::load_conflicting_name_counts(
+                        connection,
+                        tenant_id,
+                        server_id,
+                        &candidate_names,
+                    )?;
+
+                    rows.iter()
+                        .find(|row| refreshed_name_counts.contains_key(&row.tool_name))
+                        .map(|row| Self::duplicate_entry_error(row, &refreshed_name_counts))
+                        .map_or_else(
+                            || Err(ToolCatalogError::persistence("transaction", err)),
+                            Err,
+                        )
+                }
+                Err(e) => Err(ToolCatalogError::persistence("transaction", e)),
+            }
+        })
+        .await
+    }
+
+    fn duplicate_entry_error(
+        row: &NewCatalogEntryRow,
+        name_counts: &HashMap<String, usize>,
+    ) -> ToolCatalogError {
+        let server_count = name_counts.get(&row.tool_name).copied().unwrap_or_default() + 1;
+        ToolCatalogError::DuplicateEntry {
+            id: CatalogEntryId::from_uuid(row.id),
+            tool_name: row.tool_name.clone(),
+            server_count,
+        }
+    }
 }
 
 #[async_trait]
@@ -124,80 +262,11 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         server_id: McpServerId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
-        if let Some(bad) = entries.iter().find(|e| e.server_id() != server_id) {
-            return Err(ToolCatalogError::MixedServerBatch {
-                reason: format!(
-                    "entry '{}' belongs to server {} but batch targets {}",
-                    bad.tool().name(),
-                    bad.server_id(),
-                    server_id,
-                ),
-            });
-        }
-        if let Some(err) = Self::find_duplicate_entry(entries) {
-            return Err(err);
-        }
-        let tenant_id = ctx.tenant_id();
-        let sid = server_id.into_inner();
-        let tid = tenant_id.into_inner();
-        let rows: Vec<NewCatalogEntryRow> =
-            entries.iter().map(|e| entry_to_new_row(e, tid)).collect();
-        let entry_conflicts: Vec<(CatalogEntryId, String)> = entries
-            .iter()
-            .map(|entry| (entry.id(), entry.tool().name().to_owned()))
-            .collect();
-        let candidate_names: HashSet<String> = entries
-            .iter()
-            .map(|entry| entry.tool().name().to_owned())
-            .collect();
-
-        self.execute_query(tenant_id, move |connection| {
-            let existing_name_counts = mcp_tool_catalog::table
-                .filter(mcp_tool_catalog::tenant_id.eq(tid))
-                .filter(mcp_tool_catalog::server_id.ne(sid))
-                .select(mcp_tool_catalog::tool_name)
-                .load::<String>(connection)
-                .map_err(|e| ToolCatalogError::persistence("select", e))?
-                .into_iter()
-                .filter(|tool_name| candidate_names.contains(tool_name))
-                .fold(HashMap::new(), |mut counts, tool_name| {
-                    *counts.entry(tool_name).or_insert(0usize) += 1;
-                    counts
-                });
-
-            if let Some((id, tool_name)) = entry_conflicts
-                .iter()
-                .find(|(_, tool_name)| existing_name_counts.contains_key(tool_name))
-            {
-                let server_count = existing_name_counts
-                    .get(tool_name)
-                    .copied()
-                    .unwrap_or_default()
-                    + 1;
-                return Err(ToolCatalogError::DuplicateEntry {
-                    id: *id,
-                    tool_name: tool_name.clone(),
-                    server_count,
-                });
-            }
-
-            diesel::delete(
-                mcp_tool_catalog::table
-                    .filter(mcp_tool_catalog::server_id.eq(sid))
-                    .filter(mcp_tool_catalog::tenant_id.eq(tid)),
-            )
-            .execute(connection)
-            .map_err(|e| ToolCatalogError::persistence("delete", e))?;
-
-            for row in &rows {
-                diesel::insert_into(mcp_tool_catalog::table)
-                    .values(row)
-                    .execute(connection)
-                    .map_err(|e| ToolCatalogError::persistence("insert", e))?;
-            }
-            Ok(())
-        })
-        .await
+        Self::validate_same_server(server_id, entries)?;
+        let tenant_id = ctx.tenant_id().into_inner();
+        let rows = Self::to_new_rows(tenant_id, entries)?;
+        self.run_sync_in_pool(tenant_id, server_id.into_inner(), rows)
+            .await
     }
 
     async fn mark_server_tools_unavailable(

@@ -7,8 +7,8 @@ use crate::tool_registry::{
         ToolCallResult,
     },
     ports::{
-        McpServerHost, McpServerRegistryRepository, SweepContext, ToolCatalogRepository,
-        ToolLogStore, ToolPolicyEnforcer,
+        McpServerHost, McpServerRegistryRepository, StoreLogRequest, SweepContext,
+        ToolCatalogRepository, ToolLogStore, ToolPolicyEnforcer,
     },
 };
 use mockable::Clock;
@@ -98,9 +98,12 @@ where
             tenant_id: ctx.tenant_id(),
         };
         let metadata = LogEntryMetadata::for_startup(server_id, byte_count, &capture_ctx);
-        self.log_store
-            .store_log(ctx, &metadata, stderr, &self.retention_policy)
-            .await?;
+        let request = StoreLogRequest {
+            metadata: &metadata,
+            content: stderr,
+            retention: &self.retention_policy,
+        };
+        self.log_store.store_log(ctx, &request).await?;
         let _sweep_count = self.sweep_expired_logs(ctx, server_id).await;
         Ok(metadata)
     }
@@ -145,11 +148,12 @@ where
             &capture_ctx,
         );
         let path = metadata.object_path().to_owned();
-        match self
-            .log_store
-            .store_log(ctx, &metadata, stderr, &self.retention_policy)
-            .await
-        {
+        let request = StoreLogRequest {
+            metadata: &metadata,
+            content: stderr,
+            retention: &self.retention_policy,
+        };
+        match self.log_store.store_log(ctx, &request).await {
             Ok(()) => Some(path),
             Err(_) => None,
         }

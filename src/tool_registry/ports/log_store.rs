@@ -13,6 +13,16 @@ use thiserror::Error;
 /// Result type for log store operations.
 pub type ToolLogStoreResult<T> = Result<T, ToolLogStoreError>;
 
+/// Request payload for storing a log blob.
+pub struct StoreLogRequest<'a> {
+    /// Metadata describing the blob to store.
+    pub metadata: &'a LogEntryMetadata,
+    /// Blob content to write.
+    pub content: bytes::Bytes,
+    /// Retention policy governing truncation limits.
+    pub retention: &'a LogRetentionPolicy,
+}
+
 /// Context bundle for a log retention sweep.
 ///
 /// Groups the policy and wall-clock timestamp that
@@ -41,16 +51,10 @@ pub trait ToolLogStore: Send + Sync {
     /// # Errors
     ///
     /// Returns [`ToolLogStoreError::StoreFailed`] when the write fails.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "RequestContext plumbing adds one parameter beyond the natural arity"
-    )]
     async fn store_log(
         &self,
         ctx: &RequestContext,
-        metadata: &LogEntryMetadata,
-        content: bytes::Bytes,
-        retention: &LogRetentionPolicy,
+        req: &StoreLogRequest<'_>,
     ) -> ToolLogStoreResult<()>;
 
     /// Reads a log blob by path.

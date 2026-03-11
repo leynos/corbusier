@@ -3,6 +3,10 @@ name = "corbusier"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+test-support = []
+
 [dependencies]
 # Serialisation
 serde = { version = "1.0.228", features = ["derive"] }
@@ -50,6 +54,7 @@ pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "asyn
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
+corbusier = { path = ".", features = ["test-support"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = { version = "0.5.0", features = ["strict-compile-time-validation"] }

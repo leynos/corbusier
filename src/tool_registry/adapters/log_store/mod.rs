@@ -9,10 +9,9 @@
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy, McpServerId,
-        PersistedLogEntryData, ToolCallId,
+        LogEntryId, LogEntryKind, LogEntryMetadata, McpServerId, PersistedLogEntryData, ToolCallId,
     },
-    ports::{SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
+    ports::{StoreLogRequest, SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -205,13 +204,11 @@ impl ToolLogStore for ObjectStoreLogAdapter {
     async fn store_log(
         &self,
         ctx: &RequestContext,
-        metadata: &LogEntryMetadata,
-        content: Bytes,
-        retention: &LogRetentionPolicy,
+        req: &StoreLogRequest<'_>,
     ) -> ToolLogStoreResult<()> {
-        validate_tenant_prefix(ctx, metadata.object_path())?;
-        let path = Path::from(metadata.object_path());
-        let truncated = truncate_if_needed(content, retention.max_bytes_per_log);
+        validate_tenant_prefix(ctx, req.metadata.object_path())?;
+        let path = Path::from(req.metadata.object_path());
+        let truncated = truncate_if_needed(req.content.clone(), req.retention.max_bytes_per_log);
         self.store
             .put(&path, truncated.into())
             .await
@@ -221,7 +218,7 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         self.metadata
             .write()
             .await
-            .insert(metadata.object_path().to_owned(), metadata.clone());
+            .insert(req.metadata.object_path().to_owned(), req.metadata.clone());
         Ok(())
     }
 
