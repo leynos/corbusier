@@ -1,6 +1,6 @@
 //! In-memory repository for MCP server registrations.
 
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::tool_registry::{
     domain::{McpServerId, McpServerName, McpServerRegistration},
     ports::{McpServerRegistryError, McpServerRegistryRepository, McpServerRegistryResult},
@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 /// Thread-safe in-memory MCP server registry repository.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryMcpServerRegistry {
-    state: Arc<RwLock<InMemoryRegistryState>>,
+    state: Arc<RwLock<HashMap<TenantId, InMemoryRegistryState>>>,
 }
 
 #[derive(Debug, Default)]
@@ -33,12 +33,13 @@ impl InMemoryMcpServerRegistry {
 impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
     async fn register(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerRegistryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
+        let mut tenants = self.state.write().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         if state.servers.contains_key(&server.id()) {
             return Err(McpServerRegistryError::DuplicateServer(server.id()));
@@ -57,12 +58,13 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
 
     async fn update(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerRegistryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
+        let mut tenants = self.state.write().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
+        let state = tenants.entry(ctx.tenant_id()).or_default();
 
         let stored_name = state
             .servers
@@ -90,38 +92,45 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        Ok(state.servers.get(&server_id).cloned())
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .and_then(|state| state.servers.get(&server_id).cloned()))
     }
 
     async fn find_by_name(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        let server = state
-            .name_index
-            .get(server_name)
-            .and_then(|id| state.servers.get(id))
-            .cloned();
+        let server = tenants.get(&ctx.tenant_id()).and_then(|state| {
+            state
+                .name_index
+                .get(server_name)
+                .and_then(|id| state.servers.get(id))
+                .cloned()
+        });
         Ok(server)
     }
 
     async fn list_all(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
     ) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
-        let state = self.state.read().map_err(|err| {
+        let tenants = self.state.read().map_err(|err| {
             McpServerRegistryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        Ok(state.servers.values().cloned().collect())
+        Ok(tenants
+            .get(&ctx.tenant_id())
+            .map(|state| state.servers.values().cloned().collect())
+            .unwrap_or_default())
     }
 }

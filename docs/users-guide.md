@@ -448,6 +448,8 @@ are only allowed when a server is in the `running` lifecycle state.
 ```rust,no_run
 use std::sync::Arc;
 
+use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
+use corbusier::tenant::TenantId;
 use corbusier::tool_registry::{
     adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
     domain::{McpServerName, McpToolDefinition, McpTransport},

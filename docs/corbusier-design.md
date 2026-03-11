@@ -1234,12 +1234,10 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   - 100 logs per server maximum; oldest logs are deleted first.
   - Retention sweeps run during `store_startup_stderr` and can be triggered
     explicitly via `sweep_expired_logs`.
-- **Tenant scoping**: all three tool registry child tables carry a `tenant_id`
-  column. The `mcp_servers` table does **not** carry a `tenant_id` column;
-  consequently the foreign keys on the child tables reference only
-  `mcp_servers(id)`, not a composite `(server_id, tenant_id)`. Tenant isolation
-  is enforced at the application layer through `RequestContext` propagation
-  and, in the PostgreSQL adapter, via `SET LOCAL app.tenant_id`.
+- **Tenant scoping**: `mcp_servers` and all tool-registry child tables carry a
+  `tenant_id` column. Child foreign keys reference `(server_id, tenant_id)`,
+  enforcing cross-tenant isolation at the database boundary in addition to
+  `RequestContext` scoping and `SET LOCAL app.tenant_id`.
 
 _Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
 persistence model. The `mcp_servers` table is the parent entity; each server
@@ -1251,6 +1249,7 @@ can host many tools (via `mcp_tool_catalog`), produce many audit log entries
 erDiagram
     mcp_servers {
         uuid id PK
+        uuid tenant_id
         varchar name
         varchar transport
     }
@@ -1297,9 +1296,9 @@ erDiagram
         timestamptz expires_at
     }
 
-    mcp_servers ||--o{ mcp_tool_catalog : hosts_tools
-    mcp_servers ||--o{ tool_log_metadata : has_logs
-    mcp_servers ||--o{ tool_call_audit_log : handles_calls
+    mcp_servers ||--o{ mcp_tool_catalog : "(id, tenant_id)"
+    mcp_servers ||--o{ tool_log_metadata : "(id, tenant_id)"
+    mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
 ```
 
 _Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within

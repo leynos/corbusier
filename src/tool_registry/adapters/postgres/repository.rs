@@ -4,7 +4,7 @@ use super::{
     models::{McpServerRow, NewMcpServerRow},
     schema::mcp_servers,
 };
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::tool_registry::{
     domain::{
         McpServerHealthSnapshot, McpServerHealthStatus, McpServerId, McpServerLifecycleState,
@@ -68,12 +68,12 @@ impl PostgresMcpServerRegistry {
 impl McpServerRegistryRepository for PostgresMcpServerRegistry {
     async fn register(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerRegistryResult<()> {
         let server_id = server.id();
         let server_name = server.name().clone();
-        let new_row = to_new_row(server)?;
+        let new_row = to_new_row(server, ctx.tenant_id())?;
 
         self.run_blocking(move |connection| {
             diesel::insert_into(mcp_servers::table)
@@ -97,25 +97,29 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn update(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server: &McpServerRegistration,
     ) -> McpServerRegistryResult<()> {
         let server_id = server.id().into_inner();
+        let tenant_id = ctx.tenant_id().into_inner();
         let serialized = serialize_server_fields(server)?;
 
         self.run_blocking(move |connection| {
-            let updated_count =
-                diesel::update(mcp_servers::table.filter(mcp_servers::id.eq(server_id)))
-                    .set((
-                        mcp_servers::transport.eq(&serialized.transport),
-                        mcp_servers::lifecycle_state.eq(&serialized.lifecycle_state),
-                        mcp_servers::health_status.eq(&serialized.health_status),
-                        mcp_servers::health_message.eq(&serialized.health_message),
-                        mcp_servers::health_checked_at.eq(serialized.health_checked_at),
-                        mcp_servers::updated_at.eq(serialized.updated_at),
-                    ))
-                    .execute(connection)
-                    .map_err(McpServerRegistryError::persistence)?;
+            let updated_count = diesel::update(
+                mcp_servers::table
+                    .filter(mcp_servers::id.eq(server_id))
+                    .filter(mcp_servers::tenant_id.eq(tenant_id)),
+            )
+            .set((
+                mcp_servers::transport.eq(&serialized.transport),
+                mcp_servers::lifecycle_state.eq(&serialized.lifecycle_state),
+                mcp_servers::health_status.eq(&serialized.health_status),
+                mcp_servers::health_message.eq(&serialized.health_message),
+                mcp_servers::health_checked_at.eq(serialized.health_checked_at),
+                mcp_servers::updated_at.eq(serialized.updated_at),
+            ))
+            .execute(connection)
+            .map_err(McpServerRegistryError::persistence)?;
 
             if updated_count == 0 {
                 return Err(McpServerRegistryError::NotFound(McpServerId::from_uuid(
@@ -129,12 +133,15 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
         self.execute_find_query(move |connection| {
             mcp_servers::table
                 .filter(mcp_servers::id.eq(server_id.into_inner()))
+                .filter(mcp_servers::tenant_id.eq(tid))
                 .select(McpServerRow::as_select())
                 .first::<McpServerRow>(connection)
                 .optional()
@@ -144,13 +151,16 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn find_by_name(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         server_name: &McpServerName,
     ) -> McpServerRegistryResult<Option<McpServerRegistration>> {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
         let name = server_name.as_str().to_owned();
         self.execute_find_query(move |connection| {
             mcp_servers::table
                 .filter(mcp_servers::name.eq(&name))
+                .filter(mcp_servers::tenant_id.eq(tid))
                 .select(McpServerRow::as_select())
                 .first::<McpServerRow>(connection)
                 .optional()
@@ -160,10 +170,13 @@ impl McpServerRegistryRepository for PostgresMcpServerRegistry {
 
     async fn list_all(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
     ) -> McpServerRegistryResult<Vec<McpServerRegistration>> {
+        let tenant_id = ctx.tenant_id();
+        let tid = tenant_id.into_inner();
         self.run_blocking(move |connection| {
             let rows = mcp_servers::table
+                .filter(mcp_servers::tenant_id.eq(tid))
                 .select(McpServerRow::as_select())
                 .load::<McpServerRow>(connection)
                 .map_err(McpServerRegistryError::persistence)?;
@@ -199,11 +212,15 @@ fn serialize_server_fields(
     })
 }
 
-fn to_new_row(server: &McpServerRegistration) -> McpServerRegistryResult<NewMcpServerRow> {
+fn to_new_row(
+    server: &McpServerRegistration,
+    tenant_id: TenantId,
+) -> McpServerRegistryResult<NewMcpServerRow> {
     let serialized = serialize_server_fields(server)?;
 
     Ok(NewMcpServerRow {
         id: server.id().into_inner(),
+        tenant_id: tenant_id.into_inner(),
         name: server.name().as_str().to_owned(),
         transport: serialized.transport,
         lifecycle_state: serialized.lifecycle_state,
@@ -237,6 +254,7 @@ fn serialize_health(
 fn row_to_server(row: McpServerRow) -> McpServerRegistryResult<McpServerRegistration> {
     let McpServerRow {
         id,
+        tenant_id: _tenant_id,
         name,
         transport,
         lifecycle_state,
@@ -290,5 +308,5 @@ fn build_health_snapshot(
 
 fn is_name_unique_violation(info: &dyn diesel::result::DatabaseErrorInformation) -> bool {
     info.constraint_name()
-        .is_some_and(|name| name == "idx_mcp_servers_name")
+        .is_some_and(|name| matches!(name, "idx_mcp_servers_name" | "idx_mcp_servers_tenant_name"))
 }

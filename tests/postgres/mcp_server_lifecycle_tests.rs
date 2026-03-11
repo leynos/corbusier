@@ -2,14 +2,17 @@
 
 use std::sync::Arc;
 
-use corbusier::tool_registry::{
-    adapters::{
-        InMemoryMcpServerHost,
-        postgres::{McpServerPgPool, PostgresMcpServerRegistry},
-    },
-    domain::{McpServerHealthStatus, McpServerName, McpToolDefinition, McpTransport},
-    services::{
-        McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest,
+use corbusier::{
+    context::RequestContext,
+    tool_registry::{
+        adapters::{
+            InMemoryMcpServerHost,
+            postgres::{McpServerPgPool, PostgresMcpServerRegistry},
+        },
+        domain::{McpServerHealthStatus, McpServerName, McpToolDefinition, McpTransport},
+        services::{
+            McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest,
+        },
     },
 };
 use diesel::PgConnection;
@@ -74,6 +77,15 @@ fn stdio_request(
         name,
         McpTransport::stdio("mcp-server")?,
     ))
+}
+
+fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        corbusier::context::TenantId::new(),
+        source.correlation_id(),
+        source.user_id(),
+        source.session_id(),
+    )
 }
 
 #[rstest]
@@ -206,6 +218,45 @@ async fn postgres_duplicate_name_is_rejected(
             corbusier::tool_registry::ports::McpServerRegistryError::DuplicateServerName(_)
         ))
     ));
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_duplicate_name_is_scoped_per_tenant(
+    #[future] context: Result<McpServerTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let tenant_a = test_request_ctx();
+    let tenant_b = other_tenant_ctx(&tenant_a);
+
+    let first = ctx
+        .service
+        .register(
+            &tenant_a,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
+        .await
+        .expect("first registration should succeed");
+    let second = ctx
+        .service
+        .register(
+            &tenant_b,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
+        .await
+        .expect("second tenant registration should succeed");
+
+    assert_ne!(first.id(), second.id());
+    assert_eq!(ctx.service.list_all(&tenant_a).await?.len(), 1);
+    assert_eq!(ctx.service.list_all(&tenant_b).await?.len(), 1);
+    let found = ctx
+        .service
+        .find_by_name(&tenant_b, "workspace_tools")
+        .await?
+        .expect("tenant B server should exist");
+    assert_eq!(found.id(), second.id());
 
     Ok(())
 }

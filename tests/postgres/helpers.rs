@@ -49,11 +49,15 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
 );
 
+/// SQL to tenant-scope `mcp_servers` and enforce composite child foreign keys.
+pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
+    include_str!("../../migrations/2026-03-11-000000_tenant_scope_mcp_servers/up.sql");
+
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v6";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v7";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -115,6 +119,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
     Ok(())
 }
 

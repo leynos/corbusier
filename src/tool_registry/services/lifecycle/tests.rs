@@ -2,7 +2,7 @@
 
 use super::{McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest};
 use crate::{
-    context::RequestContext,
+    context::{RequestContext, TenantId},
     test_support::HealthProbeFailureHost,
     tool_registry::{
         adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
@@ -45,6 +45,15 @@ fn service_bundle() -> (Arc<InMemoryMcpServerHost>, TestService) {
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
     let transport = McpTransport::stdio("mcp-server")?;
     Ok(RegisterMcpServerRequest::new(name, transport))
+}
+
+fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        source.correlation_id(),
+        source.user_id(),
+        source.session_id(),
+    )
 }
 
 /// Creates a standard `read_file` tool definition.
@@ -217,5 +226,32 @@ async fn start_returns_health_refresh_failed_when_health_probe_fails() -> Result
         result,
         Err(McpServerLifecycleServiceError::HealthRefreshFailed { .. })
     ));
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_name_is_scoped_per_tenant(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) -> Result<()> {
+    let (_, service) = service_bundle;
+    let ctx_a = test_request_ctx();
+    let ctx_b = other_tenant_ctx(&ctx_a);
+
+    let first = service
+        .register(&ctx_a, stdio_request("workspace_tools")?)
+        .await?;
+    let second = service
+        .register(&ctx_b, stdio_request("workspace_tools")?)
+        .await?;
+
+    assert_ne!(first.id(), second.id());
+    assert_eq!(service.list_all(&ctx_a).await?.len(), 1);
+    assert_eq!(service.list_all(&ctx_b).await?.len(), 1);
+    let found = service
+        .find_by_name(&ctx_b, "workspace_tools")
+        .await?
+        .expect("tenant B server should exist");
+    assert_eq!(found.id(), second.id());
     Ok(())
 }

@@ -13,6 +13,9 @@ pub struct McpServerRow {
     /// Internal server identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub tenant_id: uuid::Uuid,
     /// Unique server name.
     #[diesel(sql_type = diesel::sql_types::Varchar)]
     pub name: String,
@@ -45,6 +48,8 @@ pub struct McpServerRow {
 pub struct NewMcpServerRow {
     /// Internal server identifier.
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Unique server name.
     pub name: String,
     /// Transport configuration payload.
