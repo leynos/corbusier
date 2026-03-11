@@ -12,6 +12,7 @@ use crate::agent_backend::{
         TurnSessionRepositoryError,
     },
 };
+use crate::context::RequestContext;
 use chrono::Duration;
 use mockable::Clock;
 use std::collections::HashMap;
@@ -290,6 +291,7 @@ where
     /// routing fails.
     pub async fn execute_turn(
         &self,
+        ctx: &RequestContext,
         request: ExecuteAgentTurnRequest,
     ) -> AgentTurnOrchestrationResult<ExecuteAgentTurnResponse> {
         let conversation_id = request.turn.conversation_id();
@@ -300,7 +302,7 @@ where
 
         let backend = self
             .backend_registry
-            .find_by_id(request.backend_id)
+            .find_by_id(ctx, request.backend_id)
             .await?
             .ok_or(AgentTurnOrchestrationError::BackendNotFound(
                 request.backend_id,

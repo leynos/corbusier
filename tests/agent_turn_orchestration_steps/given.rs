@@ -21,7 +21,7 @@ fn an_active_backend_named(world: &mut AgentTurnWorld, name: String) -> Result<(
     let registration =
         AgentBackendRegistration::new(backend_name, capabilities, info, &mockable::DefaultClock);
     world.backend_id = Some(registration.id());
-    run_async(world.backend_registry.register(&registration))?;
+    run_async(world.backend_registry.register(&world.ctx, &registration))?;
     Ok(())
 }
 

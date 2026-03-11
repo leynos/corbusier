@@ -14,6 +14,7 @@ use corbusier::agent_backend::{
         AgentTurnOrchestratorService, ExecuteAgentTurnResponse,
     },
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use mockable::DefaultClock;
 use rstest::fixture;
 use uuid::Uuid;
@@ -47,6 +48,8 @@ pub struct AgentTurnWorld {
     pub last_result: Option<Result<ExecuteAgentTurnResponse, AgentTurnOrchestrationError>>,
     /// Existing session ID used by reuse/rotation scenarios.
     pub existing_session_id: Option<TurnSessionId>,
+    /// Request context for tenant-scoped orchestration operations.
+    pub ctx: RequestContext,
 }
 
 impl AgentTurnWorld {
@@ -80,6 +83,12 @@ impl AgentTurnWorld {
             conversations: HashMap::new(),
             last_result: None,
             existing_session_id: None,
+            ctx: RequestContext::new(
+                TenantId::new(),
+                CorrelationId::new(),
+                UserId::new(),
+                SessionId::new(),
+            ),
         }
     }
 

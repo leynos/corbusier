@@ -19,6 +19,7 @@ use corbusier::agent_backend::{
         RegisterBackendRequest,
     },
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use corbusier::message::domain::ConversationId;
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
@@ -44,6 +45,7 @@ type TestRegistryService = BackendRegistryService<PostgresBackendRegistry, Defau
 
 struct OrchestrationContext {
     cluster: PostgresCluster,
+    ctx: RequestContext,
     service: TestOrchestrator,
     registry_service: TestRegistryService,
     session_repository: Arc<PostgresTurnSessionRepository>,
@@ -85,6 +87,12 @@ async fn setup_context(cluster: PostgresCluster) -> Result<OrchestrationContext,
 
     Ok(OrchestrationContext {
         cluster,
+        ctx: RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        ),
         service,
         registry_service,
         session_repository,
@@ -110,6 +118,7 @@ async fn register_backend(context: &OrchestrationContext, name: &str) -> Result<
     let backend = context
         .registry_service
         .register(
+            &context.ctx,
             RegisterBackendRequest::new(name, name, "1.0.0", "test-provider")
                 .with_capabilities(true, true),
         )
@@ -154,10 +163,13 @@ async fn postgres_orchestrates_turn_and_reuses_session(
 
     let first = ctx
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "first", Vec::new()),
-        ))
+        .execute_turn(
+            &ctx.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "first", Vec::new()),
+            ),
+        )
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
 
@@ -167,10 +179,13 @@ async fn postgres_orchestrates_turn_and_reuses_session(
 
     let second = ctx
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "second", Vec::new()),
-        ))
+        .execute_turn(
+            &ctx.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "second", Vec::new()),
+            ),
+        )
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
 
@@ -218,10 +233,13 @@ async fn postgres_rotates_expired_session(
 
     let response = ctx
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "rotate", Vec::new()),
-        ))
+        .execute_turn(
+            &ctx.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "rotate", Vec::new()),
+            ),
+        )
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
 
@@ -271,8 +289,8 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
     );
 
     let (first_result, second_result) = tokio::join!(
-        ctx.service.execute_turn(first_request),
-        ctx.service.execute_turn(second_request)
+        ctx.service.execute_turn(&ctx.ctx, first_request),
+        ctx.service.execute_turn(&ctx.ctx, second_request)
     );
 
     let first_response = first_result.map_err(|err| Box::new(err) as BoxError)?;
@@ -333,10 +351,13 @@ async fn postgres_propagates_tool_routing_failure(
 
     let result = ctx
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "fail", Vec::new()),
-        ))
+        .execute_turn(
+            &ctx.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "fail", Vec::new()),
+            ),
+        )
         .await;
 
     assert!(matches!(

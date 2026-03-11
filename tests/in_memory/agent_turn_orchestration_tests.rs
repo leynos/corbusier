@@ -18,6 +18,7 @@ use corbusier::agent_backend::{
         AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
     },
 };
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 use serde_json::json;
@@ -37,6 +38,7 @@ struct TestContext {
     runtime: Arc<InMemoryAgentRuntime>,
     router: Arc<InMemoryToolRouter>,
     service: TestOrchestrator,
+    ctx: RequestContext,
 }
 
 #[fixture]
@@ -64,6 +66,12 @@ fn context() -> TestContext {
         runtime,
         router,
         service,
+        ctx: RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        ),
     }
 }
 
@@ -80,7 +88,7 @@ async fn register_backend(context: &TestContext, name: &str) -> Result<uuid::Uui
         context.backend_registry.clone(),
         Arc::new(DefaultClock),
     );
-    let backend = registry_service.register(request).await?;
+    let backend = registry_service.register(&context.ctx, request).await?;
     Ok(backend.id().into_inner())
 }
 
@@ -104,10 +112,13 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
 
     let first = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "first", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "first", Vec::new()),
+            ),
+        )
         .await?;
 
     context
@@ -116,10 +127,13 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
 
     let second = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "second", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "second", Vec::new()),
+            ),
+        )
         .await?;
 
     assert!(!first.reused_session());
@@ -164,10 +178,13 @@ async fn rotates_expired_session_and_marks_prior_session_expired(
 
     let response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "next", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "next", Vec::new()),
+            ),
+        )
         .await?;
 
     assert!(response.rotated_session());
@@ -197,10 +214,13 @@ async fn propagates_tool_router_failures(context: TestContext) -> Result<(), eyr
 
     let result = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(Uuid::new_v4(), "run", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(Uuid::new_v4(), "run", Vec::new()),
+            ),
+        )
         .await;
 
     assert!(matches!(

@@ -17,6 +17,6 @@ fn execute_turn_for_conversation(
         backend_id,
         TurnExecutionRequest::new(conversation_id, "bdd prompt", Vec::new()),
     );
-    world.last_result = Some(run_async(world.service.execute_turn(request)));
+    world.last_result = Some(run_async(world.service.execute_turn(&world.ctx, request)));
     Ok(())
 }

@@ -19,6 +19,7 @@ use crate::agent_backend::{
         AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
     },
 };
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use chrono::{Duration, Utc};
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
@@ -40,6 +41,7 @@ struct OrchestrationContext {
     tool_router: Arc<InMemoryToolRouter>,
     service: TestOrchestrator,
     clock: Arc<DefaultClock>,
+    ctx: RequestContext,
 }
 
 #[fixture]
@@ -69,6 +71,12 @@ fn context() -> OrchestrationContext {
         tool_router,
         service,
         clock,
+        ctx: RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        ),
     }
 }
 
@@ -93,7 +101,10 @@ async fn register_backend(
 ) -> Result<BackendId, eyre::Report> {
     let registration = create_backend_registration(name, context.clock.as_ref())?;
     let backend_id = registration.id();
-    context.backend_registry.register(&registration).await?;
+    context
+        .backend_registry
+        .register(&context.ctx, &registration)
+        .await?;
     Ok(backend_id)
 }
 
@@ -123,7 +134,7 @@ async fn execute_turn_routes_tool_calls_and_returns_audits(
     let turn = TurnExecutionRequest::new(conversation_id, "Process this", Vec::new());
     let response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(backend_id, turn))
+        .execute_turn(&context.ctx, ExecuteAgentTurnRequest::new(backend_id, turn))
         .await?;
 
     assert_eq!(response.assistant_response(), "assistant response");
@@ -162,10 +173,13 @@ async fn execute_turn_propagates_runtime_failure(
 
     let result = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(Uuid::new_v4(), "Run turn", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(Uuid::new_v4(), "Run turn", Vec::new()),
+            ),
+        )
         .await;
 
     assert!(matches!(
@@ -192,10 +206,13 @@ async fn execute_turn_propagates_session_creation_failure(
 
     let result = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(Uuid::new_v4(), "Fail create session", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(Uuid::new_v4(), "Fail create session", Vec::new()),
+            ),
+        )
         .await;
 
     assert!(matches!(
@@ -226,10 +243,13 @@ async fn execute_turn_propagates_tool_routing_failure(
 
     let result = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(Uuid::new_v4(), "Trigger routing", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(Uuid::new_v4(), "Trigger routing", Vec::new()),
+            ),
+        )
         .await;
 
     let expected_call_id = deterministic_tool_call_id(&failing_call, 0);
@@ -281,10 +301,13 @@ async fn execute_turn_reuses_active_session(
 
     let reused_response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(active_conversation, "Reuse", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(active_conversation, "Reuse", Vec::new()),
+            ),
+        )
         .await?;
 
     assert!(reused_response.reused_session());
@@ -321,8 +344,8 @@ async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
     );
 
     let (first_result, second_result) = tokio::join!(
-        context.service.execute_turn(first_request),
-        context.service.execute_turn(second_request)
+        context.service.execute_turn(&context.ctx, first_request),
+        context.service.execute_turn(&context.ctx, second_request)
     );
 
     let first_response = first_result?;
@@ -383,10 +406,13 @@ async fn execute_turn_rotates_expired_session(
 
     let rotated_response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(expired_conversation, "Rotate", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(expired_conversation, "Rotate", Vec::new()),
+            ),
+        )
         .await?;
 
     assert!(!rotated_response.reused_session());
@@ -427,18 +453,24 @@ async fn execute_turn_produces_deterministic_tool_call_order_for_identical_input
 
     let first_response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "Run 1", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "Run 1", Vec::new()),
+            ),
+        )
         .await?;
 
     let second_response = context
         .service
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            backend_id,
-            TurnExecutionRequest::new(conversation_id, "Run 2", Vec::new()),
-        ))
+        .execute_turn(
+            &context.ctx,
+            ExecuteAgentTurnRequest::new(
+                backend_id,
+                TurnExecutionRequest::new(conversation_id, "Run 2", Vec::new()),
+            ),
+        )
         .await?;
 
     let first_ids: Vec<&str> = first_response
