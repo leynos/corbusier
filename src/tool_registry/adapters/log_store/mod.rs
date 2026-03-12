@@ -6,11 +6,11 @@
 //! the full metadata slice (which the service layer cannot provide
 //! for the object-store backend).
 
+mod path_rebuild;
+
 use crate::context::RequestContext;
 use crate::tool_registry::{
-    domain::{
-        LogEntryId, LogEntryKind, LogEntryMetadata, McpServerId, PersistedLogEntryData, ToolCallId,
-    },
+    domain::{LogEntryMetadata, McpServerId, PersistedLogEntryData},
     ports::{StoreLogRequest, SweepContext, ToolLogStore, ToolLogStoreError, ToolLogStoreResult},
 };
 use async_trait::async_trait;
@@ -20,8 +20,8 @@ use object_store::{ObjectStore, path::Path};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::warn;
-use uuid::Uuid;
+
+use self::path_rebuild::rebuild_metadata_from_object_meta;
 
 /// Adapter wrapping an [`ObjectStore`] backend for tool stderr log storage.
 ///
@@ -210,16 +210,28 @@ impl ToolLogStore for ObjectStoreLogAdapter {
         validate_tenant_prefix(ctx, req.metadata.object_path())?;
         let path = Path::from(req.metadata.object_path());
         let truncated = truncate_if_needed(req.content.clone(), req.retention.max_bytes_per_log);
+        let truncated_len = u64::try_from(truncated.len())
+            .map_err(|err| ToolLogStoreError::StoreFailed(err.to_string()))?;
         self.store
             .put(&path, truncated.into())
             .await
             .map_err(|err| ToolLogStoreError::StoreFailed(err.to_string()))?;
 
+        let cached_metadata = LogEntryMetadata::from_persisted(PersistedLogEntryData {
+            id: req.metadata.id(),
+            server_id: req.metadata.server_id(),
+            kind: req.metadata.kind().clone(),
+            object_path: req.metadata.object_path().to_owned(),
+            byte_count: truncated_len,
+            captured_at: req.metadata.captured_at(),
+            expires_at: req.metadata.expires_at(),
+        });
+
         // Track metadata for retention sweeps.
         self.metadata
             .write()
             .await
-            .insert(req.metadata.object_path().to_owned(), req.metadata.clone());
+            .insert(req.metadata.object_path().to_owned(), cached_metadata);
         Ok(())
     }
 
@@ -297,108 +309,6 @@ impl ToolLogStore for ObjectStoreLogAdapter {
 
         Ok(total_keys.len())
     }
-}
-
-fn rebuild_metadata_from_object_meta(
-    meta: &object_store::ObjectMeta,
-    server_id: McpServerId,
-    retention_period: chrono::Duration,
-) -> Option<LogEntryMetadata> {
-    let path = meta.location.to_string();
-    if path.is_empty() {
-        warn_rebuild_metadata_failure(meta, "empty object-store path");
-        return None;
-    }
-    let segments: Vec<&str> = path.split('/').collect();
-    if segments.is_empty() {
-        warn_rebuild_metadata_failure(meta, "path contained no segments");
-        return None;
-    }
-    let file_name = extract_file_name(meta, &segments)?;
-    let id = parse_log_entry_id(meta, file_name)?;
-    let kind = parse_log_kind(meta, &segments)?;
-    let byte_count = meta.size;
-    let captured_at = meta.last_modified;
-    let expires_at = captured_at + retention_period;
-    Some(LogEntryMetadata::from_persisted(PersistedLogEntryData {
-        id,
-        server_id,
-        kind,
-        object_path: path,
-        byte_count,
-        captured_at,
-        expires_at,
-    }))
-}
-
-fn extract_file_name<'a>(meta: &object_store::ObjectMeta, segments: &'a [&str]) -> Option<&'a str> {
-    let Some(file_name) = segments.last().copied() else {
-        warn_rebuild_metadata_failure(meta, "missing file name segment");
-        return None;
-    };
-    Some(file_name)
-}
-
-fn parse_log_entry_id(meta: &object_store::ObjectMeta, file_name: &str) -> Option<LogEntryId> {
-    let Some(id_segment) = file_name.strip_suffix(".stderr") else {
-        warn_rebuild_metadata_failure(meta, "missing .stderr suffix");
-        return None;
-    };
-    match Uuid::parse_str(id_segment) {
-        Ok(uuid) => Some(LogEntryId::from_uuid(uuid)),
-        Err(err) => {
-            warn_rebuild_metadata_failure_with_error(
-                meta,
-                "invalid log entry id",
-                &err.to_string(),
-            );
-            None
-        }
-    }
-}
-
-fn parse_log_kind(meta: &object_store::ObjectMeta, segments: &[&str]) -> Option<LogEntryKind> {
-    match segments {
-        ["tool_logs", _, _, "startup", _] => Some(LogEntryKind::ServerStartup),
-        ["tool_logs", _, _, "call", call_id, _] => match Uuid::parse_str(call_id) {
-            Ok(uuid) => Some(LogEntryKind::ToolCall {
-                call_id: ToolCallId::from_uuid(uuid),
-            }),
-            Err(err) => {
-                warn_rebuild_metadata_failure_with_error(
-                    meta,
-                    "invalid tool call id",
-                    &err.to_string(),
-                );
-                None
-            }
-        },
-        _ => {
-            warn_rebuild_metadata_failure(meta, "unrecognised log path shape");
-            None
-        }
-    }
-}
-
-fn warn_rebuild_metadata_failure(meta: &object_store::ObjectMeta, reason: &str) {
-    warn!(
-        function = "rebuild_metadata_from_object_meta",
-        location = %meta.location,
-        reason,
-    );
-}
-
-fn warn_rebuild_metadata_failure_with_error(
-    meta: &object_store::ObjectMeta,
-    reason: &str,
-    error_message: &str,
-) {
-    warn!(
-        function = "rebuild_metadata_from_object_meta",
-        location = %meta.location,
-        reason,
-        error = error_message,
-    );
 }
 
 /// Truncates content if it exceeds `max_bytes`.

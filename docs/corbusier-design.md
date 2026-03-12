@@ -1103,7 +1103,7 @@ For screen readers: The following sequence diagram shows how starting an MCP
 server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
-Figure 2.2.3.1: MCP server start and `tools/list` lifecycle interaction
+Figure 2.2.4.3: MCP server start and `tools/list` lifecycle interaction
 sequence.
 
 ```mermaid
@@ -1809,23 +1809,24 @@ you to also send your logs for further analysis.
 
 Table 3.3.1-1: Core dependencies.
 
-| Crate        | Version | Purpose                          | Registry  |
-| ------------ | ------- | -------------------------------- | --------- |
-| serde        | 1.0.228 | Serialization framework          | crates.io |
-| serde_json   | 1.0.149 | JSON serialization               | crates.io |
-| chrono       | 0.4.43  | Date/time handling               | crates.io |
-| uuid         | 1.19.0  | UUID generation                  | crates.io |
-| thiserror    | 2.0.17  | Error derive macros              | crates.io |
-| sha2         | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
-| minijinja    | 2.16.0  | Template rendering               | crates.io |
-| async-trait  | 0.1.89  | Async trait support              | crates.io |
-| mockable     | 3.0.0   | Clock abstraction for testing    | crates.io |
-| diesel       | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
-| bytes        | 1.10.1  | Byte buffer utilities            | crates.io |
-| object_store | 0.12.0  | Object storage abstraction       | crates.io |
-| cap-std      | 3.4.5   | Capability-based filesystem      | crates.io |
-| futures      | 0.3.31  | Async utilities / combinators    | crates.io |
-| tokio        | 1.49.0  | Async runtime                    | crates.io |
+| Crate        | Version | Purpose                                      | Registry  |
+| ------------ | ------- | -------------------------------------------- | --------- |
+| serde        | 1.0.228 | Serialization framework                      | crates.io |
+| serde_json   | 1.0.149 | JSON serialization                           | crates.io |
+| chrono       | 0.4.43  | Date/time handling                           | crates.io |
+| uuid         | 1.19.0  | UUID generation                              | crates.io |
+| thiserror    | 2.0.17  | Error derive macros                          | crates.io |
+| sha2         | 0.10.9  | SHA-256 deterministic call IDs               | crates.io |
+| minijinja    | 2.16.0  | Template rendering                           | crates.io |
+| async-trait  | 0.1.89  | Async trait support                          | crates.io |
+| mockable     | 3.0.0   | Clock abstraction for testing                | crates.io |
+| diesel       | 2.3.5   | Database ORM (with r2d2 pooling)             | crates.io |
+| bytes        | 1.10.1  | Byte buffer utilities                        | crates.io |
+| object_store | 0.12.0  | Object storage abstraction                   | crates.io |
+| cap-std      | 3.4.5   | Capability-based filesystem                  | crates.io |
+| futures      | 0.3.31  | Async utilities / combinators                | crates.io |
+| tokio        | 1.49.0  | Async runtime                                | crates.io |
+| tracing      | 0.1.41  | Application diagnostics / structured logging | crates.io |
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)
 

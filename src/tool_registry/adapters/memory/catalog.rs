@@ -106,6 +106,12 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let state = tenants.entry(ctx.tenant_id()).or_default();
 
         // Stage the new entries, rejecting within-batch and cross-server duplicates.
+        let batch_name_counts = entries.iter().fold(HashMap::new(), |mut counts, entry| {
+            *counts
+                .entry(entry.tool().name().to_owned())
+                .or_insert(0usize) += 1;
+            counts
+        });
         let existing_name_counts = state
             .entries
             .values()
@@ -124,7 +130,10 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
                 return Err(ToolCatalogError::DuplicateWithinBatch {
                     id: entry.id(),
                     tool_name,
-                    entry_count: 2,
+                    entry_count: batch_name_counts
+                        .get(entry.tool().name())
+                        .copied()
+                        .unwrap_or(2),
                 });
             }
             if let Some(existing_count) = existing_name_counts.get(&tool_name) {

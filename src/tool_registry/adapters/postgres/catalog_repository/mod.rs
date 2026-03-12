@@ -121,6 +121,12 @@ impl PostgresToolCatalog {
     }
 
     fn find_duplicate_entry(entries: &[CatalogEntry]) -> Option<ToolCatalogError> {
+        let name_counts = entries.iter().fold(HashMap::new(), |mut counts, entry| {
+            *counts
+                .entry(entry.tool().name().to_owned())
+                .or_insert(0usize) += 1;
+            counts
+        });
         let mut seen_names = HashSet::new();
         for entry in entries {
             let tool_name = entry.tool().name().to_owned();
@@ -128,7 +134,7 @@ impl PostgresToolCatalog {
                 return Some(ToolCatalogError::DuplicateWithinBatch {
                     id: entry.id(),
                     tool_name,
-                    entry_count: 2,
+                    entry_count: name_counts.get(entry.tool().name()).copied().unwrap_or(2),
                 });
             }
         }
