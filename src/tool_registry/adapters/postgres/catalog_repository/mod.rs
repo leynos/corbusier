@@ -20,7 +20,7 @@ use crate::tool_registry::{
 };
 
 use async_trait::async_trait;
-use diesel::pg::PgConnection;
+use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -259,6 +259,27 @@ impl PostgresToolCatalog {
             server_count,
         }
     }
+
+    fn load_entries_for_tenant(
+        connection: &mut PgConnection,
+        tenant_id: uuid::Uuid,
+        tool_name: Option<&str>,
+    ) -> ToolCatalogResult<Vec<CatalogEntry>> {
+        let mut query = mcp_tool_catalog::table
+            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
+            .into_boxed::<Pg>();
+
+        if let Some(name) = tool_name {
+            query = query.filter(mcp_tool_catalog::tool_name.eq(name));
+        }
+
+        let rows = query
+            .select(CatalogEntryRow::as_select())
+            .load::<CatalogEntryRow>(connection)
+            .map_err(|e| ToolCatalogError::persistence("select", e))?;
+
+        rows.into_iter().map(row_to_entry).collect()
+    }
 }
 
 #[async_trait]
@@ -303,13 +324,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
         self.execute_query(tenant_id, move |connection| {
-            let rows = mcp_tool_catalog::table
-                .filter(mcp_tool_catalog::tool_name.eq(&name))
-                .filter(mcp_tool_catalog::tenant_id.eq(tid))
-                .select(CatalogEntryRow::as_select())
-                .load::<CatalogEntryRow>(connection)
-                .map_err(|e| ToolCatalogError::persistence("select", e))?;
-            rows.into_iter().map(row_to_entry).collect()
+            Self::load_entries_for_tenant(connection, tid, Some(name.as_str()))
         })
         .await
     }
@@ -318,12 +333,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         self.execute_query(tenant_id, move |connection| {
-            let rows = mcp_tool_catalog::table
-                .filter(mcp_tool_catalog::tenant_id.eq(tid))
-                .select(CatalogEntryRow::as_select())
-                .load::<CatalogEntryRow>(connection)
-                .map_err(|e| ToolCatalogError::persistence("select", e))?;
-            rows.into_iter().map(row_to_entry).collect()
+            Self::load_entries_for_tenant(connection, tid, None)
         })
         .await
     }
