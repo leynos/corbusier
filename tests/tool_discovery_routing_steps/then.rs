@@ -1,8 +1,7 @@
 //! Then steps for tool discovery and routing BDD scenarios.
 
-use corbusier::tool_registry::{
-    domain::ToolRegistryDomainError, services::ToolDiscoveryRoutingServiceError,
-};
+use corbusier::tool_registry::domain::ToolRegistryDomainError;
+use corbusier::tool_registry::services::ToolDiscoveryRoutingServiceError;
 use eyre::{WrapErr, eyre};
 use rstest_bdd_macros::then;
 
@@ -21,9 +20,9 @@ fn assert_last_error_matches(
     match err {
         ToolDiscoveryRoutingServiceError::Domain(domain) if predicate(domain) => Ok(()),
         ToolDiscoveryRoutingServiceError::Domain(other) => {
-            Err(eyre!("{message}; got Domain({other:?})"))
+            eyre::bail!("{message}; got Domain({other:?})")
         }
-        other => Err(eyre!("{message}; got non-domain error: {other:?}")),
+        other => eyre::bail!("{message}; got non-domain error: {other:?}"),
     }
 }
 
