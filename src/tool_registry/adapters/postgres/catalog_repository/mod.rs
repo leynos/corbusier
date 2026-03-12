@@ -22,7 +22,6 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use std::collections::{HashMap, HashSet};
 
 use self::audit_helpers::audit_to_new_row;
@@ -154,6 +153,15 @@ impl PostgresToolCatalog {
             .collect())
     }
 
+    fn advisory_lock_key(tenant_id: uuid::Uuid, server_id: uuid::Uuid) -> i64 {
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        tenant_id.as_bytes().hash(&mut hasher);
+        server_id.as_bytes().hash(&mut hasher);
+        hasher.finish() as i64
+    }
+
     fn sync_rows_tx(
         conn: &mut PgConnection,
         tenant_id: uuid::Uuid,
@@ -161,6 +169,12 @@ impl PostgresToolCatalog {
         rows: &[NewCatalogEntryRow],
     ) -> Result<(), diesel::result::Error> {
         conn.transaction(|transaction| {
+            diesel::sql_query(format!(
+                "SELECT pg_advisory_xact_lock({})",
+                Self::advisory_lock_key(tenant_id, server_id)
+            ))
+            .execute(transaction)?;
+
             diesel::delete(
                 mcp_tool_catalog::table
                     .filter(mcp_tool_catalog::server_id.eq(server_id))
@@ -228,26 +242,8 @@ impl PostgresToolCatalog {
                 return Err(Self::duplicate_entry_error(row, &existing_name_counts));
             }
 
-            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
-                Ok(()) => Ok(()),
-                Err(err @ DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => {
-                    let refreshed_name_counts = Self::load_conflicting_name_counts(
-                        connection,
-                        tenant_id,
-                        server_id,
-                        &candidate_names,
-                    )?;
-
-                    rows.iter()
-                        .find(|row| refreshed_name_counts.contains_key(&row.tool_name))
-                        .map(|row| Self::duplicate_entry_error(row, &refreshed_name_counts))
-                        .map_or_else(
-                            || Err(ToolCatalogError::persistence("transaction", err)),
-                            Err,
-                        )
-                }
-                Err(e) => Err(ToolCatalogError::persistence("transaction", e)),
-            }
+            Self::sync_rows_tx(connection, tenant_id, server_id, &rows)
+                .map_err(|e| ToolCatalogError::persistence("transaction", e))
         })
         .await
     }
