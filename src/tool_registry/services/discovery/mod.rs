@@ -168,10 +168,7 @@ where
         ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<()> {
-        self.catalog
-            .mark_server_tools_unavailable(ctx, server_id)
-            .await?;
-        Ok(())
+        self.set_tools_availability(ctx, server_id, false).await
     }
 
     /// Marks all tools for a server as available in the catalog.
@@ -183,10 +180,7 @@ where
         ctx: &RequestContext,
         server_id: McpServerId,
     ) -> ToolDiscoveryRoutingServiceResult<()> {
-        self.catalog
-            .mark_server_tools_available(ctx, server_id)
-            .await?;
-        Ok(())
+        self.set_tools_availability(ctx, server_id, true).await
     }
 
     /// Returns the complete tool catalog.
@@ -278,6 +272,24 @@ where
             return Err((Some(entry), err));
         }
         Ok(entry)
+    }
+
+    async fn set_tools_availability(
+        &self,
+        ctx: &RequestContext,
+        server_id: McpServerId,
+        available: bool,
+    ) -> ToolDiscoveryRoutingServiceResult<()> {
+        let res = if available {
+            self.catalog
+                .mark_server_tools_available(ctx, server_id)
+                .await
+        } else {
+            self.catalog
+                .mark_server_tools_unavailable(ctx, server_id)
+                .await
+        };
+        res.map_err(ToolDiscoveryRoutingServiceError::Catalog)
     }
 
     /// Validates availability, schema, and policy for a resolved entry.

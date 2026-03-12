@@ -159,7 +159,7 @@ impl PostgresToolCatalog {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         tenant_id.as_bytes().hash(&mut hasher);
         server_id.as_bytes().hash(&mut hasher);
-        hasher.finish() as i64
+        hasher.finish().cast_signed()
     }
 
     fn sync_rows_tx(

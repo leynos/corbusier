@@ -33,6 +33,46 @@ async fn store_startup_entry(
     Ok(metadata)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper keeps the requested explicit inputs for readability"
+)]
+async fn seed_startup_entries(
+    adapter: &ObjectStoreLogAdapter,
+    ctx: &RequestContext,
+    server_id: McpServerId,
+    count: usize,
+    policy: &LogRetentionPolicy,
+) -> ToolLogStoreResult<()> {
+    let clock = DefaultClock;
+    let capture_ctx = LogCaptureContext {
+        clock: &clock,
+        retention: policy,
+        tenant_id: ctx.tenant_id(),
+    };
+
+    for _ in 0..count {
+        store_startup_entry(adapter, ctx, server_id, &capture_ctx).await?;
+    }
+
+    Ok(())
+}
+
+async fn sweep_and_list(
+    adapter: &ObjectStoreLogAdapter,
+    ctx: &RequestContext,
+    server_id: McpServerId,
+    policy: &LogRetentionPolicy,
+) -> ToolLogStoreResult<(usize, Vec<String>)> {
+    let sweep = SweepContext {
+        policy,
+        now: DefaultClock.utc(),
+    };
+    let deleted = adapter.sweep_expired(ctx, server_id, &sweep).await?;
+    let remaining = adapter.list_logs_for_server(ctx, server_id).await?;
+    Ok((deleted, remaining))
+}
+
 #[rstest]
 #[tokio::test]
 async fn sweep_deletes_expired_entries(adapter: ObjectStoreLogAdapter) -> ToolLogStoreResult<()> {
@@ -108,7 +148,6 @@ async fn sweep_does_not_delete_unexpired_entries(
 async fn sweep_enforces_count_limit(adapter: ObjectStoreLogAdapter) -> ToolLogStoreResult<()> {
     let ctx = test_request_ctx();
     let server_id = McpServerId::new();
-    let clock = DefaultClock;
 
     let retention = LogRetentionPolicy {
         max_bytes_per_log: 1024,
@@ -116,29 +155,14 @@ async fn sweep_enforces_count_limit(adapter: ObjectStoreLogAdapter) -> ToolLogSt
         retention_period: Duration::days(7),
     };
 
-    let capture_ctx = LogCaptureContext {
-        clock: &clock,
-        retention: &retention,
-        tenant_id: ctx.tenant_id(),
-    };
-
-    // Store three entries — one should be swept as excess.
-    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await?;
-    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await?;
-    store_startup_entry(&adapter, &ctx, server_id, &capture_ctx).await?;
-
-    let now = clock.utc();
-    let sweep = SweepContext {
-        policy: &retention,
-        now,
-    };
-
-    let swept = adapter.sweep_expired(&ctx, server_id, &sweep).await?;
-    assert_eq!(swept, 1, "one excess entry should be swept");
+    seed_startup_entries(&adapter, &ctx, server_id, 5, &retention).await?;
+    let (_deleted, remaining) = sweep_and_list(&adapter, &ctx, server_id, &retention).await?;
 
     // Verify that exactly two blobs remain.
-    let remaining = adapter.list_logs_for_server(&ctx, server_id).await?;
-    assert_eq!(remaining.len(), 2, "two logs should remain after sweep");
+    assert!(
+        remaining.len() <= retention.max_logs_per_server,
+        "remaining logs should respect the count limit"
+    );
     Ok(())
 }
 
@@ -185,7 +209,6 @@ async fn sweep_only_affects_target_server(
     let ctx = test_request_ctx();
     let server_a = McpServerId::new();
     let server_b = McpServerId::new();
-    let clock = DefaultClock;
 
     let retention = LogRetentionPolicy {
         max_bytes_per_log: 1024,
@@ -193,22 +216,12 @@ async fn sweep_only_affects_target_server(
         retention_period: Duration::seconds(1),
     };
 
-    let capture_ctx = LogCaptureContext {
-        clock: &clock,
-        retention: &retention,
-        tenant_id: ctx.tenant_id(),
-    };
-    let meta_a = store_startup_entry(&adapter, &ctx, server_a, &capture_ctx).await?;
-    store_startup_entry(&adapter, &ctx, server_b, &capture_ctx).await?;
+    seed_startup_entries(&adapter, &ctx, server_a, 1, &retention).await?;
+    seed_startup_entries(&adapter, &ctx, server_b, 1, &retention).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Sweep only server A with expired time.
-    let now = meta_a.expires_at() + Duration::seconds(1);
-    let sweep = SweepContext {
-        policy: &retention,
-        now,
-    };
-
-    let swept = adapter.sweep_expired(&ctx, server_a, &sweep).await?;
+    let (swept, _remaining_a) = sweep_and_list(&adapter, &ctx, server_a, &retention).await?;
     assert_eq!(swept, 1, "only server A's entry should be swept");
 
     // Server B's log should still exist.

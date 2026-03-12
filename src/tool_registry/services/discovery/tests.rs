@@ -23,6 +23,26 @@ use test_helpers::{
     register_start_with_stderr, setup_success_result, stdio_request, test_request_ctx,
 };
 
+async fn exercise_policy_failure<Pol>(policy: Pol) -> Result<ToolDiscoveryRoutingServiceError>
+where
+    Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static,
+{
+    let ctx = test_request_ctx();
+    let clock = Arc::new(DefaultClock);
+    let registry = Arc::new(InMemoryMcpServerRegistry::new());
+    let host = Arc::new(InMemoryMcpServerHost::new());
+    let (discovery, _catalog) = discovery_with_policy(&registry, &host, policy, &clock);
+    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
+
+    let request =
+        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
+    match discovery.call_tool(&ctx, &request).await {
+        Ok(_) => Err(eyre::eyre!("expected policy evaluation to fail")),
+        Err(err) => Ok(err),
+    }
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn discover_tools_persists_catalog(bundle: TestBundle) -> Result<()> {
@@ -183,22 +203,10 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_denied() -> Result<()> {
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let clock = Arc::new(DefaultClock);
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let (disc, _catalog) =
-        discovery_with_policy(&registry, &host, DenyAllPolicy::new("forbidden"), &clock);
-
-    let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
+    let err = exercise_policy_failure(DenyAllPolicy::new("forbidden")).await?;
     assert!(matches!(
-        disc.call_tool(&ctx, &request).await,
-        Err(ToolDiscoveryRoutingServiceError::Domain(
-            ToolRegistryDomainError::PolicyDenied { .. }
-        ))
+        err,
+        ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::PolicyDenied { .. })
     ));
     Ok(())
 }
@@ -206,21 +214,8 @@ async fn call_tool_policy_denied() -> Result<()> {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_evaluation_failed() -> Result<()> {
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let clock = Arc::new(DefaultClock);
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let (disc, _catalog) =
-        discovery_with_policy(&registry, &host, FailingPolicy::new("engine down"), &clock);
-
-    let ctx = test_request_ctx();
-    register_start_discover(&host, &lifecycle, &disc, &ctx).await?;
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock);
-    assert!(matches!(
-        disc.call_tool(&ctx, &request).await,
-        Err(ToolDiscoveryRoutingServiceError::Policy(_))
-    ));
+    let err = exercise_policy_failure(FailingPolicy::new("engine down")).await?;
+    assert!(matches!(err, ToolDiscoveryRoutingServiceError::Policy(_)));
     Ok(())
 }
 
