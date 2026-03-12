@@ -1,20 +1,22 @@
 //! Unit tests for MCP server lifecycle orchestration.
 
 use super::{McpServerLifecycleService, McpServerLifecycleServiceError, RegisterMcpServerRequest};
-use crate::tool_registry::{
-    adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
-    domain::{
-        McpServerHealthSnapshot, McpServerHealthStatus, McpServerId, McpServerLifecycleState,
-        McpServerName, McpToolDefinition, McpTransport, ToolRegistryDomainError,
+use crate::{
+    context::RequestContext,
+    test_support::{HealthProbeFailureHost, other_tenant_ctx, test_request_ctx},
+    tool_registry::{
+        adapters::{InMemoryMcpServerHost, memory::InMemoryMcpServerRegistry},
+        domain::{
+            McpServerHealthStatus, McpServerId, McpServerLifecycleState, McpServerName,
+            McpToolDefinition, McpTransport, ToolRegistryDomainError,
+        },
     },
-    ports::{McpServerHost, McpServerHostError, McpServerHostResult},
 };
-use async_trait::async_trait;
 use eyre::Result;
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 use serde_json::json;
-use std::{collections::HashSet, io::Error, sync::Arc};
+use std::sync::Arc;
 
 type TestService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
@@ -65,10 +67,11 @@ fn setup_tool_catalog(
 /// Registers and starts a server, returning the started registration.
 async fn register_and_start(
     service: &TestService,
+    ctx: &RequestContext,
     name: &str,
 ) -> Result<crate::tool_registry::domain::McpServerRegistration> {
-    let registered = service.register(stdio_request(name)?).await?;
-    Ok(service.start(registered.id()).await?)
+    let registered = service.register(ctx, stdio_request(name)?).await?;
+    Ok(service.start(ctx, registered.id()).await?.server)
 }
 
 #[rstest]
@@ -77,11 +80,14 @@ async fn register_and_find_by_name(
     service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
 ) -> Result<()> {
     let (_, service) = service_bundle;
+    let ctx = test_request_ctx();
 
-    let registered = service.register(stdio_request("workspace_tools")?).await?;
+    let registered = service
+        .register(&ctx, stdio_request("workspace_tools")?)
+        .await?;
 
     let found_server = service
-        .find_by_name("workspace_tools")
+        .find_by_name(&ctx, "workspace_tools")
         .await?
         .expect("server should exist");
 
@@ -95,8 +101,9 @@ async fn start_unknown_server_returns_not_found(
     service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
 ) {
     let (_, service) = service_bundle;
+    let ctx = test_request_ctx();
 
-    let result = service.start(McpServerId::new()).await;
+    let result = service.start(&ctx, McpServerId::new()).await;
 
     assert!(matches!(
         result,
@@ -110,9 +117,12 @@ async fn list_tools_requires_running_server(
     service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
 ) -> Result<()> {
     let (_, service) = service_bundle;
-    let registered = service.register(stdio_request("workspace_tools")?).await?;
+    let ctx = test_request_ctx();
+    let registered = service
+        .register(&ctx, stdio_request("workspace_tools")?)
+        .await?;
 
-    let result = service.list_tools(registered.id()).await;
+    let result = service.list_tools(&ctx, registered.id()).await;
 
     assert!(matches!(
         result,
@@ -134,22 +144,23 @@ async fn lifecycle_scenarios(
     #[case] scenario: LifecycleScenario,
 ) -> Result<()> {
     let (host, service) = service_bundle;
+    let ctx = test_request_ctx();
     setup_tool_catalog(&host, "workspace_tools", vec![create_read_file_tool()?])?;
 
-    let started = register_and_start(&service, "workspace_tools").await?;
+    let started = register_and_start(&service, &ctx, "workspace_tools").await?;
     assert_eq!(started.lifecycle_state(), McpServerLifecycleState::Running);
     match scenario {
         LifecycleScenario::StartAndList => {
-            let tools = service.list_tools(started.id()).await?;
+            let tools = service.list_tools(&ctx, started.id()).await?;
             assert_eq!(tools.len(), 1);
             let first = tools.first().expect("tool should exist");
             assert_eq!(first.name(), "read_file");
         }
         LifecycleScenario::StopBlocksQueries => {
-            let stopped = service.stop(started.id()).await?;
+            let stopped = service.stop(&ctx, started.id()).await?;
             assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
             assert!(matches!(
-                service.list_tools(started.id()).await,
+                service.list_tools(&ctx, started.id()).await,
                 Err(McpServerLifecycleServiceError::Domain(
                     ToolRegistryDomainError::ToolQueryRequiresRunning { .. }
                 ))
@@ -158,7 +169,7 @@ async fn lifecycle_scenarios(
         LifecycleScenario::RefreshHealth => {
             host.set_unhealthy(started.id(), "probe timeout")?;
 
-            let refreshed = service.refresh_health(started.id()).await?;
+            let refreshed = service.refresh_health(&ctx, started.id()).await?;
 
             assert_eq!(
                 refreshed.lifecycle_state(),
@@ -171,113 +182,70 @@ async fn lifecycle_scenarios(
             assert_eq!(health.message(), Some("probe timeout"));
         }
         LifecycleScenario::StartStopStart => {
-            let stopped = service.stop(started.id()).await?;
+            let stopped = service.stop(&ctx, started.id()).await?;
             assert_eq!(stopped.lifecycle_state(), McpServerLifecycleState::Stopped);
 
-            let restarted = service.start(started.id()).await?;
+            let restarted = service.start(&ctx, started.id()).await?.server;
             assert_eq!(
                 restarted.lifecycle_state(),
                 McpServerLifecycleState::Running
             );
-            assert_eq!(service.list_tools(started.id()).await?.len(), 1);
+            assert_eq!(service.list_tools(&ctx, started.id()).await?.len(), 1);
         }
     }
     Ok(())
 }
 
-#[derive(Debug, Clone, Default)]
-struct HealthProbeFailureHost {
-    started: std::sync::Arc<std::sync::Mutex<HashSet<McpServerId>>>,
-}
-
-impl HealthProbeFailureHost {
-    /// Helper to acquire the lock on started servers and handle errors.
-    fn with_started_lock<F, T>(&self, operation: F) -> McpServerHostResult<T>
-    where
-        F: FnOnce(&mut HashSet<McpServerId>) -> T,
-    {
-        let mut started = self
-            .started
-            .lock()
-            .map_err(|err| McpServerHostError::runtime(Error::other(err.to_string())))?;
-        Ok(operation(&mut started))
-    }
-}
-
-#[async_trait]
-impl McpServerHost for HealthProbeFailureHost {
-    async fn start(
-        &self,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<()> {
-        self.with_started_lock(|started| {
-            started.insert(server.id());
-        })
-    }
-
-    async fn stop(
-        &self,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<()> {
-        self.with_started_lock(|started| {
-            started.remove(&server.id());
-        })
-    }
-
-    async fn health(
-        &self,
-        _server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<McpServerHealthSnapshot> {
-        Err(McpServerHostError::runtime(Error::other(
-            "health probe unavailable",
-        )))
-    }
-
-    async fn list_tools(
-        &self,
-        server: &crate::tool_registry::domain::McpServerRegistration,
-    ) -> McpServerHostResult<Vec<McpToolDefinition>> {
-        self.with_started_lock(|started| {
-            if started.contains(&server.id()) {
-                Ok(vec![])
-            } else {
-                Err(McpServerHostError::NotRunning(server.id()))
-            }
-        })?
-    }
-}
-
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn start_persists_running_state_when_health_probe_fails() -> Result<()> {
+async fn start_returns_health_refresh_failed_when_health_probe_fails() -> Result<()> {
     let service = McpServerLifecycleService::new(
         Arc::new(InMemoryMcpServerRegistry::new()),
         Arc::new(HealthProbeFailureHost::default()),
         Arc::new(DefaultClock),
     );
+    let ctx = test_request_ctx();
 
-    let registered = service.register(stdio_request("workspace_tools")?).await?;
-    let start_result = service.start(registered.id()).await;
+    let registered = service
+        .register(&ctx, stdio_request("workspace_tools")?)
+        .await?;
+    let result = service.start(&ctx, registered.id()).await;
 
     assert!(matches!(
-        start_result,
-        Err(McpServerLifecycleServiceError::Host(_))
+        result,
+        Err(McpServerLifecycleServiceError::HealthRefreshFailed { .. })
     ));
+    Ok(())
+}
 
-    let persisted_server = service
-        .find_by_name("workspace_tools")
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_name_is_scoped_per_tenant(
+    service_bundle: (Arc<InMemoryMcpServerHost>, TestService),
+) -> Result<()> {
+    let (_, service) = service_bundle;
+    let ctx_a = test_request_ctx();
+    let ctx_b = other_tenant_ctx(&ctx_a);
+
+    let first = service
+        .register(&ctx_a, stdio_request("workspace_tools")?)
+        .await?;
+    let second = service
+        .register(&ctx_b, stdio_request("workspace_tools")?)
+        .await?;
+
+    assert_ne!(first.id(), second.id());
+    assert_eq!(service.list_all(&ctx_a).await?.len(), 1);
+    assert_eq!(service.list_all(&ctx_b).await?.len(), 1);
+    let found_a = service
+        .find_by_name(&ctx_a, "workspace_tools")
         .await?
-        .expect("server should exist");
-    assert_eq!(
-        persisted_server.lifecycle_state(),
-        McpServerLifecycleState::Running
-    );
-    assert_eq!(
-        persisted_server
-            .last_health()
-            .expect("health snapshot should exist")
-            .status(),
-        McpServerHealthStatus::Unknown
-    );
+        .expect("tenant A server should exist");
+    let found_b = service
+        .find_by_name(&ctx_b, "workspace_tools")
+        .await?
+        .expect("tenant B server should exist");
+    assert_eq!(found_a.id(), first.id());
+    assert_eq!(found_b.id(), second.id());
     Ok(())
 }

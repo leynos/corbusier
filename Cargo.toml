@@ -3,6 +3,10 @@ name = "corbusier"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+test-support = []
+
 [dependencies]
 # Serialisation
 serde = { version = "1.0.228", features = ["derive"] }
@@ -33,14 +37,27 @@ diesel = { version = "2.3.6", features = ["postgres", "uuid", "chrono", "serde_j
 # Capability-based filesystem access
 cap-std = { version = "4.0.0", features = ["fs_utf8"] }
 
+# Byte buffer types (used in port APIs for log capture)
+bytes = "1.10.1"
+
+# Async stream combinators (used by log store listing)
+futures = "0.3.31"
+
+# Object storage for tool stderr log capture
+object_store = "0.12.0"
+
 # Async runtime
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
+
+# Structured diagnostics
+tracing = "0.1.41"
 
 # Embedded PostgreSQL support (tests and tooling)
 pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "async-api"] }
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
+corbusier = { path = ".", features = ["test-support"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = { version = "0.5.0", features = ["strict-compile-time-validation"] }

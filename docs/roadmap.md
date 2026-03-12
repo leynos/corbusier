@@ -162,14 +162,23 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §2.2.4.
   - [x] Success criteria: MCP servers can be started, listed, and queried for
     available tools.
-- [ ] 2.1.2 Deliver tool discovery and routing. Requires 2.1.1. See
+- [x] 2.1.2 Deliver tool discovery and routing. Requires 2.1.1. See
   corbusier-design.md §2.2.4 and §6.1.4.
-  - [ ] Implement tool discovery and metadata persistence. See
+  - [x] Implement tool discovery and catalogue persistence. See
     corbusier-design.md §2.2.4.
-  - [ ] Route tool calls through the registry with policy checks. See
+  - [x] Route tool calls through the registry with policy checks. See
     corbusier-design.md §6.1.4 and §6.4.2.4.
-  - [ ] Success criteria: tool execution requests are routed to the correct MCP
-    server with consistent metadata.
+  - [x] Record audit trail entries for tool calls (success, failure, and
+    pre-execution rejections) including timing, parameters, and outcome. See
+    corbusier-design.md §2.2.4.
+  - [x] Capture startup and per-tool-call stderr via `ToolLogStore` port with
+    `ObjectStoreLogAdapter` backend. See corbusier-design.md §2.2.4.
+  - [x] Enforce stderr log retention policy (7-day default, 10 MiB cap,
+    100-log-per-server maximum) with automated sweeps. See
+    corbusier-design.md §2.2.4.
+  - [x] Success criteria: tool execution requests are routed to the correct MCP
+    server with consistent metadata; audit trail records all outcomes; stderr
+    blobs are persisted and rotated per retention policy.
 
 ### 2.2. Weaver file editing integration
 

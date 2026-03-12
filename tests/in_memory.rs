@@ -8,6 +8,7 @@
 //! - `task_lifecycle_tests`: Issue-to-task creation and tracking
 //! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `mcp_server_lifecycle_tests`: MCP server registration and lifecycle
+//! - `tool_discovery_routing_tests`: Tool discovery, catalog, and call routing
 
 mod in_memory {
     pub mod helpers;
@@ -20,4 +21,5 @@ mod in_memory {
     mod sequence_tests;
     mod slash_command_tests;
     mod task_lifecycle_tests;
+    mod tool_discovery_routing_tests;
 }

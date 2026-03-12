@@ -339,7 +339,7 @@ Corbusier implements this through:
 
 ## 2. Product Requirements
 
-### 2.1 Feature Catalog
+### 2.1 Feature catalogue
 
 #### 2.1.1 Core Orchestration Features
 
@@ -755,11 +755,12 @@ Corbusier implements this through:
 
 #### 2.1.5 Tenancy and Identity Features
 
-_Table 2.1.5.1: Tenancy and identity feature catalog._
-
+<!-- markdownlint-disable MD058 -->
+Table 2.1.5.1: Tenancy and identity feature catalogue.
 | Feature ID | Feature Name                          | Category             | Priority | Status   |
 | ---------- | ------------------------------------- | -------------------- | -------- | -------- |
 | F-017      | Tenant Context and Identity Isolation | Security and Tenancy | Critical | Proposed |
+<!-- markdownlint-enable MD058 -->
 
 ##### F-017: Tenant Context and Identity Isolation
 
@@ -1103,6 +1104,9 @@ For screen readers: The following sequence diagram shows how starting an MCP
 server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.1: MCP server start and `tools/list` lifecycle interaction
+sequence.
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -1151,14 +1155,13 @@ sequenceDiagram
     RegistryRepo-->>McpServerLifecycleService: ok
     McpServerLifecycleService-->>Operator: List ToolDefinition
 ```
-
-_Figure: MCP server start and `tools/list` lifecycle interaction sequence._
+<!-- markdownlint-enable MD031 -->
 
 ##### F-005-RQ-002: Tool Discovery and Registration
 
 - **Technical Specifications:**
   - Input Parameters: Tool metadata including JSON Schema input/output contracts
-  - Output/Response: Registered tool catalog with capability descriptions
+  - Output/Response: Registered tool catalogue with capability descriptions
   - Performance Criteria: <5s tool discovery, real-time tool availability
     updates
   - Data Requirements: Tool schemas, capability annotations, access control
@@ -1186,6 +1189,168 @@ _Figure: MCP server start and `tools/list` lifecycle interaction sequence._
   - Security Requirements: Tool execution isolation, resource limit enforcement
   - Compliance Requirements: Complete tool execution audit trails
 
+##### Implementation decisions for F-005-RQ-002 and F-005-RQ-003
+
+_Recorded 2026-03-05 during roadmap 2.1.2 implementation._
+
+- **`ToolDiscoveryRoutingService`** is a sibling service to
+  `McpServerLifecycleService` rather than an extension of it. The lifecycle
+  service manages server state transitions; the discovery/routing service
+  manages the tool catalogue and call routing. Composition at the call site
+  keeps each service focused and testable.
+- **Composition-based integration**: when a server starts, the caller
+  invokes `discover_and_persist_tools()`; when it stops, the caller invokes
+  `mark_tools_unavailable()`. The services share port instances but do not
+  reference each other.
+- **Lightweight schema validation**: a domain `validate_parameters()` function
+  checks required fields and object type without a dedicated JSON Schema crate.
+  This covers the common MCP case (flat object schemas) and can be replaced
+  with a crate-backed implementation later.
+- **`AllowAllPolicy` default**: the `ToolPolicyEnforcer` port is an
+  extensibility point. The default adapter permits all calls; real
+  authorization will be implemented when the workspace and permission systems
+  exist.
+- **Unique tool names per tenant**: a database unique index on
+  `(tenant_id, tool_name)` enforces unambiguous routing within a tenant.
+  Different tenants may register the same tool name without conflict. If two
+  servers within the same tenant advertise the same tool name, the second
+  discovery attempt fails. The database unique index on
+  `(tenant_id, tool_name)` rejects the duplicate, and `sync_server_tools`
+  surfaces that conflict as a domain error instead of replacing the first
+  server's entry.
+- **Audit trail**: every tool call (success or failure) produces a
+  `ToolCallAuditRecord` persisted to the `tool_call_audit_log` table, including
+  duration, outcome, and optional stderr log path. String-valued fields
+  persisted to `tool_call_audit_log`, including parameter strings, outcome
+  content, and `outcome_error` text, are redacted with `[REDACTED]` before
+  persistence to minimize sensitive data exposure in the audit trail.
+- **Stderr log capture** via a `ToolLogStore` port backed by the Rust
+  `object_store` crate. Startup stderr and per-tool-call stderr are stored as
+  opaque blobs with structured path keys
+  (`tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`).
+  References are recorded in audit records. The `tool_log_metadata` table
+  indexes stored blobs for retention sweeps.
+- **Stderr log retention policy**: the following limits apply **only** to
+  stderr blobs stored via `ToolLogStore` (i.e. files under
+  `tool_logs/{tenant_id}/{server_id}/…` and their `tool_log_metadata` rows).
+  They do **not** affect the `tool_call_audit_log` table, which follows the
+  longer-lived audit and compliance retention defined elsewhere in this
+  document.
+  - 7-day default retention period; expired blobs are swept automatically.
+  - 10 MiB per-log cap (truncated with a marker).
+  - 100 logs per server maximum; oldest logs are deleted first.
+  - Retention sweeps run during `store_startup_stderr` and can be triggered
+    explicitly via `sweep_expired_logs`.
+- **Tenant scoping**: `mcp_servers` and all tool-registry child tables carry a
+  `tenant_id` column. Child foreign keys reference `(server_id, tenant_id)`,
+  enforcing cross-tenant isolation at the database boundary in addition to
+  `RequestContext` scoping and `SET LOCAL app.tenant_id`.
+
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.2: Entity-relationship diagram showing the tool registry
+persistence model.
+```mermaid
+erDiagram
+    mcp_servers {
+        uuid id PK
+        uuid tenant_id
+        varchar name
+        varchar transport
+    }
+
+    mcp_tool_catalog {
+        uuid id PK
+        uuid tenant_id
+        uuid server_id FK
+        varchar server_name
+        varchar tool_name
+        text tool_description
+        jsonb input_schema
+        jsonb output_schema
+        bool available
+        timestamptz discovered_at
+        timestamptz updated_at
+    }
+
+    tool_call_audit_log {
+        uuid id PK
+        uuid tenant_id
+        uuid call_id
+        varchar tool_name
+        uuid server_id FK
+        jsonb parameters
+        varchar outcome
+        jsonb outcome_content
+        text outcome_error
+        bigint duration_ms
+        timestamptz initiated_at
+        timestamptz completed_at
+        varchar stderr_log_path
+    }
+
+    tool_log_metadata {
+        uuid id PK
+        uuid tenant_id
+        uuid server_id FK
+        varchar kind
+        uuid call_id
+        varchar object_path
+        bigint byte_count
+        timestamptz captured_at
+        timestamptz expires_at
+    }
+
+    mcp_servers ||--o{ mcp_tool_catalog : "(id, tenant_id)"
+    mcp_servers ||--o{ tool_log_metadata : "(id, tenant_id)"
+    mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
+```
+<!-- markdownlint-enable MD031 -->
+
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.3: Sequence diagram for the `call_tool` flow within
+`ToolDiscoveryRoutingService`.
+```mermaid
+sequenceDiagram
+    actor Caller
+    participant Service as ToolDiscoveryRoutingService
+    participant Catalog as ToolCatalogRepository
+    participant Policy as ToolPolicyEnforcer
+    participant Registry as McpServerRegistryRepository
+    participant Host as McpServerHost
+    participant LogStore as ToolLogStore
+
+    Caller->>Service: call_tool(request_context, request: ToolCallRequest)
+
+    rect rgb(235, 235, 245)
+        Service->>Catalog: find_by_tool_name(request_context, tool_name)
+        Catalog-->>Service: CatalogEntry or None
+        Service-->>Service: check available
+        Service-->>Service: validate_parameters(input_schema, parameters)
+        Service->>Policy: evaluate(request_context, tool_name, parameters)
+        Policy-->>Service: PolicyDecision
+        Service->>Registry: find_by_id(request_context, server_id)
+        Registry-->>Service: McpServerRegistration
+    end
+
+    Service->>Host: call_tool(request_context, server, tool_call_request)
+    Host-->>Service: ToolCallHostResult or McpServerHostError
+
+    Service-->>Service: build ToolCallOutcome
+    Service-->>Service: build ToolCallResult
+
+    alt stderr_output present
+        Service->>LogStore: store_log(request_context, StoreLogRequest{metadata, stderr, retention_policy})
+        LogStore-->>Service: result
+    end
+
+    Service-->>Service: build ToolCallAuditRecord
+    Service->>Catalog: record_audit(request_context, audit_record)
+    Catalog-->>Service: result
+
+    Service-->>Caller: ToolCallResult or error
+```
+<!-- markdownlint-enable MD031 -->
+
 ##### F-006-RQ-001: Weaver Change Tracking
 
 - **Technical Specifications:**
@@ -1203,8 +1368,8 @@ _Figure: MCP server start and `tools/list` lifecycle interaction sequence._
 
 #### 2.2.5 Tenancy and Identity Requirements
 
-_Table 2.2.5.1: Tenancy and identity requirement matrix._
-
+<!-- markdownlint-disable MD058 -->
+Table 2.2.5.1: Tenancy and identity requirement matrix.
 | Requirement ID | Description                          | Acceptance Criteria                                                           | Priority  | Complexity |
 | -------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------- | ---------- |
 | F-017-RQ-001   | Tenant Domain Primitive              | Tenant identity is modelled separately from user identity                     | Must-Have | Medium     |
@@ -1212,6 +1377,7 @@ _Table 2.2.5.1: Tenancy and identity requirement matrix._
 | F-017-RQ-003   | Tenant-Scoped Persistence and Lookup | All tenant-owned mutations and reads require tenant context                   | Must-Have | High       |
 | F-017-RQ-004   | Dual-Layer Isolation Enforcement     | Rust signatures and PostgreSQL RLS/constraints both block cross-tenant access | Must-Have | High       |
 | F-017-RQ-005   | Tenant Isolation Verification        | Test scenarios prove same external IDs can coexist across tenants safely      | Must-Have | Medium     |
+<!-- markdownlint-enable MD058 -->
 
 ##### F-017-RQ-001: Tenant Domain Primitive
 
@@ -1646,20 +1812,27 @@ you to also send your logs for further analysis.
 
 #### 3.3.1 Core Dependencies
 
-| Crate       | Version | Purpose                          | Registry  |
-| ----------- | ------- | -------------------------------- | --------- |
-| serde       | 1.0.228 | Serialization framework          | crates.io |
-| serde_json  | 1.0.149 | JSON serialization               | crates.io |
-| chrono      | 0.4.43  | Date/time handling               | crates.io |
-| uuid        | 1.19.0  | UUID generation                  | crates.io |
-| thiserror   | 2.0.17  | Error derive macros              | crates.io |
-| sha2        | 0.10.9  | SHA-256 deterministic call IDs   | crates.io |
-| minijinja   | 2.16.0  | Template rendering               | crates.io |
-| async-trait | 0.1.89  | Async trait support              | crates.io |
-| mockable    | 3.0.0   | Clock abstraction for testing    | crates.io |
-| diesel      | 2.3.5   | Database ORM (with r2d2 pooling) | crates.io |
-| cap-std     | 3.4.5   | Capability-based filesystem      | crates.io |
-| tokio       | 1.49.0  | Async runtime                    | crates.io |
+<!-- markdownlint-disable MD058 -->
+Table 3.3.1-1: Core dependencies.
+| Crate        | Version | Purpose                                      | Registry  |
+| ------------ | ------- | -------------------------------------------- | --------- |
+| serde        | 1.0.228 | Serialization framework                      | crates.io |
+| serde_json   | 1.0.149 | JSON serialization                           | crates.io |
+| chrono       | 0.4.43  | Date/time handling                           | crates.io |
+| uuid         | 1.19.0  | UUID generation                              | crates.io |
+| thiserror    | 2.0.17  | Error derive macros                          | crates.io |
+| sha2         | 0.10.9  | SHA-256 deterministic call IDs               | crates.io |
+| minijinja    | 2.16.0  | Template rendering                           | crates.io |
+| async-trait  | 0.1.89  | Async trait support                          | crates.io |
+| mockable     | 3.0.0   | Clock abstraction for testing                | crates.io |
+| diesel       | 2.3.5   | Database ORM (with r2d2 pooling)             | crates.io |
+| bytes        | 1.10.1  | Byte buffer utilities                        | crates.io |
+| object_store | 0.12.0  | Object storage abstraction                   | crates.io |
+| cap-std      | 3.4.5   | Capability-based filesystem                  | crates.io |
+| futures      | 0.3.31  | Async utilities / combinators                | crates.io |
+| tokio        | 1.49.0  | Async runtime                                | crates.io |
+| tracing      | 0.1.41  | Application diagnostics / structured logging | crates.io |
+<!-- markdownlint-enable MD058 -->
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)
 
@@ -1668,7 +1841,6 @@ MCP protocol support will require additional dependencies when implemented:
 | Crate        | Version | Purpose                     | Registry  |
 | ------------ | ------- | --------------------------- | --------- |
 | jsonrpc-core | 18.x    | JSON-RPC 2.0 implementation | crates.io |
-| futures      | 0.3.x   | Future utilities            | crates.io |
 | tokio-util   | 0.7.x   | Tokio utilities             | crates.io |
 
 #### 3.3.3 Development and Testing Dependencies
@@ -1851,22 +2023,30 @@ graph TB
 - **Change Logs**: Weaver-generated change sets and diffs
 - **Temporary Files**: Tool execution artifacts and build outputs
 
-##### Object Storage (Future)
+##### Object storage
 
-- **Artifact Storage**: Large tool outputs and build artifacts
-- **Backup Storage**: Database backups and disaster recovery
-- **Static Assets**: Documentation and configuration templates
+- **Tool Stderr Logs**: MCP server startup and tool call stderr captured
+  via `ObjectStoreLogAdapter` (backed by the Rust `object_store` crate;
+  `InMemory` for tests, cloud backends for production). Blobs are stored at
+  paths `tool_logs/{tenant_id}/{server_id}/{kind}/{log_entry_id}.stderr`. The
+  `tool_log_metadata` table indexes these blobs for retention sweeps, while
+  `tool_call_audit_log` records the structured call audit trail (the two tables
+  serve distinct purposes and should not be conflated)
+- **Artifact Storage** (future): Large tool outputs and build artifacts
+- **Backup Storage** (future): Database backups and disaster recovery
+- **Static Assets** (future): Documentation and configuration templates
 
 #### 3.5.5 Database Configuration
 
+<!-- markdownlint-disable MD058 -->
 Table 3.5.5-1: Database configuration by environment.
-
 | Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
 | ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |
 | Development | SQLite (default), in-memory                                               | Single connection  | None (ephemeral)         |
 | Testing     | In-memory (unit), SQLite (file-backed), embedded PostgreSQL (integration) | Per-test isolation | None (ephemeral)         |
 | Staging     | PostgreSQL                                                                | 10 connections     | Daily snapshots          |
 | Production  | PostgreSQL                                                                | 50 connections     | Continuous WAL archiving |
+<!-- markdownlint-enable MD058 -->
 
 ##### Diesel Configuration Example
 

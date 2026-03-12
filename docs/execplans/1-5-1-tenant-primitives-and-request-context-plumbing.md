@@ -99,9 +99,9 @@ focuses exclusively on domain primitives and plumbing signatures.
   Document the choice in the decision log.
 
 - Risk: Behaviour-Driven Development (BDD) test step definitions
-  may collide with existing step names from other subsystems.
-  Severity: low Likelihood: low Mitigation: Use tenant-specific
-  vocabulary in step definitions.
+  may collide with existing step names from other subsystems. Severity: low
+  Likelihood: low Mitigation: Use tenant-specific vocabulary in step
+  definitions.
 
 ## Progress
 

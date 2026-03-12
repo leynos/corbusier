@@ -1,50 +1,35 @@
 //! Service layer for MCP server lifecycle orchestration.
 
-use crate::tool_registry::{
-    domain::{
-        McpServerHealthSnapshot, McpServerId, McpServerName, McpServerRegistration,
-        McpToolDefinition, McpTransport, ToolRegistryDomainError,
-    },
-    ports::{
-        McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
+mod transitions;
+
+use crate::{
+    context::RequestContext,
+    tool_registry::{
+        domain::{
+            McpServerHealthSnapshot, McpServerId, McpServerName, McpServerRegistration,
+            McpToolDefinition, McpTransport, ToolRegistryDomainError,
+        },
+        ports::{
+            McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
+        },
     },
 };
 use mockable::Clock;
 use std::{future::Future, pin::Pin, sync::Arc};
 use thiserror::Error;
+use transitions::{
+    LifecycleChange, LifecycleCompensationAction, LifecycleHostAction, LifecycleTransition,
+};
 
 type LifecycleChangeFuture<'a> =
     Pin<Box<dyn Future<Output = McpServerLifecycleServiceResult<LifecycleChange>> + 'a>>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LifecycleCompensationAction {
-    Start,
-    Stop,
-}
-
-#[derive(Debug, Clone)]
-struct LifecycleChange {
-    updated_server: McpServerRegistration,
+/// Bundles the arguments for [`McpServerLifecycleService::apply_compensation_if_needed`].
+struct CompensationArgs<'a> {
+    ctx: &'a RequestContext,
     compensation: Option<LifecycleCompensationAction>,
-}
-
-impl LifecycleChange {
-    const fn without_compensation(updated_server: McpServerRegistration) -> Self {
-        Self {
-            updated_server,
-            compensation: None,
-        }
-    }
-
-    const fn with_compensation(
-        updated_server: McpServerRegistration,
-        compensation: LifecycleCompensationAction,
-    ) -> Self {
-        Self {
-            updated_server,
-            compensation: Some(compensation),
-        }
-    }
+    server: &'a McpServerRegistration,
+    repository_error: &'a McpServerRegistryError,
 }
 
 /// Request payload for registering an MCP server.
@@ -67,6 +52,15 @@ impl RegisterMcpServerRequest {
     }
 }
 
+/// Result of starting an MCP server, including captured startup stderr.
+#[derive(Debug, Clone)]
+pub struct LifecycleStartResult {
+    /// The updated server registration after starting.
+    pub server: McpServerRegistration,
+    /// Stderr output captured during server startup, if any.
+    pub startup_stderr: Option<bytes::Bytes>,
+}
+
 /// Service-level errors for MCP server lifecycle operations.
 #[derive(Debug, Error)]
 pub enum McpServerLifecycleServiceError {
@@ -79,6 +73,14 @@ pub enum McpServerLifecycleServiceError {
     /// Host operation failed.
     #[error(transparent)]
     Host(#[from] McpServerHostError),
+    /// Health refresh failed after starting the server.
+    #[error("health refresh failed after start: {reason}")]
+    HealthRefreshFailed {
+        /// Description of the underlying error.
+        reason: String,
+        /// Startup stderr captured before the health probe failed.
+        startup_stderr: Option<bytes::Bytes>,
+    },
     /// No server exists with the given identifier.
     #[error("MCP server {0} not found")]
     NotFound(McpServerId),
@@ -100,37 +102,6 @@ where
     clock: Arc<C>,
 }
 
-/// Identifies which host operation to invoke for a lifecycle transition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LifecycleHostAction {
-    Start,
-    Stop,
-}
-
-impl LifecycleHostAction {
-    /// Returns the compensation action for this host action.
-    const fn compensation(self) -> LifecycleCompensationAction {
-        match self {
-            Self::Start => LifecycleCompensationAction::Stop,
-            Self::Stop => LifecycleCompensationAction::Start,
-        }
-    }
-}
-
-struct LifecycleTransition<DomainMut> {
-    host_action: LifecycleHostAction,
-    domain_mutation: DomainMut,
-}
-
-impl<DomainMut> LifecycleTransition<DomainMut> {
-    const fn new(host_action: LifecycleHostAction, domain_mutation: DomainMut) -> Self {
-        Self {
-            host_action,
-            domain_mutation,
-        }
-    }
-}
-
 impl<R, H, C> McpServerLifecycleService<R, H, C>
 where
     R: McpServerRegistryRepository,
@@ -149,65 +120,70 @@ where
 
     async fn find_server_or_error(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
         self.repository
-            .find_by_id(server_id)
+            .find_by_id(ctx, server_id)
             .await?
             .ok_or(McpServerLifecycleServiceError::NotFound(server_id))
     }
 
     async fn execute_lifecycle_change<F>(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         apply_change: F,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    ) -> McpServerLifecycleServiceResult<LifecycleChange>
     where
         F: for<'a> FnOnce(&'a McpServerRegistration, &'a Self) -> LifecycleChangeFuture<'a>,
     {
-        let server = self.find_server_or_error(server_id).await?;
+        let server = self.find_server_or_error(ctx, server_id).await?;
         let change = apply_change(&server, self).await?;
-        if let Err(repository_error) = self.repository.update(&change.updated_server).await {
-            if let Some(compensation_error) = self
-                .apply_compensation_if_needed(
-                    change.compensation,
-                    &change.updated_server,
-                    &repository_error,
-                )
-                .await
-            {
+        if let Err(repository_error) = self.repository.update(ctx, &change.updated_server).await {
+            let args = CompensationArgs {
+                ctx,
+                compensation: change.compensation,
+                server: &change.updated_server,
+                repository_error: &repository_error,
+            };
+            if let Some(compensation_error) = self.apply_compensation_if_needed(args).await {
                 return Err(compensation_error);
             }
             return Err(McpServerLifecycleServiceError::Repository(repository_error));
         }
-        Ok(change.updated_server)
+        Ok(change)
     }
 
     async fn apply_compensation_if_needed(
         &self,
-        compensation: Option<LifecycleCompensationAction>,
-        server: &McpServerRegistration,
-        repository_error: &McpServerRegistryError,
+        args: CompensationArgs<'_>,
     ) -> Option<McpServerLifecycleServiceError> {
-        let compensation_action = compensation?;
+        let compensation_action = args.compensation?;
         let compensation_result = match compensation_action {
-            LifecycleCompensationAction::Start => self.host.start(server).await,
-            LifecycleCompensationAction::Stop => self.host.stop(server).await,
+            LifecycleCompensationAction::Start => {
+                self.host.start(args.ctx, args.server).await.map(|_| ())
+            }
+            LifecycleCompensationAction::Stop => self.host.stop(args.ctx, args.server).await,
         };
         compensation_result.err().map(|host_error| {
-            let combined_error = std::io::Error::other(format!(
-                "lifecycle persistence failed: {repository_error}; compensation failed: {host_error}"
-            ));
-            McpServerLifecycleServiceError::Host(McpServerHostError::runtime(combined_error))
+            McpServerLifecycleServiceError::Host(McpServerHostError::CommunicationError {
+                server_id: args.server.id(),
+                reason: format!(
+                    "lifecycle persistence failed: {}; compensation failed: {host_error}",
+                    args.repository_error,
+                ),
+            })
         })
     }
 
     /// Helper for lifecycle transitions with compensation.
     async fn execute_transition_with_compensation<DomainMut>(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
         transition: LifecycleTransition<DomainMut>,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration>
+    ) -> McpServerLifecycleServiceResult<LifecycleChange>
     where
         DomainMut:
             FnOnce(&mut McpServerRegistration, &C) -> Result<(), ToolRegistryDomainError> + 'static,
@@ -217,18 +193,18 @@ where
             domain_mutation,
         } = transition;
         let compensation = host_action.compensation();
-        self.execute_lifecycle_change(server_id, move |server, service| {
+        let closure_ctx = ctx.clone();
+        self.execute_lifecycle_change(ctx, server_id, move |server, service| {
             Box::pin(async move {
                 let mut updated_server = server.clone();
                 domain_mutation(&mut updated_server, &*service.clock)?;
-                match host_action {
-                    LifecycleHostAction::Start => service.host.start(server).await?,
-                    LifecycleHostAction::Stop => service.host.stop(server).await?,
-                }
-                Ok(LifecycleChange::with_compensation(
-                    updated_server,
-                    compensation,
-                ))
+                let stderr = host_action
+                    .execute(&closure_ctx, &*service.host, server)
+                    .await?;
+                Ok(
+                    LifecycleChange::with_compensation(updated_server, compensation)
+                        .with_startup_stderr(stderr),
+                )
             })
         })
         .await
@@ -242,15 +218,19 @@ where
     /// persistence rejects registration.
     pub async fn register(
         &self,
+        ctx: &RequestContext,
         request: RegisterMcpServerRequest,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
         let server_name = McpServerName::new(request.name)?;
         let registration = McpServerRegistration::new(server_name, request.transport, &*self.clock);
-        self.repository.register(&registration).await?;
+        self.repository.register(ctx, &registration).await?;
         Ok(registration)
     }
 
     /// Starts a registered MCP server.
+    ///
+    /// Returns a [`LifecycleStartResult`] containing the updated server
+    /// registration and any startup stderr captured from the host.
     ///
     /// # Errors
     ///
@@ -259,17 +239,29 @@ where
     /// and persistence errors.
     pub async fn start(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
-    ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
+    ) -> McpServerLifecycleServiceResult<LifecycleStartResult> {
         let transition = LifecycleTransition::new(
             LifecycleHostAction::Start,
             |server: &mut McpServerRegistration, clock: &C| {
                 server.mark_started(McpServerHealthSnapshot::unknown(clock.utc()), clock)
             },
         );
-        self.execute_transition_with_compensation(server_id, transition)
+        let change = self
+            .execute_transition_with_compensation(ctx, server_id, transition)
             .await?;
-        self.refresh_health(server_id).await
+        let startup_stderr = change.startup_stderr;
+        match self.refresh_health(ctx, server_id).await {
+            Ok(server) => Ok(LifecycleStartResult {
+                server,
+                startup_stderr,
+            }),
+            Err(err) => Err(McpServerLifecycleServiceError::HealthRefreshFailed {
+                reason: err.to_string(),
+                startup_stderr,
+            }),
+        }
     }
 
     /// Stops a registered MCP server.
@@ -281,35 +273,42 @@ where
     /// and persistence errors.
     pub async fn stop(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
         let transition = LifecycleTransition::new(
             LifecycleHostAction::Stop,
             |server: &mut McpServerRegistration, clock: &C| server.mark_stopped(clock),
         );
-        self.execute_transition_with_compensation(server_id, transition)
-            .await
+        Ok(self
+            .execute_transition_with_compensation(ctx, server_id, transition)
+            .await?
+            .updated_server)
     }
 
     /// Refreshes and persists server health.
     ///
     /// # Errors
     ///
-    /// Returns [`McpServerLifecycleServiceError::NotFound`] when no server has
-    /// the given ID, or host and persistence errors.
+    /// Returns [`McpServerLifecycleServiceError::NotFound`] when no server
+    /// has the given ID, or host and persistence errors.
     pub async fn refresh_health(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<McpServerRegistration> {
-        self.execute_lifecycle_change(server_id, |server, service| {
-            Box::pin(async move {
-                let health_snapshot = service.host.health(server).await?;
-                let mut refreshed_server = server.clone();
-                refreshed_server.update_health(health_snapshot, &*service.clock);
-                Ok(LifecycleChange::without_compensation(refreshed_server))
+        let closure_ctx = ctx.clone();
+        Ok(self
+            .execute_lifecycle_change(ctx, server_id, |server, service| {
+                Box::pin(async move {
+                    let health_snapshot = service.host.health(&closure_ctx, server).await?;
+                    let mut refreshed_server = server.clone();
+                    refreshed_server.update_health(health_snapshot, &*service.clock);
+                    Ok(LifecycleChange::without_compensation(refreshed_server))
+                })
             })
-        })
-        .await
+            .await?
+            .updated_server)
     }
 
     /// Lists all registered MCP servers.
@@ -317,8 +316,11 @@ where
     /// # Errors
     ///
     /// Returns persistence-layer errors from the repository.
-    pub async fn list_all(&self) -> McpServerLifecycleServiceResult<Vec<McpServerRegistration>> {
-        Ok(self.repository.list_all().await?)
+    pub async fn list_all(
+        &self,
+        ctx: &RequestContext,
+    ) -> McpServerLifecycleServiceResult<Vec<McpServerRegistration>> {
+        Ok(self.repository.list_all(ctx).await?)
     }
 
     /// Finds a registered server by name.
@@ -329,10 +331,11 @@ where
     /// persistence errors from the repository.
     pub async fn find_by_name(
         &self,
+        ctx: &RequestContext,
         server_name: &str,
     ) -> McpServerLifecycleServiceResult<Option<McpServerRegistration>> {
         let validated_name = McpServerName::new(server_name)?;
-        Ok(self.repository.find_by_name(&validated_name).await?)
+        Ok(self.repository.find_by_name(ctx, &validated_name).await?)
     }
 
     /// Returns tools exposed by a running server.
@@ -344,11 +347,12 @@ where
     /// tools, or host errors.
     pub async fn list_tools(
         &self,
+        ctx: &RequestContext,
         server_id: McpServerId,
     ) -> McpServerLifecycleServiceResult<Vec<McpToolDefinition>> {
-        let server = self.find_server_or_error(server_id).await?;
+        let server = self.find_server_or_error(ctx, server_id).await?;
         server.ensure_can_query_tools()?;
-        Ok(self.host.list_tools(&server).await?)
+        Ok(self.host.list_tools(ctx, &server).await?)
     }
 }
 

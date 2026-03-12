@@ -5,6 +5,8 @@ diesel::table! {
     mcp_servers (id) {
         /// Internal server identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Unique human-readable server name.
         #[max_length = 100]
         name -> Varchar,

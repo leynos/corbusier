@@ -21,7 +21,8 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
+    test_request_ctx,
 };
 
 type TestService =
@@ -82,16 +83,20 @@ async fn postgres_register_and_find_by_name(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     let found = ctx
         .service
-        .find_by_name("workspace_tools")
+        .find_by_name(&request_ctx, "workspace_tools")
         .await
         .expect("lookup should succeed")
         .expect("server should exist");
@@ -106,20 +111,24 @@ async fn postgres_start_persists_running_state(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
 
     let found = ctx
         .service
-        .find_by_name("workspace_tools")
+        .find_by_name(&request_ctx, "workspace_tools")
         .await
         .expect("lookup should succeed")
         .expect("server should exist");
@@ -134,14 +143,18 @@ async fn postgres_refresh_health_persists_unhealthy_status(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
     ctx.host
@@ -150,7 +163,7 @@ async fn postgres_refresh_health_persists_unhealthy_status(
 
     let refreshed = ctx
         .service
-        .refresh_health(created.id())
+        .refresh_health(&request_ctx, created.id())
         .await
         .expect("health refresh should succeed");
 
@@ -170,15 +183,22 @@ async fn postgres_duplicate_name_is_rejected(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
 
     ctx.service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("first registration should succeed");
 
     let result = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await;
 
     assert!(matches!(
@@ -193,10 +213,50 @@ async fn postgres_duplicate_name_is_rejected(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
+async fn postgres_duplicate_name_is_scoped_per_tenant(
+    #[future] context: Result<McpServerTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let tenant_a = test_request_ctx();
+    let tenant_b = other_tenant_ctx(&tenant_a);
+
+    let first = ctx
+        .service
+        .register(
+            &tenant_a,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
+        .await
+        .expect("first registration should succeed");
+    let second = ctx
+        .service
+        .register(
+            &tenant_b,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
+        .await
+        .expect("second tenant registration should succeed");
+
+    assert_ne!(first.id(), second.id());
+    assert_eq!(ctx.service.list_all(&tenant_a).await?.len(), 1);
+    assert_eq!(ctx.service.list_all(&tenant_b).await?.len(), 1);
+    let found = ctx
+        .service
+        .find_by_name(&tenant_b, "workspace_tools")
+        .await?
+        .expect("tenant B server should exist");
+    assert_eq!(found.id(), second.id());
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
 async fn postgres_list_tools_for_running_server(
     #[future] context: Result<McpServerTestContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
+    let request_ctx = test_request_ctx();
     let tool = McpToolDefinition::new(
         "search_code",
         "Searches the workspace source tree",
@@ -212,18 +272,21 @@ async fn postgres_list_tools_for_running_server(
 
     let created = ctx
         .service
-        .register(stdio_request("workspace_tools").expect("valid test request"))
+        .register(
+            &request_ctx,
+            stdio_request("workspace_tools").expect("valid test request"),
+        )
         .await
         .expect("registration should succeed");
 
     ctx.service
-        .start(created.id())
+        .start(&request_ctx, created.id())
         .await
         .expect("start should succeed");
 
     let tools = ctx
         .service
-        .list_tools(created.id())
+        .list_tools(&request_ctx, created.id())
         .await
         .expect("tool listing should succeed");
 

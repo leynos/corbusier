@@ -20,6 +20,7 @@
 //! - [`message`]: Canonical message format and validation
 //! - [`task`]: Issue-to-task creation and lifecycle tracking
 //! - [`tool_registry`]: MCP server lifecycle management and tool discovery
+//! - `test_support` (feature-gated): Shared fixtures and fakes for tests
 
 pub mod context;
 pub mod tenant;
@@ -27,5 +28,7 @@ pub mod tenant;
 pub mod agent_backend;
 pub mod message;
 pub mod task;
+#[cfg(feature = "test-support")]
+pub mod test_support;
 pub mod tool_registry;
 pub mod worker;

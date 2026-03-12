@@ -2,11 +2,14 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::context::RequestContext;
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
 };
+pub use corbusier::test_support::other_tenant_ctx;
+pub use corbusier::test_support::test_request_ctx;
+use corbusier::test_support::test_request_ctx as shared_test_request_ctx;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -44,16 +47,28 @@ pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
 
+/// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
+pub const ADD_TOOL_CATALOG_SQL: &str =
+    include_str!("../../migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql");
+
+/// SQL to add `tenant_id` to tool registry tables for tenant isolation.
+pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
+    include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
+
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
 );
 
+/// SQL to tenant-scope `mcp_servers` and enforce composite child foreign keys.
+pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
+    include_str!("../../migrations/2026-03-11-000000_tenant_scope_mcp_servers/up.sql");
+
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v2";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v8";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -64,12 +79,7 @@ pub fn clock() -> DefaultClock {
 /// Provides a [`RequestContext`] for test fixtures.
 #[fixture]
 pub fn test_request_context() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
+    shared_test_request_ctx()
 }
 
 /// Ensures the template database exists with the schema applied.
@@ -107,7 +117,10 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
     Ok(())
 }
 
