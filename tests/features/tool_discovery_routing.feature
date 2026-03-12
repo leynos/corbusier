@@ -25,12 +25,14 @@ Feature: Tool discovery and routing
     And tools are discovered
     And the server is stopped
     And tools are marked unavailable
+    And tool "read_file" is called with parameters '{"path": "/tmp/test.txt"}'
     Then calling tool "read_file" is rejected as unavailable
 
   Scenario: Unknown tool call is rejected
     Given a stdio MCP server named "workspace_tools" with command "mcp-server"
     When the server is registered and started
     And tools are discovered
+    And tool "nonexistent_tool" is called with parameters '{}'
     Then calling tool "nonexistent_tool" is rejected as not found
 
   Scenario: Tool call stderr is captured in the log store

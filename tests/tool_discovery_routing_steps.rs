@@ -1,4 +1,7 @@
 //! Behaviour tests for tool discovery and call routing.
+//!
+//! Keep this file in sync with `tests/features/tool_discovery_routing.feature`.
+//! The scenario macro consumes that feature file at compile time.
 
 #[path = "tool_discovery_routing_steps/mod.rs"]
 mod tool_discovery_routing_steps_defs;

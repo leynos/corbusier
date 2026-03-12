@@ -15,6 +15,13 @@ fn adapter() -> ObjectStoreLogAdapter {
     ObjectStoreLogAdapter::in_memory()
 }
 
+struct SeedParams<'a> {
+    ctx: &'a RequestContext,
+    server_id: McpServerId,
+    count: usize,
+    policy: &'a LogRetentionPolicy,
+}
+
 /// Stores a startup log entry and returns its metadata.
 async fn store_startup_entry(
     adapter: &ObjectStoreLogAdapter,
@@ -33,26 +40,19 @@ async fn store_startup_entry(
     Ok(metadata)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper keeps the requested explicit inputs for readability"
-)]
 async fn seed_startup_entries(
     adapter: &ObjectStoreLogAdapter,
-    ctx: &RequestContext,
-    server_id: McpServerId,
-    count: usize,
-    policy: &LogRetentionPolicy,
+    params: &SeedParams<'_>,
 ) -> ToolLogStoreResult<()> {
     let clock = DefaultClock;
     let capture_ctx = LogCaptureContext {
         clock: &clock,
-        retention: policy,
-        tenant_id: ctx.tenant_id(),
+        retention: params.policy,
+        tenant_id: params.ctx.tenant_id(),
     };
 
-    for _ in 0..count {
-        store_startup_entry(adapter, ctx, server_id, &capture_ctx).await?;
+    for _ in 0..params.count {
+        store_startup_entry(adapter, params.ctx, params.server_id, &capture_ctx).await?;
     }
 
     Ok(())
@@ -155,7 +155,13 @@ async fn sweep_enforces_count_limit(adapter: ObjectStoreLogAdapter) -> ToolLogSt
         retention_period: Duration::days(7),
     };
 
-    seed_startup_entries(&adapter, &ctx, server_id, 5, &retention).await?;
+    let params = SeedParams {
+        ctx: &ctx,
+        server_id,
+        count: 5,
+        policy: &retention,
+    };
+    seed_startup_entries(&adapter, &params).await?;
     let (_deleted, remaining) = sweep_and_list(&adapter, &ctx, server_id, &retention).await?;
 
     // Verify that exactly two blobs remain.
@@ -216,8 +222,20 @@ async fn sweep_only_affects_target_server(
         retention_period: Duration::seconds(1),
     };
 
-    seed_startup_entries(&adapter, &ctx, server_a, 1, &retention).await?;
-    seed_startup_entries(&adapter, &ctx, server_b, 1, &retention).await?;
+    let params_a = SeedParams {
+        ctx: &ctx,
+        server_id: server_a,
+        count: 1,
+        policy: &retention,
+    };
+    let params_b = SeedParams {
+        ctx: &ctx,
+        server_id: server_b,
+        count: 1,
+        policy: &retention,
+    };
+    seed_startup_entries(&adapter, &params_a).await?;
+    seed_startup_entries(&adapter, &params_b).await?;
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Sweep only server A with expired time.

@@ -1,33 +1,29 @@
 //! Then steps for tool discovery and routing BDD scenarios.
 
 use corbusier::tool_registry::{
-    domain::{ToolCallRequest, ToolRegistryDomainError},
-    services::ToolDiscoveryRoutingServiceError,
+    domain::ToolRegistryDomainError, services::ToolDiscoveryRoutingServiceError,
 };
 use eyre::{WrapErr, eyre};
-use mockable::DefaultClock;
 use rstest_bdd_macros::then;
 
 use super::run_async;
 use super::world::ToolDiscoveryWorld;
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "BDD helper keeps explicit step inputs and matcher callback together"
-)]
-fn assert_rejected_with(
-    world: &mut ToolDiscoveryWorld,
-    tool_name: &str,
-    params: serde_json::Value,
-    is_expected: fn(&ToolRegistryDomainError) -> bool,
-    expectation_label: &str,
+fn assert_last_error_matches(
+    world: &ToolDiscoveryWorld,
+    predicate: fn(&ToolRegistryDomainError) -> bool,
+    message: &str,
 ) -> eyre::Result<()> {
-    let request = ToolCallRequest::new(tool_name, params, &DefaultClock);
-    let result = run_async(world.discovery()?.call_tool(&world.request_ctx, &request));
-    match result {
-        Err(ToolDiscoveryRoutingServiceError::Domain(domain)) if is_expected(&domain) => Ok(()),
-        Err(other) => Err(eyre!("expected {expectation_label}, got {other:?}")),
-        Ok(_) => Err(eyre!("expected {expectation_label}, but call succeeded")),
+    let err = world
+        .last_error
+        .as_ref()
+        .ok_or_else(|| eyre!("expected an error in world.last_error, found None"))?;
+    match err {
+        ToolDiscoveryRoutingServiceError::Domain(domain) if predicate(domain) => Ok(()),
+        ToolDiscoveryRoutingServiceError::Domain(other) => {
+            Err(eyre!("{message}; got Domain({other:?})"))
+        }
+        other => Err(eyre!("{message}; got non-domain error: {other:?}")),
     }
 }
 
@@ -102,28 +98,24 @@ fn audit_log_contains_entry(
 #[then(r#"calling tool "{tool_name}" is rejected as unavailable"#)]
 fn tool_call_rejected_unavailable(
     world: &mut ToolDiscoveryWorld,
-    tool_name: String,
+    _tool_name: String,
 ) -> Result<(), eyre::Report> {
-    assert_rejected_with(
+    assert_last_error_matches(
         world,
-        &tool_name,
-        serde_json::json!({"path": "/tmp/test.txt"}),
         |e| matches!(e, ToolRegistryDomainError::ToolUnavailable { .. }),
-        "ToolUnavailable",
+        "expected ToolUnavailable",
     )
 }
 
 #[then(r#"calling tool "{tool_name}" is rejected as not found"#)]
 fn tool_call_rejected_not_found(
     world: &mut ToolDiscoveryWorld,
-    tool_name: String,
+    _tool_name: String,
 ) -> Result<(), eyre::Report> {
-    assert_rejected_with(
+    assert_last_error_matches(
         world,
-        &tool_name,
-        serde_json::json!({}),
         |e| matches!(e, ToolRegistryDomainError::ToolNotFound(_)),
-        "ToolNotFound",
+        "expected ToolNotFound",
     )
 }
 
