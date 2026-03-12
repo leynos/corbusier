@@ -339,7 +339,7 @@ Corbusier implements this through:
 
 ## 2. Product Requirements
 
-### 2.1 Feature Catalogue
+### 2.1 Feature catalogue
 
 #### 2.1.1 Core Orchestration Features
 
@@ -755,11 +755,12 @@ Corbusier implements this through:
 
 #### 2.1.5 Tenancy and Identity Features
 
+<!-- markdownlint-disable MD058 -->
 Table 2.1.5.1: Tenancy and identity feature catalogue.
-
 | Feature ID | Feature Name                          | Category             | Priority | Status   |
 | ---------- | ------------------------------------- | -------------------- | -------- | -------- |
 | F-017      | Tenant Context and Identity Isolation | Security and Tenancy | Critical | Proposed |
+<!-- markdownlint-enable MD058 -->
 
 ##### F-017: Tenant Context and Identity Isolation
 
@@ -1103,9 +1104,9 @@ For screen readers: The following sequence diagram shows how starting an MCP
 server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
-Figure 2.2.4.3: MCP server start and `tools/list` lifecycle interaction
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.1: MCP server start and `tools/list` lifecycle interaction
 sequence.
-
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -1154,6 +1155,7 @@ sequenceDiagram
     RegistryRepo-->>McpServerLifecycleService: ok
     McpServerLifecycleService-->>Operator: List ToolDefinition
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### F-005-RQ-002: Tool Discovery and Registration
 
@@ -1244,9 +1246,9 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   enforcing cross-tenant isolation at the database boundary in addition to
   `RequestContext` scoping and `SET LOCAL app.tenant_id`.
 
-Figure 2.2.4.1: Entity-relationship diagram showing the tool registry
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.2: Entity-relationship diagram showing the tool registry
 persistence model.
-
 ```mermaid
 erDiagram
     mcp_servers {
@@ -1302,10 +1304,11 @@ erDiagram
     mcp_servers ||--o{ tool_log_metadata : "(id, tenant_id)"
     mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
 ```
+<!-- markdownlint-enable MD031 -->
 
-Figure 2.2.4.2: Sequence diagram for the `call_tool` flow within
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.4.3: Sequence diagram for the `call_tool` flow within
 `ToolDiscoveryRoutingService`.
-
 ```mermaid
 sequenceDiagram
     actor Caller
@@ -1346,6 +1349,7 @@ sequenceDiagram
 
     Service-->>Caller: ToolCallResult or error
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### F-006-RQ-001: Weaver Change Tracking
 
@@ -1364,8 +1368,8 @@ sequenceDiagram
 
 #### 2.2.5 Tenancy and Identity Requirements
 
+<!-- markdownlint-disable MD058 -->
 Table 2.2.5.1: Tenancy and identity requirement matrix.
-
 | Requirement ID | Description                          | Acceptance Criteria                                                           | Priority  | Complexity |
 | -------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------- | ---------- |
 | F-017-RQ-001   | Tenant Domain Primitive              | Tenant identity is modelled separately from user identity                     | Must-Have | Medium     |
@@ -1373,6 +1377,7 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
 | F-017-RQ-003   | Tenant-Scoped Persistence and Lookup | All tenant-owned mutations and reads require tenant context                   | Must-Have | High       |
 | F-017-RQ-004   | Dual-Layer Isolation Enforcement     | Rust signatures and PostgreSQL RLS/constraints both block cross-tenant access | Must-Have | High       |
 | F-017-RQ-005   | Tenant Isolation Verification        | Test scenarios prove same external IDs can coexist across tenants safely      | Must-Have | Medium     |
+<!-- markdownlint-enable MD058 -->
 
 ##### F-017-RQ-001: Tenant Domain Primitive
 
@@ -1807,8 +1812,8 @@ you to also send your logs for further analysis.
 
 #### 3.3.1 Core Dependencies
 
+<!-- markdownlint-disable MD058 -->
 Table 3.3.1-1: Core dependencies.
-
 | Crate        | Version | Purpose                                      | Registry  |
 | ------------ | ------- | -------------------------------------------- | --------- |
 | serde        | 1.0.228 | Serialization framework                      | crates.io |
@@ -1827,6 +1832,7 @@ Table 3.3.1-1: Core dependencies.
 | futures      | 0.3.31  | Async utilities / combinators                | crates.io |
 | tokio        | 1.49.0  | Async runtime                                | crates.io |
 | tracing      | 0.1.41  | Application diagnostics / structured logging | crates.io |
+<!-- markdownlint-enable MD058 -->
 
 #### 3.3.2 MCP Protocol Dependencies (Planned)
 
@@ -2017,7 +2023,7 @@ graph TB
 - **Change Logs**: Weaver-generated change sets and diffs
 - **Temporary Files**: Tool execution artifacts and build outputs
 
-##### Object Storage
+##### Object storage
 
 - **Tool Stderr Logs**: MCP server startup and tool call stderr captured
   via `ObjectStoreLogAdapter` (backed by the Rust `object_store` crate;
@@ -2032,14 +2038,15 @@ graph TB
 
 #### 3.5.5 Database Configuration
 
+<!-- markdownlint-disable MD058 -->
 Table 3.5.5-1: Database configuration by environment.
-
 | Environment | Database                                                                  | Connection Pool    | Backup Strategy          |
 | ----------- | ------------------------------------------------------------------------- | ------------------ | ------------------------ |
 | Development | SQLite (default), in-memory                                               | Single connection  | None (ephemeral)         |
 | Testing     | In-memory (unit), SQLite (file-backed), embedded PostgreSQL (integration) | Per-test isolation | None (ephemeral)         |
 | Staging     | PostgreSQL                                                                | 10 connections     | Daily snapshots          |
 | Production  | PostgreSQL                                                                | 50 connections     | Continuous WAL archiving |
+<!-- markdownlint-enable MD058 -->
 
 ##### Diesel Configuration Example
 

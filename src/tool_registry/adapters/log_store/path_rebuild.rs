@@ -86,7 +86,7 @@ fn parse_log_kind(meta: &ObjectMeta, segments: &[&str]) -> Option<LogEntryKind> 
             }
         },
         _ => {
-            warn_rebuild_metadata_failure(meta, "unrecognised log path shape");
+            warn_rebuild_metadata_failure(meta, "unrecognized log path shape");
             None
         }
     }

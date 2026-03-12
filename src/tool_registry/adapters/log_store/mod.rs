@@ -78,17 +78,15 @@ impl ObjectStoreLogAdapter {
         server_id: McpServerId,
         sweep: &SweepContext<'_>,
     ) -> ToolLogStoreResult<Vec<LogEntryMetadata>> {
-        let existing_entries: Vec<LogEntryMetadata> = {
-            let guard = self.metadata.read().await;
-            guard
-                .values()
-                .filter(|e| e.server_id() == server_id)
-                .cloned()
-                .collect()
-        };
-        if !existing_entries.is_empty() {
-            return Ok(existing_entries);
-        }
+        let mut merged_entries: HashMap<String, LogEntryMetadata> = self
+            .metadata
+            .read()
+            .await
+            .values()
+            .filter(|e| e.server_id() == server_id)
+            .cloned()
+            .map(|entry| (entry.object_path().to_owned(), entry))
+            .collect();
 
         let prefix = Path::from(format!("tool_logs/{}/{server_id}/", ctx.tenant_id()));
         let rebuilt_entries: Vec<LogEntryMetadata> = self
@@ -104,15 +102,15 @@ impl ObjectStoreLogAdapter {
             .try_collect()
             .await
             .map_err(|err| ToolLogStoreError::ListFailed(err.to_string()))?;
-        if rebuilt_entries.is_empty() {
-            return Ok(rebuilt_entries);
+        for entry in &rebuilt_entries {
+            merged_entries.insert(entry.object_path().to_owned(), entry.clone());
         }
 
         let mut guard = self.metadata.write().await;
-        for entry in &rebuilt_entries {
+        for entry in merged_entries.values() {
             guard.insert(entry.object_path().to_owned(), entry.clone());
         }
-        Ok(rebuilt_entries)
+        Ok(merged_entries.into_values().collect())
     }
 
     /// Deletes log entries whose retention period has elapsed.
