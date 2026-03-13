@@ -32,7 +32,7 @@ async fn execute_turn_reuses_active_session(
     })?;
     context
         .session_repository
-        .upsert_session(&active_session)
+        .upsert_session(&context.ctx, &active_session)
         .await?;
     context
         .runtime
@@ -140,7 +140,7 @@ async fn execute_turn_rotates_expired_session(
     });
     context
         .session_repository
-        .upsert_session(&expired_session)
+        .upsert_session(&context.ctx, &expired_session)
         .await?;
     context
         .runtime

@@ -65,21 +65,21 @@ pub const ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL: &str = include_str!(
 /// SQL to enforce idempotent hook execution inserts per tenant and trigger context.
 pub const ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL: &str =
     include_str!("../../migrations/2026-03-14-000000_add_hook_executions_unique_constraint/up.sql");
-
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
 );
-
 /// SQL to tenant-scope `mcp_servers` and enforce composite child foreign keys.
 pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-03-11-000000_tenant_scope_mcp_servers/up.sql");
-
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
 pub const TEMPLATE_DB: &str = "corbusier_test_template_v10";
+/// SQL to tenant-scope agent backend and turn-session tables.
+pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
+    include_str!("../../migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql");
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -136,6 +136,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
     Ok(())
 }
 

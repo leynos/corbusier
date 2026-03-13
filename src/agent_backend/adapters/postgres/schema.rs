@@ -5,6 +5,8 @@ diesel::table! {
     backend_registrations (id) {
         /// Internal backend identifier.
         id -> Uuid,
+        /// Tenant identifier owning this backend.
+        tenant_id -> Uuid,
         /// Unique human-readable backend name.
         #[max_length = 100]
         name -> Varchar,
@@ -27,6 +29,8 @@ diesel::table! {
     agent_turn_sessions (id) {
         /// Internal session identifier.
         id -> Uuid,
+        /// Tenant identifier owning this session.
+        tenant_id -> Uuid,
         /// Owning backend registration identifier.
         backend_id -> Uuid,
         /// Conversation identifier.

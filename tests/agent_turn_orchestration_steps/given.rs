@@ -82,7 +82,11 @@ fn existing_active_session(
         now: Utc::now(),
     })?;
     world.existing_session_id = Some(session.id());
-    run_async(world.session_repository.upsert_session(&session))?;
+    run_async(
+        world
+            .session_repository
+            .upsert_session(&world.ctx, &session),
+    )?;
     Ok(())
 }
 
@@ -112,7 +116,11 @@ fn expired_active_session(
     });
 
     world.existing_session_id = Some(session.id());
-    run_async(world.session_repository.upsert_session(&session))?;
+    run_async(
+        world
+            .session_repository
+            .upsert_session(&world.ctx, &session),
+    )?;
     Ok(())
 }
 

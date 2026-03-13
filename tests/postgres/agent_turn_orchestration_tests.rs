@@ -127,6 +127,15 @@ async fn register_backend(context: &OrchestrationContext, name: &str) -> Result<
     Ok(backend.id().into_inner())
 }
 
+fn other_tenant_context(ctx: &RequestContext) -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        ctx.correlation_id(),
+        ctx.user_id(),
+        ctx.session_id(),
+    )
+}
+
 #[fixture]
 async fn context(
     postgres_cluster: Result<PostgresCluster, BoxError>,
@@ -223,7 +232,7 @@ async fn postgres_rotates_expired_session(
         turn_count: 2,
     });
     ctx.session_repository
-        .upsert_session(&expired_session)
+        .upsert_session(&ctx.ctx, &expired_session)
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
 
@@ -248,7 +257,7 @@ async fn postgres_rotates_expired_session(
 
     let active = ctx
         .session_repository
-        .find_active_session(backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, backend_id, conversation_id)
         .await
         .map_err(|err| Box::new(err) as BoxError)?
         .ok_or_else(|| {
@@ -316,7 +325,7 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
 
     let active = ctx
         .session_repository
-        .find_active_session(backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, backend_id, conversation_id)
         .await
         .map_err(|err| Box::new(err) as BoxError)?
         .ok_or_else(|| Box::new(std::io::Error::other("expected active session")) as BoxError)?;
@@ -400,8 +409,8 @@ async fn postgres_detects_concurrent_active_session_conflict(
     .map_err(|err| Box::new(err) as BoxError)?;
 
     let (first, second) = tokio::join!(
-        ctx.session_repository.upsert_session(&session_a),
-        ctx.session_repository.upsert_session(&session_b)
+        ctx.session_repository.upsert_session(&ctx.ctx, &session_a),
+        ctx.session_repository.upsert_session(&ctx.ctx, &session_b)
     );
 
     let first_conflict = matches!(
@@ -419,9 +428,47 @@ async fn postgres_detects_concurrent_active_session_conflict(
 
     let active = ctx
         .session_repository
-        .find_active_session(backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, backend_id, conversation_id)
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
     assert!(active.is_some());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_session_repository_scopes_lookup_by_tenant(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&ctx, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    let session = TurnSession::new(TurnSessionCreateParams {
+        backend_id,
+        conversation_id,
+        runtime_session_id: RuntimeSessionId::new("tenant-a-runtime")
+            .map_err(|err| Box::new(err) as BoxError)?,
+        ttl: Duration::minutes(5),
+        now: Utc::now(),
+    })
+    .map_err(|err| Box::new(err) as BoxError)?;
+
+    ctx.session_repository
+        .upsert_session(&ctx.ctx, &session)
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+
+    let tenant_b_ctx = other_tenant_context(&ctx.ctx);
+    let tenant_b_lookup = ctx
+        .session_repository
+        .find_active_session(&tenant_b_ctx, backend_id, conversation_id)
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+
+    assert!(tenant_b_lookup.is_none());
     Ok(())
 }

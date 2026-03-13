@@ -1,6 +1,7 @@
 //! Session persistence port for turn orchestration.
 
 use crate::agent_backend::domain::{BackendId, TurnSession};
+use crate::context::RequestContext;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
@@ -25,7 +26,7 @@ pub enum SessionSlotArbitration {
 #[async_trait]
 pub trait TurnSessionRepository: Send + Sync {
     /// Atomically resolves active-session state for a backend/conversation
-    /// pair.
+    /// pair within the tenant identified by [`RequestContext`].
     ///
     /// Adapters must perform the read/expiry transition in a single
     /// transaction so concurrent callers cannot observe torn state.
@@ -33,14 +34,20 @@ pub trait TurnSessionRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns [`TurnSessionRepositoryError`] on persistence failures.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "tenant-scoped slot arbitration needs context, key, and clock inputs"
+    )]
     async fn arbitrate_session_slot(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: Uuid,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration>;
 
-    /// Finds the active session for a backend/conversation pair.
+    /// Finds the active session for a backend/conversation pair scoped by
+    /// tenant.
     ///
     /// Returns `None` when there is no active session.
     ///
@@ -49,16 +56,21 @@ pub trait TurnSessionRepository: Send + Sync {
     /// Returns [`TurnSessionRepositoryError`] on persistence failures.
     async fn find_active_session(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: Uuid,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>>;
 
-    /// Persists a session insert or update.
+    /// Persists a session insert or update scoped by tenant.
     ///
     /// # Errors
     ///
     /// Returns [`TurnSessionRepositoryError`] on persistence failures.
-    async fn upsert_session(&self, session: &TurnSession) -> TurnSessionRepositoryResult<()>;
+    async fn upsert_session(
+        &self,
+        ctx: &RequestContext,
+        session: &TurnSession,
+    ) -> TurnSessionRepositoryResult<()>;
 }
 
 /// Errors returned by turn-session repository adapters.

@@ -13,6 +13,9 @@ pub struct BackendRegistrationRow {
     /// Internal backend identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub id: uuid::Uuid,
+    /// Tenant identifier owning this backend.
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub tenant_id: uuid::Uuid,
     /// Unique human-readable backend name.
     #[diesel(sql_type = diesel::sql_types::Varchar)]
     pub name: String,
@@ -39,6 +42,8 @@ pub struct BackendRegistrationRow {
 pub struct NewBackendRegistrationRow {
     /// Internal backend identifier.
     pub id: uuid::Uuid,
+    /// Tenant identifier owning this backend.
+    pub tenant_id: uuid::Uuid,
     /// Unique human-readable backend name.
     pub name: String,
     /// Lifecycle status.
@@ -61,6 +66,9 @@ pub struct AgentTurnSessionRow {
     /// Internal session identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub id: uuid::Uuid,
+    /// Tenant identifier owning this session.
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub tenant_id: uuid::Uuid,
     /// Owning backend registration identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub backend_id: uuid::Uuid,
@@ -99,6 +107,8 @@ pub struct AgentTurnSessionRow {
 pub struct NewAgentTurnSessionRow {
     /// Internal session identifier.
     pub id: uuid::Uuid,
+    /// Tenant identifier owning this session.
+    pub tenant_id: uuid::Uuid,
     /// Owning backend registration identifier.
     pub backend_id: uuid::Uuid,
     /// Conversation identifier.

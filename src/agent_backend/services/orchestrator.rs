@@ -323,7 +323,7 @@ where
         let session_resolution_now = self.clock.utc();
 
         let (mut session, reused_session, rotated_session) = self
-            .resolve_session(&backend, conversation_id, session_resolution_now)
+            .resolve_session(ctx, &backend, conversation_id, session_resolution_now)
             .await?;
 
         let runtime_result = self
@@ -337,7 +337,7 @@ where
 
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
-        self.turn_sessions.upsert_session(&session).await?;
+        self.turn_sessions.upsert_session(ctx, &session).await?;
 
         Ok(ExecuteAgentTurnResponse {
             session_id: session.id(),
@@ -350,35 +350,45 @@ where
         })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "session arbitration depends on request context, backend key, and clock timestamp"
+    )]
     async fn resolve_session(
         &self,
+        ctx: &RequestContext,
         backend: &AgentBackendRegistration,
         conversation_id: Uuid,
         now: chrono::DateTime<chrono::Utc>,
     ) -> AgentTurnOrchestrationResult<(TurnSession, bool, bool)> {
         match self
             .turn_sessions
-            .arbitrate_session_slot(backend.id(), conversation_id, now)
+            .arbitrate_session_slot(ctx, backend.id(), conversation_id, now)
             .await?
         {
             SessionSlotArbitration::Reused(existing) => Ok((existing, true, false)),
             SessionSlotArbitration::Vacant => {
                 let (created_session, reused_due_to_conflict) = self
-                    .create_or_reuse_session(backend, conversation_id, now)
+                    .create_or_reuse_session(ctx, backend, conversation_id, now)
                     .await?;
                 Ok((created_session, reused_due_to_conflict, false))
             }
             SessionSlotArbitration::Expired => {
                 let (rotated_session, reused_due_to_conflict) = self
-                    .create_or_reuse_session(backend, conversation_id, now)
+                    .create_or_reuse_session(ctx, backend, conversation_id, now)
                     .await?;
                 Ok((rotated_session, reused_due_to_conflict, true))
             }
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "session creation needs request context, backend identity, conversation, and timestamp"
+    )]
     async fn create_session(
         &self,
+        ctx: &RequestContext,
         backend: &AgentBackendRegistration,
         conversation_id: Uuid,
         now: chrono::DateTime<chrono::Utc>,
@@ -404,7 +414,7 @@ where
             }
         };
 
-        match self.turn_sessions.upsert_session(&session).await {
+        match self.turn_sessions.upsert_session(ctx, &session).await {
             Ok(()) => Ok(session),
             Err(error) => {
                 self.runtime
@@ -415,19 +425,27 @@ where
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "session reuse path requires context plus backend/conversation arbitration inputs"
+    )]
     async fn create_or_reuse_session(
         &self,
+        ctx: &RequestContext,
         backend: &AgentBackendRegistration,
         conversation_id: Uuid,
         now: chrono::DateTime<chrono::Utc>,
     ) -> AgentTurnOrchestrationResult<(TurnSession, bool)> {
-        match self.create_session(backend, conversation_id, now).await {
+        match self
+            .create_session(ctx, backend, conversation_id, now)
+            .await
+        {
             Ok(created) => Ok((created, false)),
             Err(AgentTurnOrchestrationError::SessionRepository(
                 TurnSessionRepositoryError::ActiveSessionConflict { .. },
             )) => {
                 let active = self
-                    .require_active_session_after_conflict(backend.id(), conversation_id)
+                    .require_active_session_after_conflict(ctx, backend.id(), conversation_id)
                     .await?;
                 Ok((active, true))
             }
@@ -437,11 +455,12 @@ where
 
     async fn require_active_session_after_conflict(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: Uuid,
     ) -> AgentTurnOrchestrationResult<TurnSession> {
         self.turn_sessions
-            .find_active_session(backend_id, conversation_id)
+            .find_active_session(ctx, backend_id, conversation_id)
             .await?
             .ok_or(AgentTurnOrchestrationError::SessionRepository(
                 TurnSessionRepositoryError::active_session_conflict(backend_id, conversation_id),

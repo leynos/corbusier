@@ -169,7 +169,7 @@ async fn rotates_expired_session_and_marks_prior_session_expired(
     });
     context
         .session_repository
-        .upsert_session(&expired_session)
+        .upsert_session(&context.ctx, &expired_session)
         .await?;
 
     context

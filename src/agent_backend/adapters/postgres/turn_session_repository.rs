@@ -15,6 +15,7 @@ use crate::agent_backend::{
         TurnSessionRepositoryResult,
     },
 };
+use crate::context::RequestContext;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use diesel::pg::PgConnection;
@@ -55,15 +56,18 @@ impl PostgresTurnSessionRepository {
 impl TurnSessionRepository for PostgresTurnSessionRepository {
     async fn arbitrate_session_slot(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: uuid::Uuid,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
-                lock_session_key(tx_conn, backend_id.into_inner())?;
+                lock_session_key(tx_conn, tenant_id, backend_id.into_inner())?;
 
                 let row = agent_turn_sessions::table
+                    .filter(agent_turn_sessions::tenant_id.eq(tenant_id))
                     .filter(agent_turn_sessions::backend_id.eq(backend_id.into_inner()))
                     .filter(agent_turn_sessions::conversation_id.eq(conversation_id))
                     .filter(agent_turn_sessions::status.eq(TurnSessionStatus::Active.as_str()))
@@ -101,11 +105,14 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 
     async fn find_active_session(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: uuid::Uuid,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
+        let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             let row = agent_turn_sessions::table
+                .filter(agent_turn_sessions::tenant_id.eq(tenant_id))
                 .filter(agent_turn_sessions::backend_id.eq(backend_id.into_inner()))
                 .filter(agent_turn_sessions::conversation_id.eq(conversation_id))
                 .filter(agent_turn_sessions::status.eq(TurnSessionStatus::Active.as_str()))
@@ -120,17 +127,24 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
         .await
     }
 
-    async fn upsert_session(&self, session: &TurnSession) -> TurnSessionRepositoryResult<()> {
-        let new_row = to_new_row(session)?;
+    async fn upsert_session(
+        &self,
+        ctx: &RequestContext,
+        session: &TurnSession,
+    ) -> TurnSessionRepositoryResult<()> {
+        let tenant_id = ctx.tenant_id().into_inner();
+        let new_row = to_new_row(session, tenant_id)?;
         let backend_id = new_row.backend_id;
         let conversation_id = new_row.conversation_id;
 
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
-                lock_session_key(tx_conn, backend_id)?;
+                lock_session_key(tx_conn, tenant_id, backend_id)?;
 
                 let updated = diesel::update(
-                    agent_turn_sessions::table.filter(agent_turn_sessions::id.eq(new_row.id)),
+                    agent_turn_sessions::table
+                        .filter(agent_turn_sessions::id.eq(new_row.id))
+                        .filter(agent_turn_sessions::tenant_id.eq(tenant_id)),
                 )
                 .set((
                     agent_turn_sessions::status.eq(&new_row.status),
@@ -152,6 +166,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                 let inserted = diesel::insert_into(agent_turn_sessions::table)
                     .values(&new_row)
                     .on_conflict((
+                        agent_turn_sessions::tenant_id,
                         agent_turn_sessions::backend_id,
                         agent_turn_sessions::conversation_id,
                     ))
@@ -177,9 +192,11 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 
 fn lock_session_key(
     connection: &mut PgConnection,
+    tenant_id: uuid::Uuid,
     backend_id: uuid::Uuid,
 ) -> TurnSessionRepositoryResult<()> {
     backend_registrations::table
+        .filter(backend_registrations::tenant_id.eq(tenant_id))
         .filter(backend_registrations::id.eq(backend_id))
         .for_update()
         .select(backend_registrations::id)
@@ -188,7 +205,10 @@ fn lock_session_key(
         .map_err(TurnSessionRepositoryError::persistence)
 }
 
-fn to_new_row(session: &TurnSession) -> TurnSessionRepositoryResult<NewAgentTurnSessionRow> {
+fn to_new_row(
+    session: &TurnSession,
+    tenant_id: uuid::Uuid,
+) -> TurnSessionRepositoryResult<NewAgentTurnSessionRow> {
     let turn_count: i64 =
         session
             .turn_count()
@@ -201,6 +221,7 @@ fn to_new_row(session: &TurnSession) -> TurnSessionRepositoryResult<NewAgentTurn
 
     Ok(NewAgentTurnSessionRow {
         id: session.id().into_inner(),
+        tenant_id,
         backend_id: session.backend_id().into_inner(),
         conversation_id: session.conversation_id(),
         runtime_session_id: session.runtime_session_handle().as_str().to_owned(),
@@ -217,6 +238,7 @@ fn to_new_row(session: &TurnSession) -> TurnSessionRepositoryResult<NewAgentTurn
 fn row_to_turn_session(row: AgentTurnSessionRow) -> TurnSessionRepositoryResult<TurnSession> {
     let AgentTurnSessionRow {
         id,
+        tenant_id: _tenant_id,
         backend_id,
         conversation_id,
         runtime_session_id,

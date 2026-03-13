@@ -7,6 +7,7 @@ use crate::agent_backend::{
         TurnSessionRepositoryResult,
     },
 };
+use crate::context::{RequestContext, TenantId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ use uuid::Uuid;
 #[derive(Debug, Default)]
 struct InMemoryTurnSessionState {
     sessions: HashMap<TurnSessionId, TurnSession>,
-    active_index: HashMap<(BackendId, Uuid), TurnSessionId>,
+    active_index: HashMap<(TenantId, BackendId, Uuid), TurnSessionId>,
 }
 
 /// Thread-safe in-memory repository for turn sessions.
@@ -47,9 +48,10 @@ impl InMemoryTurnSessionRepository {
 
     fn reconcile_session_index(
         state: &mut InMemoryTurnSessionState,
+        tenant_id: TenantId,
         session: &TurnSession,
     ) -> TurnSessionRepositoryResult<()> {
-        let key = (session.backend_id(), session.conversation_id());
+        let key = (tenant_id, session.backend_id(), session.conversation_id());
         if session.status() == TurnSessionStatus::Active {
             let has_competing_active = state.active_index.get(&key).is_some_and(|existing_id| {
                 *existing_id != session.id()
@@ -86,6 +88,7 @@ impl InMemoryTurnSessionRepository {
 impl TurnSessionRepository for InMemoryTurnSessionRepository {
     async fn arbitrate_session_slot(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: Uuid,
         now: DateTime<Utc>,
@@ -94,7 +97,7 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
 
-        let key = (backend_id, conversation_id);
+        let key = (ctx.tenant_id(), backend_id, conversation_id);
         let Some(active_id) = state.active_index.get(&key).copied() else {
             return Ok(SessionSlotArbitration::Vacant);
         };
@@ -120,6 +123,7 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
 
     async fn find_active_session(
         &self,
+        ctx: &RequestContext,
         backend_id: BackendId,
         conversation_id: Uuid,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
@@ -129,7 +133,7 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
 
         let session = state
             .active_index
-            .get(&(backend_id, conversation_id))
+            .get(&(ctx.tenant_id(), backend_id, conversation_id))
             .and_then(|id| state.sessions.get(id))
             .filter(|session| session.status() == TurnSessionStatus::Active)
             .cloned();
@@ -137,10 +141,14 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
         Ok(session)
     }
 
-    async fn upsert_session(&self, session: &TurnSession) -> TurnSessionRepositoryResult<()> {
+    async fn upsert_session(
+        &self,
+        ctx: &RequestContext,
+        session: &TurnSession,
+    ) -> TurnSessionRepositoryResult<()> {
         let mut state = self.state.write().map_err(|err| {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
-        Self::reconcile_session_index(&mut state, session)
+        Self::reconcile_session_index(&mut state, ctx.tenant_id(), session)
     }
 }

@@ -153,11 +153,11 @@ fn only_one_active_session_remains_for_conversation(
         .copied()
         .ok_or_else(|| eyre::eyre!("missing conversation id for label {conversation}"))?;
 
-    let active = super::world::run_async(
-        world
-            .session_repository
-            .find_active_session(backend_id, conversation_id),
-    )?;
+    let active = super::world::run_async(world.session_repository.find_active_session(
+        &world.ctx,
+        backend_id,
+        conversation_id,
+    ))?;
     if active.is_none() {
         return Err(eyre::eyre!("expected one active session but found none"));
     }
