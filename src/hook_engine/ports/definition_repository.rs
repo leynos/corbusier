@@ -1,5 +1,6 @@
 //! Port contract for hook definition lookup.
 
+use crate::context::RequestContext;
 use crate::hook_engine::domain::{HookDefinition, HookTriggerType};
 use async_trait::async_trait;
 use thiserror::Error;
@@ -12,7 +13,7 @@ pub type HookDefinitionRepositoryResult<T> = Result<T, HookDefinitionRepositoryE
 pub trait HookDefinitionRepository: Send + Sync {
     /// Lists enabled hook definitions for the given trigger type.
     ///
-    /// Example: `list_enabled_for_trigger(HookTriggerType::PreCommit)` returns
+    /// Example: `list_enabled_for_trigger(&ctx, HookTriggerType::PreCommit)` returns
     /// all enabled pre-commit hooks.
     ///
     /// # Errors
@@ -20,6 +21,7 @@ pub trait HookDefinitionRepository: Send + Sync {
     /// Returns [`HookDefinitionRepositoryError`] when persistence fails.
     async fn list_enabled_for_trigger(
         &self,
+        ctx: &RequestContext,
         trigger: HookTriggerType,
     ) -> HookDefinitionRepositoryResult<Vec<HookDefinition>>;
 }

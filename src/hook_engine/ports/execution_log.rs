@@ -1,5 +1,6 @@
 //! Port contract for persisting hook execution results.
 
+use crate::context::RequestContext;
 use crate::hook_engine::domain::{HookExecutionResult, TriggerContextId};
 use async_trait::async_trait;
 use thiserror::Error;
@@ -12,22 +13,27 @@ pub type HookExecutionLogResult<T> = Result<T, HookExecutionLogError>;
 pub trait HookExecutionLogRepository: Send + Sync {
     /// Persists a hook execution result.
     ///
-    /// Example: `store(&result)` records the hook execution.
+    /// Example: `store(&ctx, &result)` records the hook execution.
     ///
     /// # Errors
     ///
     /// Returns [`HookExecutionLogError`] when persistence fails.
-    async fn store(&self, result: &HookExecutionResult) -> HookExecutionLogResult<()>;
+    async fn store(
+        &self,
+        ctx: &RequestContext,
+        result: &HookExecutionResult,
+    ) -> HookExecutionLogResult<()>;
 
     /// Returns all execution results for a trigger context.
     ///
-    /// Example: `find_by_trigger_context(id)` returns results for `id`.
+    /// Example: `find_by_trigger_context(&ctx, id)` returns results for `id`.
     ///
     /// # Errors
     ///
     /// Returns [`HookExecutionLogError`] when persistence lookup fails.
     async fn find_by_trigger_context(
         &self,
+        ctx: &RequestContext,
         trigger_context_id: TriggerContextId,
     ) -> HookExecutionLogResult<Vec<HookExecutionResult>>;
 }

@@ -1,5 +1,6 @@
 //! Hook engine orchestration service.
 
+use crate::context::RequestContext;
 use crate::hook_engine::domain::{
     ActionResult, HookDefinition, HookExecutionInput, HookExecutionResult, HookTriggerContext,
     HookTriggerType,
@@ -92,11 +93,12 @@ where
 {
     async fn execute(
         &self,
+        ctx: &RequestContext,
         context: HookTriggerContext,
     ) -> HookEngineResult<Vec<HookExecutionResult>> {
         let mut definitions = self
             .definition_repository
-            .list_enabled_for_trigger(context.trigger_type())
+            .list_enabled_for_trigger(ctx, context.trigger_type())
             .await?;
         Self::sort_definitions(&mut definitions);
 
@@ -113,7 +115,7 @@ where
                 action_results,
                 executed_at: self.clock.utc(),
             });
-            self.execution_log.store(&result).await?;
+            self.execution_log.store(ctx, &result).await?;
             results.push(result);
         }
         Ok(results)

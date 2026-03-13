@@ -58,6 +58,10 @@ pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
 /// SQL to add hook execution log table for roadmap 2.3.1.
 pub const ADD_HOOK_EXECUTIONS_SQL: &str =
     include_str!("../../migrations/2026-03-03-000000_add_hook_executions_table/up.sql");
+/// SQL to tenant-scope hook execution log table for tenant isolation.
+pub const ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL: &str = include_str!(
+    "../../migrations/2026-03-13-000000_add_tenant_id_to_hook_executions_table/up.sql"
+);
 
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
@@ -72,7 +76,7 @@ pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v8";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v9";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -126,6 +130,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL))?;
     Ok(())
 }
 

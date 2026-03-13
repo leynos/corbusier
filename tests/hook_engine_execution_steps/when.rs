@@ -10,7 +10,8 @@ use rstest_bdd_macros::when;
 fn fire_trigger(world: &mut HookWorld, trigger: HookTriggerType) -> Result<(), eyre::Report> {
     let context = HookTriggerContext::new(trigger, &DefaultClock);
     let stored_context = context.clone();
-    let results = run_async(world.service.execute(context)).wrap_err("hook execution failed")?;
+    let results = run_async(world.service.execute(&world.request_ctx, context))
+        .wrap_err("hook execution failed")?;
     world.last_context = Some(stored_context);
     world.last_results = Some(results);
     Ok(())

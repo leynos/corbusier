@@ -5,6 +5,8 @@ diesel::table! {
     hook_executions (id) {
         /// Unique execution identifier.
         id -> Uuid,
+        /// Tenant identifier for row isolation.
+        tenant_id -> Uuid,
         /// Trigger context correlation identifier.
         trigger_context_id -> Uuid,
         /// Hook definition identifier.

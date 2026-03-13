@@ -1,5 +1,6 @@
 //! Service tests for hook engine execution.
 
+use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::hook_engine::adapters::memory::{
     InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
     InMemoryHookExecutionLogRepository,
@@ -12,6 +13,15 @@ use crate::hook_engine::ports::{HookEngine, HookExecutionLogRepository};
 use crate::hook_engine::services::HookEngineService;
 use mockable::DefaultClock;
 use std::sync::Arc;
+
+fn request_ctx() -> RequestContext {
+    RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    )
+}
 
 fn build_action(id: &str) -> Result<HookAction, crate::hook_engine::domain::HookDomainError> {
     let action_id = HookActionId::new(id)?;
@@ -43,23 +53,33 @@ async fn execute_orders_hooks_by_priority_then_id() {
         Arc::new(execution_log.clone()),
         Arc::new(DefaultClock),
     );
+    let ctx = request_ctx();
 
     definition_repo
-        .insert(build_definition("hook-b", 10).expect("hook-b definition should be valid for test"))
+        .insert(
+            &ctx,
+            build_definition("hook-b", 10).expect("hook-b definition should be valid for test"),
+        )
         .await
         .expect("insert hook-b definition should succeed");
     definition_repo
-        .insert(build_definition("hook-a", 5).expect("hook-a definition should be valid for test"))
+        .insert(
+            &ctx,
+            build_definition("hook-a", 5).expect("hook-a definition should be valid for test"),
+        )
         .await
         .expect("insert hook-a definition should succeed");
     definition_repo
-        .insert(build_definition("hook-c", 5).expect("hook-c definition should be valid for test"))
+        .insert(
+            &ctx,
+            build_definition("hook-c", 5).expect("hook-c definition should be valid for test"),
+        )
         .await
         .expect("insert hook-c definition should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
     let results = service
-        .execute(context)
+        .execute(&ctx, context)
         .await
         .expect("pre-commit hook execution should succeed");
 
@@ -81,6 +101,7 @@ async fn execute_persists_results_and_failure_status() {
         Arc::new(execution_log.clone()),
         Arc::new(DefaultClock),
     );
+    let ctx = request_ctx();
 
     let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");
     let hook_id = HookId::new("hook-fail").expect("failing hook id should be valid");
@@ -97,7 +118,7 @@ async fn execute_persists_results_and_failure_status() {
     .with_priority(HookPriority::new(1));
 
     definition_repo
-        .insert(definition)
+        .insert(&ctx, definition)
         .await
         .expect("insert failing definition should succeed");
     action_executor
@@ -107,7 +128,7 @@ async fn execute_persists_results_and_failure_status() {
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
     let results = service
-        .execute(context)
+        .execute(&ctx, context)
         .await
         .expect("post-deploy hook execution should succeed");
 
@@ -115,7 +136,7 @@ async fn execute_persists_results_and_failure_status() {
     assert_eq!(result.status(), HookExecutionStatus::Failed);
 
     let stored = execution_log
-        .find_by_trigger_context(trigger_context_id)
+        .find_by_trigger_context(&ctx, trigger_context_id)
         .await
         .expect("querying stored execution results should succeed");
     assert_eq!(stored.len(), 1);

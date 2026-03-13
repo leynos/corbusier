@@ -1,6 +1,7 @@
 //! Hook engine execution port.
 
 use super::{HookActionExecutionError, HookDefinitionRepositoryError, HookExecutionLogError};
+use crate::context::RequestContext;
 use crate::hook_engine::domain::{HookExecutionResult, HookTriggerContext, HookTriggerType};
 use async_trait::async_trait;
 use thiserror::Error;
@@ -13,7 +14,7 @@ pub type HookEngineResult<T> = Result<T, HookEngineError>;
 pub trait HookEngine: Send + Sync {
     /// Executes all configured hooks for the given trigger context.
     ///
-    /// Example: `engine.execute(context)` returns execution results.
+    /// Example: `engine.execute(&ctx, context)` returns execution results.
     ///
     /// # Errors
     ///
@@ -21,6 +22,7 @@ pub trait HookEngine: Send + Sync {
     /// or persistence fails.
     async fn execute(
         &self,
+        ctx: &RequestContext,
         context: HookTriggerContext,
     ) -> HookEngineResult<Vec<HookExecutionResult>>;
 

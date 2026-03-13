@@ -26,7 +26,7 @@ fn configure_hook(world: &mut HookWorld, setup: HookSetup) -> Result<HookActionI
         vec![HookAction::new(action_id.clone(), setup.action_type)],
     )
     .wrap_err("build hook definition for scenario setup")?;
-    run_async(world.definition_repo.insert(definition))
+    run_async(world.definition_repo.insert(&world.request_ctx, definition))
         .wrap_err("insert hook definition into in-memory scenario repository")?;
     Ok(action_id)
 }

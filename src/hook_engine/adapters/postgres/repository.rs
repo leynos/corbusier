@@ -2,6 +2,7 @@
 
 use super::models::{HookExecutionRow, NewHookExecutionRow};
 use super::schema::hook_executions;
+use crate::context::{RequestContext, TenantId};
 use crate::hook_engine::domain::{
     ActionResult, HookExecutionId, HookExecutionPersisted, HookExecutionResult,
     HookExecutionStatus, HookId, HookTriggerType, TriggerContextId,
@@ -9,6 +10,7 @@ use crate::hook_engine::domain::{
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
 };
+use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -32,7 +34,11 @@ impl PostgresHookExecutionLogRepository {
         Self { pool }
     }
 
-    async fn run_blocking<F, T>(&self, f: F) -> HookExecutionLogResult<T>
+    async fn execute_query<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> HookExecutionLogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> HookExecutionLogResult<T> + Send + 'static,
         T: Send + 'static,
@@ -42,20 +48,35 @@ impl PostgresHookExecutionLogRepository {
             let mut connection = pool
                 .get()
                 .map_err(HookExecutionLogError::persistence_failed)?;
-            f(&mut connection)
+            with_tenant_tx(&mut connection, tenant_id.into_inner(), query_fn)
         })
         .await
         .map_err(HookExecutionLogError::persistence_failed)?
     }
 }
 
+impl FromTxError<Self> for HookExecutionLogError {
+    fn from_tx_error(err: TxError<Self>) -> Self {
+        match err {
+            TxError::Domain(error) => error,
+            TxError::Diesel(error) => Self::persistence_failed(error),
+        }
+    }
+}
+
 #[async_trait]
 impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
-    async fn store(&self, result: &HookExecutionResult) -> HookExecutionLogResult<()> {
+    async fn store(
+        &self,
+        ctx: &RequestContext,
+        result: &HookExecutionResult,
+    ) -> HookExecutionLogResult<()> {
+        let tenant_id = ctx.tenant_id();
         let action_results = serde_json::to_value(result.action_results())
             .map_err(HookExecutionLogError::persistence_failed)?;
         let new_row = NewHookExecutionRow {
             id: result.execution_id().into_inner(),
+            tenant_id: tenant_id.into_inner(),
             trigger_context_id: result.trigger_context_id().into_inner(),
             hook_id: result.hook_id().as_str().to_owned(),
             trigger_type: result.trigger_type().as_str().to_owned(),
@@ -65,7 +86,7 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
             executed_at: result.executed_at(),
         };
 
-        self.run_blocking(move |connection| {
+        self.execute_query(tenant_id, move |connection| {
             diesel::insert_into(hook_executions::table)
                 .values(&new_row)
                 .execute(connection)
@@ -77,11 +98,14 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
 
     async fn find_by_trigger_context(
         &self,
+        ctx: &RequestContext,
         trigger_context_id: TriggerContextId,
     ) -> HookExecutionLogResult<Vec<HookExecutionResult>> {
+        let tenant_id = ctx.tenant_id();
         let trigger_context_uuid = trigger_context_id.into_inner();
-        self.run_blocking(move |connection| {
+        self.execute_query(tenant_id, move |connection| {
             let rows = hook_executions::table
+                .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))
                 .filter(hook_executions::trigger_context_id.eq(trigger_context_uuid))
                 .order_by((
                     hook_executions::executed_at.asc(),

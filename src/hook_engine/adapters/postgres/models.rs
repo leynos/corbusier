@@ -10,6 +10,8 @@ use diesel::prelude::*;
 pub struct HookExecutionRow {
     /// Execution identifier.
     pub id: uuid::Uuid,
+    /// Tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Trigger context identifier.
     pub trigger_context_id: uuid::Uuid,
     /// Hook identifier string.
@@ -32,6 +34,8 @@ pub struct HookExecutionRow {
 pub struct NewHookExecutionRow {
     /// Execution identifier.
     pub id: uuid::Uuid,
+    /// Tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Trigger context identifier.
     pub trigger_context_id: uuid::Uuid,
     /// Hook identifier string.

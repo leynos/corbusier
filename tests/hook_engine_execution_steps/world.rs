@@ -2,12 +2,14 @@
 
 use std::sync::Arc;
 
+use corbusier::context::RequestContext;
 use corbusier::hook_engine::adapters::memory::{
     InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
     InMemoryHookExecutionLogRepository,
 };
 use corbusier::hook_engine::domain::{HookExecutionResult, HookTriggerContext};
 use corbusier::hook_engine::services::HookEngineService;
+use corbusier::test_support::test_request_ctx;
 use mockable::DefaultClock;
 use rstest::fixture;
 
@@ -33,6 +35,8 @@ pub struct HookWorld {
     pub last_context: Option<HookTriggerContext>,
     /// Last execution results.
     pub last_results: Option<Vec<HookExecutionResult>>,
+    /// Request context used by the scenario.
+    pub request_ctx: RequestContext,
 }
 
 impl HookWorld {
@@ -55,6 +59,7 @@ impl HookWorld {
             execution_log,
             last_context: None,
             last_results: None,
+            request_ctx: test_request_ctx(),
         }
     }
 }

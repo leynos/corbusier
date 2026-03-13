@@ -28,8 +28,12 @@ fn assert_execution_status(
         .last_context
         .as_ref()
         .ok_or_else(|| eyre::eyre!("no trigger context captured"))?;
-    let stored = run_async(world.execution_log.find_by_trigger_context(context.id()))
-        .wrap_err("execution log lookup failed")?;
+    let stored = run_async(
+        world
+            .execution_log
+            .find_by_trigger_context(&world.request_ctx, context.id()),
+    )
+    .wrap_err("execution log lookup failed")?;
     if stored.len() != 1 {
         return Err(eyre::eyre!(
             "expected 1 stored execution, got {}",
