@@ -1,9 +1,7 @@
 //! In-memory hook definition repository.
 
 use crate::hook_engine::domain::{HookDefinition, HookTriggerType};
-use crate::hook_engine::ports::{
-    HookDefinitionRepository, HookDefinitionRepositoryError, HookDefinitionRepositoryResult,
-};
+use crate::hook_engine::ports::{HookDefinitionRepository, HookDefinitionRepositoryResult};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -25,17 +23,14 @@ impl InMemoryHookDefinitionRepository {
 
     /// Inserts a hook definition into the repository.
     ///
-    /// Example: `repo.insert(definition)` stores the definition in memory.
+    /// Example: `repo.insert(definition).await` stores the definition in memory.
     ///
     /// # Errors
     ///
-    /// Returns [`HookDefinitionRepositoryError`] if the lock cannot be acquired.
-    pub fn insert(&self, definition: HookDefinition) -> HookDefinitionRepositoryResult<()> {
-        let mut definitions = self.definitions.try_write().map_err(|err| {
-            HookDefinitionRepositoryError::persistence(std::io::Error::other(format!(
-                "hook definition lock unavailable: {err}"
-            )))
-        })?;
+    /// Returns `HookDefinitionRepositoryError` when persisting the definition
+    /// fails.
+    pub async fn insert(&self, definition: HookDefinition) -> HookDefinitionRepositoryResult<()> {
+        let mut definitions = self.definitions.write().await;
         definitions.push(definition);
         Ok(())
     }

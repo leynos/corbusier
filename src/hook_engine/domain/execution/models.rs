@@ -157,6 +157,14 @@ impl HookExecutionResult {
     /// Example: `from_persisted(HookExecutionPersisted { .. })` restores stored records.
     #[must_use]
     pub fn from_persisted(persisted: HookExecutionPersisted) -> Self {
+        let recomputed_status = HookExecutionStatus::from_action_statuses(
+            persisted.action_results.iter().map(ActionResult::status),
+        );
+        let stored_status = persisted.status;
+        debug_assert_eq!(
+            stored_status, recomputed_status,
+            "persisted hook execution status diverges from recomputed action status"
+        );
         Self {
             execution_id: persisted.execution_id,
             hook_id: persisted.hook_id,
@@ -164,7 +172,7 @@ impl HookExecutionResult {
             trigger_type: persisted.trigger_type,
             predicate_data: persisted.predicate_data,
             action_results: persisted.action_results,
-            status: persisted.status,
+            status: recomputed_status,
             executed_at: persisted.executed_at,
         }
     }

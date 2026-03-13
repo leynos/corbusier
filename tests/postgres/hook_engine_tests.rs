@@ -96,6 +96,7 @@ async fn postgres_hook_execution_is_persisted(
     .expect("definition should be valid");
     ctx.definition_repo
         .insert(definition)
+        .await
         .expect("insert succeeds");
 
     let trigger_context = HookTriggerContext::new(HookTriggerType::PostPush, &DefaultClock);

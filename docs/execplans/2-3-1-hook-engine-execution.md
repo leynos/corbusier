@@ -125,9 +125,10 @@ Observable operator outcome:
   and post-deploy trigger families. This plan resolves the mismatch by
   introducing a domain trigger enum centred on roadmap semantics while allowing
   adapter-level mapping from concrete event sources.
-- Current source tree has no hook-engine module yet; this work introduces a new
-  top-level subsystem with the same hexagonal shape as `task` and
-  `agent_backend`.
+- At the start of this work, the source tree did not contain a `hook_engine`
+  module; this change introduced a new top-level `hook_engine` subsystem with
+  the same hexagonal shape as `task` and `agent_backend`, and `src/lib.rs` now
+  exports `hook_engine`.
 
 ## Decision log
 
@@ -194,7 +195,11 @@ src/hook_engine/
 │   ├── action.rs
 │   ├── definition.rs
 │   ├── error.rs
-│   ├── execution.rs
+│   ├── execution/
+│   │   ├── mod.rs
+│   │   ├── logs.rs
+│   │   ├── models.rs
+│   │   └── status.rs
 │   ├── ids.rs
 │   └── trigger.rs
 ├── ports/

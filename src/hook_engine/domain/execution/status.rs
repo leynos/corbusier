@@ -60,7 +60,8 @@ impl TryFrom<&str> for ActionStatus {
 pub enum HookExecutionStatus {
     /// All actions succeeded or were skipped.
     Succeeded,
-    /// All actions failed.
+    /// No action succeeded and at least one action failed.
+    /// A mix of failed and skipped actions collapses to failed.
     Failed,
     /// A mix of successes and failures.
     PartialFailure,

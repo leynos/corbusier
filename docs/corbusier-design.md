@@ -2725,23 +2725,25 @@ flowchart TD
 
 ###### Hook Event Processing
 
+Table 4.1.2: Hook trigger processing flow
+
 ```mermaid
 flowchart TD
     subgraph "Hook Triggers"
-        TURN_START[Turn Start]
-        TURN_END[Turn End]
-        PRE_TOOL_USE[Pre Tool Use]
-        POST_TOOL_USE[Post Tool Use]
-        PRE_COMMIT[Pre Commit]
-        POST_COMMIT[Post Commit]
-        PRE_MERGE[Pre Merge]
-        POST_MERGE[Post Merge]
-        PRE_PULL[Pre Pull]
-        POST_PULL[Post Pull]
-        PRE_PUSH[Pre Push]
-        POST_PUSH[Post Push]
-        PRE_DEPLOY[Pre Deploy]
-        POST_DEPLOY[Post Deploy]
+        TURN_START[TurnStart]
+        TURN_END[TurnEnd]
+        PRE_TOOL_USE[PreToolUse]
+        POST_TOOL_USE[PostToolUse]
+        PRE_COMMIT[PreCommit]
+        POST_COMMIT[PostCommit]
+        PRE_MERGE[PreMerge]
+        POST_MERGE[PostMerge]
+        PRE_PULL[PrePull]
+        POST_PULL[PostPull]
+        PRE_PUSH[PrePush]
+        POST_PUSH[PostPush]
+        PRE_DEPLOY[PreDeploy]
+        POST_DEPLOY[PostDeploy]
     end
     
     subgraph "Hook Engine"

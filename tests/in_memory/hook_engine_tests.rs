@@ -35,7 +35,10 @@ async fn in_memory_pre_commit_hook_persists_results() {
     )
     .expect("definition should be valid");
 
-    definition_repo.insert(definition).expect("insert succeeds");
+    definition_repo
+        .insert(definition)
+        .await
+        .expect("insert succeeds");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
     let trigger_context_id = context.id();

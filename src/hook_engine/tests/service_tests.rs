@@ -46,12 +46,15 @@ async fn execute_orders_hooks_by_priority_then_id() {
 
     definition_repo
         .insert(build_definition("hook-b", 10).expect("hook-b definition should be valid for test"))
+        .await
         .expect("insert hook-b definition should succeed");
     definition_repo
         .insert(build_definition("hook-a", 5).expect("hook-a definition should be valid for test"))
+        .await
         .expect("insert hook-a definition should succeed");
     definition_repo
         .insert(build_definition("hook-c", 5).expect("hook-c definition should be valid for test"))
+        .await
         .expect("insert hook-c definition should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
@@ -95,6 +98,7 @@ async fn execute_persists_results_and_failure_status() {
 
     definition_repo
         .insert(definition)
+        .await
         .expect("insert failing definition should succeed");
     action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)

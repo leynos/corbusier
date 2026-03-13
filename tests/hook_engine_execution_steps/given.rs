@@ -1,6 +1,6 @@
 //! Given steps for hook engine execution scenarios.
 
-use super::world::HookWorld;
+use super::world::{HookWorld, run_async};
 use corbusier::hook_engine::domain::{
     ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };
@@ -26,9 +26,7 @@ fn configure_hook(world: &mut HookWorld, setup: HookSetup) -> Result<HookActionI
         vec![HookAction::new(action_id.clone(), setup.action_type)],
     )
     .wrap_err("build hook definition for scenario setup")?;
-    world
-        .definition_repo
-        .insert(definition)
+    run_async(world.definition_repo.insert(definition))
         .wrap_err("insert hook definition into in-memory scenario repository")?;
     Ok(action_id)
 }

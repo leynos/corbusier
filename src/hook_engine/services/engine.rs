@@ -11,6 +11,8 @@ use crate::hook_engine::ports::{
 use mockable::Clock;
 use std::sync::Arc;
 
+const SUPPORTED_TRIGGERS: [HookTriggerType; 14] = HookTriggerType::all();
+
 /// Hook execution orchestration service.
 #[derive(Clone)]
 pub struct HookEngineService<D, A, L, C>
@@ -118,7 +120,6 @@ where
     }
 
     fn supported_triggers(&self) -> &'static [HookTriggerType] {
-        const SUPPORTED: [HookTriggerType; 14] = HookTriggerType::all();
-        &SUPPORTED
+        &SUPPORTED_TRIGGERS
     }
 }

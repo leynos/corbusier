@@ -2,7 +2,6 @@
 
 use crate::hook_engine::domain::{HookDefinition, HookTriggerType};
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 
 /// Result type for hook definition repository operations.
@@ -29,15 +28,28 @@ pub trait HookDefinitionRepository: Send + Sync {
 #[derive(Debug, Clone, Error)]
 pub enum HookDefinitionRepositoryError {
     /// Persistence-layer failure.
-    #[error("persistence error: {0}")]
-    Persistence(Arc<dyn std::error::Error + Send + Sync>),
+    #[error(transparent)]
+    Persistence(HookDefinitionRepositoryPersistenceError),
+}
+
+/// Typed persistence errors for hook definition repository operations.
+#[derive(Debug, Clone, Error)]
+pub enum HookDefinitionRepositoryPersistenceError {
+    /// Persistence operation failed.
+    #[error("persistence operation failed: {reason}")]
+    Failed {
+        /// Human-readable reason from the failing persistence dependency.
+        reason: String,
+    },
 }
 
 impl HookDefinitionRepositoryError {
     /// Wraps a persistence error.
     ///
     /// Example: `HookDefinitionRepositoryError::persistence(err)` wraps `err`.
-    pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Persistence(Arc::new(err))
+    pub fn persistence(err: impl std::error::Error) -> Self {
+        Self::Persistence(HookDefinitionRepositoryPersistenceError::Failed {
+            reason: err.to_string(),
+        })
     }
 }
