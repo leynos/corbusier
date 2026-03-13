@@ -25,6 +25,20 @@ pub trait AgentRuntimePort: Send + Sync {
         conversation_id: Uuid,
     ) -> AgentRuntimeResult<RuntimeSessionId>;
 
+    /// Releases a previously created backend-native session identifier.
+    ///
+    /// This is used when higher-level arbitration determines a newly created
+    /// runtime session cannot be persisted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AgentRuntimeError`] when teardown fails.
+    async fn teardown_session(
+        &self,
+        backend: &AgentBackendRegistration,
+        runtime_session_id: &RuntimeSessionId,
+    ) -> AgentRuntimeResult<()>;
+
     /// Executes one turn against the provided backend session.
     ///
     /// # Errors

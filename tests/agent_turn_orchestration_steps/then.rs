@@ -4,6 +4,7 @@ use super::world::AgentTurnWorld;
 use corbusier::agent_backend::{
     domain::ToolCallAuditStatus, services::AgentTurnOrchestrationError,
 };
+use corbusier::agent_backend::{domain::TurnSessionStatus, ports::TurnSessionRepository};
 use rstest_bdd_macros::then;
 
 #[then("the turn succeeds")]
@@ -120,6 +121,58 @@ fn turn_fails_with_tool_routing_error(world: &AgentTurnWorld) -> Result<(), eyre
         .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
     if !matches!(result, Err(AgentTurnOrchestrationError::ToolRouting { .. })) {
         return Err(eyre::eyre!("expected tool routing failure, got {result:?}"));
+    }
+    Ok(())
+}
+
+#[then("both concurrent turns succeed")]
+fn both_concurrent_turns_succeed(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
+    let (first, second) = world
+        .concurrent_results
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("missing concurrent turn results in world"))?;
+    if first.is_err() || second.is_err() {
+        return Err(eyre::eyre!(
+            "expected both concurrent turns to succeed, got ({first:?}, {second:?})"
+        ));
+    }
+    Ok(())
+}
+
+#[then(r#"only one active session remains for conversation "{conversation}""#)]
+fn only_one_active_session_remains_for_conversation(
+    world: &AgentTurnWorld,
+    conversation: String,
+) -> Result<(), eyre::Report> {
+    let backend_id = world
+        .backend_id
+        .ok_or_else(|| eyre::eyre!("missing backend id in world"))?;
+    let conversation_id = world
+        .conversations
+        .get(&conversation)
+        .copied()
+        .ok_or_else(|| eyre::eyre!("missing conversation id for label {conversation}"))?;
+
+    let active = super::world::run_async(
+        world
+            .session_repository
+            .find_active_session(backend_id, conversation_id),
+    )?;
+    if active.is_none() {
+        return Err(eyre::eyre!("expected one active session but found none"));
+    }
+
+    let sessions = world.session_repository.all_sessions()?;
+    let active_count = sessions
+        .iter()
+        .filter(|session| session.backend_id() == backend_id)
+        .filter(|session| session.conversation_id() == conversation_id)
+        .filter(|session| session.status() == TurnSessionStatus::Active)
+        .count();
+    if active_count != 1 {
+        return Err(eyre::eyre!(
+            "expected one active session, found {active_count}"
+        ));
     }
     Ok(())
 }

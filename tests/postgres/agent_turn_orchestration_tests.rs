@@ -10,9 +10,9 @@ use corbusier::agent_backend::{
     },
     domain::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
-        TurnExecutionResult, TurnSession, TurnSessionStatus,
+        TurnExecutionResult, TurnSession, TurnSessionCreateParams, TurnSessionStatus,
     },
-    ports::TurnSessionRepository,
+    ports::{TurnSessionRepository, TurnSessionRepositoryError},
     services::{
         AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
         AgentTurnOrchestratorService, BackendRegistryService, ExecuteAgentTurnRequest,
@@ -364,5 +364,64 @@ async fn postgres_propagates_tool_routing_failure(
         result,
         Err(AgentTurnOrchestrationError::ToolRouting { .. })
     ));
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_detects_concurrent_active_session_conflict(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&ctx, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    let now = Utc::now();
+    let session_a = TurnSession::new(TurnSessionCreateParams {
+        backend_id,
+        conversation_id,
+        runtime_session_id: RuntimeSessionId::new("runtime-a")
+            .map_err(|err| Box::new(err) as BoxError)?,
+        ttl: Duration::minutes(5),
+        now,
+    })
+    .map_err(|err| Box::new(err) as BoxError)?;
+    let session_b = TurnSession::new(TurnSessionCreateParams {
+        backend_id,
+        conversation_id,
+        runtime_session_id: RuntimeSessionId::new("runtime-b")
+            .map_err(|err| Box::new(err) as BoxError)?,
+        ttl: Duration::minutes(5),
+        now,
+    })
+    .map_err(|err| Box::new(err) as BoxError)?;
+
+    let (first, second) = tokio::join!(
+        ctx.session_repository.upsert_session(&session_a),
+        ctx.session_repository.upsert_session(&session_b)
+    );
+
+    let first_conflict = matches!(
+        &first,
+        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
+    );
+    let second_conflict = matches!(
+        &second,
+        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
+    );
+    if !(first_conflict || second_conflict) {
+        first.map_err(|err| Box::new(err) as BoxError)?;
+        second.map_err(|err| Box::new(err) as BoxError)?;
+    }
+
+    let active = ctx
+        .session_repository
+        .find_active_session(backend_id, conversation_id)
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+    assert!(active.is_some());
     Ok(())
 }

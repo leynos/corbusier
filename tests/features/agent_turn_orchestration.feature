@@ -30,3 +30,10 @@ Feature: Agent turn orchestration and session continuity
     And the tool router fails for tool "broken_tool"
     When I execute a turn for conversation "delta"
     Then the turn fails with a tool routing error
+
+  Scenario: Concurrent turns on same backend/conversation
+    Given an active backend named "claude_code_sdk"
+    And the runtime returns assistant texts "first" and "second" with no tools
+    When I execute two concurrent turns for conversation "epsilon"
+    Then both concurrent turns succeed
+    And only one active session remains for conversation "epsilon"

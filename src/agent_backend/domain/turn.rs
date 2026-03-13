@@ -128,6 +128,7 @@ impl ToolCallAudit {
     /// Attaches an error message to a failed audit entry.
     #[must_use]
     pub fn with_error(mut self, error: impl Into<String>) -> Self {
+        self.status = ToolCallAuditStatus::Failed;
         self.error = Some(error.into());
         self
     }

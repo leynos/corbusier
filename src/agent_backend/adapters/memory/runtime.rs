@@ -96,15 +96,11 @@ impl InMemoryAgentRuntime {
     ///
     /// Returns [`AgentRuntimeError::Infrastructure`] when the in-memory state
     /// lock cannot be acquired.
-    pub fn created_session_ids(&self) -> AgentRuntimeResult<Vec<String>> {
+    pub fn created_session_ids(&self) -> AgentRuntimeResult<Vec<RuntimeSessionId>> {
         let state = self.state.read().map_err(|err| {
             AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
-        Ok(state
-            .created_session_ids
-            .iter()
-            .map(|session_id| session_id.as_str().to_owned())
-            .collect())
+        Ok(state.created_session_ids.clone())
     }
 
     /// Returns recorded runtime execution requests.
@@ -149,6 +145,20 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
             .map_err(|_| AgentRuntimeError::InvalidRuntimeSessionId)?;
         state.created_session_ids.push(parsed_session_id.clone());
         Ok(parsed_session_id)
+    }
+
+    async fn teardown_session(
+        &self,
+        _backend: &AgentBackendRegistration,
+        runtime_session_id: &RuntimeSessionId,
+    ) -> AgentRuntimeResult<()> {
+        let mut state = self.state.write().map_err(|err| {
+            AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
+        })?;
+        state
+            .created_session_ids
+            .retain(|id| id != runtime_session_id);
+        Ok(())
     }
 
     async fn execute_turn(

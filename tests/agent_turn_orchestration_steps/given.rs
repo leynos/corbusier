@@ -50,6 +50,21 @@ fn runtime_returns_text_with_no_tools(
     Ok(())
 }
 
+#[given(r#"the runtime returns assistant texts "{first_text}" and "{second_text}" with no tools"#)]
+fn runtime_returns_two_texts_with_no_tools(
+    world: &mut AgentTurnWorld,
+    first_text: String,
+    second_text: String,
+) -> Result<(), eyre::Report> {
+    world
+        .runtime
+        .queue_turn_result(TurnExecutionResult::new(first_text, Vec::new()))?;
+    world
+        .runtime
+        .queue_turn_result(TurnExecutionResult::new(second_text, Vec::new()))?;
+    Ok(())
+}
+
 #[given(r#"an existing active session for conversation "{conversation}""#)]
 fn existing_active_session(
     world: &mut AgentTurnWorld,

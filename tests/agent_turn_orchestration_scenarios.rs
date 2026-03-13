@@ -40,3 +40,12 @@ async fn rotate_expired_session(world: AgentTurnWorld) {
 async fn surface_tool_routing_failure(world: AgentTurnWorld) {
     let _ = world;
 }
+
+#[scenario(
+    path = "tests/features/agent_turn_orchestration.feature",
+    name = "Concurrent turns on same backend/conversation"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_turns_on_same_backend_conversation(world: AgentTurnWorld) {
+    let _ = world;
+}

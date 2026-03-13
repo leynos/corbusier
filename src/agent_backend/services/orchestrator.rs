@@ -8,25 +8,26 @@ use crate::agent_backend::{
     },
     ports::{
         AgentRuntimeError, AgentRuntimePort, BackendRegistryError, BackendRegistryRepository,
-        ToolRouterPort, ToolRoutingContext, ToolRoutingError, TurnSessionRepository,
-        TurnSessionRepositoryError,
+        SessionSlotArbitration, ToolRouterPort, ToolRoutingContext, ToolRoutingError,
+        TurnSessionRepository, TurnSessionRepositoryError,
     },
 };
 use crate::context::RequestContext;
 use chrono::Duration;
 use mockable::Clock;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tokio::sync::{Mutex, OwnedMutexGuard};
 use uuid::Uuid;
 
 type SessionKey = (BackendId, Uuid);
 type SessionLock = Arc<Mutex<()>>;
+type SessionLockRef = Weak<Mutex<()>>;
 
 #[derive(Debug)]
 struct SessionExecutionLocks {
-    locks: std::sync::Mutex<HashMap<SessionKey, SessionLock>>,
+    locks: std::sync::Mutex<HashMap<SessionKey, SessionLockRef>>,
 }
 
 impl SessionExecutionLocks {
@@ -42,7 +43,14 @@ impl SessionExecutionLocks {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        Arc::clone(locks.entry(key).or_insert_with(|| Arc::new(Mutex::new(()))))
+        locks.retain(|_, lock| lock.strong_count() > 0);
+        if let Some(existing) = locks.get(&key).and_then(Weak::upgrade) {
+            return existing;
+        }
+
+        let created = Arc::new(Mutex::new(()));
+        locks.insert(key, Arc::downgrade(&created));
+        created
     }
 
     async fn lock(&self, backend_id: BackendId, conversation_id: Uuid) -> OwnedMutexGuard<()> {
@@ -328,7 +336,7 @@ where
             .await?;
 
         let completion_time = self.clock.utc();
-        session.record_turn(completion_time);
+        session.record_turn(completion_time)?;
         self.turn_sessions.upsert_session(&session).await?;
 
         Ok(ExecuteAgentTurnResponse {
@@ -348,26 +356,25 @@ where
         conversation_id: Uuid,
         now: chrono::DateTime<chrono::Utc>,
     ) -> AgentTurnOrchestrationResult<(TurnSession, bool, bool)> {
-        if let Some(mut existing) = self
+        match self
             .turn_sessions
-            .find_active_session(backend.id(), conversation_id)
+            .arbitrate_session_slot(backend.id(), conversation_id, now)
             .await?
         {
-            if existing.is_expired_at(now) {
-                existing.mark_expired(now);
-                self.turn_sessions.upsert_session(&existing).await?;
+            SessionSlotArbitration::Reused(existing) => Ok((existing, true, false)),
+            SessionSlotArbitration::Vacant => {
+                let (created_session, reused_due_to_conflict) = self
+                    .create_or_reuse_session(backend, conversation_id, now)
+                    .await?;
+                Ok((created_session, reused_due_to_conflict, false))
+            }
+            SessionSlotArbitration::Expired => {
                 let (rotated_session, reused_due_to_conflict) = self
                     .create_or_reuse_session(backend, conversation_id, now)
                     .await?;
-                return Ok((rotated_session, reused_due_to_conflict, true));
+                Ok((rotated_session, reused_due_to_conflict, true))
             }
-            return Ok((existing, true, false));
         }
-
-        let (created_session, reused_due_to_conflict) = self
-            .create_or_reuse_session(backend, conversation_id, now)
-            .await?;
-        Ok((created_session, reused_due_to_conflict, false))
     }
 
     async fn create_session(
@@ -381,16 +388,31 @@ where
             .create_session(backend, conversation_id)
             .await?;
 
-        let session = TurnSession::new(TurnSessionCreateParams {
+        let session = match TurnSession::new(TurnSessionCreateParams {
             backend_id: backend.id(),
             conversation_id,
-            runtime_session_id,
+            runtime_session_id: runtime_session_id.clone(),
             ttl: self.config.session_ttl(),
             now,
-        })?;
+        }) {
+            Ok(session) => session,
+            Err(error) => {
+                self.runtime
+                    .teardown_session(backend, &runtime_session_id)
+                    .await?;
+                return Err(AgentTurnOrchestrationError::SessionDomain(error));
+            }
+        };
 
-        self.turn_sessions.upsert_session(&session).await?;
-        Ok(session)
+        match self.turn_sessions.upsert_session(&session).await {
+            Ok(()) => Ok(session),
+            Err(error) => {
+                self.runtime
+                    .teardown_session(backend, &runtime_session_id)
+                    .await?;
+                Err(AgentTurnOrchestrationError::SessionRepository(error))
+            }
+        }
     }
 
     async fn create_or_reuse_session(

@@ -46,6 +46,11 @@ pub struct AgentTurnWorld {
     pub conversations: HashMap<String, Uuid>,
     /// Last turn execution result.
     pub last_result: Option<Result<ExecuteAgentTurnResponse, AgentTurnOrchestrationError>>,
+    /// Results from concurrent turn executions.
+    pub concurrent_results: Option<(
+        Result<ExecuteAgentTurnResponse, AgentTurnOrchestrationError>,
+        Result<ExecuteAgentTurnResponse, AgentTurnOrchestrationError>,
+    )>,
     /// Existing session ID used by reuse/rotation scenarios.
     pub existing_session_id: Option<TurnSessionId>,
     /// Request context for tenant-scoped orchestration operations.
@@ -82,6 +87,7 @@ impl AgentTurnWorld {
             backend_id: None,
             conversations: HashMap::new(),
             last_result: None,
+            concurrent_results: None,
             existing_session_id: None,
             ctx: RequestContext::new(
                 TenantId::new(),
@@ -115,6 +121,11 @@ pub fn world() -> AgentTurnWorld {
 }
 
 /// Runs an async operation within synchronous step definitions.
+///
+/// This uses `tokio::task::block_in_place` with
+/// `tokio::runtime::Handle::current().block_on(...)`, which panics when no
+/// multi-threaded Tokio runtime is active (including current-thread runtimes).
+/// Callers must invoke `run_async` only from within a multi-threaded runtime.
 pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }

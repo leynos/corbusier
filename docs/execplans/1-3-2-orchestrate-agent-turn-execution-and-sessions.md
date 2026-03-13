@@ -1,7 +1,7 @@
 # Orchestrate agent turn execution and sessions (roadmap 1.3.2)
 
 This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
@@ -112,7 +112,7 @@ Observable outcomes:
 - [x] (2026-03-03 12:58Z) Stage G: Run full quality gates and capture evidence
       logs.
 
-## Surprises & discoveries
+## Surprises & Discoveries
 
 - Existing code already contains `message` session persistence and handoff
   workflows (`agent_sessions`, `handoffs`, `context_snapshots`). 1.3.2 must
@@ -424,7 +424,7 @@ Quality criteria:
   rerun `make markdownlint`.
 - If transient Postgres shutdown errors occur during `make test`, rerun once;
   persistent failures require investigation and should be logged in
-  `Surprises & discoveries`.
+  `Surprises & Discoveries`.
 - Migration changes must be additive; do not alter historical migration files.
 
 ## Artifacts and notes

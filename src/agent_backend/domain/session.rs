@@ -87,6 +87,10 @@ pub enum TurnSessionDomainError {
     /// Session TTL must be positive.
     #[error("session ttl must be positive seconds, got {0}")]
     InvalidSessionTtl(i64),
+
+    /// Turn counts cannot be recorded on expired sessions.
+    #[error("cannot record turn on expired session")]
+    RecordTurnOnExpiredSession,
 }
 
 /// Backend-native runtime session identifier.
@@ -331,10 +335,19 @@ impl TurnSession {
     }
 
     /// Records a successful turn and extends expiry using a sliding TTL window.
-    pub fn record_turn(&mut self, now: DateTime<Utc>) {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TurnSessionDomainError::RecordTurnOnExpiredSession`] when the
+    /// session is not active.
+    pub fn record_turn(&mut self, now: DateTime<Utc>) -> Result<(), TurnSessionDomainError> {
+        if self.status != TurnSessionStatus::Active {
+            return Err(TurnSessionDomainError::RecordTurnOnExpiredSession);
+        }
         self.turn_count = self.turn_count.saturating_add(1);
         self.last_used_at = now;
         self.expires_at = now + Duration::seconds(self.ttl_seconds);
+        Ok(())
     }
 
     /// Marks the session expired.

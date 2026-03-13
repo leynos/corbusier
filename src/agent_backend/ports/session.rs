@@ -2,6 +2,7 @@
 
 use crate::agent_backend::domain::{BackendId, TurnSession};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
@@ -9,9 +10,36 @@ use uuid::Uuid;
 /// Result type for turn-session repository operations.
 pub type TurnSessionRepositoryResult<T> = Result<T, TurnSessionRepositoryError>;
 
+/// Session-slot arbitration result for a backend/conversation pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionSlotArbitration {
+    /// Existing active session remains reusable.
+    Reused(TurnSession),
+    /// No active session exists for the pair.
+    Vacant,
+    /// An active session existed but was expired during arbitration.
+    Expired,
+}
+
 /// Repository contract for orchestration turn sessions.
 #[async_trait]
 pub trait TurnSessionRepository: Send + Sync {
+    /// Atomically resolves active-session state for a backend/conversation
+    /// pair.
+    ///
+    /// Adapters must perform the read/expiry transition in a single
+    /// transaction so concurrent callers cannot observe torn state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TurnSessionRepositoryError`] on persistence failures.
+    async fn arbitrate_session_slot(
+        &self,
+        backend_id: BackendId,
+        conversation_id: Uuid,
+        now: DateTime<Utc>,
+    ) -> TurnSessionRepositoryResult<SessionSlotArbitration>;
+
     /// Finds the active session for a backend/conversation pair.
     ///
     /// Returns `None` when there is no active session.
