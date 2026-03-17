@@ -43,9 +43,14 @@ pub const ADD_BRANCH_PR_INDEXES_SQL: &str =
 /// SQL to add agent backend registrations table for roadmap 1.3.1.
 pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
     include_str!("../../migrations/2026-02-25-000000_add_backend_registrations_table/up.sql");
+
 /// SQL to add MCP server registry table for roadmap 2.1.1.
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
+
+/// SQL to add agent turn sessions table for roadmap 1.3.2.
+pub const ADD_AGENT_TURN_SESSIONS_SQL: &str =
+    include_str!("../../migrations/2026-03-03-000000_add_agent_turn_sessions_table/up.sql");
 
 /// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
 pub const ADD_TOOL_CATALOG_SQL: &str =
@@ -127,8 +132,9 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TASKS_SCHEMA_SQL))?;
     map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
-    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
+    map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
+    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
@@ -139,10 +145,6 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
     Ok(())
 }
-
-/// SQL to add agent turn sessions table for roadmap 1.3.2.
-pub const ADD_AGENT_TURN_SESSIONS_SQL: &str =
-    include_str!("../../migrations/2026-03-03-000000_add_agent_turn_sessions_table/up.sql");
 
 /// Builds a Diesel `r2d2` connection pool for the given database URL.
 ///

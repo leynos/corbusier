@@ -29,8 +29,8 @@ impl ToolCallRequest {
     /// Returns [`TurnDomainError::EmptyToolName`] when `tool_name` is empty
     /// after trimming.
     pub fn new(tool_name: impl Into<String>, parameters: Value) -> Result<Self, TurnDomainError> {
-        let normalized_tool_name = tool_name.into();
-        if normalized_tool_name.trim().is_empty() {
+        let normalized_tool_name = tool_name.into().trim().to_owned();
+        if normalized_tool_name.is_empty() {
             return Err(TurnDomainError::EmptyToolName);
         }
         Ok(Self {

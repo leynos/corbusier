@@ -190,6 +190,13 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
     }
 }
 
+// Acquires a row-level lock on the backend_registrations row to serialize
+// concurrent turn executions for the same (backend_id, conversation_id) pair.
+// We lock the backend_registrations row instead of using pg_advisory_xact_lock
+// because: (1) it avoids hash collisions across different key spaces, (2) it
+// automatically verifies the backend registration exists (fail-fast if not
+// found), and (3) it leverages the database's row-level locking semantics to
+// keep locking and existence checks atomic.
 fn lock_session_key(
     connection: &mut PgConnection,
     tenant_id: uuid::Uuid,

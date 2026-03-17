@@ -326,10 +326,24 @@ where
             .resolve_session(ctx, &backend, conversation_id, session_resolution_now)
             .await?;
 
-        let runtime_result = self
+        let runtime_result = match self
             .runtime
             .execute_turn(&backend, session.runtime_session_handle(), &request.turn)
-            .await?;
+            .await
+        {
+            Ok(result) => result,
+            Err(error) => {
+                let expire_time = self.clock.utc();
+                session.mark_expired(expire_time);
+                drop(self.turn_sessions.upsert_session(ctx, &session).await);
+                drop(
+                    self.runtime
+                        .teardown_session(&backend, session.runtime_session_handle())
+                        .await,
+                );
+                return Err(error.into());
+            }
+        };
 
         let (tool_results, tool_call_audits) = self
             .route_tool_calls(&session, runtime_result.tool_calls())

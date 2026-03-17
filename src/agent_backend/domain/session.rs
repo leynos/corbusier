@@ -359,11 +359,9 @@ impl TurnSession {
 
 fn parse_turn_session_status(value: &str) -> Option<TurnSessionStatus> {
     let normalized = value.trim().to_ascii_lowercase();
-    if normalized == "active" {
-        Some(TurnSessionStatus::Active)
-    } else if normalized == "expired" {
-        Some(TurnSessionStatus::Expired)
-    } else {
-        None
+    match normalized.as_str() {
+        "active" => Some(TurnSessionStatus::Active),
+        "expired" => Some(TurnSessionStatus::Expired),
+        _ => None,
     }
 }

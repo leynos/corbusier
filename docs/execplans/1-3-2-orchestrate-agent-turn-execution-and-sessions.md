@@ -7,7 +7,7 @@ proceeds.
 
 Status: COMPLETE
 
-This plan covers roadmap item 1.3.2 in [docs/roadmap.md](docs/roadmap.md):
+This plan covers roadmap item 1.3.2 in [docs/roadmap.md](../roadmap.md):
 
 - Coordinate turn execution with tool calls and responses.
 - Maintain session state and expiry rules.

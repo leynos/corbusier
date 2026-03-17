@@ -17,7 +17,7 @@ pub struct RuntimeExecutionRecord {
     /// Backend ID used for execution.
     pub backend_id: crate::agent_backend::domain::BackendId,
     /// Runtime session ID used for execution.
-    pub runtime_session_id: String,
+    pub runtime_session_id: RuntimeSessionId,
     /// Request payload sent to runtime.
     pub request: TurnExecutionRequest,
 }
@@ -182,7 +182,7 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
 
         state.execution_records.push(RuntimeExecutionRecord {
             backend_id: backend.id(),
-            runtime_session_id: runtime_session_id.as_str().to_owned(),
+            runtime_session_id: runtime_session_id.clone(),
             request: request.clone(),
         });
 

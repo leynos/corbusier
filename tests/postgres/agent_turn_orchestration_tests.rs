@@ -421,9 +421,14 @@ async fn postgres_detects_concurrent_active_session_conflict(
         &second,
         Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
     );
-    if !(first_conflict || second_conflict) {
-        first.map_err(|err| Box::new(err) as BoxError)?;
+    assert!(
+        first_conflict != second_conflict,
+        "Expected exactly one conflict, got first_conflict={first_conflict}, second_conflict={second_conflict}"
+    );
+    if first_conflict {
         second.map_err(|err| Box::new(err) as BoxError)?;
+    } else {
+        first.map_err(|err| Box::new(err) as BoxError)?;
     }
 
     let active = ctx
@@ -470,5 +475,64 @@ async fn postgres_session_repository_scopes_lookup_by_tenant(
         .map_err(|err| Box::new(err) as BoxError)?;
 
     assert!(tenant_b_lookup.is_none());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_execute_turn_creates_single_active_session(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&ctx, "concurrent_test_backend").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    // Queue two turn results for the runtime to return
+    ctx.runtime
+        .queue_turn_result(TurnExecutionResult::new("response-a", Vec::new()))
+        .map_err(|err| Box::new(err) as BoxError)?;
+    ctx.runtime
+        .queue_turn_result(TurnExecutionResult::new("response-b", Vec::new()))
+        .map_err(|err| Box::new(err) as BoxError)?;
+
+    let first_request = ExecuteAgentTurnRequest::new(
+        backend_id,
+        TurnExecutionRequest::new(conversation_id, "first turn", Vec::new()),
+    );
+    let second_request = ExecuteAgentTurnRequest::new(
+        backend_id,
+        TurnExecutionRequest::new(conversation_id, "second turn", Vec::new()),
+    );
+
+    // Execute both turns concurrently for the same backend_id and conversation_id
+    let (first_result, second_result) = tokio::join!(
+        ctx.service.execute_turn(&ctx.ctx, first_request),
+        ctx.service.execute_turn(&ctx.ctx, second_request)
+    );
+
+    // Both should succeed (one will wait for the lock, then reuse the session)
+    let first_response = first_result.map_err(|err| Box::new(err) as BoxError)?;
+    let second_response = second_result.map_err(|err| Box::new(err) as BoxError)?;
+
+    // Verify that both turns used the same session (one created, one reused)
+    assert_eq!(first_response.session_id(), second_response.session_id());
+
+    // Verify that exactly one active session exists for this (backend_id, conversation_id)
+    // This ensures no duplicate session rows or uniqueness violations occurred
+    let active_session = ctx
+        .session_repository
+        .find_active_session(&ctx.ctx, backend_id, conversation_id)
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?
+        .expect("Expected exactly one active session to exist");
+    assert_eq!(
+        active_session.id(),
+        first_response.session_id(),
+        "Active session ID should match the session used by both turns"
+    );
+
     Ok(())
 }

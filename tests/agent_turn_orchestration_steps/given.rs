@@ -15,7 +15,7 @@ use serde_json::json;
 
 #[given(r#"an active backend named "{name}""#)]
 fn an_active_backend_named(world: &mut AgentTurnWorld, name: String) -> Result<(), eyre::Report> {
-    let backend_name = BackendName::new(name.clone())?;
+    let backend_name = BackendName::new(&name)?;
     let capabilities = AgentCapabilities::new(true, true);
     let info = BackendInfo::new(name, "1.0.0", "bdd-provider")?;
     let registration =
