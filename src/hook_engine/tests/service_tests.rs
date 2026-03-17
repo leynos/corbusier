@@ -12,6 +12,7 @@ use crate::hook_engine::domain::{
 use crate::hook_engine::ports::{HookEngine, HookExecutionLogRepository};
 use crate::hook_engine::services::HookEngineService;
 use mockable::DefaultClock;
+use rstest::fixture;
 use std::sync::Arc;
 
 fn request_ctx() -> RequestContext {
@@ -42,17 +43,45 @@ fn build_definition(
     .map(|definition| definition.with_priority(HookPriority::new(priority)))
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn execute_orders_hooks_by_priority_then_id() {
+struct HookEngineFixture {
+    definition_repo: InMemoryHookDefinitionRepository,
+    action_executor: InMemoryHookActionExecutor,
+    execution_log: InMemoryHookExecutionLogRepository,
+    service: HookEngineService<
+        InMemoryHookDefinitionRepository,
+        InMemoryHookActionExecutor,
+        InMemoryHookExecutionLogRepository,
+        DefaultClock,
+    >,
+}
+
+#[fixture]
+fn hook_engine_fixture() -> HookEngineFixture {
     let definition_repo = InMemoryHookDefinitionRepository::new();
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let service = HookEngineService::new(
         Arc::new(definition_repo.clone()),
-        Arc::new(action_executor),
+        Arc::new(action_executor.clone()),
         Arc::new(execution_log.clone()),
         Arc::new(DefaultClock),
     );
+    HookEngineFixture {
+        definition_repo,
+        action_executor,
+        execution_log,
+        service,
+    }
+}
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_orders_hooks_by_priority_then_id(hook_engine_fixture: HookEngineFixture) {
+    let HookEngineFixture {
+        definition_repo,
+        service,
+        ..
+    } = hook_engine_fixture;
     let ctx = request_ctx();
 
     definition_repo
@@ -90,17 +119,15 @@ async fn execute_orders_hooks_by_priority_then_id() {
     assert_eq!(hook_ids, vec!["hook-a", "hook-c", "hook-b"]);
 }
 
+#[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn execute_persists_results_and_failure_status() {
-    let definition_repo = InMemoryHookDefinitionRepository::new();
-    let action_executor = InMemoryHookActionExecutor::new();
-    let execution_log = InMemoryHookExecutionLogRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log.clone()),
-        Arc::new(DefaultClock),
-    );
+async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEngineFixture) {
+    let HookEngineFixture {
+        definition_repo,
+        action_executor,
+        execution_log,
+        service,
+    } = hook_engine_fixture;
     let ctx = request_ctx();
 
     let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");

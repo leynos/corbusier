@@ -117,6 +117,12 @@ async fn postgres_hook_execution_is_persisted(
         .await
         .expect("lookup succeeds");
     assert_eq!(stored.len(), 1);
+
+    let expected = results.first().expect("expected execution result");
+    let persisted = stored.first().expect("expected stored result");
+    assert_eq!(persisted.hook_id(), expected.hook_id());
+    assert_eq!(persisted.status(), expected.status());
+    assert_eq!(persisted.action_results(), expected.action_results());
     Ok(())
 }
 

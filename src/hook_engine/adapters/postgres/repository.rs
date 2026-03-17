@@ -105,6 +105,9 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
         let trigger_context_uuid = trigger_context_id.into_inner();
         self.execute_query(tenant_id, move |connection| {
             let rows = hook_executions::table
+                // Defense-in-depth: explicit tenant_id filter even though with_tenant_tx
+                // sets app.tenant_id for RLS. Retains multi-tenant isolation if RLS is
+                // not configured on the table.
                 .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))
                 .filter(hook_executions::trigger_context_id.eq(trigger_context_uuid))
                 .order_by((

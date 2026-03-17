@@ -56,6 +56,11 @@ async fn in_memory_pre_commit_hook_persists_results() {
         .await
         .expect("lookup succeeds");
     assert_eq!(stored.len(), 1);
+
+    let expected = results.first().expect("expected execution result");
+    let persisted = stored.first().expect("expected stored result");
+    assert_eq!(persisted.execution_id(), expected.execution_id());
+    assert_eq!(persisted.status(), expected.status());
 }
 
 #[tokio::test(flavor = "multi_thread")]

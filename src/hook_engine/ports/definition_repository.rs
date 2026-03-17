@@ -46,9 +46,14 @@ pub enum HookDefinitionRepositoryPersistenceError {
 }
 
 impl HookDefinitionRepositoryError {
-    /// Wraps a persistence error.
+    /// Wraps a persistence error as a lossy string conversion.
     ///
-    /// Example: `HookDefinitionRepositoryError::persistence(err)` wraps `err`.
+    /// This helper constructs a [`HookDefinitionRepositoryError::Persistence`]
+    /// variant containing a [`HookDefinitionRepositoryPersistenceError::Failed`]
+    /// with only the stringified error message (`err.to_string()`). The original
+    /// error type and source chain are not preserved.
+    ///
+    /// Example: `HookDefinitionRepositoryError::persistence(err)` captures `err.to_string()`.
     pub fn persistence(err: impl std::error::Error) -> Self {
         Self::Persistence(HookDefinitionRepositoryPersistenceError::Failed {
             reason: err.to_string(),

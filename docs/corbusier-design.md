@@ -589,8 +589,8 @@ Corbusier implements this through:
 - **Technical Context:** Event-driven architecture with declarative hook
   definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
   PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
-  PrePush, PostPush, PreDeploy, PostDeploy) and actions (quality gates, policy
-  checks, notification, block actions, and remediation).
+  PrePush, PostPush, PreDeploy, PostDeploy) and actions (QualityGate,
+  PolicyCheck, Notification, BlockAction, and Remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -2726,6 +2726,8 @@ flowchart TD
 ###### Hook Event Processing
 
 Table 4.1.2: Hook trigger processing flow
+
+For screen readers: This diagram shows the hook trigger processing flow from event to handler.
 
 ```mermaid
 flowchart TD
