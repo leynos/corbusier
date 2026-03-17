@@ -3,13 +3,13 @@
 ## Executive summary
 
 The corbusier-mockup front end encodes a data-model-driven UI contract: cards
-and screens render from concrete domain entities that already include localised
+and screens render from concrete domain entities that already include localized
 strings, stable descriptor identifiers (labels, priorities, health statuses),
 and structured timelines and dependency graphs. The mockup explicitly expects
 project and task primitives, a conversation subsystem with tool-run cards and
 slash-command metadata, a directives registry, AI suggestions, and "System"
-registry pages (personnel, agent backends, MCP tool registry, hooks and
-policies, monitoring, and tenant management).
+registry pages (personnel, agent backends, Model Context Protocol (MCP) tool
+registry, hooks and policies, monitoring, and tenant management).
 
 The existing Corbusier backend already has several strong anchors: a task
 aggregate with a typed state machine and origin metadata, a message subsystem
@@ -36,7 +36,7 @@ Recommendations:
 - Preserve the existing aggregates unchanged where possible, and migrate by
   additive schema, backfill, and dual-read.
 - Reuse Wildside patterns directly: a reusable cursor-pagination crate API and
-  envelope, centralised error schema and idempotency key semantics, and (for
+  envelope, centralized error schema and idempotency key semantics, and (for
   streaming) explicit event identifiers plus replay semantics compatible with
   EventSource `Last-Event-ID`.
 
@@ -47,7 +47,7 @@ document. The following assumptions apply:
 
 - Initial "single owning user per tenant" remains true.
 - API auth starts with a session cookie or API key.
-- The system tolerates initially sparse localisation (en-GB only), while
+- The system tolerates initially sparse localization (en-GB only), while
   keeping the schema capable of multi-locale payloads.
 
 ## Front-end contract distilled from corbusier-mockup
@@ -76,18 +76,19 @@ unusually concrete:
   and policies, monitoring, tenant management, plus settings pages for auth and
   session management.
 
-The v2a stack document clarifies why the backend surface must be designed for
-reuse: the intended "full v2a" application stack uses Zustand for client and UI
-state and TanStack Query for server state, with Dexie and XState in the wider
-architecture. That implies the backend should provide: stable resource-shaped
-endpoints, cache-friendly list and detail separation, cursor-pagination, and
-event-driven invalidation signals.
+The v2a (df12 Productions' pattern for offline-first progressive web
+applications) stack document clarifies why the backend surface must be designed
+for reuse: the intended "full v2a" application stack uses Zustand for client
+and UI state and TanStack Query for server state, with Dexie and XState in the
+wider architecture. That implies the backend should provide: stable
+resource-shaped endpoints, cache-friendly list and detail separation,
+cursor-pagination, and event-driven invalidation signals.
 
 Finally, the data-model-driven card architecture document sets a strict rule:
-entity models carry their own localised names, descriptions, and badges, and
-numeric values should be stored in Systeme International (SI) base units; UI
+entity models carry their own localized names, descriptions, and badges, and
+numeric values should be stored in Système international (SI) base units; UI
 chrome remains in the translation bundles. This drives both persistence choices
-(likely JSONB localisation blocks) and DTO composition (entities arrive "fully
+(likely JSONB localization blocks) and DTO composition (entities arrive "fully
 formed").
 
 ## Existing Corbusier artefacts and the design gaps they imply
@@ -128,8 +129,8 @@ query projections that return composite "cards" (task list cards, dependency
 cards, project cards, suggestion cards, and activity entries). None of those
 are currently modelled as aggregates in Corbusier code.
 
-The second gap is **API formalisation**: Wildside already publishes an OpenAPI
-schema with a centralised error type and a session-cookie security scheme, plus
+The second gap is **API formalization**: Wildside already publishes an OpenAPI
+schema with a centralized error type and a session-cookie security scheme, plus
 idempotency headers on mutation endpoints. Corbusier should adopt the same
 rigour early to keep the v2a front-end reusable across apps.
 
@@ -149,7 +150,7 @@ The proposed additions are:
   grouping.
 - **plan** -- planning artefacts: plan documents, plan steps, plan reviews,
   plan execution binding to tasks.
-- **projections** -- read models and DTOs optimised for mockup screens and card
+- **projections** -- read models and DTOs optimized for mockup screens and card
   rendering.
 - **governance** -- hooks, policies, policy decisions, and compliance/audit
   readouts.
@@ -360,6 +361,8 @@ pub struct TaskDetailDto {
 
 #### Current versus proposed task states
 
+_Table 1: Current versus proposed task states._
+
 | Aspect                    | Current (`TaskState`) | Proposed (`TaskStateV2`) | UI implication                                |
 | ------------------------- | --------------------- | ------------------------ | --------------------------------------------- |
 | Unscheduled backlog       | `draft`               | `draft`                  | "To-Do" column / backlog list                 |
@@ -369,8 +372,6 @@ pub struct TaskDetailDto {
 | Paused                    | `paused`              | `paused`                 | Filter/badge; not necessarily a Kanban column |
 | Completed                 | `done`                | `done`                   | "Done" column                                 |
 | Abandoned                 | `abandoned`           | `abandoned`              | Hidden by default; terminal                   |
-
-_Table 1: Current versus proposed task states._
 
 #### Migration strategy from current models
 
@@ -389,7 +390,7 @@ _Table 1: Current versus proposed task states._
 
 #### Project write-side model
 
-Projects appear in multiple screens with a stable `slug` and localised name and
+Projects appear in multiple screens with a stable `slug` and localized name and
 description, plus lead, date range, status, and team.
 
 ```rust,no_run
@@ -436,7 +437,7 @@ pub struct ProjectAggregate {
 
 #### Project projections
 
-- `ProjectCardDto` (project list): slug, localised name, lead badge, date
+- `ProjectCardDto` (project list): slug, localized name, lead badge, date
   range, status badge, and team avatar stack.
 - `ProjectLandingDto`: header plus counts per task state and available views.
 - `ProjectKanbanDto`: five columns with tasks in each.
@@ -527,6 +528,8 @@ from non-terminal states.
 
 #### Plan statuses
 
+_Table 2: Plan statuses and allowed transitions._
+
 | Plan status  | Meaning                           | Allowed transitions                 | Developer-facing implication  |
 | ------------ | --------------------------------- | ----------------------------------- | ----------------------------- |
 | `draft`      | Plan is being constructed         | to `in_review`, `abandoned`         | Not pullable for execution    |
@@ -534,8 +537,6 @@ from non-terminal states.
 | `approved`   | Execution-ready and frozen        | to `superseded`                     | "Planned bucket" to pull from |
 | `superseded` | Replaced by a newer approved plan | terminal                            | Keep for audit/history        |
 | `abandoned`  | Discarded                         | terminal                            | Visible only in history       |
-
-_Table 2: Plan statuses and allowed transitions._
 
 #### Plan projections
 
@@ -881,7 +882,7 @@ consistently, as already required by Corbusier's multi-tenancy design.
 
 ### Error and validation contract
 
-Reuse Wildside's centralised error payload pattern:
+Reuse Wildside's centralized error payload pattern:
 
 ```json
 {
@@ -1061,7 +1062,7 @@ returns a projection DTO (not raw persistence rows).
 - `GET /api/v1/projects/{slug}/directives`
 - `GET /api/v1/directives/{directive_id}`
 - `POST /api/v1/projects/{slug}/directives` (idempotent) -- request body is
-  essentially `SlashCommandDefinition` (already serialisable).
+  essentially `SlashCommandDefinition` (already serializable).
 
 #### Suggestions
 
@@ -1090,7 +1091,7 @@ The tool registry projections should be built from the existing
 ### Internal crate layout
 
 The goal is to make reusable primitives emerge naturally by extracting
-cross-cutting crates first, leaving domain crates to stabilise after the second
+cross-cutting crates first, leaving domain crates to stabilize after the second
 use.
 
 The recommendation is to introduce a Cargo workspace with `crates/` and migrate
@@ -1121,11 +1122,13 @@ incrementally:
 
 ### Incremental implementation plan
 
-Pass goals are ordered to minimise churn: contract first, then core read
+Pass goals are ordered to minimize churn: contract first, then core read
 models, then streaming, then governance and suggestions hardening.
 
 For screen readers: The following flowchart outlines the four implementation
 passes and their constituent tasks.
+
+_Figure 1: Implementation pass sequence._
 
 ```mermaid
 flowchart LR
@@ -1133,8 +1136,6 @@ flowchart LR
   B --> C["Pass 3: Conversations, directives, SSE replay"]
   C --> D["Pass 4: Suggestions, governance, system hardening"]
 ```
-
-_Figure 1: Implementation pass sequence._
 
 #### Pass 1: contracts and scaffolding
 
@@ -1148,7 +1149,7 @@ _Figure 1: Implementation pass sequence._
 #### Pass 2: projects and tasks read models
 
 - Add `project` aggregate and seed a default project; attach existing tasks.
-- Extend task persistence with localisation, priority, labels, assignment,
+- Extend task persistence with localization, priority, labels, assignment,
   scheduling, and hierarchy references.
 - Implement task list, task detail, project list, project landing, and project
   Kanban projections.
@@ -1159,7 +1160,7 @@ _Figure 1: Implementation pass sequence._
 
 - Add `conversation` table and aggregate linking to project and tasks and
   expose conversation list and detail endpoints.
-- Expose message paging; reuse existing `ContentPart` serialisation directly.
+- Expose message paging; reuse existing `ContentPart` serialization directly.
 - Persist directives (`SlashCommandDefinition`) per project; expose registry
   endpoints.
 - Implement SSE stream semantics: stable event identifiers in stream, replay
@@ -1193,7 +1194,7 @@ _Figure 1: Implementation pass sequence._
 ### Test strategy
 
 - **Unit tests (domain invariants)**: state transitions (task and plan), slug
-  validation, localisation requirements, directive schema validation, and
+  validation, localization requirements, directive schema validation, and
   idempotency token handling.
 - **Integration tests (repositories and migrations)**: Postgres-backed tests
   for pagination ordering guarantees, dependency graph queries, and event store

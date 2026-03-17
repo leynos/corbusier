@@ -397,7 +397,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 - [ ] 5.2.1 Introduce project aggregate and bootstrap default projects.
   Requires 1.5.1. See corbusier-api-design.md §Project domain.
-  - [ ] Implement `ProjectAggregate` with slug, localised name and
+  - [ ] Implement `ProjectAggregate` with slug, localized name and
     description, lead, date range, status, and team membership. See
     corbusier-api-design.md §Project domain.
   - [ ] Seed a default project per tenant and attach existing tasks. See
@@ -406,7 +406,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     slug with tenant scoping.
 - [ ] 5.2.2 Extend task aggregate with front-end fields. Requires 5.2.1 and
   1.2.3. See corbusier-api-design.md §Task domain.
-  - [ ] Add localisation, priority, labels, assignment, scheduling, and
+  - [ ] Add localization, priority, labels, assignment, scheduling, and
     hierarchy reference fields to task persistence. See
     corbusier-api-design.md §Task domain -- Proposed write-side model.
   - [ ] Introduce `Planned` state and update the transition matrix. See
@@ -415,7 +415,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     `TaskOrigin::Issue` snapshot titles. See corbusier-api-design.md §Task
     domain -- Migration strategy from current models.
   - [ ] Success criteria: all task state transition pairs (including `Planned`)
-    are unit-tested; existing tasks are retrievable with localised names.
+    are unit-tested; existing tasks are retrievable with localized names.
 - [ ] 5.2.3 Deliver task and project projection endpoints. Requires 5.1.2 and
   5.2.2. See corbusier-api-design.md §Endpoint inventory -- Tasks and §Endpoint
   inventory -- Projects.
@@ -442,7 +442,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     paginated endpoints. See corbusier-api-design.md §Endpoint inventory --
     Conversations and messages.
   - [ ] Success criteria: conversations are listed and retrieved with message
-    paging; content parts render through existing serialisation.
+    paging; content parts render through existing serialization.
 - [ ] 5.3.2 Persist directives and expose registry endpoints. Requires 1.4.1
   and 5.2.1. See corbusier-api-design.md §Directives domain.
   - [ ] Implement `DirectiveAggregate` scoped to project and tenant. See
