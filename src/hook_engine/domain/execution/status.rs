@@ -58,6 +58,8 @@ impl TryFrom<&str> for ActionStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HookExecutionStatus {
+    /// Hook execution has been recorded but actions have not yet been executed.
+    Pending,
     /// All actions succeeded or were skipped.
     Succeeded,
     /// No action succeeded and at least one action failed.
@@ -73,6 +75,7 @@ impl HookExecutionStatus {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Pending => "pending",
             Self::Succeeded => "succeeded",
             Self::Failed => "failed",
             Self::PartialFailure => "partial_failure",
@@ -122,6 +125,7 @@ impl TryFrom<&str> for HookExecutionStatus {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
+            "pending" => Ok(Self::Pending),
             "succeeded" => Ok(Self::Succeeded),
             "failed" => Ok(Self::Failed),
             "partial_failure" => Ok(Self::PartialFailure),
