@@ -4,7 +4,7 @@ use super::world::AgentTurnWorld;
 use corbusier::agent_backend::{
     domain::ToolCallAuditStatus, services::AgentTurnOrchestrationError,
 };
-use corbusier::agent_backend::{domain::TurnSessionStatus, ports::TurnSessionRepository};
+use corbusier::agent_backend::{domain::TurnSessionStatus, ports::{SessionSlotKey, TurnSessionRepository}};
 use rstest_bdd_macros::then;
 
 #[then("the turn succeeds")]
@@ -155,8 +155,7 @@ fn only_one_active_session_remains_for_conversation(
 
     let active = super::world::run_async(world.session_repository.find_active_session(
         &world.ctx,
-        backend_id,
-        conversation_id,
+        SessionSlotKey::new(backend_id, conversation_id),
     ))?;
     if active.is_none() {
         return Err(eyre::eyre!("expected one active session but found none"));

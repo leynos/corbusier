@@ -12,7 +12,7 @@ use corbusier::agent_backend::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
         TurnExecutionResult, TurnSession, TurnSessionCreateParams, TurnSessionStatus,
     },
-    ports::{TurnSessionRepository, TurnSessionRepositoryError},
+    ports::{SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError},
     services::{
         AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
         AgentTurnOrchestratorService, BackendRegistryService, ExecuteAgentTurnRequest,
@@ -257,7 +257,7 @@ async fn postgres_rotates_expired_session(
 
     let active = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
         .await
         .map_err(|err| Box::new(err) as BoxError)?
         .ok_or_else(|| {
@@ -325,7 +325,7 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
 
     let active = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
         .await
         .map_err(|err| Box::new(err) as BoxError)?
         .ok_or_else(|| Box::new(std::io::Error::other("expected active session")) as BoxError)?;
@@ -433,7 +433,7 @@ async fn postgres_detects_concurrent_active_session_conflict(
 
     let active = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
     assert!(active.is_some());
@@ -470,7 +470,7 @@ async fn postgres_session_repository_scopes_lookup_by_tenant(
     let tenant_b_ctx = other_tenant_context(&ctx.ctx);
     let tenant_b_lookup = ctx
         .session_repository
-        .find_active_session(&tenant_b_ctx, backend_id, conversation_id)
+        .find_active_session(&tenant_b_ctx, SessionSlotKey::new(backend_id, conversation_id))
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
 
@@ -524,7 +524,7 @@ async fn concurrent_execute_turn_creates_single_active_session(
     // This ensures no duplicate session rows or uniqueness violations occurred
     let active_session = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, backend_id, conversation_id)
+        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
         .await
         .map_err(|err| Box::new(err) as BoxError)?
         .expect("Expected exactly one active session to exist");

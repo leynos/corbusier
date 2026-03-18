@@ -3,7 +3,7 @@
 use crate::agent_backend::{
     domain::{BackendId, TurnSession, TurnSessionId, TurnSessionStatus},
     ports::{
-        SessionSlotArbitration, TurnSessionRepository, TurnSessionRepositoryError,
+        SessionSlotArbitration, SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError,
         TurnSessionRepositoryResult,
     },
 };
@@ -89,32 +89,32 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
     async fn arbitrate_session_slot(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: Uuid,
+        key: SessionSlotKey,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let SessionSlotKey { backend_id, conversation_id } = key;
         let mut state = self.state.write().map_err(|err| {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
 
-        let key = (ctx.tenant_id(), backend_id, conversation_id);
-        let Some(active_id) = state.active_index.get(&key).copied() else {
+        let index_key = (ctx.tenant_id(), backend_id, conversation_id);
+        let Some(active_id) = state.active_index.get(&index_key).copied() else {
             return Ok(SessionSlotArbitration::Vacant);
         };
 
         let Some(existing) = state.sessions.get_mut(&active_id) else {
-            state.active_index.remove(&key);
+            state.active_index.remove(&index_key);
             return Ok(SessionSlotArbitration::Vacant);
         };
 
         if existing.status() != TurnSessionStatus::Active {
-            state.active_index.remove(&key);
+            state.active_index.remove(&index_key);
             return Ok(SessionSlotArbitration::Vacant);
         }
 
         if existing.is_expired_at(now) {
             existing.mark_expired(now);
-            state.active_index.remove(&key);
+            state.active_index.remove(&index_key);
             return Ok(SessionSlotArbitration::Expired);
         }
 
@@ -124,9 +124,9 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
     async fn find_active_session(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: Uuid,
+        key: SessionSlotKey,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
+        let SessionSlotKey { backend_id, conversation_id } = key;
         let state = self.state.read().map_err(|err| {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;

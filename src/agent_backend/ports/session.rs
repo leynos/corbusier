@@ -11,6 +11,24 @@ use uuid::Uuid;
 /// Result type for turn-session repository operations.
 pub type TurnSessionRepositoryResult<T> = Result<T, TurnSessionRepositoryError>;
 
+/// Composite key identifying an active session slot for a
+/// backend/conversation pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionSlotKey {
+    /// Backend whose session slot is being queried.
+    pub backend_id: BackendId,
+    /// Conversation whose session slot is being queried.
+    pub conversation_id: Uuid,
+}
+
+impl SessionSlotKey {
+    /// Creates a new session-slot key.
+    #[must_use]
+    pub const fn new(backend_id: BackendId, conversation_id: Uuid) -> Self {
+        Self { backend_id, conversation_id }
+    }
+}
+
 /// Session-slot arbitration result for a backend/conversation pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SessionSlotArbitration {
@@ -34,15 +52,10 @@ pub trait TurnSessionRepository: Send + Sync {
     /// # Errors
     ///
     /// Returns [`TurnSessionRepositoryError`] on persistence failures.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "tenant-scoped slot arbitration needs context, key, and clock inputs"
-    )]
     async fn arbitrate_session_slot(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: Uuid,
+        key: SessionSlotKey,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration>;
 
@@ -57,8 +70,7 @@ pub trait TurnSessionRepository: Send + Sync {
     async fn find_active_session(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: Uuid,
+        key: SessionSlotKey,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>>;
 
     /// Persists a session insert or update scoped by tenant.

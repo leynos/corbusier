@@ -11,7 +11,7 @@ use crate::agent_backend::{
         TurnSessionStatus,
     },
     ports::{
-        SessionSlotArbitration, TurnSessionRepository, TurnSessionRepositoryError,
+        SessionSlotArbitration, SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError,
         TurnSessionRepositoryResult,
     },
 };
@@ -57,10 +57,10 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
     async fn arbitrate_session_slot(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: uuid::Uuid,
+        key: SessionSlotKey,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let SessionSlotKey { backend_id, conversation_id } = key;
         let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
@@ -106,9 +106,9 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
     async fn find_active_session(
         &self,
         ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: uuid::Uuid,
+        key: SessionSlotKey,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
+        let SessionSlotKey { backend_id, conversation_id } = key;
         let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             let row = agent_turn_sessions::table
