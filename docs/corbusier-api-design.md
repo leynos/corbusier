@@ -56,7 +56,7 @@ The mockup's site map and card inventory make the backend expectations
 unusually concrete:
 
 - **Dashboard**: system health, Key Performance Indicator (KPI) panels, recent
-  activity feed, agent utilisation summary; explicitly fed by SSE from
+  activity feed, agent utilization summary; explicitly fed by SSE from
   `/api/v1/events`.
 - **My Tasks**: filterable task list; task detail view expects state-machine
   controls based on validity (`can_transition_to`), dependency panels, a
