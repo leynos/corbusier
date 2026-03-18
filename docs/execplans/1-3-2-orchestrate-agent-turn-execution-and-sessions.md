@@ -145,15 +145,15 @@ Observable outcomes:
 
 - Decision: Introduce `AgentTurnOrchestratorPorts` as an explicit dependency
   bundle for the orchestrator service. Rationale: keeps constructor signatures
-  within lint constraints while making port boundaries explicit and test wiring
-  straightforward. Date/Author: 2026-03-03 / implementation author.
+  within lint constraints, while making port boundaries explicit and test
+  wiring straightforward. Date/Author: 2026-03-03 / implementation author.
 
 - Decision: Bump `TEMPLATE_DB` name in Postgres test helpers when adding the
   new migration. Rationale: shared template creation is idempotent and would
   otherwise skip applying the new `agent_turn_sessions` schema in existing
   local environments. Date/Author: 2026-03-03 / implementation author.
 
-## Outcomes & retrospective
+## Outcomes & Retrospective
 
 Delivered behaviour against 1.3.2 success criteria:
 

@@ -1,223 +1,30 @@
 //! Service layer for agent turn orchestration and session continuity.
 
+mod errors;
+mod execution_locks;
+mod types;
+
+pub use errors::{AgentTurnOrchestrationError, AgentTurnOrchestrationResult};
+use execution_locks::SessionExecutionLocks;
+use types::ExecuteAgentTurnResponseParts;
+pub use types::{AgentTurnOrchestratorConfig, ExecuteAgentTurnRequest, ExecuteAgentTurnResponse};
+
 use crate::agent_backend::{
     domain::{
         AgentBackendRegistration, BackendId, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
-        ToolCallRequest, ToolCallResult, TurnExecutionRequest, TurnSession,
-        TurnSessionCreateParams, TurnSessionDomainError, TurnSessionId, deterministic_tool_call_id,
+        ToolCallRequest, ToolCallResult, TurnSession, TurnSessionCreateParams,
+        deterministic_tool_call_id,
     },
     ports::{
-        AgentRuntimeError, AgentRuntimePort, BackendRegistryError, BackendRegistryRepository,
-        SessionSlotArbitration, SessionSlotKey, ToolRouterPort, ToolRoutingContext, ToolRoutingError,
-        TurnSessionRepository, TurnSessionRepositoryError,
+        AgentRuntimePort, BackendRegistryRepository, SessionSlotArbitration, SessionSlotKey,
+        ToolRouterPort, ToolRoutingContext, TurnSessionRepository, TurnSessionRepositoryError,
     },
 };
 use crate::context::RequestContext;
-use chrono::Duration;
+use chrono::Utc;
 use mockable::Clock;
-use std::collections::HashMap;
-use std::sync::{Arc, Weak};
-use thiserror::Error;
-use tokio::sync::{Mutex, OwnedMutexGuard};
+use std::sync::Arc;
 use uuid::Uuid;
-
-type SessionKey = (BackendId, Uuid);
-type SessionLock = Arc<Mutex<()>>;
-type SessionLockRef = Weak<Mutex<()>>;
-
-#[derive(Debug)]
-struct SessionExecutionLocks {
-    locks: std::sync::Mutex<HashMap<SessionKey, SessionLockRef>>,
-}
-
-impl SessionExecutionLocks {
-    fn new() -> Self {
-        Self {
-            locks: std::sync::Mutex::new(HashMap::new()),
-        }
-    }
-
-    fn lock_for(&self, backend_id: BackendId, conversation_id: Uuid) -> SessionLock {
-        let key = (backend_id, conversation_id);
-        let mut locks = match self.locks.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        locks.retain(|_, lock| lock.strong_count() > 0);
-        if let Some(existing) = locks.get(&key).and_then(Weak::upgrade) {
-            return existing;
-        }
-
-        let created = Arc::new(Mutex::new(()));
-        locks.insert(key, Arc::downgrade(&created));
-        created
-    }
-
-    async fn lock(&self, backend_id: BackendId, conversation_id: Uuid) -> OwnedMutexGuard<()> {
-        self.lock_for(backend_id, conversation_id)
-            .lock_owned()
-            .await
-    }
-}
-
-/// Configuration for turn orchestration behaviour.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AgentTurnOrchestratorConfig {
-    session_ttl: Duration,
-}
-
-impl AgentTurnOrchestratorConfig {
-    /// Creates orchestration configuration from a session TTL duration.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AgentTurnOrchestrationError::InvalidSessionTtl`] when the
-    /// duration is not strictly positive.
-    #[expect(
-        clippy::missing_const_for_fn,
-        reason = "Constructor intentionally remains non-const to avoid committing to const API semantics."
-    )]
-    pub fn new(session_ttl: Duration) -> Result<Self, AgentTurnOrchestrationError> {
-        let ttl_seconds = session_ttl.num_seconds();
-        if ttl_seconds <= 0 {
-            return Err(AgentTurnOrchestrationError::InvalidSessionTtl(ttl_seconds));
-        }
-        Ok(Self { session_ttl })
-    }
-
-    /// Returns configured session TTL.
-    #[must_use]
-    pub const fn session_ttl(self) -> Duration {
-        self.session_ttl
-    }
-}
-
-impl Default for AgentTurnOrchestratorConfig {
-    fn default() -> Self {
-        Self {
-            session_ttl: Duration::minutes(30),
-        }
-    }
-}
-
-/// Request payload for executing an orchestrated agent turn.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteAgentTurnRequest {
-    /// Backend registration identifier.
-    pub backend_id: BackendId,
-    /// Canonical turn request payload.
-    pub turn: TurnExecutionRequest,
-}
-
-impl ExecuteAgentTurnRequest {
-    /// Creates an execute-turn request.
-    #[must_use]
-    pub const fn new(backend_id: BackendId, turn: TurnExecutionRequest) -> Self {
-        Self { backend_id, turn }
-    }
-}
-
-/// Orchestrated turn response with routed tool details and session metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteAgentTurnResponse {
-    session_id: TurnSessionId,
-    runtime_session_id: String,
-    assistant_response: String,
-    tool_results: Vec<ToolCallResult>,
-    tool_call_audits: Vec<ToolCallAudit>,
-    reused_session: bool,
-    rotated_session: bool,
-}
-
-impl ExecuteAgentTurnResponse {
-    /// Returns orchestration session ID.
-    #[must_use]
-    pub const fn session_id(&self) -> TurnSessionId {
-        self.session_id
-    }
-
-    /// Returns backend-native runtime session ID.
-    #[must_use]
-    pub fn runtime_session_id(&self) -> &str {
-        &self.runtime_session_id
-    }
-
-    /// Returns assistant response text.
-    #[must_use]
-    pub fn assistant_response(&self) -> &str {
-        &self.assistant_response
-    }
-
-    /// Returns routed tool results.
-    #[must_use]
-    pub fn tool_results(&self) -> &[ToolCallResult] {
-        &self.tool_results
-    }
-
-    /// Returns tool call audits emitted by orchestration.
-    #[must_use]
-    pub fn tool_call_audits(&self) -> &[ToolCallAudit] {
-        &self.tool_call_audits
-    }
-
-    /// Returns `true` when an existing active session was reused.
-    #[must_use]
-    pub const fn reused_session(&self) -> bool {
-        self.reused_session
-    }
-
-    /// Returns `true` when an expired session was rotated.
-    #[must_use]
-    pub const fn rotated_session(&self) -> bool {
-        self.rotated_session
-    }
-}
-
-/// Service-level errors for turn orchestration.
-#[derive(Debug, Error)]
-pub enum AgentTurnOrchestrationError {
-    /// Backend was not found in registry.
-    #[error("backend {0} not found")]
-    BackendNotFound(BackendId),
-
-    /// Backend is registered but inactive.
-    #[error("backend {0} is inactive")]
-    BackendInactive(BackendId),
-
-    /// Session TTL configuration is invalid.
-    #[error("session ttl must be positive seconds, got {0}")]
-    InvalidSessionTtl(i64),
-
-    /// Backend registry operation failed.
-    #[error(transparent)]
-    BackendRegistry(#[from] BackendRegistryError),
-
-    /// Runtime adapter operation failed.
-    #[error(transparent)]
-    Runtime(#[from] AgentRuntimeError),
-
-    /// Session repository operation failed.
-    #[error(transparent)]
-    SessionRepository(#[from] TurnSessionRepositoryError),
-
-    /// Session-domain validation failed.
-    #[error(transparent)]
-    SessionDomain(#[from] TurnSessionDomainError),
-
-    /// Tool routing failed for one call.
-    #[error("tool routing failed for call {call_id} ({tool_name}): {source}")]
-    ToolRouting {
-        /// Deterministic call identifier.
-        call_id: String,
-        /// Tool name associated with the failure.
-        tool_name: String,
-        /// Underlying routing error.
-        source: ToolRoutingError,
-    },
-}
-
-/// Result type for orchestration operations.
-pub type AgentTurnOrchestrationResult<T> = Result<T, AgentTurnOrchestrationError>;
 
 /// Dependency bundle for [`AgentTurnOrchestratorService`].
 pub struct AgentTurnOrchestratorPorts<R, S, RT, TR, C>
@@ -244,7 +51,7 @@ struct SessionResolutionParams<'a> {
     ctx: &'a RequestContext,
     backend: &'a AgentBackendRegistration,
     conversation_id: Uuid,
-    now: chrono::DateTime<chrono::Utc>,
+    now: chrono::DateTime<Utc>,
 }
 
 /// Service that orchestrates backend turns and session lifecycle.
@@ -327,17 +134,14 @@ where
             return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
         }
 
-        let session_resolution_now = self.clock.utc();
-
         let resolution_params = SessionResolutionParams {
             ctx,
             backend: &backend,
             conversation_id,
-            now: session_resolution_now,
+            now: self.clock.utc(),
         };
-        let (mut session, reused_session, rotated_session) = self
-            .resolve_session(&resolution_params)
-            .await?;
+        let (mut session, reused_session, rotated_session) =
+            self.resolve_session(&resolution_params).await?;
 
         let runtime_result = match self
             .runtime
@@ -366,15 +170,16 @@ where
         session.record_turn(completion_time)?;
         self.turn_sessions.upsert_session(ctx, &session).await?;
 
-        Ok(ExecuteAgentTurnResponse {
-            session_id: session.id(),
-            runtime_session_id: session.runtime_session_id().to_owned(),
-            assistant_response: runtime_result.assistant_response().to_owned(),
-            tool_results,
-            tool_call_audits,
-            reused_session,
-            rotated_session,
-        })
+        Ok(ExecuteAgentTurnResponse::new(
+            &session,
+            ExecuteAgentTurnResponseParts {
+                assistant_response: runtime_result.assistant_response().to_owned(),
+                tool_results,
+                tool_call_audits,
+                reused_session,
+                rotated_session,
+            },
+        ))
     }
 
     async fn resolve_session(
@@ -383,20 +188,22 @@ where
     ) -> AgentTurnOrchestrationResult<(TurnSession, bool, bool)> {
         match self
             .turn_sessions
-            .arbitrate_session_slot(params.ctx, SessionSlotKey::new(params.backend.id(), params.conversation_id), params.now)
+            .arbitrate_session_slot(
+                params.ctx,
+                SessionSlotKey::new(params.backend.id(), params.conversation_id),
+                params.now,
+            )
             .await?
         {
             SessionSlotArbitration::Reused(existing) => Ok((existing, true, false)),
             SessionSlotArbitration::Vacant => {
-                let (created_session, reused_due_to_conflict) = self
-                    .create_or_reuse_session(params)
-                    .await?;
+                let (created_session, reused_due_to_conflict) =
+                    self.create_or_reuse_session(params).await?;
                 Ok((created_session, reused_due_to_conflict, false))
             }
             SessionSlotArbitration::Expired => {
-                let (rotated_session, reused_due_to_conflict) = self
-                    .create_or_reuse_session(params)
-                    .await?;
+                let (rotated_session, reused_due_to_conflict) =
+                    self.create_or_reuse_session(params).await?;
                 Ok((rotated_session, reused_due_to_conflict, true))
             }
         }
@@ -428,7 +235,11 @@ where
             }
         };
 
-        match self.turn_sessions.upsert_session(params.ctx, &session).await {
+        match self
+            .turn_sessions
+            .upsert_session(params.ctx, &session)
+            .await
+        {
             Ok(()) => Ok(session),
             Err(error) => {
                 self.runtime
@@ -443,16 +254,17 @@ where
         &self,
         params: &SessionResolutionParams<'_>,
     ) -> AgentTurnOrchestrationResult<(TurnSession, bool)> {
-        match self
-            .create_session(params)
-            .await
-        {
+        match self.create_session(params).await {
             Ok(created) => Ok((created, false)),
             Err(AgentTurnOrchestrationError::SessionRepository(
                 TurnSessionRepositoryError::ActiveSessionConflict { .. },
             )) => {
                 let active = self
-                    .require_active_session_after_conflict(params.ctx, params.backend.id(), params.conversation_id)
+                    .require_active_session_after_conflict(
+                        params.ctx,
+                        params.backend.id(),
+                        params.conversation_id,
+                    )
                     .await?;
                 Ok((active, true))
             }

@@ -92,7 +92,10 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
         key: SessionSlotKey,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
-        let SessionSlotKey { backend_id, conversation_id } = key;
+        let SessionSlotKey {
+            backend_id,
+            conversation_id,
+        } = key;
         let mut state = self.state.write().map_err(|err| {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
@@ -126,7 +129,10 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
         ctx: &RequestContext,
         key: SessionSlotKey,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
-        let SessionSlotKey { backend_id, conversation_id } = key;
+        let SessionSlotKey {
+            backend_id,
+            conversation_id,
+        } = key;
         let state = self.state.read().map_err(|err| {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;

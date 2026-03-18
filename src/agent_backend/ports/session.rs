@@ -25,7 +25,10 @@ impl SessionSlotKey {
     /// Creates a new session-slot key.
     #[must_use]
     pub const fn new(backend_id: BackendId, conversation_id: Uuid) -> Self {
-        Self { backend_id, conversation_id }
+        Self {
+            backend_id,
+            conversation_id,
+        }
     }
 }
 

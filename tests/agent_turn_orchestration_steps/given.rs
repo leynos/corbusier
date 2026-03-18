@@ -6,12 +6,32 @@ use corbusier::agent_backend::{
     domain::{
         AgentBackendRegistration, AgentCapabilities, BackendInfo, BackendName,
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionResult,
-        TurnSession, TurnSessionCreateParams, TurnSessionStatus,
+        TurnSession, TurnSessionCreateParams, TurnSessionId, TurnSessionStatus,
     },
     ports::{BackendRegistryRepository, TurnSessionRepository},
 };
 use rstest_bdd_macros::given;
 use serde_json::json;
+
+fn queue_turn_result_without_tools(
+    world: &mut AgentTurnWorld,
+    assistant_text: impl Into<String>,
+) -> Result<(), eyre::Report> {
+    world
+        .runtime
+        .queue_turn_result(TurnExecutionResult::new(assistant_text, Vec::new()))?;
+    Ok(())
+}
+
+fn seeded_session(world: &mut AgentTurnWorld, session: &TurnSession) -> Result<(), eyre::Report> {
+    world.existing_session_id = Some(session.id());
+    run_async(
+        world
+            .session_repository
+            .upsert_session(&world.ctx, session),
+    )?;
+    Ok(())
+}
 
 #[given(r#"an active backend named "{name}""#)]
 fn an_active_backend_named(world: &mut AgentTurnWorld, name: String) -> Result<(), eyre::Report> {
@@ -44,10 +64,7 @@ fn runtime_returns_text_with_no_tools(
     world: &mut AgentTurnWorld,
     text: String,
 ) -> Result<(), eyre::Report> {
-    world
-        .runtime
-        .queue_turn_result(TurnExecutionResult::new(text, Vec::new()))?;
-    Ok(())
+    queue_turn_result_without_tools(world, text)
 }
 
 #[given(r#"the runtime returns assistant texts "{first_text}" and "{second_text}" with no tools"#)]
@@ -56,12 +73,8 @@ fn runtime_returns_two_texts_with_no_tools(
     first_text: String,
     second_text: String,
 ) -> Result<(), eyre::Report> {
-    world
-        .runtime
-        .queue_turn_result(TurnExecutionResult::new(first_text, Vec::new()))?;
-    world
-        .runtime
-        .queue_turn_result(TurnExecutionResult::new(second_text, Vec::new()))?;
+    queue_turn_result_without_tools(world, first_text)?;
+    queue_turn_result_without_tools(world, second_text)?;
     Ok(())
 }
 
@@ -81,13 +94,7 @@ fn existing_active_session(
         ttl: Duration::minutes(5),
         now: Utc::now(),
     })?;
-    world.existing_session_id = Some(session.id());
-    run_async(
-        world
-            .session_repository
-            .upsert_session(&world.ctx, &session),
-    )?;
-    Ok(())
+    seeded_session(world, &session)
 }
 
 #[given(r#"an expired active session for conversation "{conversation}""#)]
@@ -102,7 +109,7 @@ fn expired_active_session(
     let now = Utc::now();
 
     let session = TurnSession::from_persisted(PersistedTurnSessionData {
-        id: corbusier::agent_backend::domain::TurnSessionId::new(),
+        id: TurnSessionId::new(),
         backend_id,
         conversation_id,
         runtime_session_id: RuntimeSessionId::new("expired-runtime-session")?,
@@ -114,14 +121,7 @@ fn expired_active_session(
         ended_at: None,
         turn_count: 2,
     });
-
-    world.existing_session_id = Some(session.id());
-    run_async(
-        world
-            .session_repository
-            .upsert_session(&world.ctx, &session),
-    )?;
-    Ok(())
+    seeded_session(world, &session)
 }
 
 #[given(r#"the tool router fails for tool "{tool}""#)]

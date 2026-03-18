@@ -4,8 +4,29 @@ use super::world::AgentTurnWorld;
 use corbusier::agent_backend::{
     domain::ToolCallAuditStatus, services::AgentTurnOrchestrationError,
 };
-use corbusier::agent_backend::{domain::TurnSessionStatus, ports::{SessionSlotKey, TurnSessionRepository}};
+use corbusier::agent_backend::{
+    domain::{TurnSessionId, TurnSessionStatus},
+    ports::{SessionSlotKey, TurnSessionRepository},
+    services::ExecuteAgentTurnResponse,
+};
 use rstest_bdd_macros::then;
+
+fn assert_session_expectation(
+    world: &AgentTurnWorld,
+    predicate: impl FnOnce(&ExecuteAgentTurnResponse, TurnSessionId) -> Result<(), eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let expected_session_id = world
+        .existing_session_id
+        .ok_or_else(|| eyre::eyre!("missing existing session in world"))?;
+    let result = world
+        .last_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
+    let response = result
+        .as_ref()
+        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
+    predicate(response, expected_session_id)
+}
 
 #[then("the turn succeeds")]
 fn turn_succeeds(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
@@ -67,50 +88,32 @@ fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyr
 
 #[then("the existing session is reused")]
 fn existing_session_reused(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let expected_session_id = world
-        .existing_session_id
-        .ok_or_else(|| eyre::eyre!("missing existing session in world"))?;
-    let result = world
-        .last_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    let response = result
-        .as_ref()
-        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
-
-    if !response.reused_session() {
-        return Err(eyre::eyre!("expected reused_session=true"));
-    }
-    if response.session_id() != expected_session_id {
-        return Err(eyre::eyre!(
-            "expected session {:?}, got {:?}",
-            expected_session_id,
-            response.session_id()
-        ));
-    }
-    Ok(())
+    assert_session_expectation(world, |response, expected_session_id| {
+        if !response.reused_session() {
+            return Err(eyre::eyre!("expected reused_session=true"));
+        }
+        if response.session_id() != expected_session_id {
+            return Err(eyre::eyre!(
+                "expected session {:?}, got {:?}",
+                expected_session_id,
+                response.session_id()
+            ));
+        }
+        Ok(())
+    })
 }
 
 #[then("the session is rotated")]
 fn session_rotated(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let expected_prior_session_id = world
-        .existing_session_id
-        .ok_or_else(|| eyre::eyre!("missing existing session in world"))?;
-    let result = world
-        .last_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    let response = result
-        .as_ref()
-        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
-
-    if !response.rotated_session() {
-        return Err(eyre::eyre!("expected rotated_session=true"));
-    }
-    if response.session_id() == expected_prior_session_id {
-        return Err(eyre::eyre!("expected a new rotated session id"));
-    }
-    Ok(())
+    assert_session_expectation(world, |response, expected_prior_session_id| {
+        if !response.rotated_session() {
+            return Err(eyre::eyre!("expected rotated_session=true"));
+        }
+        if response.session_id() == expected_prior_session_id {
+            return Err(eyre::eyre!("expected a new rotated session id"));
+        }
+        Ok(())
+    })
 }
 
 #[then("the turn fails with a tool routing error")]
@@ -153,10 +156,11 @@ fn only_one_active_session_remains_for_conversation(
         .copied()
         .ok_or_else(|| eyre::eyre!("missing conversation id for label {conversation}"))?;
 
-    let active = super::world::run_async(world.session_repository.find_active_session(
-        &world.ctx,
-        SessionSlotKey::new(backend_id, conversation_id),
-    ))?;
+    let active = super::world::run_async(
+        world
+            .session_repository
+            .find_active_session(&world.ctx, SessionSlotKey::new(backend_id, conversation_id)),
+    )?;
     if active.is_none() {
         return Err(eyre::eyre!("expected one active session but found none"));
     }

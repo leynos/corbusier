@@ -60,7 +60,10 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
         key: SessionSlotKey,
         now: DateTime<Utc>,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
-        let SessionSlotKey { backend_id, conversation_id } = key;
+        let SessionSlotKey {
+            backend_id,
+            conversation_id,
+        } = key;
         let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
@@ -108,7 +111,10 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
         ctx: &RequestContext,
         key: SessionSlotKey,
     ) -> TurnSessionRepositoryResult<Option<TurnSession>> {
-        let SessionSlotKey { backend_id, conversation_id } = key;
+        let SessionSlotKey {
+            backend_id,
+            conversation_id,
+        } = key;
         let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             let row = agent_turn_sessions::table
@@ -297,7 +303,9 @@ fn map_upsert_error(
         DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, db_error)
             if db_error
                 .constraint_name()
-                .is_some_and(|name| name == "idx_agent_turn_sessions_backend_conversation_active")
+                .is_some_and(
+                    |name| name == "idx_agent_turn_sessions_tenant_backend_conversation_active"
+                )
     );
     if is_active_session_conflict {
         TurnSessionRepositoryError::active_session_conflict(

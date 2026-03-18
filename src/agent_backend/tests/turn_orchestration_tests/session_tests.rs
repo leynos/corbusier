@@ -4,7 +4,7 @@ use super::common::{OrchestrationContext, context, register_backend};
 use crate::agent_backend::{
     domain::{
         PersistedTurnSessionData, RuntimeSessionId, TurnExecutionRequest, TurnExecutionResult,
-        TurnSession, TurnSessionCreateParams, TurnSessionStatus,
+        TurnSession, TurnSessionCreateParams, TurnSessionId, TurnSessionStatus,
     },
     ports::TurnSessionRepository,
     services::ExecuteAgentTurnRequest,
@@ -129,7 +129,7 @@ async fn execute_turn_rotates_expired_session(
     let now = Utc::now();
     let expired_conversation = Uuid::new_v4();
     let expired_session = TurnSession::from_persisted(PersistedTurnSessionData {
-        id: crate::agent_backend::domain::TurnSessionId::new(),
+        id: TurnSessionId::new(),
         backend_id,
         conversation_id: expired_conversation,
         runtime_session_id: RuntimeSessionId::new("expired-runtime-session")?,

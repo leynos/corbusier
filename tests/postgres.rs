@@ -4,8 +4,8 @@
 //! - `cluster`: Embedded `PostgreSQL` cluster lifecycle helpers
 //! - `agent_session_tests`: Agent session persistence and active-session uniqueness
 //! - `audit_tests`: Audit context capture and verification
-//! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `agent_turn_orchestration_tests`: Turn execution and session continuity
+//! - `backend_registry_tests`: Agent backend registration and discovery
 //! - `crud_tests`: Basic CRUD operations
 //! - `mcp_server_lifecycle_tests`: MCP server lifecycle persistence
 //! - `sequence_tests`: Sequence number management

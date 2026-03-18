@@ -1,149 +1,20 @@
-//! `PostgreSQL` integration tests for turn orchestration and session continuity.
-
-use std::sync::Arc;
+//! End-to-end orchestration behaviour tests against `PostgreSQL`.
 
 use chrono::{Duration, Utc};
 use corbusier::agent_backend::{
-    adapters::{
-        memory::{InMemoryAgentRuntime, InMemoryToolRouter},
-        postgres::{BackendPgPool, PostgresBackendRegistry, PostgresTurnSessionRepository},
-    },
     domain::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
-        TurnExecutionResult, TurnSession, TurnSessionCreateParams, TurnSessionStatus,
+        TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
-    ports::{SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError},
-    services::{
-        AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
-        AgentTurnOrchestratorService, BackendRegistryService, ExecuteAgentTurnRequest,
-        RegisterBackendRequest,
-    },
+    ports::{SessionSlotKey, TurnSessionRepository},
+    services::{AgentTurnOrchestrationError, ExecuteAgentTurnRequest},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
-use corbusier::message::domain::ConversationId;
-use diesel::PgConnection;
-use diesel::r2d2::ConnectionManager;
-use mockable::DefaultClock;
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::postgres::cluster::TemporaryDatabase;
-use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, insert_conversation, postgres_cluster,
-};
-
-type TestOrchestrator = AgentTurnOrchestratorService<
-    PostgresBackendRegistry,
-    PostgresTurnSessionRepository,
-    InMemoryAgentRuntime,
-    InMemoryToolRouter,
-    DefaultClock,
->;
-
-type TestRegistryService = BackendRegistryService<PostgresBackendRegistry, DefaultClock>;
-
-struct OrchestrationContext {
-    cluster: PostgresCluster,
-    ctx: RequestContext,
-    service: TestOrchestrator,
-    registry_service: TestRegistryService,
-    session_repository: Arc<PostgresTurnSessionRepository>,
-    runtime: Arc<InMemoryAgentRuntime>,
-    router: Arc<InMemoryToolRouter>,
-    temp_db: TemporaryDatabase,
-}
-
-async fn setup_context(cluster: PostgresCluster) -> Result<OrchestrationContext, BoxError> {
-    let db = cluster
-        .temporary_database_from_template(&format!("turn_orch_{}", Uuid::new_v4()), TEMPLATE_DB)
-        .await?;
-    let manager = ConnectionManager::<PgConnection>::new(db.url().to_owned());
-    let pool: BackendPgPool = diesel::r2d2::Pool::builder()
-        .max_size(1)
-        .build(manager)
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    let backend_registry = Arc::new(PostgresBackendRegistry::new(pool.clone()));
-    let session_repository = Arc::new(PostgresTurnSessionRepository::new(pool));
-    let runtime = Arc::new(InMemoryAgentRuntime::new());
-    let router = Arc::new(InMemoryToolRouter::new());
-    let clock = Arc::new(DefaultClock);
-    let config = AgentTurnOrchestratorConfig::new(Duration::minutes(5))
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    let service = AgentTurnOrchestratorService::with_config(
-        AgentTurnOrchestratorPorts {
-            backend_registry: backend_registry.clone(),
-            turn_sessions: session_repository.clone(),
-            runtime: runtime.clone(),
-            tool_router: router.clone(),
-            clock: clock.clone(),
-        },
-        config,
-    );
-
-    let registry_service = BackendRegistryService::new(backend_registry, clock);
-
-    Ok(OrchestrationContext {
-        cluster,
-        ctx: RequestContext::new(
-            TenantId::new(),
-            CorrelationId::new(),
-            UserId::new(),
-            SessionId::new(),
-        ),
-        service,
-        registry_service,
-        session_repository,
-        runtime,
-        router,
-        temp_db: db,
-    })
-}
-
-async fn ensure_conversation_exists(
-    context: &OrchestrationContext,
-    conversation_id: Uuid,
-) -> Result<(), BoxError> {
-    insert_conversation(
-        context.cluster,
-        context.temp_db.name(),
-        ConversationId::from_uuid(conversation_id),
-    )
-    .await
-}
-
-async fn register_backend(context: &OrchestrationContext, name: &str) -> Result<Uuid, BoxError> {
-    let backend = context
-        .registry_service
-        .register(
-            &context.ctx,
-            RegisterBackendRequest::new(name, name, "1.0.0", "test-provider")
-                .with_capabilities(true, true),
-        )
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
-    Ok(backend.id().into_inner())
-}
-
-fn other_tenant_context(ctx: &RequestContext) -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        ctx.correlation_id(),
-        ctx.user_id(),
-        ctx.session_id(),
-    )
-}
-
-#[fixture]
-async fn context(
-    postgres_cluster: Result<PostgresCluster, BoxError>,
-) -> Result<OrchestrationContext, BoxError> {
-    let cluster = postgres_cluster?;
-    ensure_template(cluster).await?;
-    setup_context(cluster).await
-}
+use super::common::{OrchestrationContext, context, ensure_conversation_exists, register_backend};
+use crate::postgres::helpers::BoxError;
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
@@ -378,108 +249,6 @@ async fn postgres_propagates_tool_routing_failure(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn postgres_detects_concurrent_active_session_conflict(
-    #[future] context: Result<OrchestrationContext, BoxError>,
-) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
-    let conversation_id = Uuid::new_v4();
-    ensure_conversation_exists(&ctx, conversation_id).await?;
-
-    let now = Utc::now();
-    let session_a = TurnSession::new(TurnSessionCreateParams {
-        backend_id,
-        conversation_id,
-        runtime_session_id: RuntimeSessionId::new("runtime-a")
-            .map_err(|err| Box::new(err) as BoxError)?,
-        ttl: Duration::minutes(5),
-        now,
-    })
-    .map_err(|err| Box::new(err) as BoxError)?;
-    let session_b = TurnSession::new(TurnSessionCreateParams {
-        backend_id,
-        conversation_id,
-        runtime_session_id: RuntimeSessionId::new("runtime-b")
-            .map_err(|err| Box::new(err) as BoxError)?,
-        ttl: Duration::minutes(5),
-        now,
-    })
-    .map_err(|err| Box::new(err) as BoxError)?;
-
-    let (first, second) = tokio::join!(
-        ctx.session_repository.upsert_session(&ctx.ctx, &session_a),
-        ctx.session_repository.upsert_session(&ctx.ctx, &session_b)
-    );
-
-    let first_conflict = matches!(
-        &first,
-        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
-    );
-    let second_conflict = matches!(
-        &second,
-        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
-    );
-    assert!(
-        first_conflict != second_conflict,
-        "Expected exactly one conflict, got first_conflict={first_conflict}, second_conflict={second_conflict}"
-    );
-    if first_conflict {
-        second.map_err(|err| Box::new(err) as BoxError)?;
-    } else {
-        first.map_err(|err| Box::new(err) as BoxError)?;
-    }
-
-    let active = ctx
-        .session_repository
-        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
-    assert!(active.is_some());
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn postgres_session_repository_scopes_lookup_by_tenant(
-    #[future] context: Result<OrchestrationContext, BoxError>,
-) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
-    let conversation_id = Uuid::new_v4();
-    ensure_conversation_exists(&ctx, conversation_id).await?;
-
-    let session = TurnSession::new(TurnSessionCreateParams {
-        backend_id,
-        conversation_id,
-        runtime_session_id: RuntimeSessionId::new("tenant-a-runtime")
-            .map_err(|err| Box::new(err) as BoxError)?,
-        ttl: Duration::minutes(5),
-        now: Utc::now(),
-    })
-    .map_err(|err| Box::new(err) as BoxError)?;
-
-    ctx.session_repository
-        .upsert_session(&ctx.ctx, &session)
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    let tenant_b_ctx = other_tenant_context(&ctx.ctx);
-    let tenant_b_lookup = ctx
-        .session_repository
-        .find_active_session(&tenant_b_ctx, SessionSlotKey::new(backend_id, conversation_id))
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    assert!(tenant_b_lookup.is_none());
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
 async fn concurrent_execute_turn_creates_single_active_session(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
@@ -490,7 +259,6 @@ async fn concurrent_execute_turn_creates_single_active_session(
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
-    // Queue two turn results for the runtime to return
     ctx.runtime
         .queue_turn_result(TurnExecutionResult::new("response-a", Vec::new()))
         .map_err(|err| Box::new(err) as BoxError)?;
@@ -507,21 +275,15 @@ async fn concurrent_execute_turn_creates_single_active_session(
         TurnExecutionRequest::new(conversation_id, "second turn", Vec::new()),
     );
 
-    // Execute both turns concurrently for the same backend_id and conversation_id
     let (first_result, second_result) = tokio::join!(
         ctx.service.execute_turn(&ctx.ctx, first_request),
         ctx.service.execute_turn(&ctx.ctx, second_request)
     );
 
-    // Both should succeed (one will wait for the lock, then reuse the session)
     let first_response = first_result.map_err(|err| Box::new(err) as BoxError)?;
     let second_response = second_result.map_err(|err| Box::new(err) as BoxError)?;
-
-    // Verify that both turns used the same session (one created, one reused)
     assert_eq!(first_response.session_id(), second_response.session_id());
 
-    // Verify that exactly one active session exists for this (backend_id, conversation_id)
-    // This ensures no duplicate session rows or uniqueness violations occurred
     let active_session = ctx
         .session_repository
         .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
