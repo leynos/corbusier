@@ -65,9 +65,8 @@ impl HookWorld {
 }
 
 impl Default for HookWorld {
-    fn default() -> Self {
-        Self::new()
-    }
+    #[rustfmt::skip]
+    fn default() -> Self { Self::new() }
 }
 
 /// Fixture that creates a new scenario world.

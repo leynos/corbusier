@@ -98,6 +98,8 @@ pub struct HookExecutionResult {
 /// Input bundle for constructing a [`HookExecutionResult`].
 #[derive(Debug, Clone)]
 pub struct HookExecutionInput {
+    /// Identifier of the execution record to persist.
+    pub execution_id: HookExecutionId,
     /// Identifier of the executed hook definition.
     pub hook_id: HookId,
     /// Identifier of the trigger context that initiated execution.
@@ -135,14 +137,14 @@ pub struct HookExecutionPersisted {
 
 impl HookExecutionResult {
     /// Creates a new hook execution result.
-    /// Example: `HookExecutionResult::new(HookExecutionInput { hook_id, trigger_context_id, trigger_type, predicate_data, action_results, executed_at })` computes the status.
+    /// Example: `HookExecutionResult::new(HookExecutionInput { execution_id, hook_id, trigger_context_id, trigger_type, predicate_data, action_results, executed_at })` computes the status.
     #[must_use]
     pub fn new(input: HookExecutionInput) -> Self {
         let status = HookExecutionStatus::from_action_statuses(
             input.action_results.iter().map(ActionResult::status),
         );
         Self {
-            execution_id: HookExecutionId::new(),
+            execution_id: input.execution_id,
             hook_id: input.hook_id,
             trigger_context_id: input.trigger_context_id,
             trigger_type: input.trigger_type,
@@ -157,10 +159,14 @@ impl HookExecutionResult {
     /// Example: `from_persisted(HookExecutionPersisted { .. })` restores stored records.
     #[must_use]
     pub fn from_persisted(persisted: HookExecutionPersisted) -> Self {
-        let recomputed_status = HookExecutionStatus::from_action_statuses(
-            persisted.action_results.iter().map(ActionResult::status),
-        );
         let stored_status = persisted.status;
+        let recomputed_status = if stored_status == HookExecutionStatus::Pending {
+            HookExecutionStatus::Pending
+        } else {
+            HookExecutionStatus::from_action_statuses(
+                persisted.action_results.iter().map(ActionResult::status),
+            )
+        };
         debug_assert_eq!(
             stored_status, recomputed_status,
             "persisted hook execution status diverges from recomputed action status"

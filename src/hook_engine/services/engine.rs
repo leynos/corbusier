@@ -104,10 +104,20 @@ where
 
         let mut results = Vec::with_capacity(definitions.len());
         for definition in definitions {
-            // A hook result is persisted only after all of its actions execute
-            // successfully.
+            let execution_id = crate::hook_engine::domain::HookExecutionId::new();
+            self.execution_log
+                .store_pending(
+                    ctx,
+                    execution_id,
+                    definition.id(),
+                    context.id(),
+                    context.trigger_type(),
+                    self.clock.utc(),
+                )
+                .await?;
             let action_results = self.execute_actions(&definition, &context).await?;
             let result = HookExecutionResult::new(HookExecutionInput {
+                execution_id,
                 hook_id: definition.id().clone(),
                 trigger_context_id: context.id(),
                 trigger_type: context.trigger_type(),
@@ -115,7 +125,7 @@ where
                 action_results,
                 executed_at: self.clock.utc(),
             });
-            self.execution_log.store(ctx, &result).await?;
+            self.execution_log.update_result(ctx, &result).await?;
             results.push(result);
         }
         Ok(results)

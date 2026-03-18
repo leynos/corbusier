@@ -1,11 +1,15 @@
 //! In-memory hook execution log repository.
 
 use crate::context::{RequestContext, TenantId};
-use crate::hook_engine::domain::{HookExecutionResult, TriggerContextId};
+use crate::hook_engine::domain::{
+    HookExecutionId, HookExecutionPersisted, HookExecutionResult, HookExecutionStatus, HookId,
+    HookTriggerType, TriggerContextId,
+};
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
 };
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -47,6 +51,57 @@ impl InMemoryHookExecutionLogRepository {
 
 #[async_trait]
 impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
+    async fn store_pending(
+        &self,
+        ctx: &RequestContext,
+        execution_id: HookExecutionId,
+        hook_id: &HookId,
+        trigger_context_id: TriggerContextId,
+        trigger_type: HookTriggerType,
+        executed_at: DateTime<Utc>,
+    ) -> HookExecutionLogResult<()> {
+        let mut executions = self.executions.write().await;
+        let execution = HookExecutionResult::from_persisted(HookExecutionPersisted {
+            execution_id,
+            hook_id: hook_id.clone(),
+            trigger_context_id,
+            trigger_type,
+            predicate_data: serde_json::Value::Object(serde_json::Map::new()),
+            action_results: Vec::new(),
+            status: HookExecutionStatus::Pending,
+            executed_at,
+        });
+        let tenant_executions = executions.entry(ctx.tenant_id()).or_default();
+        if let Some(existing) = tenant_executions.iter_mut().find(|result| {
+            result.trigger_context_id() == trigger_context_id && result.hook_id() == hook_id
+        }) {
+            *existing = execution;
+        } else {
+            tenant_executions.push(execution);
+        }
+        Ok(())
+    }
+
+    async fn update_result(
+        &self,
+        ctx: &RequestContext,
+        result: &HookExecutionResult,
+    ) -> HookExecutionLogResult<()> {
+        let mut executions = self.executions.write().await;
+        let tenant_executions = executions.entry(ctx.tenant_id()).or_default();
+        let Some(existing) = tenant_executions
+            .iter_mut()
+            .find(|stored| stored.execution_id() == result.execution_id())
+        else {
+            return Err(HookExecutionLogError::invalid_persisted_data(format!(
+                "missing pending hook execution for {}",
+                result.execution_id()
+            )));
+        };
+        *existing = result.clone();
+        Ok(())
+    }
+
     async fn store(
         &self,
         ctx: &RequestContext,

@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::upsert::excluded;
 
 /// `PostgreSQL` connection pool type used by hook execution log adapters.
 pub type HookExecutionPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -66,6 +67,100 @@ impl FromTxError<Self> for HookExecutionLogError {
 
 #[async_trait]
 impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
+    async fn store_pending(
+        &self,
+        ctx: &RequestContext,
+        execution_id: HookExecutionId,
+        hook_id: &HookId,
+        trigger_context_id: TriggerContextId,
+        trigger_type: HookTriggerType,
+        executed_at: chrono::DateTime<chrono::Utc>,
+    ) -> HookExecutionLogResult<()> {
+        let tenant_id = ctx.tenant_id();
+        let new_row = NewHookExecutionRow {
+            id: execution_id.into_inner(),
+            tenant_id: tenant_id.into_inner(),
+            trigger_context_id: trigger_context_id.into_inner(),
+            hook_id: hook_id.as_str().to_owned(),
+            trigger_type: trigger_type.as_str().to_owned(),
+            predicate_data: serde_json::Value::Object(serde_json::Map::new()),
+            action_results: serde_json::Value::Array(Vec::new()),
+            status: HookExecutionStatus::Pending.as_str().to_owned(),
+            executed_at,
+        };
+
+        self.execute_query(tenant_id, move |connection| {
+            diesel::insert_into(hook_executions::table)
+                .values(&new_row)
+                .on_conflict((
+                    hook_executions::tenant_id,
+                    hook_executions::trigger_context_id,
+                    hook_executions::hook_id,
+                ))
+                .do_update()
+                .set((
+                    hook_executions::id.eq(excluded(hook_executions::id)),
+                    hook_executions::trigger_type.eq(excluded(hook_executions::trigger_type)),
+                    hook_executions::predicate_data.eq(excluded(hook_executions::predicate_data)),
+                    hook_executions::action_results.eq(excluded(hook_executions::action_results)),
+                    hook_executions::status.eq(excluded(hook_executions::status)),
+                    hook_executions::executed_at.eq(excluded(hook_executions::executed_at)),
+                ))
+                .execute(connection)
+                .map_err(HookExecutionLogError::persistence_failed)?;
+            Ok(())
+        })
+        .await
+    }
+
+    async fn update_result(
+        &self,
+        ctx: &RequestContext,
+        result: &HookExecutionResult,
+    ) -> HookExecutionLogResult<()> {
+        let tenant_id = ctx.tenant_id();
+        let owned_result = result.clone();
+        let execution_id = owned_result.execution_id().into_inner();
+        let action_results = serde_json::to_value(owned_result.action_results())
+            .map_err(HookExecutionLogError::persistence_failed)?;
+        let hook_id = owned_result.hook_id().as_str().to_owned();
+        let trigger_type = owned_result.trigger_type().as_str().to_owned();
+        let predicate_data = owned_result.predicate_data().clone();
+        let status = owned_result.status().as_str().to_owned();
+        let executed_at = owned_result.executed_at();
+        let trigger_context_id = owned_result.trigger_context_id().into_inner();
+        let execution_id_text = owned_result.execution_id().to_string();
+
+        self.execute_query(tenant_id, move |connection| {
+            let updated_rows = diesel::update(
+                hook_executions::table
+                    .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(hook_executions::id.eq(execution_id)),
+            )
+            .set((
+                hook_executions::trigger_context_id.eq(trigger_context_id),
+                hook_executions::hook_id.eq(hook_id),
+                hook_executions::trigger_type.eq(trigger_type),
+                hook_executions::predicate_data.eq(predicate_data),
+                hook_executions::action_results.eq(action_results),
+                hook_executions::status.eq(status),
+                hook_executions::executed_at.eq(executed_at),
+            ))
+            .execute(connection)
+            .map_err(HookExecutionLogError::persistence_failed)?;
+
+            if updated_rows == 0 {
+                return Err(HookExecutionLogError::invalid_persisted_data(format!(
+                    "missing pending hook execution for {}",
+                    execution_id_text
+                )));
+            }
+
+            Ok(())
+        })
+        .await
+    }
+
     async fn store(
         &self,
         ctx: &RequestContext,
