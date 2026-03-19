@@ -31,7 +31,7 @@ Recommendations:
 
 - Extend the domain with new aggregates: **project**, **plan**, **identity**,
   **governance**, **suggestion**, plus **events** (event store + Server-Sent
-  Events (SSE)) and **projections** (query-optimised Data Transfer Objects
+  Events (SSE)) and **projections** (query-optimized Data Transfer Objects
   (DTOs) matching the mockup cards).
 - Preserve the existing aggregates unchanged where possible, and migrate by
   additive schema, backfill, and dual-read.
@@ -154,7 +154,7 @@ The proposed additions are:
   rendering.
 - **governance** -- hooks, policies, policy decisions, and compliance/audit
   readouts.
-- **identity** -- users, roles, sessions and API keys (backing "personnel" and
+- **identity** -- users, roles, sessions, and API keys (backing "personnel" and
   "settings/auth").
 - **suggestion** -- AI suggestions and their accept/dismiss lifecycle.
 - **api/http** -- versioned REST surface plus OpenAPI generation and shared
@@ -361,7 +361,7 @@ pub struct TaskDetailDto {
 
 #### Current versus proposed task states
 
-_Table 1: Current versus proposed task states._
+_Table 1.1.1: Current versus proposed task states._
 
 | Aspect                    | Current (`TaskState`) | Proposed (`TaskStateV2`) | UI implication                                |
 | ------------------------- | --------------------- | ------------------------ | --------------------------------------------- |
@@ -528,7 +528,7 @@ from non-terminal states.
 
 #### Plan statuses
 
-_Table 2: Plan statuses and allowed transitions._
+_Table 1.1.2: Plan statuses and allowed transitions._
 
 | Plan status  | Meaning                           | Allowed transitions                 | Developer-facing implication  |
 | ------------ | --------------------------------- | ----------------------------------- | ----------------------------- |
@@ -1128,7 +1128,7 @@ models, then streaming, then governance and suggestions hardening.
 For screen readers: The following flowchart outlines the four implementation
 passes and their constituent tasks.
 
-_Figure 1: Implementation pass sequence._
+_Figure 1.1.1: Implementation pass sequence._
 
 ```mermaid
 flowchart LR
