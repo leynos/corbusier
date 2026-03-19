@@ -974,7 +974,7 @@ focus and is a good precedent for replay semantics.
 #### Recommended SSE endpoints
 
 - `GET /api/v1/events` -- tenant-scoped global stream (dashboard activity,
-  system health changes, task and project changes).
+  system health changes, task, and project changes).
 - `GET /api/v1/events/conversations/{conversation_id}` -- conversation-only
   stream (turn, tool, message, and handoff events).
 - `GET /api/v1/events/tasks/{task_id}` -- task-specific stream (state
