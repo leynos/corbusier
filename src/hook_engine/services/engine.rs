@@ -7,7 +7,7 @@ use crate::hook_engine::domain::{
 };
 use crate::hook_engine::ports::{
     HookActionExecutor, HookDefinitionRepository, HookEngine, HookEngineResult,
-    HookExecutionLogRepository,
+    HookExecutionLogRepository, PendingExecutionRecord,
 };
 use mockable::Clock;
 use std::sync::Arc;
@@ -108,11 +108,13 @@ where
             self.execution_log
                 .store_pending(
                     ctx,
-                    execution_id,
-                    definition.id(),
-                    context.id(),
-                    context.trigger_type(),
-                    self.clock.utc(),
+                    PendingExecutionRecord {
+                        execution_id,
+                        hook_id: definition.id().clone(),
+                        trigger_context_id: context.id(),
+                        trigger_type: context.trigger_type(),
+                        executed_at: self.clock.utc(),
+                    },
                 )
                 .await?;
             let action_results = self.execute_actions(&definition, &context).await?;

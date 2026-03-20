@@ -14,4 +14,5 @@ pub use definition_repository::{
 pub use engine::{HookEngine, HookEngineError, HookEngineResult};
 pub use execution_log::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
+    PendingExecutionRecord,
 };

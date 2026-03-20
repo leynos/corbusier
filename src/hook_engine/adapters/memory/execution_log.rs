@@ -2,14 +2,13 @@
 
 use crate::context::{RequestContext, TenantId};
 use crate::hook_engine::domain::{
-    HookExecutionId, HookExecutionPersisted, HookExecutionResult, HookExecutionStatus, HookId,
-    HookTriggerType, TriggerContextId,
+    HookExecutionPersisted, HookExecutionResult, HookExecutionStatus, TriggerContextId,
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
+    PendingExecutionRecord,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -54,26 +53,23 @@ impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
     async fn store_pending(
         &self,
         ctx: &RequestContext,
-        execution_id: HookExecutionId,
-        hook_id: &HookId,
-        trigger_context_id: TriggerContextId,
-        trigger_type: HookTriggerType,
-        executed_at: DateTime<Utc>,
+        record: PendingExecutionRecord,
     ) -> HookExecutionLogResult<()> {
         let mut executions = self.executions.write().await;
         let execution = HookExecutionResult::from_persisted(HookExecutionPersisted {
-            execution_id,
-            hook_id: hook_id.clone(),
-            trigger_context_id,
-            trigger_type,
+            execution_id: record.execution_id,
+            hook_id: record.hook_id.clone(),
+            trigger_context_id: record.trigger_context_id,
+            trigger_type: record.trigger_type,
             predicate_data: serde_json::Value::Object(serde_json::Map::new()),
             action_results: Vec::new(),
             status: HookExecutionStatus::Pending,
-            executed_at,
+            executed_at: record.executed_at,
         });
         let tenant_executions = executions.entry(ctx.tenant_id()).or_default();
         if let Some(existing) = tenant_executions.iter_mut().find(|result| {
-            result.trigger_context_id() == trigger_context_id && result.hook_id() == hook_id
+            result.trigger_context_id() == record.trigger_context_id
+                && result.hook_id() == &record.hook_id
         }) {
             *existing = execution;
         } else {

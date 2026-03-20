@@ -9,6 +9,7 @@ use crate::hook_engine::domain::{
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
+    PendingExecutionRecord,
 };
 use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use async_trait::async_trait;
@@ -70,23 +71,19 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
     async fn store_pending(
         &self,
         ctx: &RequestContext,
-        execution_id: HookExecutionId,
-        hook_id: &HookId,
-        trigger_context_id: TriggerContextId,
-        trigger_type: HookTriggerType,
-        executed_at: chrono::DateTime<chrono::Utc>,
+        record: PendingExecutionRecord,
     ) -> HookExecutionLogResult<()> {
         let tenant_id = ctx.tenant_id();
         let new_row = NewHookExecutionRow {
-            id: execution_id.into_inner(),
+            id: record.execution_id.into_inner(),
             tenant_id: tenant_id.into_inner(),
-            trigger_context_id: trigger_context_id.into_inner(),
-            hook_id: hook_id.as_str().to_owned(),
-            trigger_type: trigger_type.as_str().to_owned(),
+            trigger_context_id: record.trigger_context_id.into_inner(),
+            hook_id: record.hook_id.as_str().to_owned(),
+            trigger_type: record.trigger_type.as_str().to_owned(),
             predicate_data: serde_json::Value::Object(serde_json::Map::new()),
             action_results: serde_json::Value::Array(Vec::new()),
             status: HookExecutionStatus::Pending.as_str().to_owned(),
-            executed_at,
+            executed_at: record.executed_at,
         };
 
         self.execute_query(tenant_id, move |connection| {
