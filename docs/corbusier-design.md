@@ -2727,7 +2727,8 @@ flowchart TD
 
 Table 4.1.2: Hook trigger processing flow
 
-For screen readers: This diagram shows the hook trigger processing flow from event to handler.
+For screen readers: This diagram shows the hook trigger processing flow from
+event to handler.
 
 ```mermaid
 flowchart TD
