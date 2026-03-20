@@ -127,6 +127,18 @@ impl std::str::FromStr for AssistantText {
     }
 }
 
+/// Semantic wrapper for a backend name label in BDD steps.
+#[derive(Debug, Clone)]
+pub struct BackendNameLabel(pub String);
+
+impl std::str::FromStr for BackendNameLabel {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned()))
+    }
+}
+
 /// Semantic wrapper for a tool name in BDD steps.
 #[derive(Debug, Clone)]
 pub struct ToolName(pub String);

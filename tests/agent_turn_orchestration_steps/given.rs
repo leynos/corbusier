@@ -1,6 +1,8 @@
 //! Given steps for agent turn orchestration BDD scenarios.
 
-use super::world::{AgentTurnWorld, AssistantText, ConversationLabel, ToolName, run_async};
+use super::world::{
+    AgentTurnWorld, AssistantText, BackendNameLabel, ConversationLabel, ToolName, run_async,
+};
 use chrono::{Duration, Utc};
 use corbusier::agent_backend::{
     domain::{
@@ -45,7 +47,7 @@ fn queue_tool_call_result(
 #[given(r#"an active backend named "{name}""#)]
 fn an_active_backend_named(
     world: &mut AgentTurnWorld,
-    name: AssistantText,
+    name: BackendNameLabel,
 ) -> Result<(), eyre::Report> {
     let backend_name = BackendName::new(&name.0)?;
     let capabilities = AgentCapabilities::new(true, true);

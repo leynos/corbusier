@@ -1,13 +1,10 @@
 //! Then steps for agent turn orchestration BDD scenarios.
 
-use super::world::AgentTurnWorld;
+use super::world::{AgentTurnWorld, ConversationLabel};
 use corbusier::agent_backend::{
-    domain::ToolCallAuditStatus, services::AgentTurnOrchestrationError,
-};
-use corbusier::agent_backend::{
-    domain::{TurnSessionId, TurnSessionStatus},
+    domain::{ToolCallAuditStatus, TurnSessionId, TurnSessionStatus},
     ports::{SessionSlotKey, TurnSessionRepository},
-    services::ExecuteAgentTurnResponse,
+    services::{AgentTurnOrchestrationError, ExecuteAgentTurnResponse},
 };
 use rstest_bdd_macros::then;
 
@@ -29,16 +26,7 @@ fn expect_existing_session_id(world: &AgentTurnWorld) -> Result<TurnSessionId, e
 
 #[then("the turn succeeds")]
 fn turn_succeeds(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    if let Err(error) = successful_response(world) {
-        let result = world
-            .last_result
-            .as_ref()
-            .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-        if result.is_err() {
-            return Err(eyre::eyre!("expected successful turn, got {result:?}"));
-        }
-        return Err(error);
-    }
+    successful_response(world)?;
     Ok(())
 }
 
@@ -137,16 +125,17 @@ fn both_concurrent_turns_succeed(world: &AgentTurnWorld) -> Result<(), eyre::Rep
 #[then(r#"only one active session remains for conversation "{conversation}""#)]
 fn only_one_active_session_remains_for_conversation(
     world: &AgentTurnWorld,
-    conversation: String,
+    conversation: ConversationLabel,
 ) -> Result<(), eyre::Report> {
+    let conversation_label = conversation.0;
     let backend_id = world
         .backend_id
         .ok_or_else(|| eyre::eyre!("missing backend id in world"))?;
     let conversation_id = world
         .conversations
-        .get(&conversation)
+        .get(&conversation_label)
         .copied()
-        .ok_or_else(|| eyre::eyre!("missing conversation id for label {conversation}"))?;
+        .ok_or_else(|| eyre::eyre!("missing conversation id for label {conversation_label}"))?;
 
     let active = super::world::run_async(
         world
