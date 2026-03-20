@@ -691,6 +691,7 @@ use corbusier::agent_backend::{
     },
 };
 use chrono::Duration;
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use mockable::DefaultClock;
 use serde_json::json;
 use uuid::Uuid;
@@ -701,6 +702,12 @@ async fn execute_orchestrated_turn() -> Result<(), Box<dyn std::error::Error>> {
     let runtime = Arc::new(InMemoryAgentRuntime::new());
     let router = Arc::new(InMemoryToolRouter::new());
     let clock = Arc::new(DefaultClock);
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
 
     // Register one backend used for orchestration.
     let backend = corbusier::agent_backend::services::BackendRegistryService::new(
@@ -708,6 +715,7 @@ async fn execute_orchestrated_turn() -> Result<(), Box<dyn std::error::Error>> {
         clock.clone(),
     )
     .register(
+        &ctx,
         corbusier::agent_backend::services::RegisterBackendRequest::new(
             "claude_code_sdk",
             "Claude Code SDK",
@@ -739,10 +747,13 @@ async fn execute_orchestrated_turn() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let response = orchestrator
-        .execute_turn(ExecuteAgentTurnRequest::new(
-            BackendId::from_uuid(backend.id().into_inner()),
-            TurnExecutionRequest::new(Uuid::new_v4(), "Please summarize this", Vec::new()),
-        ))
+        .execute_turn(
+            &ctx,
+            ExecuteAgentTurnRequest::new(
+                BackendId::from_uuid(backend.id().into_inner()),
+                TurnExecutionRequest::new(Uuid::new_v4(), "Please summarize this", Vec::new()),
+            ),
+        )
         .await?;
 
     assert_eq!(response.tool_results().len(), 1);

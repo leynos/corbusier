@@ -27,6 +27,10 @@ pub enum TurnSessionDomainError {
     /// Turn counts cannot be recorded on expired sessions.
     #[error("cannot record turn on expired session")]
     RecordTurnOnExpiredSession,
+
+    /// Only reserved sessions can be activated.
+    #[error("cannot activate a non-reserved session")]
+    ActivateNonReservedSession,
 }
 
 /// Persisted data used to reconstruct [`TurnSession`] aggregates.
@@ -299,14 +303,14 @@ impl TurnSession {
     ///
     /// # Errors
     ///
-    /// Returns [`TurnSessionDomainError::RecordTurnOnExpiredSession`] when the
+    /// Returns [`TurnSessionDomainError::ActivateNonReservedSession`] when the
     /// session is not currently reserved.
     pub fn activate(
         &mut self,
         runtime_session_id: RuntimeSessionId,
     ) -> Result<(), TurnSessionDomainError> {
         if self.status != TurnSessionStatus::Reserved {
-            return Err(TurnSessionDomainError::RecordTurnOnExpiredSession);
+            return Err(TurnSessionDomainError::ActivateNonReservedSession);
         }
 
         self.runtime_session_id = runtime_session_id;

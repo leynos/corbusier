@@ -49,10 +49,11 @@ impl RuntimeSessionId {
     /// identifier is empty after trimming.
     pub fn new(value: impl Into<String>) -> Result<Self, TurnSessionDomainError> {
         let raw_value = value.into();
-        if raw_value.trim().is_empty() {
+        let trimmed = raw_value.trim().to_owned();
+        if trimmed.is_empty() {
             return Err(TurnSessionDomainError::EmptyRuntimeSessionId);
         }
-        Ok(Self(raw_value))
+        Ok(Self(trimmed))
     }
 
     /// Returns the runtime session identifier as a string slice.

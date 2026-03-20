@@ -240,7 +240,7 @@ where
         teardown_result
     }
 
-    async fn expire_reserved_session(
+    async fn expire_session(
         &self,
         ctx: &RequestContext,
         mut reservation: TurnSession,
@@ -262,8 +262,7 @@ where
         {
             Ok(runtime_session_id) => runtime_session_id,
             Err(error) => {
-                self.expire_reserved_session(params.ctx, reservation)
-                    .await?;
+                self.expire_session(params.ctx, reservation).await?;
                 return Err(error.into());
             }
         };
@@ -272,8 +271,7 @@ where
             self.runtime
                 .teardown_session(params.backend, &runtime_session_id)
                 .await?;
-            self.expire_reserved_session(params.ctx, reservation)
-                .await?;
+            self.expire_session(params.ctx, reservation).await?;
             return Err(AgentTurnOrchestrationError::SessionDomain(error));
         }
 
@@ -285,8 +283,7 @@ where
             self.runtime
                 .teardown_session(params.backend, &runtime_session_id)
                 .await?;
-            self.expire_reserved_session(params.ctx, reservation.clone())
-                .await?;
+            self.expire_session(params.ctx, reservation.clone()).await?;
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
 

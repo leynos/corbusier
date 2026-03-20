@@ -101,45 +101,38 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     .map_err(TurnSessionRepositoryError::persistence)?;
 
                 let Some(existing_row) = row else {
-                    let reserved_session =
-                        create_reservation_session(backend_id, conversation_id, now, ttl)?;
-                    diesel::insert_into(agent_turn_sessions::table)
-                        .values(to_new_row(&reserved_session, tenant_id)?)
-                        .execute(tx_conn)
-                        .map_err(|error| {
-                            map_upsert_error(error, backend_id.into_inner(), conversation_id)
-                        })?;
+                    let reservation = insert_reserved_session(
+                        tx_conn,
+                        ReservedSessionInsertParams {
+                            backend_id,
+                            conversation_id,
+                            tenant_id,
+                            now,
+                            ttl,
+                        },
+                    )?;
                     return Ok(SessionSlotArbitration::Reserved {
-                        reservation: reserved_session,
+                        reservation,
                         prior_expired: None,
                     });
                 };
 
                 let existing = row_to_turn_session(existing_row)?;
                 if existing.is_expired_at(now) {
-                    diesel::update(
-                        agent_turn_sessions::table
-                            .filter(agent_turn_sessions::id.eq(existing.id().into_inner())),
-                    )
-                    .set((
-                        agent_turn_sessions::status.eq(TurnSessionStatus::Expired.as_str()),
-                        agent_turn_sessions::ended_at.eq(Some(now)),
-                    ))
-                    .execute(tx_conn)
-                    .map_err(TurnSessionRepositoryError::persistence)?;
-                    let mut expired = existing.clone();
-                    expired.mark_expired(now);
-                    let reserved_session =
-                        create_reservation_session(backend_id, conversation_id, now, ttl)?;
-                    diesel::insert_into(agent_turn_sessions::table)
-                        .values(to_new_row(&reserved_session, tenant_id)?)
-                        .execute(tx_conn)
-                        .map_err(|error| {
-                            map_upsert_error(error, backend_id.into_inner(), conversation_id)
-                        })?;
+                    let prior_expired = expire_active_session(tx_conn, &existing, now)?;
+                    let reservation = insert_reserved_session(
+                        tx_conn,
+                        ReservedSessionInsertParams {
+                            backend_id,
+                            conversation_id,
+                            tenant_id,
+                            now,
+                            ttl,
+                        },
+                    )?;
                     return Ok(SessionSlotArbitration::Reserved {
-                        reservation: reserved_session,
-                        prior_expired: Some(expired),
+                        reservation,
+                        prior_expired: Some(prior_expired),
                     });
                 }
 
@@ -261,6 +254,60 @@ fn lock_session_key(
         .optional()
         .map(|_| ())
         .map_err(TurnSessionRepositoryError::persistence)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReservedSessionInsertParams {
+    backend_id: BackendId,
+    conversation_id: uuid::Uuid,
+    tenant_id: uuid::Uuid,
+    now: DateTime<Utc>,
+    ttl: Duration,
+}
+
+/// Inserts a new reserved-session row and returns the domain session.
+fn insert_reserved_session(
+    conn: &mut PgConnection,
+    params: ReservedSessionInsertParams,
+) -> TurnSessionRepositoryResult<TurnSession> {
+    let reserved = create_reservation_session(
+        params.backend_id,
+        params.conversation_id,
+        params.now,
+        params.ttl,
+    )?;
+    diesel::insert_into(agent_turn_sessions::table)
+        .values(to_new_row(&reserved, params.tenant_id)?)
+        .execute(conn)
+        .map_err(|error| {
+            map_upsert_error(
+                error,
+                params.backend_id.into_inner(),
+                params.conversation_id,
+            )
+        })?;
+    Ok(reserved)
+}
+
+/// Updates an active session to `Expired` in the database and returns the
+/// updated domain session.
+fn expire_active_session(
+    conn: &mut PgConnection,
+    existing: &TurnSession,
+    now: DateTime<Utc>,
+) -> TurnSessionRepositoryResult<TurnSession> {
+    diesel::update(
+        agent_turn_sessions::table.filter(agent_turn_sessions::id.eq(existing.id().into_inner())),
+    )
+    .set((
+        agent_turn_sessions::status.eq(TurnSessionStatus::Expired.as_str()),
+        agent_turn_sessions::ended_at.eq(Some(now)),
+    ))
+    .execute(conn)
+    .map_err(TurnSessionRepositoryError::persistence)?;
+    let mut expired = existing.clone();
+    expired.mark_expired(now);
+    Ok(expired)
 }
 
 fn to_new_row(

@@ -9,6 +9,10 @@ CREATE UNIQUE INDEX idx_agent_turn_sessions_tenant_backend_conversation_active
 ALTER TABLE agent_turn_sessions
     DROP CONSTRAINT IF EXISTS agent_turn_sessions_status_check;
 
+UPDATE agent_turn_sessions
+SET status = 'expired'
+WHERE status = 'reserved';
+
 ALTER TABLE agent_turn_sessions
     ADD CONSTRAINT agent_turn_sessions_status_check CHECK (
         status IN ('active', 'expired')

@@ -163,6 +163,26 @@ impl std::str::FromStr for ConversationLabel {
     }
 }
 
+/// Semantic wrapper for a tool audit status in BDD steps.
+#[derive(Debug, Clone)]
+pub struct AuditStatusLabel(String);
+
+impl AuditStatusLabel {
+    /// Returns the wrapped audit-status label.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::str::FromStr for AuditStatusLabel {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned()))
+    }
+}
+
 /// Fixture that creates a new scenario world.
 #[fixture]
 pub fn world() -> AgentTurnWorld {

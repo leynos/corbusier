@@ -1,6 +1,6 @@
 //! Then steps for agent turn orchestration BDD scenarios.
 
-use super::world::{AgentTurnWorld, ConversationLabel};
+use super::world::{AgentTurnWorld, AuditStatusLabel, ConversationLabel};
 use corbusier::agent_backend::{
     domain::{ToolCallAuditStatus, TurnSessionId, TurnSessionStatus},
     ports::{SessionSlotKey, TurnSessionRepository},
@@ -80,7 +80,10 @@ fn one_tool_result_returned(world: &AgentTurnWorld) -> Result<(), eyre::Report> 
 }
 
 #[then(r#"all tool audits are "{status}""#)]
-fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyre::Report> {
+fn all_tool_audits_are(
+    world: &AgentTurnWorld,
+    status: AuditStatusLabel,
+) -> Result<(), eyre::Report> {
     let response = successful_response(world)?;
 
     let expected = match status.as_str() {
@@ -93,8 +96,9 @@ fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyr
         return Err(eyre::eyre!("expected at least one tool audit"));
     }
     if !audits.iter().all(|audit| audit.status() == expected) {
+        let status_label = status.as_str();
         return Err(eyre::eyre!(
-            "expected all audits to be {status}, got {:?}",
+            "expected all audits to be {status_label}, got {:?}",
             audits
         ));
     }
