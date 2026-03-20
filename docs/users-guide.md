@@ -671,7 +671,10 @@ turn, and routes tool calls in deterministic order. Session continuity is
 tracked per `(backend_id, conversation_id)` until the session expires.
 
 When a stored session is still active, it is reused. When expired, the session
-is marked expired and a new runtime session is created automatically.
+is marked expired and a new runtime session is created automatically. The
+session repository now commits a `reserved` slot row before the runtime session
+is created, so expiry detection and replacement-session claiming happen at the
+database boundary before any external runtime call is made.
 
 ```rust,no_run
 use std::sync::Arc;

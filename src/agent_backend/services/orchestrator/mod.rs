@@ -11,13 +11,12 @@ pub use types::{AgentTurnOrchestratorConfig, ExecuteAgentTurnRequest, ExecuteAge
 
 use crate::agent_backend::{
     domain::{
-        AgentBackendRegistration, BackendId, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
-        ToolCallRequest, ToolCallResult, TurnSession, TurnSessionCreateParams,
-        deterministic_tool_call_id,
+        AgentBackendRegistration, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
+        ToolCallRequest, ToolCallResult, TurnSession, deterministic_tool_call_id,
     },
     ports::{
         AgentRuntimePort, BackendRegistryRepository, SessionSlotArbitration, SessionSlotKey,
-        ToolRouterPort, ToolRoutingContext, TurnSessionRepository, TurnSessionRepositoryError,
+        SessionSlotReservation, ToolRouterPort, ToolRoutingContext, TurnSessionRepository,
     },
 };
 use crate::context::RequestContext;
@@ -192,24 +191,27 @@ where
             .turn_sessions
             .arbitrate_session_slot(
                 params.ctx,
-                SessionSlotKey::new(params.backend.id(), params.conversation_id),
-                params.now,
+                SessionSlotReservation::new(
+                    SessionSlotKey::new(params.backend.id(), params.conversation_id),
+                    params.now,
+                    self.config.session_ttl(),
+                ),
             )
             .await?
         {
             SessionSlotArbitration::Reused(existing) => Ok((existing, true, false)),
-            SessionSlotArbitration::Vacant => {
-                let (created_session, reused_due_to_conflict) =
-                    self.create_or_reuse_session(params).await?;
-                Ok((created_session, reused_due_to_conflict, false))
-            }
-            SessionSlotArbitration::Expired(expired_session) => {
-                let (rotated_session, reused_due_to_conflict) =
-                    self.create_or_reuse_session(params).await?;
-                self.runtime
-                    .teardown_session(params.backend, expired_session.runtime_session_handle())
-                    .await?;
-                Ok((rotated_session, reused_due_to_conflict, true))
+            SessionSlotArbitration::Reserved {
+                reservation,
+                prior_expired,
+            } => {
+                let rotated_session = prior_expired.is_some();
+                let activated = self.activate_reserved_session(params, reservation).await?;
+                if let Some(expired_session) = prior_expired {
+                    self.runtime
+                        .teardown_session(params.backend, expired_session.runtime_session_handle())
+                        .await?;
+                }
+                Ok((activated, false, rotated_session))
             }
         }
     }
@@ -238,81 +240,57 @@ where
         teardown_result
     }
 
-    async fn create_session(
+    async fn expire_reserved_session(
+        &self,
+        ctx: &RequestContext,
+        mut reservation: TurnSession,
+    ) -> AgentTurnOrchestrationResult<()> {
+        reservation.mark_expired(self.clock.utc());
+        self.turn_sessions.upsert_session(ctx, &reservation).await?;
+        Ok(())
+    }
+
+    async fn activate_reserved_session(
         &self,
         params: &SessionResolutionParams<'_>,
+        mut reservation: TurnSession,
     ) -> AgentTurnOrchestrationResult<TurnSession> {
-        let runtime_session_id = self
+        let runtime_session_id = match self
             .runtime
             .create_session(params.backend, params.conversation_id)
-            .await?;
-
-        let now = self.clock.utc();
-        let session = match TurnSession::new(TurnSessionCreateParams {
-            backend_id: params.backend.id(),
-            conversation_id: params.conversation_id,
-            runtime_session_id: runtime_session_id.clone(),
-            ttl: self.config.session_ttl(),
-            now,
-        }) {
-            Ok(session) => session,
+            .await
+        {
+            Ok(runtime_session_id) => runtime_session_id,
             Err(error) => {
-                self.runtime
-                    .teardown_session(params.backend, &runtime_session_id)
+                self.expire_reserved_session(params.ctx, reservation)
                     .await?;
-                return Err(AgentTurnOrchestrationError::SessionDomain(error));
+                return Err(error.into());
             }
         };
 
-        match self
+        if let Err(error) = reservation.activate(runtime_session_id.clone()) {
+            self.runtime
+                .teardown_session(params.backend, &runtime_session_id)
+                .await?;
+            self.expire_reserved_session(params.ctx, reservation)
+                .await?;
+            return Err(AgentTurnOrchestrationError::SessionDomain(error));
+        }
+
+        if let Err(error) = self
             .turn_sessions
-            .upsert_session(params.ctx, &session)
+            .upsert_session(params.ctx, &reservation)
             .await
         {
-            Ok(()) => Ok(session),
-            Err(error) => {
-                self.runtime
-                    .teardown_session(params.backend, &runtime_session_id)
-                    .await?;
-                Err(AgentTurnOrchestrationError::SessionRepository(error))
-            }
+            self.runtime
+                .teardown_session(params.backend, &runtime_session_id)
+                .await?;
+            self.expire_reserved_session(params.ctx, reservation.clone())
+                .await?;
+            return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
-    }
 
-    async fn create_or_reuse_session(
-        &self,
-        params: &SessionResolutionParams<'_>,
-    ) -> AgentTurnOrchestrationResult<(TurnSession, bool)> {
-        match self.create_session(params).await {
-            Ok(created) => Ok((created, false)),
-            Err(AgentTurnOrchestrationError::SessionRepository(
-                TurnSessionRepositoryError::ActiveSessionConflict { .. },
-            )) => {
-                let active = self
-                    .require_active_session_after_conflict(
-                        params.ctx,
-                        params.backend.id(),
-                        params.conversation_id,
-                    )
-                    .await?;
-                Ok((active, true))
-            }
-            Err(other) => Err(other),
-        }
-    }
-
-    async fn require_active_session_after_conflict(
-        &self,
-        ctx: &RequestContext,
-        backend_id: BackendId,
-        conversation_id: Uuid,
-    ) -> AgentTurnOrchestrationResult<TurnSession> {
-        self.turn_sessions
-            .find_active_session(ctx, SessionSlotKey::new(backend_id, conversation_id))
-            .await?
-            .ok_or(AgentTurnOrchestrationError::SessionRepository(
-                TurnSessionRepositoryError::active_session_conflict(backend_id, conversation_id),
-            ))
+        Ok(reservation)
     }
 
     async fn route_tool_calls(

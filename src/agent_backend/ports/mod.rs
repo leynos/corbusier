@@ -11,7 +11,7 @@ pub mod tool_router;
 pub use repository::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult};
 pub use runtime::{AgentRuntimeError, AgentRuntimePort, AgentRuntimeResult};
 pub use session::{
-    SessionSlotArbitration, SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError,
-    TurnSessionRepositoryResult,
+    SessionSlotArbitration, SessionSlotKey, SessionSlotReservation, TurnSessionRepository,
+    TurnSessionRepositoryError, TurnSessionRepositoryResult,
 };
 pub use tool_router::{ToolRouterPort, ToolRoutingContext, ToolRoutingError, ToolRoutingResult};

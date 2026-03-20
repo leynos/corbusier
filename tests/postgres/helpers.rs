@@ -85,6 +85,10 @@ pub const TEMPLATE_DB: &str = "corbusier_test_template_v10";
 /// SQL to tenant-scope agent backend and turn-session tables.
 pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
     include_str!("../../migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql");
+/// SQL to allow reserved turn-session rows during atomic slot claims.
+pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
+    "../../migrations/2026-03-20-000000_add_reserved_agent_turn_session_status/up.sql"
+);
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -143,6 +147,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
+    map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
     Ok(())
 }
 

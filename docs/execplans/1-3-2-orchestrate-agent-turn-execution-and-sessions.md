@@ -162,7 +162,10 @@ Delivered behaviour against 1.3.2 success criteria:
   tool routing, and canonical response/audit aggregation.
 - Session continuity is preserved per `(backend_id, conversation_id)`, with
   automatic session rotation when expiry is crossed and persisted lifecycle
-  updates (`active` to `expired`) in `agent_turn_sessions`.
+  updates (`active` to `reserved` to `expired`) in `agent_turn_sessions`.
+- Database arbitration now commits a `reserved` slot claim before runtime
+  session creation, eliminating the earlier split between expiry detection and
+  replacement-session allocation.
 - Tool routing uses a single adapter port path and deterministic call IDs,
   giving consistent routing metadata across repeated identical inputs.
 
@@ -180,9 +183,7 @@ Validation evidence:
 
 Deferred work:
 
-- Session-rotation atomicity (database concurrency) remains deferred to
-  roadmap 1.3.3. Tool schema translation also remains in roadmap 1.3.3 by
-  design.
+- Tool schema translation remains in roadmap 1.3.3 by design.
 
 ## Context and orientation
 

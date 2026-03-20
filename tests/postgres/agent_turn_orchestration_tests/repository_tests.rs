@@ -2,8 +2,11 @@
 
 use chrono::{Duration, Utc};
 use corbusier::agent_backend::{
-    domain::{RuntimeSessionId, TurnSession, TurnSessionCreateParams},
-    ports::{SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError},
+    domain::{RuntimeSessionId, TurnSession, TurnSessionCreateParams, TurnSessionStatus},
+    ports::{
+        SessionSlotArbitration, SessionSlotKey, SessionSlotReservation, TurnSessionRepository,
+        TurnSessionRepositoryError,
+    },
 };
 use rstest::rstest;
 use uuid::Uuid;
@@ -75,6 +78,123 @@ async fn postgres_detects_concurrent_active_session_conflict(
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
     assert!(active.is_some());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_arbitration_commits_reservation_before_runtime_creation(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&ctx, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    let arbitration = ctx
+        .session_repository
+        .arbitrate_session_slot(
+            &ctx.ctx,
+            SessionSlotReservation::new(
+                SessionSlotKey::new(backend_id, conversation_id),
+                Utc::now(),
+                Duration::minutes(5),
+            ),
+        )
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+
+    let SessionSlotArbitration::Reserved {
+        reservation,
+        prior_expired,
+    } = arbitration
+    else {
+        return Err(Box::new(std::io::Error::other(
+            "expected reserved arbitration result",
+        )) as BoxError);
+    };
+    assert!(prior_expired.is_none());
+
+    let sessions = ctx
+        .session_repository
+        .all_sessions()
+        .map_err(|err| Box::new(err) as BoxError)?;
+    assert_eq!(sessions.len(), 1);
+    let persisted = sessions
+        .first()
+        .ok_or_else(|| Box::new(std::io::Error::other("expected reservation row")) as BoxError)?;
+    assert_eq!(persisted.id(), reservation.id());
+    assert_eq!(persisted.status(), TurnSessionStatus::Reserved);
+    assert!(
+        ctx.runtime
+            .created_session_ids()
+            .map_err(|err| Box::new(err) as BoxError)?
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_detects_concurrent_reservation_conflict_before_runtime_creation(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&ctx, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    let now = Utc::now();
+    let key = SessionSlotKey::new(backend_id, conversation_id);
+    let (first, second) = tokio::join!(
+        ctx.session_repository.arbitrate_session_slot(
+            &ctx.ctx,
+            SessionSlotReservation::new(key, now, Duration::minutes(5)),
+        ),
+        ctx.session_repository.arbitrate_session_slot(
+            &ctx.ctx,
+            SessionSlotReservation::new(key, now, Duration::minutes(5)),
+        )
+    );
+
+    let first_reserved = matches!(&first, Ok(SessionSlotArbitration::Reserved { .. }));
+    let second_reserved = matches!(&second, Ok(SessionSlotArbitration::Reserved { .. }));
+    let first_conflict = matches!(
+        &first,
+        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
+    );
+    let second_conflict = matches!(
+        &second,
+        Err(TurnSessionRepositoryError::ActiveSessionConflict { .. })
+    );
+    assert!(
+        first_reserved != second_reserved,
+        "expected exactly one reserved result, got first={first:?}, second={second:?}"
+    );
+    assert!(
+        first_conflict != second_conflict,
+        "expected exactly one reservation conflict, got first={first:?}, second={second:?}"
+    );
+
+    let sessions = ctx
+        .session_repository
+        .all_sessions()
+        .map_err(|err| Box::new(err) as BoxError)?;
+    assert_eq!(sessions.len(), 1);
+    let persisted = sessions
+        .first()
+        .ok_or_else(|| Box::new(std::io::Error::other("expected reservation row")) as BoxError)?;
+    assert_eq!(persisted.status(), TurnSessionStatus::Reserved);
+    assert!(
+        ctx.runtime
+            .created_session_ids()
+            .map_err(|err| Box::new(err) as BoxError)?
+            .is_empty()
+    );
     Ok(())
 }
 

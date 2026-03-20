@@ -3,7 +3,7 @@
 use crate::agent_backend::domain::{BackendId, TurnSession};
 use crate::context::RequestContext;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
@@ -32,15 +32,38 @@ impl SessionSlotKey {
     }
 }
 
+/// Parameters for slot arbitration in the session repository.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionSlotReservation {
+    /// Composite key identifying the session slot to arbitrate.
+    pub key: SessionSlotKey,
+    /// Timestamp used for expiry evaluation and reservation creation.
+    pub now: DateTime<Utc>,
+    /// TTL assigned to a newly created reservation row.
+    pub ttl: Duration,
+}
+
+impl SessionSlotReservation {
+    /// Creates a new session-slot reservation request.
+    #[must_use]
+    pub const fn new(key: SessionSlotKey, now: DateTime<Utc>, ttl: Duration) -> Self {
+        Self { key, now, ttl }
+    }
+}
+
 /// Session-slot arbitration result for a backend/conversation pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SessionSlotArbitration {
     /// Existing active session remains reusable.
     Reused(TurnSession),
-    /// No active session exists for the pair.
-    Vacant,
-    /// An active session existed but was expired during arbitration.
-    Expired(TurnSession),
+    /// Session slot was durably reserved for a new runtime session.
+    Reserved {
+        /// Persisted reservation row for the claimed slot.
+        reservation: TurnSession,
+        /// Expired session that should be torn down after the reservation
+        /// commits.
+        prior_expired: Option<TurnSession>,
+    },
 }
 
 /// Repository contract for orchestration turn sessions.
@@ -58,8 +81,7 @@ pub trait TurnSessionRepository: Send + Sync {
     async fn arbitrate_session_slot(
         &self,
         ctx: &RequestContext,
-        key: SessionSlotKey,
-        now: DateTime<Utc>,
+        reservation: SessionSlotReservation,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration>;
 
     /// Finds the active session for a backend/conversation pair scoped by

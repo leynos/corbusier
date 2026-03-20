@@ -7,17 +7,17 @@ use super::{
 };
 use crate::agent_backend::{
     domain::{
-        BackendId, PersistedTurnSessionData, RuntimeSessionId, TurnSession, TurnSessionId,
-        TurnSessionStatus,
+        BackendId, PersistedTurnSessionData, ReservedTurnSessionCreateParams, RuntimeSessionId,
+        TurnSession, TurnSessionId, TurnSessionStatus,
     },
     ports::{
-        SessionSlotArbitration, SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError,
-        TurnSessionRepositoryResult,
+        SessionSlotArbitration, SessionSlotKey, SessionSlotReservation, TurnSessionRepository,
+        TurnSessionRepositoryError, TurnSessionRepositoryResult,
     },
 };
 use crate::context::RequestContext;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
@@ -50,6 +50,25 @@ impl PostgresTurnSessionRepository {
         .await
         .map_err(TurnSessionRepositoryError::persistence)?
     }
+
+    /// Returns all persisted sessions for integration-test assertions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TurnSessionRepositoryError`] on persistence failures.
+    pub fn all_sessions(&self) -> TurnSessionRepositoryResult<Vec<TurnSession>> {
+        let mut connection = self
+            .pool
+            .get()
+            .map_err(TurnSessionRepositoryError::persistence)?;
+        let rows = agent_turn_sessions::table
+            .order(agent_turn_sessions::started_at.asc())
+            .select(AgentTurnSessionRow::as_select())
+            .load::<AgentTurnSessionRow>(&mut connection)
+            .map_err(TurnSessionRepositoryError::persistence)?;
+
+        rows.into_iter().map(row_to_turn_session).collect()
+    }
 }
 
 #[async_trait]
@@ -57,9 +76,9 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
     async fn arbitrate_session_slot(
         &self,
         ctx: &RequestContext,
-        key: SessionSlotKey,
-        now: DateTime<Utc>,
+        slot_reservation: SessionSlotReservation,
     ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let SessionSlotReservation { key, now, ttl } = slot_reservation;
         let SessionSlotKey {
             backend_id,
             conversation_id,
@@ -82,7 +101,18 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     .map_err(TurnSessionRepositoryError::persistence)?;
 
                 let Some(existing_row) = row else {
-                    return Ok(SessionSlotArbitration::Vacant);
+                    let reserved_session =
+                        create_reservation_session(backend_id, conversation_id, now, ttl)?;
+                    diesel::insert_into(agent_turn_sessions::table)
+                        .values(to_new_row(&reserved_session, tenant_id)?)
+                        .execute(tx_conn)
+                        .map_err(|error| {
+                            map_upsert_error(error, backend_id.into_inner(), conversation_id)
+                        })?;
+                    return Ok(SessionSlotArbitration::Reserved {
+                        reservation: reserved_session,
+                        prior_expired: None,
+                    });
                 };
 
                 let existing = row_to_turn_session(existing_row)?;
@@ -99,7 +129,18 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     .map_err(TurnSessionRepositoryError::persistence)?;
                     let mut expired = existing.clone();
                     expired.mark_expired(now);
-                    return Ok(SessionSlotArbitration::Expired(expired));
+                    let reserved_session =
+                        create_reservation_session(backend_id, conversation_id, now, ttl)?;
+                    diesel::insert_into(agent_turn_sessions::table)
+                        .values(to_new_row(&reserved_session, tenant_id)?)
+                        .execute(tx_conn)
+                        .map_err(|error| {
+                            map_upsert_error(error, backend_id.into_inner(), conversation_id)
+                        })?;
+                    return Ok(SessionSlotArbitration::Reserved {
+                        reservation: reserved_session,
+                        prior_expired: Some(expired),
+                    });
                 }
 
                 Ok(SessionSlotArbitration::Reused(existing))
@@ -201,9 +242,9 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 // Acquires a row-level lock on the conversation-scoped session row when one is
 // already present for the tenant/backend/conversation slot.
 //
-// Vacant slots intentionally fall through without locking; the unique partial
-// index remains the authority for create races until session-slot reservations
-// are introduced in roadmap 1.3.3.
+// Vacant slots intentionally fall through without locking; concurrent vacancy
+// observations are serialized by the partial unique index that now covers both
+// active and reserved slot claims.
 fn lock_session_key(
     connection: &mut PgConnection,
     tenant_id: uuid::Uuid,
@@ -250,6 +291,22 @@ fn to_new_row(
         ended_at: session.ended_at(),
         turn_count,
     })
+}
+
+fn create_reservation_session(
+    backend_id: BackendId,
+    conversation_id: uuid::Uuid,
+    now: DateTime<Utc>,
+    ttl: Duration,
+) -> TurnSessionRepositoryResult<TurnSession> {
+    TurnSession::new_reserved(&ReservedTurnSessionCreateParams {
+        id: TurnSessionId::new(),
+        backend_id,
+        conversation_id,
+        ttl,
+        now,
+    })
+    .map_err(TurnSessionRepositoryError::invalid_domain_data)
 }
 
 fn row_to_turn_session(row: AgentTurnSessionRow) -> TurnSessionRepositoryResult<TurnSession> {

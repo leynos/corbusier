@@ -12,7 +12,9 @@ use corbusier::agent_backend::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
         TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
-    ports::TurnSessionRepository,
+    ports::{
+        SessionSlotArbitration, SessionSlotKey, SessionSlotReservation, TurnSessionRepository,
+    },
     services::{
         AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
         AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
@@ -140,6 +142,48 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
     assert!(second.reused_session());
     assert_eq!(first.session_id(), second.session_id());
     assert!(second.tool_results().is_empty());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn reservation_is_persisted_before_runtime_session_creation(
+    context: TestContext,
+) -> Result<(), eyre::Report> {
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&context, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+
+    let arbitration = context
+        .session_repository
+        .arbitrate_session_slot(
+            &context.ctx,
+            SessionSlotReservation::new(
+                SessionSlotKey::new(backend_id, conversation_id),
+                Utc::now(),
+                Duration::minutes(5),
+            ),
+        )
+        .await?;
+
+    let SessionSlotArbitration::Reserved {
+        reservation,
+        prior_expired,
+    } = arbitration
+    else {
+        return Err(eyre::eyre!("expected reserved arbitration result"));
+    };
+    assert!(prior_expired.is_none());
+    assert!(context.runtime.created_session_ids()?.is_empty());
+
+    let sessions = context.session_repository.all_sessions()?;
+    assert_eq!(sessions.len(), 1);
+    let persisted = sessions
+        .first()
+        .ok_or_else(|| eyre::eyre!("missing reservation row"))?;
+    assert_eq!(persisted.id(), reservation.id());
+    assert_eq!(persisted.status(), TurnSessionStatus::Reserved);
     Ok(())
 }
 

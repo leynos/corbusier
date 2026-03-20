@@ -38,7 +38,7 @@ diesel::table! {
         /// Backend-native runtime session identifier.
         #[max_length = 255]
         runtime_session_id -> Varchar,
-        /// Lifecycle status (`active` or `expired`).
+        /// Lifecycle status (`active`, `reserved`, or `expired`).
         #[max_length = 20]
         status -> Varchar,
         /// Session TTL in seconds.

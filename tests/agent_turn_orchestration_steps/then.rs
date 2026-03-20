@@ -24,6 +24,43 @@ fn expect_existing_session_id(world: &AgentTurnWorld) -> Result<TurnSessionId, e
         .ok_or_else(|| eyre::eyre!("missing existing session in world"))
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SessionOutcome {
+    Reused,
+    Rotated,
+}
+
+fn assert_session_outcome(
+    world: &AgentTurnWorld,
+    outcome: SessionOutcome,
+) -> Result<(), eyre::Report> {
+    let prior_session_id = expect_existing_session_id(world)?;
+    let response = successful_response(world)?;
+    match outcome {
+        SessionOutcome::Reused => {
+            if !response.reused_session() {
+                return Err(eyre::eyre!("expected reused_session=true"));
+            }
+            if response.session_id() != prior_session_id {
+                return Err(eyre::eyre!(
+                    "expected session {:?}, got {:?}",
+                    prior_session_id,
+                    response.session_id()
+                ));
+            }
+        }
+        SessionOutcome::Rotated => {
+            if !response.rotated_session() {
+                return Err(eyre::eyre!("expected rotated_session=true"));
+            }
+            if response.session_id() == prior_session_id {
+                return Err(eyre::eyre!("expected a new rotated session id"));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[then("the turn succeeds")]
 fn turn_succeeds(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
     successful_response(world)?;
@@ -66,34 +103,12 @@ fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyr
 
 #[then("the existing session is reused")]
 fn existing_session_reused(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let expected_session_id = expect_existing_session_id(world)?;
-    let response = successful_response(world)?;
-
-    if !response.reused_session() {
-        return Err(eyre::eyre!("expected reused_session=true"));
-    }
-    if response.session_id() != expected_session_id {
-        return Err(eyre::eyre!(
-            "expected session {:?}, got {:?}",
-            expected_session_id,
-            response.session_id()
-        ));
-    }
-    Ok(())
+    assert_session_outcome(world, SessionOutcome::Reused)
 }
 
 #[then("the session is rotated")]
 fn session_rotated(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let expected_prior_session_id = expect_existing_session_id(world)?;
-    let response = successful_response(world)?;
-
-    if !response.rotated_session() {
-        return Err(eyre::eyre!("expected rotated_session=true"));
-    }
-    if response.session_id() == expected_prior_session_id {
-        return Err(eyre::eyre!("expected a new rotated session id"));
-    }
-    Ok(())
+    assert_session_outcome(world, SessionOutcome::Rotated)
 }
 
 #[then("the turn fails with a tool routing error")]

@@ -2,7 +2,7 @@
 
 use super::common::{OrchestrationContext, context, register_backend};
 use crate::agent_backend::{
-    domain::{ToolCallRequest, TurnExecutionRequest, TurnExecutionResult},
+    domain::{ToolCallRequest, TurnExecutionRequest, TurnExecutionResult, TurnSessionStatus},
     services::{AgentTurnOrchestrationError, ExecuteAgentTurnRequest},
 };
 use rstest::rstest;
@@ -67,7 +67,13 @@ async fn execute_turn_propagates_session_creation_failure(
     ));
 
     let sessions = context.session_repository.all_sessions()?;
-    assert_eq!(sessions.len(), 0);
+    assert_eq!(sessions.len(), 1);
+    let reservation = sessions
+        .first()
+        .ok_or_else(|| eyre::eyre!("expected expired reservation session"))?;
+    assert_eq!(reservation.status(), TurnSessionStatus::Expired);
+    assert_eq!(reservation.turn_count(), 0);
+    assert!(context.runtime.created_session_ids()?.is_empty());
     Ok(())
 }
 

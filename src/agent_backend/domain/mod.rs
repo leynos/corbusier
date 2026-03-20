@@ -21,8 +21,9 @@ pub use info::BackendInfo;
 pub use name::BackendName;
 pub use registration::{AgentBackendRegistration, PersistedBackendData};
 pub use session::{
-    ParseTurnSessionStatusError, PersistedTurnSessionData, RuntimeSessionId, TurnSession,
-    TurnSessionCreateParams, TurnSessionDomainError, TurnSessionId, TurnSessionStatus,
+    ParseTurnSessionStatusError, PersistedTurnSessionData, ReservedTurnSessionCreateParams,
+    RuntimeSessionId, TurnSession, TurnSessionCreateParams, TurnSessionDomainError, TurnSessionId,
+    TurnSessionStatus,
 };
 pub use status::BackendStatus;
 pub use turn::{
