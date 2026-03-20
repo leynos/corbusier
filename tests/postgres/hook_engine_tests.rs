@@ -181,3 +181,56 @@ async fn postgres_hook_execution_history_is_tenant_isolated(
 
     Ok(())
 }
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_duplicate_execution_reuses_existing_result(
+    #[future] context: Result<HookEngineTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let request_ctx = test_request_ctx();
+
+    let hook_id = HookId::new("hook-postgres-retry").expect("valid hook id");
+    let action_id = HookActionId::new("action-postgres-retry").expect("valid action id");
+    let definition = HookDefinition::new(
+        hook_id,
+        "Retry-safe postgres hook",
+        HookTriggerType::PostPush,
+        vec![HookAction::new(action_id, HookActionType::Notification)],
+    )
+    .expect("definition should be valid");
+    ctx.definition_repo
+        .insert(&request_ctx, definition)
+        .await
+        .expect("insert succeeds");
+
+    let trigger_context = HookTriggerContext::new(HookTriggerType::PostPush, &DefaultClock);
+    let trigger_context_id = trigger_context.id();
+    let first_results = ctx
+        .service
+        .execute(&request_ctx, trigger_context.clone())
+        .await
+        .expect("initial execution succeeds");
+    let second_results = ctx
+        .service
+        .execute(&request_ctx, trigger_context)
+        .await
+        .expect("duplicate execution should reuse existing result");
+
+    let first_result = first_results
+        .first()
+        .expect("expected first execution result");
+    let second_result = second_results
+        .first()
+        .expect("expected duplicate execution result");
+    assert_eq!(first_result.execution_id(), second_result.execution_id());
+
+    let stored = ctx
+        .execution_log
+        .find_by_trigger_context(&request_ctx, trigger_context_id)
+        .await
+        .expect("lookup succeeds");
+    assert_eq!(stored.len(), 1);
+
+    Ok(())
+}

@@ -11,6 +11,15 @@ use thiserror::Error;
 /// Result type for hook execution log operations.
 pub type HookExecutionLogResult<T> = Result<T, HookExecutionLogError>;
 
+/// Outcome returned when reserving a pending execution slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingExecutionReservation {
+    /// A new pending execution row was created.
+    Created(HookExecutionId),
+    /// An execution row already existed for the hook and trigger context.
+    AlreadyExists(HookExecutionId),
+}
+
 /// Input bundle for [`HookExecutionLogRepository::store_pending`].
 #[derive(Debug)]
 pub struct PendingExecutionRecord {
@@ -36,8 +45,10 @@ pub trait HookExecutionLogRepository: Send + Sync {
     /// creating duplicate records. Implementations should use `ON CONFLICT DO NOTHING`
     /// or similar mechanisms.
     ///
-    /// Example: `store_pending(&ctx, PendingExecutionRecord { execution_id, hook_id, trigger_context_id, trigger_type, executed_at })`
-    /// records a pending execution.
+    /// Example:
+    /// `store_pending(&ctx, PendingExecutionRecord { execution_id, hook_id,
+    /// trigger_context_id, trigger_type, executed_at })` records a pending
+    /// execution.
     ///
     /// # Errors
     ///
@@ -46,7 +57,7 @@ pub trait HookExecutionLogRepository: Send + Sync {
         &self,
         ctx: &RequestContext,
         record: PendingExecutionRecord,
-    ) -> HookExecutionLogResult<()>;
+    ) -> HookExecutionLogResult<PendingExecutionReservation>;
 
     /// Updates a pending execution record with the final result.
     ///

@@ -9,14 +9,14 @@ use crate::hook_engine::domain::{
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
-    PendingExecutionRecord,
+    PendingExecutionRecord, PendingExecutionReservation,
 };
 use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
 use async_trait::async_trait;
+use diesel::OptionalExtension;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::upsert::excluded;
 
 /// `PostgreSQL` connection pool type used by hook execution log adapters.
 pub type HookExecutionPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -72,13 +72,16 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
         &self,
         ctx: &RequestContext,
         record: PendingExecutionRecord,
-    ) -> HookExecutionLogResult<()> {
+    ) -> HookExecutionLogResult<PendingExecutionReservation> {
         let tenant_id = ctx.tenant_id();
+        let execution_id = record.execution_id;
+        let hook_id = record.hook_id.as_str().to_owned();
+        let trigger_context_id = record.trigger_context_id.into_inner();
         let new_row = NewHookExecutionRow {
-            id: record.execution_id.into_inner(),
+            id: execution_id.into_inner(),
             tenant_id: tenant_id.into_inner(),
-            trigger_context_id: record.trigger_context_id.into_inner(),
-            hook_id: record.hook_id.as_str().to_owned(),
+            trigger_context_id,
+            hook_id: hook_id.clone(),
             trigger_type: record.trigger_type.as_str().to_owned(),
             predicate_data: serde_json::Value::Object(serde_json::Map::new()),
             action_results: serde_json::Value::Array(Vec::new()),
@@ -87,25 +90,35 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
         };
 
         self.execute_query(tenant_id, move |connection| {
-            diesel::insert_into(hook_executions::table)
+            let inserted_execution = diesel::insert_into(hook_executions::table)
                 .values(&new_row)
                 .on_conflict((
                     hook_executions::tenant_id,
                     hook_executions::trigger_context_id,
                     hook_executions::hook_id,
                 ))
-                .do_update()
-                .set((
-                    hook_executions::id.eq(excluded(hook_executions::id)),
-                    hook_executions::trigger_type.eq(excluded(hook_executions::trigger_type)),
-                    hook_executions::predicate_data.eq(excluded(hook_executions::predicate_data)),
-                    hook_executions::action_results.eq(excluded(hook_executions::action_results)),
-                    hook_executions::status.eq(excluded(hook_executions::status)),
-                    hook_executions::executed_at.eq(excluded(hook_executions::executed_at)),
-                ))
-                .execute(connection)
+                .do_nothing()
+                .returning(hook_executions::id)
+                .get_result::<uuid::Uuid>(connection)
+                .optional()
                 .map_err(HookExecutionLogError::persistence_failed)?;
-            Ok(())
+
+            if let Some(inserted_id) = inserted_execution {
+                return Ok(PendingExecutionReservation::Created(
+                    HookExecutionId::from_uuid(inserted_id),
+                ));
+            }
+
+            let existing_id = hook_executions::table
+                .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))
+                .filter(hook_executions::trigger_context_id.eq(trigger_context_id))
+                .filter(hook_executions::hook_id.eq(hook_id))
+                .select(hook_executions::id)
+                .first::<uuid::Uuid>(connection)
+                .map_err(HookExecutionLogError::persistence_failed)?;
+            Ok(PendingExecutionReservation::AlreadyExists(
+                HookExecutionId::from_uuid(existing_id),
+            ))
         })
         .await
     }
@@ -148,8 +161,7 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
 
             if updated_rows == 0 {
                 return Err(HookExecutionLogError::invalid_persisted_data(format!(
-                    "missing pending hook execution for {}",
-                    execution_id_text
+                    "missing pending hook execution for {execution_id_text}"
                 )));
             }
 
@@ -197,7 +209,7 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
         let trigger_context_uuid = trigger_context_id.into_inner();
         self.execute_query(tenant_id, move |connection| {
             let rows = hook_executions::table
-                // Defense-in-depth: explicit tenant_id filter even though with_tenant_tx
+                // Defence-in-depth: explicit tenant_id filter even though with_tenant_tx
                 // sets app.tenant_id for RLS. Retains multi-tenant isolation if RLS is
                 // not configured on the table.
                 .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))

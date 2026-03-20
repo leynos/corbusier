@@ -6,7 +6,7 @@ use crate::hook_engine::domain::{
 };
 use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
-    PendingExecutionRecord,
+    PendingExecutionRecord, PendingExecutionReservation,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -54,28 +54,30 @@ impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
         &self,
         ctx: &RequestContext,
         record: PendingExecutionRecord,
-    ) -> HookExecutionLogResult<()> {
+    ) -> HookExecutionLogResult<PendingExecutionReservation> {
         let mut executions = self.executions.write().await;
-        let execution = HookExecutionResult::from_persisted(HookExecutionPersisted {
-            execution_id: record.execution_id,
-            hook_id: record.hook_id.clone(),
-            trigger_context_id: record.trigger_context_id,
-            trigger_type: record.trigger_type,
-            predicate_data: serde_json::Value::Object(serde_json::Map::new()),
-            action_results: Vec::new(),
-            status: HookExecutionStatus::Pending,
-            executed_at: record.executed_at,
-        });
         let tenant_executions = executions.entry(ctx.tenant_id()).or_default();
-        if let Some(existing) = tenant_executions.iter_mut().find(|result| {
+        if let Some(existing) = tenant_executions.iter().find(|result| {
             result.trigger_context_id() == record.trigger_context_id
                 && result.hook_id() == &record.hook_id
         }) {
-            *existing = execution;
-        } else {
-            tenant_executions.push(execution);
+            return Ok(PendingExecutionReservation::AlreadyExists(
+                existing.execution_id(),
+            ));
         }
-        Ok(())
+        tenant_executions.push(HookExecutionResult::from_persisted(
+            HookExecutionPersisted {
+                execution_id: record.execution_id,
+                hook_id: record.hook_id,
+                trigger_context_id: record.trigger_context_id,
+                trigger_type: record.trigger_type,
+                predicate_data: serde_json::Value::Object(serde_json::Map::new()),
+                action_results: Vec::new(),
+                status: HookExecutionStatus::Pending,
+                executed_at: record.executed_at,
+            },
+        ));
+        Ok(PendingExecutionReservation::Created(record.execution_id))
     }
 
     async fn update_result(
@@ -104,10 +106,20 @@ impl HookExecutionLogRepository for InMemoryHookExecutionLogRepository {
         result: &HookExecutionResult,
     ) -> HookExecutionLogResult<()> {
         let mut executions = self.executions.write().await;
-        executions
-            .entry(ctx.tenant_id())
-            .or_default()
-            .push(result.clone());
+        let tenant_executions = executions.entry(ctx.tenant_id()).or_default();
+        if tenant_executions.iter().any(|stored| {
+            stored.trigger_context_id() == result.trigger_context_id()
+                && stored.hook_id() == result.hook_id()
+        }) {
+            return Err(HookExecutionLogError::persistence_failed(
+                std::io::Error::other(format!(
+                    "duplicate key value violates unique constraint \"hook_executions_tenant_context_hook_unique\" for trigger context {} and hook {}",
+                    result.trigger_context_id(),
+                    result.hook_id()
+                )),
+            ));
+        }
+        tenant_executions.push(result.clone());
         Ok(())
     }
 

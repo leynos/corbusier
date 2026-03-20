@@ -7,7 +7,8 @@ use crate::hook_engine::domain::{
 };
 use crate::hook_engine::ports::{
     HookActionExecutor, HookDefinitionRepository, HookEngine, HookEngineResult,
-    HookExecutionLogRepository, PendingExecutionRecord,
+    HookExecutionLogError, HookExecutionLogRepository, PendingExecutionRecord,
+    PendingExecutionReservation,
 };
 use mockable::Clock;
 use std::sync::Arc;
@@ -105,7 +106,8 @@ where
         let mut results = Vec::with_capacity(definitions.len());
         for definition in definitions {
             let execution_id = crate::hook_engine::domain::HookExecutionId::new();
-            self.execution_log
+            let reservation = self
+                .execution_log
                 .store_pending(
                     ctx,
                     PendingExecutionRecord {
@@ -117,6 +119,24 @@ where
                     },
                 )
                 .await?;
+            if let PendingExecutionReservation::AlreadyExists(existing_execution_id) = reservation {
+                let existing_result = self
+                    .execution_log
+                    .find_by_trigger_context(ctx, context.id())
+                    .await?
+                    .into_iter()
+                    .find(|result| {
+                        result.execution_id() == existing_execution_id
+                            && result.hook_id() == definition.id()
+                    })
+                    .ok_or_else(|| {
+                        HookExecutionLogError::invalid_persisted_data(format!(
+                            "missing reserved hook execution for {existing_execution_id}"
+                        ))
+                    })?;
+                results.push(existing_result);
+                continue;
+            }
             let action_results = self.execute_actions(&definition, &context).await?;
             let result = HookExecutionResult::new(HookExecutionInput {
                 execution_id,
