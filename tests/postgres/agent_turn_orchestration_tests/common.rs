@@ -53,7 +53,7 @@ async fn setup_context(cluster: PostgresCluster) -> Result<OrchestrationContext,
         .await?;
     let manager = ConnectionManager::<PgConnection>::new(db.url().to_owned());
     let pool: BackendPgPool = diesel::r2d2::Pool::builder()
-        .max_size(1)
+        .max_size(5)
         .build(manager)
         .map_err(|err| Box::new(err) as BoxError)?;
 

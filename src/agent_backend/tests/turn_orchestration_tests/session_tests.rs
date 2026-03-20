@@ -63,7 +63,7 @@ async fn execute_turn_reuses_active_session(
 async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
     context: OrchestrationContext,
 ) -> Result<(), eyre::Report> {
-    // Note: `SessionExecutionLocks` serializes concurrent calls within a single service
+    // Note: `SessionExecutionLocks` serialises concurrent calls within a single service
     // instance. Distributed concurrency across multiple service instances requires
     // DB-level locking (see migration concurrency discussion in PR `#36`).
     let backend_id = register_backend(&context, "claude_code_sdk").await?;
@@ -85,9 +85,6 @@ async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
         TurnExecutionRequest::new(conversation_id, "2", Vec::new()),
     );
 
-    // This verifies per-process serialization only: SessionExecutionLocks guards
-    // concurrent calls within one service instance, not across distributed
-    // service instances.
     let (first_result, second_result) = tokio::join!(
         context.service.execute_turn(&context.ctx, first_request),
         context.service.execute_turn(&context.ctx, second_request)
@@ -112,11 +109,21 @@ async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
     assert_eq!(created_sessions.len(), 1);
 
     let sessions = context.session_repository.all_sessions()?;
-    let active = sessions
+    let active_sessions = sessions
         .iter()
-        .find(|session| session.status() == TurnSessionStatus::Active)
-        .ok_or_else(|| eyre::eyre!("expected an active session"))?;
-    assert_eq!(active.turn_count(), 2);
+        .filter(|session| session.backend_id() == backend_id)
+        .filter(|session| session.conversation_id() == conversation_id)
+        .filter(|session| session.status() == TurnSessionStatus::Active)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        active_sessions.len(),
+        1,
+        "expected exactly one active session for backend {backend_id:?} conversation {conversation_id}"
+    );
+    let active_session = active_sessions
+        .first()
+        .ok_or_else(|| eyre::eyre!("expected exactly one active session after filtering"))?;
+    assert_eq!(active_session.turn_count(), 2);
     Ok(())
 }
 

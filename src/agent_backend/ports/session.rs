@@ -40,7 +40,7 @@ pub enum SessionSlotArbitration {
     /// No active session exists for the pair.
     Vacant,
     /// An active session existed but was expired during arbitration.
-    Expired,
+    Expired(TurnSession),
 }
 
 /// Repository contract for orchestration turn sessions.

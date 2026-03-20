@@ -11,44 +11,40 @@ use corbusier::agent_backend::{
 };
 use rstest_bdd_macros::then;
 
-fn assert_session_expectation(
-    world: &AgentTurnWorld,
-    predicate: impl FnOnce(&ExecuteAgentTurnResponse, TurnSessionId) -> Result<(), eyre::Report>,
-) -> Result<(), eyre::Report> {
-    let expected_session_id = world
-        .existing_session_id
-        .ok_or_else(|| eyre::eyre!("missing existing session in world"))?;
+fn successful_response(world: &AgentTurnWorld) -> Result<&ExecuteAgentTurnResponse, eyre::Report> {
     let result = world
         .last_result
         .as_ref()
         .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    let response = result
+    result
         .as_ref()
-        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
-    predicate(response, expected_session_id)
+        .map_err(|err| eyre::eyre!("expected success, got {err}"))
+}
+
+fn expect_existing_session_id(world: &AgentTurnWorld) -> Result<TurnSessionId, eyre::Report> {
+    world
+        .existing_session_id
+        .ok_or_else(|| eyre::eyre!("missing existing session in world"))
 }
 
 #[then("the turn succeeds")]
 fn turn_succeeds(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let result = world
-        .last_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    if result.is_err() {
-        return Err(eyre::eyre!("expected successful turn, got {result:?}"));
+    if let Err(error) = successful_response(world) {
+        let result = world
+            .last_result
+            .as_ref()
+            .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
+        if result.is_err() {
+            return Err(eyre::eyre!("expected successful turn, got {result:?}"));
+        }
+        return Err(error);
     }
     Ok(())
 }
 
 #[then("one tool result is returned")]
 fn one_tool_result_returned(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    let result = world
-        .last_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    let response = result
-        .as_ref()
-        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
+    let response = successful_response(world)?;
     if response.tool_results().len() != 1 {
         return Err(eyre::eyre!(
             "expected one tool result, got {}",
@@ -60,27 +56,21 @@ fn one_tool_result_returned(world: &AgentTurnWorld) -> Result<(), eyre::Report> 
 
 #[then(r#"all tool audits are "{status}""#)]
 fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyre::Report> {
-    let result = world
-        .last_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("missing turn result in world"))?;
-    let response = result
-        .as_ref()
-        .map_err(|err| eyre::eyre!("expected success, got {err}"))?;
+    let response = successful_response(world)?;
 
     let expected = match status.as_str() {
         "succeeded" => ToolCallAuditStatus::Succeeded,
         other => return Err(eyre::eyre!("unsupported audit status assertion: {other}")),
     };
 
-    if !response
-        .tool_call_audits()
-        .iter()
-        .all(|audit| audit.status() == expected)
-    {
+    let audits = response.tool_call_audits();
+    if audits.is_empty() {
+        return Err(eyre::eyre!("expected at least one tool audit"));
+    }
+    if !audits.iter().all(|audit| audit.status() == expected) {
         return Err(eyre::eyre!(
             "expected all audits to be {status}, got {:?}",
-            response.tool_call_audits()
+            audits
         ));
     }
     Ok(())
@@ -88,32 +78,34 @@ fn all_tool_audits_are(world: &AgentTurnWorld, status: String) -> Result<(), eyr
 
 #[then("the existing session is reused")]
 fn existing_session_reused(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    assert_session_expectation(world, |response, expected_session_id| {
-        if !response.reused_session() {
-            return Err(eyre::eyre!("expected reused_session=true"));
-        }
-        if response.session_id() != expected_session_id {
-            return Err(eyre::eyre!(
-                "expected session {:?}, got {:?}",
-                expected_session_id,
-                response.session_id()
-            ));
-        }
-        Ok(())
-    })
+    let expected_session_id = expect_existing_session_id(world)?;
+    let response = successful_response(world)?;
+
+    if !response.reused_session() {
+        return Err(eyre::eyre!("expected reused_session=true"));
+    }
+    if response.session_id() != expected_session_id {
+        return Err(eyre::eyre!(
+            "expected session {:?}, got {:?}",
+            expected_session_id,
+            response.session_id()
+        ));
+    }
+    Ok(())
 }
 
 #[then("the session is rotated")]
 fn session_rotated(world: &AgentTurnWorld) -> Result<(), eyre::Report> {
-    assert_session_expectation(world, |response, expected_prior_session_id| {
-        if !response.rotated_session() {
-            return Err(eyre::eyre!("expected rotated_session=true"));
-        }
-        if response.session_id() == expected_prior_session_id {
-            return Err(eyre::eyre!("expected a new rotated session id"));
-        }
-        Ok(())
-    })
+    let expected_prior_session_id = expect_existing_session_id(world)?;
+    let response = successful_response(world)?;
+
+    if !response.rotated_session() {
+        return Err(eyre::eyre!("expected rotated_session=true"));
+    }
+    if response.session_id() == expected_prior_session_id {
+        return Err(eyre::eyre!("expected a new rotated session id"));
+    }
+    Ok(())
 }
 
 #[then("the turn fails with a tool routing error")]

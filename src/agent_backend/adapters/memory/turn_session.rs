@@ -117,8 +117,9 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
 
         if existing.is_expired_at(now) {
             existing.mark_expired(now);
+            let expired = existing.clone();
             state.active_index.remove(&index_key);
-            return Ok(SessionSlotArbitration::Expired);
+            return Ok(SessionSlotArbitration::Expired(expired));
         }
 
         Ok(SessionSlotArbitration::Reused(existing.clone()))

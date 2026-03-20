@@ -1,6 +1,7 @@
 //! Shared world state for agent turn orchestration BDD scenarios.
 
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use corbusier::agent_backend::{
@@ -111,6 +112,42 @@ impl AgentTurnWorld {
 impl Default for AgentTurnWorld {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Semantic wrapper for an assistant text response in BDD steps.
+#[derive(Debug, Clone)]
+pub struct AssistantText(pub String);
+
+impl std::str::FromStr for AssistantText {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned()))
+    }
+}
+
+/// Semantic wrapper for a tool name in BDD steps.
+#[derive(Debug, Clone)]
+pub struct ToolName(pub String);
+
+impl std::str::FromStr for ToolName {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned()))
+    }
+}
+
+/// Semantic wrapper for a conversation label (map key) in BDD steps.
+#[derive(Debug, Clone)]
+pub struct ConversationLabel(pub String);
+
+impl std::str::FromStr for ConversationLabel {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned()))
     }
 }
 

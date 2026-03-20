@@ -3,7 +3,7 @@
 use super::{
     models::{AgentTurnSessionRow, NewAgentTurnSessionRow},
     repository::BackendPgPool,
-    schema::{agent_turn_sessions, backend_registrations},
+    schema::agent_turn_sessions,
 };
 use crate::agent_backend::{
     domain::{
@@ -67,7 +67,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
         let tenant_id = ctx.tenant_id().into_inner();
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
-                lock_session_key(tx_conn, tenant_id, backend_id.into_inner())?;
+                lock_session_key(tx_conn, tenant_id, backend_id.into_inner(), conversation_id)?;
 
                 let row = agent_turn_sessions::table
                     .filter(agent_turn_sessions::tenant_id.eq(tenant_id))
@@ -97,7 +97,9 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     ))
                     .execute(tx_conn)
                     .map_err(TurnSessionRepositoryError::persistence)?;
-                    return Ok(SessionSlotArbitration::Expired);
+                    let mut expired = existing.clone();
+                    expired.mark_expired(now);
+                    return Ok(SessionSlotArbitration::Expired(expired));
                 }
 
                 Ok(SessionSlotArbitration::Reused(existing))
@@ -145,7 +147,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
-                lock_session_key(tx_conn, tenant_id, backend_id)?;
+                lock_session_key(tx_conn, tenant_id, backend_id, conversation_id)?;
 
                 let updated = diesel::update(
                     agent_turn_sessions::table
@@ -196,24 +198,26 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
     }
 }
 
-// Acquires a row-level lock on the backend_registrations row to serialize
-// concurrent turn executions for the same (backend_id, conversation_id) pair.
-// We lock the backend_registrations row instead of using pg_advisory_xact_lock
-// because: (1) it avoids hash collisions across different key spaces, (2) it
-// automatically verifies the backend registration exists (fail-fast if not
-// found), and (3) it leverages the database's row-level locking semantics to
-// keep locking and existence checks atomic.
+// Acquires a row-level lock on the conversation-scoped session row when one is
+// already present for the tenant/backend/conversation slot.
+//
+// Vacant slots intentionally fall through without locking; the unique partial
+// index remains the authority for create races until session-slot reservations
+// are introduced in roadmap 1.3.3.
 fn lock_session_key(
     connection: &mut PgConnection,
     tenant_id: uuid::Uuid,
     backend_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
 ) -> TurnSessionRepositoryResult<()> {
-    backend_registrations::table
-        .filter(backend_registrations::tenant_id.eq(tenant_id))
-        .filter(backend_registrations::id.eq(backend_id))
+    agent_turn_sessions::table
+        .filter(agent_turn_sessions::tenant_id.eq(tenant_id))
+        .filter(agent_turn_sessions::backend_id.eq(backend_id))
+        .filter(agent_turn_sessions::conversation_id.eq(conversation_id))
         .for_update()
-        .select(backend_registrations::id)
+        .select(agent_turn_sessions::id)
         .first::<uuid::Uuid>(connection)
+        .optional()
         .map(|_| ())
         .map_err(TurnSessionRepositoryError::persistence)
 }

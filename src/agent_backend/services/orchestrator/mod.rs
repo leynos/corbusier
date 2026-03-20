@@ -119,7 +119,7 @@ where
         let conversation_id = request.turn.conversation_id();
         let _execution_guard = self
             .execution_locks
-            .lock(request.backend_id, conversation_id)
+            .lock(ctx.tenant_id(), request.backend_id, conversation_id)
             .await;
 
         let backend = self
@@ -150,21 +150,23 @@ where
         {
             Ok(result) => result,
             Err(error) => {
-                let expire_time = self.clock.utc();
-                session.mark_expired(expire_time);
-                drop(self.turn_sessions.upsert_session(ctx, &session).await);
-                drop(
-                    self.runtime
-                        .teardown_session(&backend, session.runtime_session_handle())
-                        .await,
-                );
+                self.expire_persist_and_teardown(ctx, &backend, &mut session)
+                    .await?;
                 return Err(error.into());
             }
         };
 
-        let (tool_results, tool_call_audits) = self
+        let (tool_results, tool_call_audits) = match self
             .route_tool_calls(&session, runtime_result.tool_calls())
-            .await?;
+            .await
+        {
+            Ok(routed) => routed,
+            Err(error) => {
+                self.expire_persist_and_teardown(ctx, &backend, &mut session)
+                    .await?;
+                return Err(error);
+            }
+        };
 
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
@@ -201,12 +203,39 @@ where
                     self.create_or_reuse_session(params).await?;
                 Ok((created_session, reused_due_to_conflict, false))
             }
-            SessionSlotArbitration::Expired => {
+            SessionSlotArbitration::Expired(expired_session) => {
                 let (rotated_session, reused_due_to_conflict) =
                     self.create_or_reuse_session(params).await?;
+                self.runtime
+                    .teardown_session(params.backend, expired_session.runtime_session_handle())
+                    .await?;
                 Ok((rotated_session, reused_due_to_conflict, true))
             }
         }
+    }
+
+    async fn expire_persist_and_teardown(
+        &self,
+        ctx: &RequestContext,
+        backend: &AgentBackendRegistration,
+        session: &mut TurnSession,
+    ) -> AgentTurnOrchestrationResult<()> {
+        let expire_time = self.clock.utc();
+        session.mark_expired(expire_time);
+
+        let persist_result = self
+            .turn_sessions
+            .upsert_session(ctx, session)
+            .await
+            .map_err(AgentTurnOrchestrationError::SessionRepository);
+        let teardown_result = self
+            .runtime
+            .teardown_session(backend, session.runtime_session_handle())
+            .await
+            .map_err(AgentTurnOrchestrationError::Runtime);
+
+        persist_result?;
+        teardown_result
     }
 
     async fn create_session(

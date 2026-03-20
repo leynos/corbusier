@@ -180,8 +180,9 @@ Validation evidence:
 
 Deferred work:
 
-- None within roadmap 1.3.2 scope. Tool schema translation remains in roadmap
-  1.3.3 by design.
+- Session-rotation atomicity (database concurrency) remains deferred to
+  roadmap 1.3.3. Tool schema translation also remains in roadmap 1.3.3 by
+  design.
 
 ## Context and orientation
 
