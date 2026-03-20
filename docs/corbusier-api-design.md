@@ -878,7 +878,22 @@ naturally for SSE.
 
 **Tenant scoping:** every tenant-owned endpoint must resolve `RequestContext`
 (tenant_id, correlation_id, causation_id, user_id, and session_id) and apply it
-consistently, as already required by Corbusier's multi-tenancy design.
+consistently, as already required by Corbusier's multi-tenancy design. The
+following tenant-isolation rules are non-negotiable:
+
+- `RequestContext.tenant_id` is mandatory for every registry and log/store
+  operation; handlers must reject requests where tenant context is absent or
+  ambiguous.
+- **Tool registry writes** (`ToolRegistry.create`, `ToolRegistry.update`) must
+  enforce a uniqueness constraint on `(tenant_id, tool_name)` so that tool
+  names are unique within a tenant but may collide across tenants.
+- **Tool catalogue and audit reads** must scope queries by
+  `RequestContext.tenant_id`; a request must never return tools, audit records,
+  or health data belonging to another tenant.
+- **Log and store APIs** (`LogStore.put`, `LogStore.get`, and equivalents) must
+  prefix or namespace all object keys by `RequestContext.tenant_id` to prevent
+  cross-tenant key collision or data leakage. Concrete key format:
+  `{tenant_id}/{object_type}/{object_id}`.
 
 ### Error and validation contract
 
@@ -1084,7 +1099,9 @@ returns a projection DTO (not raw persistence rows).
 
 The tool registry projections should be built from the existing
 `McpServerRegistration` (lifecycle, transport, and health) and
-`McpToolDefinition` plus audit trails.
+`McpToolDefinition` plus audit trails. All system endpoints above are
+tenant-scoped: `RequestContext.tenant_id` must gate every query and mutation
+(see tenant-isolation rules in "Versioning, auth, and request context").
 
 ## Recommended crate layout, implementation passes, and testing strategy
 
@@ -1139,41 +1156,124 @@ flowchart LR
 
 #### Pass 1: contracts and scaffolding
 
-- Publish initial `/api/v1` OpenAPI spec and central error schema
-  (Wildside-compatible).
-- Implement `corbusier_pagination` crate (cursor and envelope), even if only
-  one endpoint uses it initially.
-- Add `domain_events` persistence and SSE endpoint skeleton with event
-  identifiers and `Last-Event-ID` parsing.
+- [ ] **1.1** Publish `/api/v1` OpenAPI spec with central error schema.
+  Deliver a Wildside-compatible OpenAPI v3.1 document served at `/api/v1`
+  containing the `Error` schema (`code`, `message`, `traceId`, `details`),
+  `ErrorCode` enum, and `Paginated<T>` envelope. Success criteria: OpenAPI spec
+  validates with `openapi-generator validate`, Wildside compliance tests pass,
+  and CI job is green. See corbusier-api-design.md §"Error and validation
+  contract".
+- [ ] **1.2** Implement `corbusier_pagination` crate. Deliver cursor encoding
+  and decoding, `Paginated<T>` envelope, `PaginationLinks` builder, and key
+  traits. Depends on 1.1 (envelope shape defined in OpenAPI). Success criteria:
+  unit tests cover round-trip cursor encoding, direction handling, and
+  empty-result edge cases; crate compiles with no warnings. See
+  corbusier-api-design.md §"Pagination semantics".
+- [ ] **1.3** Add `domain_events` persistence and SSE endpoint skeleton.
+  Deliver `domain_events` table, `EventId` type, `EventStore` trait
+  implementation, and `GET /api/v1/events` SSE endpoint with `id:` field
+  emission and `Last-Event-ID` request header parsing. Depends on 1.1 (error
+  schema for SSE error frames). Success criteria: integration test confirms
+  event insert, retrieval by identifier, and SSE wire format (`id:`, `event:`,
+  `data:` fields); `Last-Event-ID` round-trip validated. See
+  corbusier-api-design.md §"SSE event stream and replay semantics".
 
 #### Pass 2: projects and tasks read models
 
-- Add `project` aggregate and seed a default project; attach existing tasks.
-- Extend task persistence with localization, priority, labels, assignment,
-  scheduling, and hierarchy references.
-- Implement task list, task detail, project list, project landing, and project
-  Kanban projections.
-- Add dependency graph storage (edges table) and task hierarchy nodes (goal,
-  idea, and step) as the minimum to support the dependency view.
+- [ ] **2.1** Add `project` aggregate and seed default project. Deliver
+  `ProjectAggregate` table, slug uniqueness constraint per tenant, and a
+  migration that creates one default project per tenant and attaches existing
+  tasks. Depends on 1.1 (error schema). Success criteria: migration runs
+  idempotently; all existing tasks have a non-null `project_slug`; slug
+  uniqueness enforced in integration test. See corbusier-api-design.md
+  §"Project domain".
+- [ ] **2.2** Extend task persistence with v2 fields. Add localization,
+  priority, labels, assignment, scheduling, and hierarchy reference columns to
+  the task table. Backfill `localizations["en-GB"].name` from `IssueSnapshot`
+  title and map existing states to `TaskStateV2`. Depends on 2.1 (project must
+  exist for `project_slug` foreign key). Success criteria: backfill migration
+  succeeds on existing data; `TaskStateV2` transition matrix unit tests pass
+  for all valid and invalid pairs. See corbusier-api-design.md §"Task domain".
+- [ ] **2.3** Implement task and project projection endpoints. Deliver
+  `GET /api/v1/tasks` (paginated `TaskCardDto[]`),
+  `GET /api/v1/tasks/{task_id}` (`TaskDetailDto`), `GET /api/v1/projects`
+  (paginated `ProjectCardDto[]`), `GET /api/v1/projects/{slug}`
+  (`ProjectLandingDto`), and `GET /api/v1/projects/{slug}/kanban`
+  (`ProjectKanbanDto`). Depends on 1.2 (`corbusier_pagination` crate) and 2.2
+  (v2 task fields). Success criteria: contract tests validate each DTO shape
+  against golden JSON fixtures; pagination cursor round-trips correctly in
+  integration tests. See corbusier-api-design.md §"Endpoint inventory — Tasks"
+  and §"Endpoint inventory — Projects".
+- [ ] **2.4** Add dependency graph storage and task hierarchy nodes. Deliver
+  edges table for task dependencies and hierarchy node records (goal, idea, and
+  step). Deliver `GET /api/v1/tasks/{task_id}/dependencies`
+  (`TaskDependenciesDto`). Depends on 2.2 (hierarchy reference fields). Success
+  criteria: integration test confirms cycle detection rejects circular
+  dependencies; hierarchy breadcrumb renders correctly in `TaskDetailDto`. See
+  corbusier-api-design.md §"Projection DTOs required by mockup pages".
 
 #### Pass 3: conversations, directives, and SSE replay
 
-- Add `conversation` table and aggregate linking to project and tasks and
-  expose conversation list and detail endpoints.
-- Expose message paging; reuse existing `ContentPart` serialization directly.
-- Persist directives (`SlashCommandDefinition`) per project; expose registry
-  endpoints.
-- Implement SSE stream semantics: stable event identifiers in stream, replay
-  via `Last-Event-ID`, and define "stream_reset if too old" behaviour.
+- [ ] **3.1** Add `conversation` aggregate and list/detail endpoints. Deliver
+  `conversation` table linking to project and tasks, backfill from existing
+  `conversation_id` on messages, and expose
+  `GET /api/v1/projects/{slug}/conversations` and
+  `GET /api/v1/conversations/{conversation_id}`. Depends on 2.1 (project
+  aggregate for `project_slug`). Success criteria: backfill creates
+  conversation rows for all existing message groups; list endpoint paginates
+  correctly; detail endpoint returns `ConversationDetailDto` with message
+  timeline. See corbusier-api-design.md §"Conversation domain".
+- [ ] **3.2** Expose paginated message endpoint. Deliver
+  `GET /api/v1/conversations/{conversation_id}/messages` and
+  `POST /api/v1/conversations/{conversation_id}/messages`. Reuse existing
+  `ContentPart` serialization. Depends on 3.1 (conversation aggregate) and 1.2
+  (`corbusier_pagination`). Success criteria: message ordering by
+  `SequenceNumber` validated; idempotency-key deduplication test passes. See
+  corbusier-api-design.md §"Endpoint inventory — Conversations and messages".
+- [ ] **3.3** Persist directives per project and expose registry endpoints.
+  Deliver `directive` table with `(tenant_id, project_slug, command)`
+  uniqueness, `GET /api/v1/projects/{slug}/directives`, and
+  `POST /api/v1/projects/{slug}/directives`. Depends on 2.1 (project
+  aggregate). Success criteria: schema validation rejects invalid
+  `SlashCommandDefinition`; uniqueness constraint tested. See
+  corbusier-api-design.md §"Directives domain".
+- [ ] **3.4** Implement full SSE replay semantics. Extend
+  `GET /api/v1/events` with replay from `Last-Event-ID`, add
+  `GET /api/v1/events/conversations/{conversation_id}`, and define
+  `stream_reset` event for expired identifiers. Depends on 1.3 (SSE skeleton)
+  and 3.1 (conversation events). Success criteria: reconnection test replays
+  events after last seen identifier; expired identifier produces
+  `stream_reset`; deterministic ordering validated. See corbusier-api-design.md
+  §"SSE event stream and replay semantics".
 
 #### Pass 4: suggestions, governance, and system hardening
 
-- Implement suggestion list plus accept and dismiss turning suggestions into
-  tasks.
-- Add policy and hook CRUD behind roles; integrate policy decisions with tool
-  executions.
-- Add contract tests (OpenAPI-driven), multi-tenant isolation tests, and
-  performance checks for key projections.
+- [ ] **4.1** Implement suggestion lifecycle endpoints. Deliver
+  `GET /api/v1/suggestions` (paginated, filterable by project and priority),
+  `POST /api/v1/suggestions/{id}/accept` (creates draft task in backlog), and
+  `POST /api/v1/suggestions/{id}/dismiss`. Depends on 2.2 (task v2 fields for
+  created tasks) and 1.2 (`corbusier_pagination`). Success criteria: accept
+  creates a `Draft` task linked to the originating suggestion; dismiss is
+  idempotent; confidence range `[0.0, 1.0]` enforced in validation test. See
+  corbusier-api-design.md §"Suggestions domain".
+- [ ] **4.2** Add policy and hook CRUD behind admin roles. Deliver
+  `PolicyAggregate` and `HookAggregate` tables, CRUD endpoints at
+  `GET/POST /api/v1/system/policies` and `GET/POST /api/v1/system/hooks`, and
+  integrate policy decisions with tool executions. Depends on 1.1 (error
+  schema) and tenant-isolation rules (see §"Versioning, auth, and request
+  context"). Success criteria: non-admin role receives `403 forbidden`; policy
+  violation records created on tool execution breach; hook enable/disable is
+  idempotent. See corbusier-api-design.md §"Governance domain".
+- [ ] **4.3** Add contract tests, multi-tenant isolation tests, and
+  projection performance checks. Deliver OpenAPI-driven contract tests for
+  every endpoint in the inventory, tenant-isolation integration tests
+  confirming no cross-tenant data leakage for tool registry, log store, and all
+  projection queries, and performance benchmarks for `TaskDetailDto` and
+  `ProjectKanbanDto` assembly. Depends on 4.1 and 4.2 (all endpoints
+  implemented). Success criteria: contract tests generated from OpenAPI spec
+  pass; isolation tests prove tenant A cannot read tenant B data; projection
+  queries complete within 100 ms on a 10 000-row fixture. See
+  corbusier-api-design.md §"Test strategy".
 
 ### Key risks and mitigations
 
