@@ -192,13 +192,15 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 2.3. Hook engine and policy enforcement
 
-- [ ] 2.3.1 Implement hook engine execution. Requires 1.2.3 and 2.1.2. See
+- [x] 2.3.1 Implement hook engine execution. Requires 1.2.3 and 2.1.2. See
   corbusier-design.md §2.1.3 and §6.3.3.
-  - [ ] Define hook triggers for commit, merge, and deploy events. See
+  - [x] Define hook triggers for turn start/end, tool use before/after, and
+    pre- and post-commit, pre- and post-merge, pre- and post-pull, pre- and
+    post-push, and pre- and post-deploy events. See
     corbusier-design.md §2.1.3.
-  - [ ] Execute hooks with structured outcomes and logs. See
+  - [x] Execute hooks with structured outcomes and logs. See
     corbusier-design.md §6.3.3.
-  - [ ] Success criteria: hook execution results are recorded for every
+  - [x] Success criteria: hook execution results are recorded for every
     configured trigger.
 - [ ] 2.3.2 Add policy enforcement and audit capture. Requires 2.3.1. See
   corbusier-design.md §2.1.3 and §6.4.2.5.

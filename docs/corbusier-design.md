@@ -587,8 +587,10 @@ Corbusier implements this through:
   - Consistent workflow behavior across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
-  definitions supporting multiple triggers (TurnStart, ToolCall, PreCommit,
-  etc.) and actions (gates, annotations, remediation).
+  definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
+  PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
+  PrePush, PostPush, PreDeploy, PostDeploy) and actions (QualityGate,
+  PolicyCheck, Notification, BlockAction, and Remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -2723,14 +2725,28 @@ flowchart TD
 
 ###### Hook Event Processing
 
+Table 4.1.2: Hook trigger processing flow
+
+For screen readers: This diagram shows the hook trigger processing flow from
+event to handler.
+
 ```mermaid
 flowchart TD
     subgraph "Hook Triggers"
-        TURN_START[Turn Start]
-        TOOL_CALL[Tool Call]
-        FILE_CHANGE[File Change]
-        TURN_END[Turn End]
-        PRE_COMMIT[Pre Commit]
+        TURN_START[TurnStart]
+        TURN_END[TurnEnd]
+        PRE_TOOL_USE[PreToolUse]
+        POST_TOOL_USE[PostToolUse]
+        PRE_COMMIT[PreCommit]
+        POST_COMMIT[PostCommit]
+        PRE_MERGE[PreMerge]
+        POST_MERGE[PostMerge]
+        PRE_PULL[PrePull]
+        POST_PULL[PostPull]
+        PRE_PUSH[PrePush]
+        POST_PUSH[PostPush]
+        PRE_DEPLOY[PreDeploy]
+        POST_DEPLOY[PostDeploy]
     end
     
     subgraph "Hook Engine"
@@ -2749,10 +2765,19 @@ flowchart TD
     end
     
     TURN_START --> TRIGGER_MATCH
-    TOOL_CALL --> TRIGGER_MATCH
-    FILE_CHANGE --> TRIGGER_MATCH
     TURN_END --> TRIGGER_MATCH
+    PRE_TOOL_USE --> TRIGGER_MATCH
+    POST_TOOL_USE --> TRIGGER_MATCH
     PRE_COMMIT --> TRIGGER_MATCH
+    POST_COMMIT --> TRIGGER_MATCH
+    PRE_MERGE --> TRIGGER_MATCH
+    POST_MERGE --> TRIGGER_MATCH
+    PRE_PULL --> TRIGGER_MATCH
+    POST_PULL --> TRIGGER_MATCH
+    PRE_PUSH --> TRIGGER_MATCH
+    POST_PUSH --> TRIGGER_MATCH
+    PRE_DEPLOY --> TRIGGER_MATCH
+    POST_DEPLOY --> TRIGGER_MATCH
     
     TRIGGER_MATCH --> PREDICATE_EVAL
     PREDICATE_EVAL --> ACTION_EXEC
@@ -5645,24 +5670,36 @@ pub struct HookDefinition {
     pub id: HookId,
     pub name: String,
     pub description: String,
-    pub trigger: HookTrigger,
+    pub trigger: HookTriggerType,
     pub predicate: HookPredicate,
     pub actions: Vec<HookAction>,
     pub priority: HookPriority,
     pub enabled: bool,
-    pub configuration: HookConfiguration,
 }
 
 #[derive(Debug, Clone)]
-pub enum HookTrigger {
-    TurnStart { conversation_id: ConversationId },
-    ToolCall { tool_name: String, parameters: Value },
-    FileChange { file_patterns: Vec<String> },
-    TurnEnd { conversation_id: ConversationId },
-    PreCommit { changeset: ChangeSet },
-    PostCommit { commit_ref: CommitRef },
-    PrePullRequest { pr_request: CreatePullRequestRequest },
-    PostPullRequest { pr_ref: PullRequestRef },
+pub enum HookTriggerType {
+    TurnStart,
+    TurnEnd,
+    PreToolUse,
+    PostToolUse,
+    PreCommit,
+    PostCommit,
+    PreMerge,
+    PostMerge,
+    PrePull,
+    PostPull,
+    PrePush,
+    PostPush,
+    PreDeploy,
+    PostDeploy,
+}
+
+pub struct HookTriggerContext {
+    pub id: TriggerContextId,
+    pub trigger_type: HookTriggerType,
+    pub metadata: Value,
+    pub occurred_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -5696,13 +5733,13 @@ pub enum HookAction {
 
 pub struct HookExecutionResult {
     pub hook_id: HookId,
-    pub execution_id: ExecutionId,
-    pub trigger_context: TriggerContext,
-    pub results: Vec<ActionResult>,
-    pub overall_status: ExecutionStatus,
-    pub execution_time: Duration,
-    pub artifacts: Vec<ExecutionArtifact>,
-    pub next_actions: Vec<NextAction>,
+    pub execution_id: HookExecutionId,
+    pub trigger_context_id: TriggerContextId,
+    pub trigger_type: HookTriggerType,
+    pub predicate_data: Value,
+    pub action_results: Vec<ActionResult>,
+    pub overall_status: HookExecutionStatus,
+    pub executed_at: DateTime<Utc>,
 }
 ```
 

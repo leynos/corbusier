@@ -17,6 +17,7 @@
 //! - `tool_discovery_tenant_isolation_tests`: Composite FK and index-plan checks
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and audit trail
+//! - `hook_engine_tests`: Hook execution log persistence
 
 mod test_helpers;
 mod worker_locator;
@@ -29,6 +30,7 @@ mod postgres {
     mod audit_tests;
     mod backend_registry_tests;
     mod crud_tests;
+    mod hook_engine_tests;
     mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod serialization_tests;
