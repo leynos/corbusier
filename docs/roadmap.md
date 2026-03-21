@@ -360,3 +360,144 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §4.5.3.1.
   - [ ] Success criteria: response latency remains under target thresholds and
     scaling tests meet concurrency goals.
+
+## 5. Front-end API surface and data-model extensions
+
+### 5.1. API contracts and scaffolding
+
+- [ ] 5.1.1 Publish versioned OpenAPI specification and central error schema.
+  Requires 3.2.1. See corbusier-api-design.md §HTTP API surface, pagination,
+  SSE, and error contracts.
+  - [ ] Define `ErrorCode` enum and `Error` response schema compatible with
+    Wildside. See corbusier-api-design.md §Error and validation contract.
+  - [ ] Generate `/api/v1` OpenAPI document covering error, pagination, and
+    auth contracts.
+  - [ ] Success criteria: error responses are validated against the schema in
+    contract tests.
+- [ ] 5.1.2 Implement reusable keyset pagination crate. Requires 5.1.1. See
+  corbusier-api-design.md §Pagination semantics.
+  - [ ] Implement cursor encoding and decoding with opaque tokens. See
+    corbusier-api-design.md §Pagination semantics.
+  - [ ] Implement `Paginated<T>` envelope with `data`, `limit`, and hypermedia
+    `links` (self, next, and prev). See corbusier-api-design.md §Pagination
+    semantics.
+  - [ ] Success criteria: pagination envelope shape matches TanStack Query
+    infinite query expectations; absence of `next` indicates end-of-list.
+- [ ] 5.1.3 Add domain event persistence and SSE endpoint skeleton. Requires
+  5.1.1. See corbusier-api-design.md §SSE event stream and replay semantics.
+  - [ ] Create `domain_events` table (`tenant_id`, `aggregate_id`,
+    `aggregate_type`, `event_type`, `event_data`, and `occurred_at`). See
+    corbusier-api-design.md §Replay storage.
+  - [ ] Implement SSE endpoint skeleton at `GET /api/v1/events` with event
+    identifier emission and `Last-Event-ID` parsing.[^4]
+  - [ ] Success criteria: SSE endpoint emits well-formed events with stable
+    identifiers; `Last-Event-ID` header is parsed on reconnect.
+
+### 5.2. Project and task read models
+
+- [ ] 5.2.1 Introduce project aggregate and bootstrap default projects.
+  Requires 1.5.1. See corbusier-api-design.md §Project domain.
+  - [ ] Implement `ProjectAggregate` with slug, localized name and
+    description, lead, date range, status, and team membership. See
+    corbusier-api-design.md §Project domain.
+  - [ ] Seed a default project per tenant and attach existing tasks. See
+    corbusier-api-design.md §Project domain -- Migration.
+  - [ ] Success criteria: projects can be created, listed, and retrieved by
+    slug with tenant scoping.
+- [ ] 5.2.2 Extend task aggregate with front-end fields. Requires 5.2.1 and
+  1.2.3. See corbusier-api-design.md §Task domain.
+  - [ ] Add localization, priority, labels, assignment, scheduling, and
+    hierarchy reference fields to task persistence. See
+    corbusier-api-design.md §Task domain -- Proposed write-side model.
+  - [ ] Introduce `Planned` state and update the transition matrix. See
+    corbusier-api-design.md §Task domain -- Lifecycle and transition rules.
+  - [ ] Backfill `localizations["en-GB"].name` from existing
+    `TaskOrigin::Issue` snapshot titles. See corbusier-api-design.md §Task
+    domain -- Migration strategy from current models.
+  - [ ] Success criteria: all task state transition pairs (including `Planned`)
+    are unit-tested; existing tasks are retrievable with localized names.
+- [ ] 5.2.3 Deliver task and project projection endpoints. Requires 5.1.2 and
+  5.2.2. See corbusier-api-design.md §Endpoint inventory -- Tasks and §Endpoint
+  inventory -- Projects.
+  - [ ] Implement `TaskCardDto` and `TaskDetailDto` projections. See
+    corbusier-api-design.md §Task domain -- Projection DTOs required by mockup
+    pages.
+  - [ ] Implement `ProjectCardDto`, `ProjectLandingDto`, and
+    `ProjectKanbanDto` projections. See corbusier-api-design.md §Project
+    domain -- Projections.
+  - [ ] Add dependency graph storage (edges table) and task hierarchy nodes
+    (goal, idea, and step). See corbusier-api-design.md §Task domain.
+  - [ ] Success criteria: list endpoints return paginated projection DTOs;
+    golden DTO fixtures match mockup card schemas.
+
+### 5.3. Conversations, directives, and SSE replay
+
+- [ ] 5.3.1 Add conversation aggregate and message paging. Requires 5.1.2 and
+  1.1.2. See corbusier-api-design.md §Conversation domain.
+  - [ ] Implement `ConversationAggregate` linking to project and task. See
+    corbusier-api-design.md §Conversation domain -- Write-side model.
+  - [ ] Backfill conversation rows from existing grouped messages. See
+    corbusier-api-design.md §Conversation domain -- Migration.
+  - [ ] Expose `ConversationListItemDto` and `ConversationDetailDto` via
+    paginated endpoints. See corbusier-api-design.md §Endpoint inventory --
+    Conversations and messages.
+  - [ ] Success criteria: conversations are listed and retrieved with message
+    paging; content parts render through existing serialization.
+- [ ] 5.3.2 Persist directives and expose registry endpoints. Requires 1.4.1
+  and 5.2.1. See corbusier-api-design.md §Directives domain.
+  - [ ] Implement `DirectiveAggregate` scoped to project and tenant. See
+    corbusier-api-design.md §Directives domain -- Write-side model.
+  - [ ] Seed core directives (`/task`, `/review`) from the existing
+    slash-command definitions. See corbusier-api-design.md §Directives
+    domain -- Migration.
+  - [ ] Success criteria: directives are queryable per project; schema
+    validation passes at write time.
+- [ ] 5.3.3 Implement SSE replay with `Last-Event-ID` semantics. Requires
+  5.1.3. See corbusier-api-design.md §SSE event stream and replay semantics.
+  - [ ] Implement conversation-scoped SSE at
+    `GET /api/v1/events/conversations/{conversation_id}`. See
+    corbusier-api-design.md §Recommended SSE endpoints.
+  - [ ] Replay events from the `domain_events` store on reconnect using
+    `Last-Event-ID`; emit `stream_reset` when events are no longer
+    retained.[^4]
+  - [ ] Success criteria: reconnecting clients receive replayed events;
+    deterministic replay is verified in streaming tests.
+
+### 5.4. Identity, suggestions, and governance
+
+- [ ] 5.4.1 Introduce user aggregate and personnel endpoints. Requires 1.5.1.
+  See corbusier-api-design.md §Identity domain.
+  - [ ] Implement `UserAggregate` with display name, email, avatar, and role.
+    See corbusier-api-design.md §Identity domain -- Write-side model.
+  - [ ] Implement `ApiKey` with hashed storage and revocation semantics. See
+    corbusier-api-design.md §Identity domain -- Write-side model.
+  - [ ] Bootstrap tenant owner as the first user per tenant. See
+    corbusier-api-design.md §Identity domain -- Migration.
+  - [ ] Success criteria: personnel directory lists tenant users; API keys can
+    be created and revoked.
+- [ ] 5.4.2 Deliver suggestion lifecycle and accept/dismiss endpoints. Requires
+  5.2.1. See corbusier-api-design.md §Suggestions domain.
+  - [ ] Implement `SuggestionAggregate` with priority, confidence, tags, and
+    rationale. See corbusier-api-design.md §Suggestions domain -- Write-side
+    model.
+  - [ ] Implement accept (creating a draft task) and dismiss actions. See
+    corbusier-api-design.md §Endpoint inventory -- Suggestions.
+  - [ ] Success criteria: accepted suggestions produce tasks in backlog;
+    `SuggestionCardDto` matches mockup fields.
+- [ ] 5.4.3 Add governance CRUD and system endpoint hardening. Requires 2.3.1
+  and 5.4.1. See corbusier-api-design.md §Governance domain.
+  - [ ] Implement `PolicyAggregate` and `HookAggregate` with enable/disable
+    lifecycle. See corbusier-api-design.md §Governance domain -- Write-side
+    model.
+  - [ ] Expose system endpoints for hooks, policies, agents, tool servers, and
+    tenant readout. See corbusier-api-design.md §Endpoint inventory -- System.
+  - [ ] Add OpenAPI-driven contract tests and multi-tenant isolation tests for
+    all phase 5 endpoints. See corbusier-api-design.md §Test strategy.
+  - [ ] Success criteria: contract tests validate error schema stability and
+    pagination envelope shape; tenant isolation tests pass.
+
+[^4]: See
+      [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+  and
+  [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+   for `Last-Event-ID` replay semantics.
