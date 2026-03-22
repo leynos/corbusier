@@ -64,6 +64,17 @@ owned separately by ADR 008.
 - Collapse prompt content, bundle metadata, and skills into one file type.
 - Finalise validation outcomes for target runtimes.
 
+## Podbot roadmap dependencies
+
+This ADR depends on the following upstream Podbot roadmap steps:
+
+- Step 4.5, "Normalized launch contract", because prompts, bundles, skill
+  selection, hook subscriptions, and wire references must feed one normalized
+  launch plan.
+- Step 4.8, "Prompt, bundle, and validation surfaces", because Podbot needs
+  documented prompt and bundle contracts that can align with the Corbusier
+  document model defined here.
+
 ## Options Considered
 
 ### Option A: Preserve standard skill directories and add first-class bundles and prompt files

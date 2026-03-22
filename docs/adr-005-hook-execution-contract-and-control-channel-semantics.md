@@ -65,6 +65,18 @@ schema for runtime state; ADR 006 covers that.
 - Define every future workflow trigger Corbusier might invent.
 - Replace the need for durable state and audit persistence.
 
+## Podbot roadmap dependencies
+
+This ADR depends on the following upstream Podbot roadmap steps:
+
+- Step 4.6, "Hosted session control plane", because hook requests and
+  acknowledgements must travel over a typed event and control surface.
+- Step 4.9, "Hook execution and orchestrator acknowledgement", because that
+  step provides the direct Podbot implementation surface for this contract.
+- Step 4.10, "Recovery, replay, and restart safety", because hook
+  acknowledgement semantics are incomplete without restart-safe replay and
+  duplicate-delivery handling.
+
 ## Options Considered
 
 ### Option A: Podbot emits requests, waits for acknowledgement, and executes hooks

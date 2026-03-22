@@ -62,6 +62,24 @@ does not redefine the underlying workspace, wire, or hook models.
 - Encode organisation-specific approval processes in full detail.
 - Replace host operating-system safeguards with application policy alone.
 
+## Podbot roadmap dependencies
+
+This ADR depends on the following upstream Podbot roadmap steps:
+
+- Step 1.4, "Hosting schema migration and compatibility matrix", because the
+  security-sensitive hosting fields and defaults must exist in Podbot's
+  configuration model.
+- Step 2.6, "ACP capability masking enforcement", because delegated host
+  capability rules are part of the security boundary this ADR sets.
+- Step 4.4, "Workspace strategies", because host-mount policy and allowed-root
+  enforcement are core privilege-boundary controls.
+- Step 4.7, "MCP wire provisioning and injection", because helper-container
+  `RepoAccess` defaults and wire injection details affect the runtime trust
+  boundary.
+- Step 4.9, "Hook execution and orchestrator acknowledgement", because hook
+  workspace access and environment allowlist policy are security-critical
+  defaults.
+
 ## Options Considered
 
 ### Option A: Least-privilege defaults with explicit, auditable opt-in

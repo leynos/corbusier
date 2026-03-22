@@ -64,6 +64,19 @@ the hook contract or wire model already owned by earlier ADRs.
 - Persist every telemetry event forever.
 - Replace operational observability tooling with relational state alone.
 
+## Podbot roadmap dependencies
+
+This ADR depends on the following upstream Podbot roadmap steps:
+
+- Step 4.6, "Hosted session control plane", because Corbusier's durable model
+  depends on the event boundaries exposed by Podbot's hosted session surface.
+- Step 4.9, "Hook execution and orchestrator acknowledgement", because hook
+  state and acknowledgements are part of the runtime entities that Corbusier
+  must persist.
+- Step 4.10, "Recovery, replay, and restart safety", because Podbot's event
+  identifiers and recovery behaviour drive Corbusier's idempotency and restart
+  guarantees.
+
 ## Options Considered
 
 ### Option A: Normalized relational runtime state with explicit state machines
