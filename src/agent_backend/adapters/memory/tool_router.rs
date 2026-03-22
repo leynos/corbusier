@@ -94,6 +94,7 @@ impl ToolRouterPort for InMemoryToolRouter {
         let mut state = self.state.write().map_err(|err| {
             ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
+        state.routed_call_ids.push(call_id.to_owned());
 
         if let Some(message) = state.failures.get(tool_call.tool_name()) {
             return Err(ToolRoutingError::ToolExecutionFailed(message.clone()));
@@ -104,8 +105,6 @@ impl ToolRouterPort for InMemoryToolRouter {
             .get(tool_call.tool_name())
             .cloned()
             .unwrap_or_else(|| tool_call.parameters().clone());
-
-        state.routed_call_ids.push(call_id.to_owned());
 
         Ok(ToolCallResult::new(call_id, tool_call.tool_name(), output))
     }

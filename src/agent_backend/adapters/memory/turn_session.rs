@@ -22,6 +22,22 @@ struct InMemoryTurnSessionState {
     active_index: HashMap<(TenantId, BackendId, Uuid), TurnSessionId>,
 }
 
+#[derive(Debug)]
+enum ExistingClaimOutcome {
+    Reused(TurnSession),
+    ReserveNew { prior_expired: Option<TurnSession> },
+    Conflict,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReservationParams {
+    tenant_id: TenantId,
+    backend_id: BackendId,
+    conversation_id: Uuid,
+    now: DateTime<Utc>,
+    ttl: chrono::Duration,
+}
+
 /// Thread-safe in-memory repository for turn sessions.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryTurnSessionRepository {
@@ -100,6 +116,102 @@ impl InMemoryTurnSessionRepository {
         })
         .map_err(TurnSessionRepositoryError::invalid_domain_data)
     }
+
+    fn reserve_session_slot(
+        state: &mut InMemoryTurnSessionState,
+        params: ReservationParams,
+        prior_expired: Option<TurnSession>,
+    ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let reservation = Self::create_reservation_session(
+            params.backend_id,
+            params.conversation_id,
+            params.now,
+            params.ttl,
+        )?;
+        Self::reconcile_session_index(state, params.tenant_id, &reservation)?;
+        Ok(SessionSlotArbitration::Reserved {
+            reservation,
+            prior_expired,
+        })
+    }
+
+    fn recover_stale_index(
+        state: &mut InMemoryTurnSessionState,
+        index_key: &(TenantId, BackendId, Uuid),
+    ) -> bool {
+        let should_remove = state
+            .active_index
+            .get(index_key)
+            .is_some_and(|claimed_id| !state.sessions.contains_key(claimed_id));
+        if should_remove {
+            state.active_index.remove(index_key);
+        }
+        should_remove
+    }
+
+    fn handle_reserved_slot(
+        existing: &mut TurnSession,
+        now: DateTime<Utc>,
+    ) -> Option<ExistingClaimOutcome> {
+        if existing.status() != TurnSessionStatus::Reserved {
+            return None;
+        }
+        if existing.is_expired_at(now) {
+            existing.mark_expired(now);
+            return Some(ExistingClaimOutcome::ReserveNew {
+                prior_expired: None,
+            });
+        }
+        Some(ExistingClaimOutcome::Conflict)
+    }
+
+    fn try_reuse_active(existing: &TurnSession, now: DateTime<Utc>) -> Option<TurnSession> {
+        (existing.status() == TurnSessionStatus::Active && !existing.is_expired_at(now))
+            .then(|| existing.clone())
+    }
+
+    fn expire_active(existing: &mut TurnSession, now: DateTime<Utc>) -> Option<TurnSession> {
+        if existing.status() != TurnSessionStatus::Active {
+            return None;
+        }
+        existing.mark_expired(now);
+        Some(existing.clone())
+    }
+
+    fn arbitrate_existing_claim(
+        state: &mut InMemoryTurnSessionState,
+        index_key: (TenantId, BackendId, Uuid),
+        claimed_id: TurnSessionId,
+        params: ReservationParams,
+    ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
+        let Some(existing) = state.sessions.get_mut(&claimed_id) else {
+            return Self::reserve_session_slot(state, params, None);
+        };
+        let outcome = Self::handle_reserved_slot(existing, params.now).unwrap_or_else(|| {
+            Self::try_reuse_active(existing, params.now).map_or_else(
+                || ExistingClaimOutcome::ReserveNew {
+                    prior_expired: Self::expire_active(existing, params.now),
+                },
+                ExistingClaimOutcome::Reused,
+            )
+        });
+
+        match outcome {
+            ExistingClaimOutcome::Reused(reused_session) => {
+                Ok(SessionSlotArbitration::Reused(reused_session))
+            }
+            ExistingClaimOutcome::ReserveNew { prior_expired } => {
+                state.active_index.remove(&index_key);
+                Self::reserve_session_slot(state, params, prior_expired)
+            }
+            ExistingClaimOutcome::Conflict => {
+                Err(TurnSessionRepositoryError::active_session_conflict(
+                    params.backend_id,
+                    params.conversation_id,
+                ))
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -118,58 +230,23 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
             TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
         })?;
 
+        let params = ReservationParams {
+            tenant_id: ctx.tenant_id(),
+            backend_id,
+            conversation_id,
+            now,
+            ttl,
+        };
         let index_key = (ctx.tenant_id(), backend_id, conversation_id);
-        let mut prior_expired = None;
-
-        if let Some(claimed_id) = state.active_index.get(&index_key).copied() {
-            let Some(existing) = state.sessions.get_mut(&claimed_id) else {
-                state.active_index.remove(&index_key);
-                let reserved_session =
-                    Self::create_reservation_session(backend_id, conversation_id, now, ttl)?;
-                Self::reconcile_session_index(&mut state, ctx.tenant_id(), &reserved_session)?;
-                return Ok(SessionSlotArbitration::Reserved {
-                    reservation: reserved_session,
-                    prior_expired,
-                });
-            };
-
-            if existing.status() == TurnSessionStatus::Reserved {
-                if existing.is_expired_at(now) {
-                    existing.mark_expired(now);
-                    state.active_index.remove(&index_key);
-                    let reserved_session =
-                        Self::create_reservation_session(backend_id, conversation_id, now, ttl)?;
-                    Self::reconcile_session_index(&mut state, ctx.tenant_id(), &reserved_session)?;
-                    return Ok(SessionSlotArbitration::Reserved {
-                        reservation: reserved_session,
-                        prior_expired,
-                    });
-                }
-                return Err(TurnSessionRepositoryError::active_session_conflict(
-                    backend_id,
-                    conversation_id,
-                ));
-            }
-
-            if existing.status() == TurnSessionStatus::Active && !existing.is_expired_at(now) {
-                return Ok(SessionSlotArbitration::Reused(existing.clone()));
-            }
-
-            if existing.status() == TurnSessionStatus::Active {
-                existing.mark_expired(now);
-                prior_expired = Some(existing.clone());
-            }
-
-            state.active_index.remove(&index_key);
+        if Self::recover_stale_index(&mut state, &index_key) {
+            return Self::reserve_session_slot(&mut state, params, None);
         }
 
-        let reserved_session =
-            Self::create_reservation_session(backend_id, conversation_id, now, ttl)?;
-        Self::reconcile_session_index(&mut state, ctx.tenant_id(), &reserved_session)?;
-        Ok(SessionSlotArbitration::Reserved {
-            reservation: reserved_session,
-            prior_expired,
-        })
+        if let Some(claimed_id) = state.active_index.get(&index_key).copied() {
+            return Self::arbitrate_existing_claim(&mut state, index_key, claimed_id, params);
+        }
+
+        Self::reserve_session_slot(&mut state, params, None)
     }
 
     async fn find_active_session(

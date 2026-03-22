@@ -39,11 +39,13 @@ pub type TestRegistryService = BackendRegistryService<PostgresBackendRegistry, D
 pub struct OrchestrationContext {
     pub cluster: PostgresCluster,
     pub ctx: RequestContext,
+    pub backend_registry: Arc<PostgresBackendRegistry>,
     pub service: TestOrchestrator,
     pub registry_service: TestRegistryService,
     pub session_repository: Arc<PostgresTurnSessionRepository>,
     pub runtime: Arc<InMemoryAgentRuntime>,
     pub router: Arc<InMemoryToolRouter>,
+    pub clock: Arc<DefaultClock>,
     pub temp_db: TemporaryDatabase,
 }
 
@@ -76,7 +78,7 @@ async fn setup_context(cluster: PostgresCluster) -> Result<OrchestrationContext,
         config,
     );
 
-    let registry_service = BackendRegistryService::new(backend_registry, clock);
+    let registry_service = BackendRegistryService::new(backend_registry.clone(), clock.clone());
 
     Ok(OrchestrationContext {
         cluster,
@@ -86,11 +88,13 @@ async fn setup_context(cluster: PostgresCluster) -> Result<OrchestrationContext,
             UserId::new(),
             SessionId::new(),
         ),
+        backend_registry,
         service,
         registry_service,
         session_repository,
         runtime,
         router,
+        clock,
         temp_db: db,
     })
 }

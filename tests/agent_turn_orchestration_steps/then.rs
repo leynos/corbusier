@@ -88,6 +88,7 @@ fn all_tool_audits_are(
 
     let expected = match status.as_str() {
         "succeeded" => ToolCallAuditStatus::Succeeded,
+        "failed" => ToolCallAuditStatus::Failed,
         other => return Err(eyre::eyre!("unsupported audit status assertion: {other}")),
     };
 

@@ -72,12 +72,9 @@ pub(crate) fn row_to_turn_session(
         .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
     let parsed_runtime_session_id = RuntimeSessionId::new(runtime_session_id)
         .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
-    let parsed_turn_count: u64 =
-        turn_count
-            .try_into()
-            .map_err(|err: std::num::TryFromIntError| {
-                TurnSessionRepositoryError::invalid_persisted_data(err)
-            })?;
+    let parsed_turn_count: u64 = turn_count
+        .try_into()
+        .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
 
     Ok(TurnSession::from_persisted(PersistedTurnSessionData {
         id: TurnSessionId::from_uuid(id),

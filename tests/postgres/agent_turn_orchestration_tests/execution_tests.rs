@@ -6,8 +6,11 @@ use corbusier::agent_backend::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
         TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
-    ports::{SessionSlotKey, TurnSessionRepository},
-    services::{AgentTurnOrchestrationError, ExecuteAgentTurnRequest},
+    ports::{SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError},
+    services::{
+        AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
+        AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
+    },
 };
 use rstest::rstest;
 use serde_json::json;
@@ -288,15 +291,47 @@ async fn concurrent_execute_turn_creates_single_active_session(
         backend_id,
         TurnExecutionRequest::new(conversation_id, "second turn", Vec::new()),
     );
+    let second_service = AgentTurnOrchestratorService::with_config(
+        AgentTurnOrchestratorPorts {
+            backend_registry: ctx.backend_registry.clone(),
+            turn_sessions: ctx.session_repository.clone(),
+            runtime: ctx.runtime.clone(),
+            tool_router: ctx.router.clone(),
+            clock: ctx.clock.clone(),
+        },
+        AgentTurnOrchestratorConfig::new(Duration::minutes(5))
+            .map_err(|err| Box::new(err) as BoxError)?,
+    );
 
     let (first_result, second_result) = tokio::join!(
         ctx.service.execute_turn(&ctx.ctx, first_request),
-        ctx.service.execute_turn(&ctx.ctx, second_request)
+        second_service.execute_turn(&ctx.ctx, second_request)
     );
-
-    let first_response = first_result.map_err(|err| Box::new(err) as BoxError)?;
-    let second_response = second_result.map_err(|err| Box::new(err) as BoxError)?;
-    assert_eq!(first_response.session_id(), second_response.session_id());
+    let results = [first_result, second_result];
+    let success_count = results.iter().filter(|result| result.is_ok()).count();
+    assert_eq!(
+        success_count, 1,
+        "expected exactly one concurrent execute_turn call to win the reservation race"
+    );
+    let conflict_count = results
+        .iter()
+        .filter(|result| {
+            matches!(
+                result,
+                Err(AgentTurnOrchestrationError::SessionRepository(
+                    TurnSessionRepositoryError::ActiveSessionConflict { .. }
+                ))
+            )
+        })
+        .count();
+    assert_eq!(
+        conflict_count, 1,
+        "expected exactly one concurrent execute_turn call to fail with an active-session conflict"
+    );
+    let winning_response = results
+        .into_iter()
+        .find_map(Result::ok)
+        .ok_or_else(|| Box::new(std::io::Error::other("expected a successful turn")) as BoxError)?;
 
     let active_sessions = ctx
         .session_repository
@@ -320,8 +355,8 @@ async fn concurrent_execute_turn_creates_single_active_session(
         .expect("Expected exactly one active session to exist");
     assert_eq!(
         active_session.id(),
-        first_response.session_id(),
-        "Active session ID should match the session used by both turns"
+        winning_response.session_id(),
+        "Active session ID should match the successful turn session"
     );
 
     Ok(())

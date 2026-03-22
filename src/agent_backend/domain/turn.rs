@@ -262,13 +262,7 @@ fn canonical_object_value(map: &Map<String, Value>) -> Value {
     keys.sort_unstable();
     let canonical_map = keys
         .into_iter()
-        .map(|key| {
-            (
-                key.to_owned(),
-                map.get(key)
-                    .map_or_else(|| Value::Null, canonical_json_value),
-            )
-        })
+        .map(|key| (key.to_owned(), canonical_json_value(&map[key])))
         .collect::<Map<String, Value>>();
     Value::Object(canonical_map)
 }

@@ -294,7 +294,11 @@ impl TurnSession {
     }
 
     /// Marks the session expired.
-    pub const fn mark_expired(&mut self, now: DateTime<Utc>) {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "This runtime mutator stays non-const so its stateful semantics remain explicit"
+    )]
+    pub fn mark_expired(&mut self, now: DateTime<Utc>) {
         self.status = TurnSessionStatus::Expired;
         self.ended_at = Some(now);
     }

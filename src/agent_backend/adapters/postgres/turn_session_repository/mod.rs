@@ -167,13 +167,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     .execute(tx_conn)
                     .map_err(|error| map_upsert_error(error, backend_id, conversation_id))?;
 
-                if inserted == 0
-                    && matches!(
-                        new_row.status.as_str(),
-                        status if status == TurnSessionStatus::Active.as_str()
-                            || status == TurnSessionStatus::Reserved.as_str()
-                    )
-                {
+                if inserted == 0 && is_slot_claiming_status(new_row.status.as_str()) {
                     return Err(TurnSessionRepositoryError::active_session_conflict(
                         BackendId::from_uuid(backend_id),
                         conversation_id,
@@ -184,6 +178,12 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
         })
         .await
     }
+}
+
+/// Returns `true` when `status` represents a session that claims an active
+/// slot — i.e. `active` or `reserved`.
+fn is_slot_claiming_status(status: &str) -> bool {
+    status == TurnSessionStatus::Active.as_str() || status == TurnSessionStatus::Reserved.as_str()
 }
 
 pub(crate) fn map_upsert_error(

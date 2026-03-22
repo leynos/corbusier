@@ -168,12 +168,12 @@ fn handle_existing_claim(
     existing: TurnSession,
 ) -> TurnSessionRepositoryResult<SessionSlotArbitration> {
     match existing.status() {
-        TurnSessionStatus::Active if existing.is_expired_at(params.now) => {
+        TurnSessionStatus::Active if is_active_and_expired(&existing, params.now) => {
             let prior_expired = expire_claimed_session(tx_conn, &existing, params.now)?;
             reserve_slot(tx_conn, params, Some(prior_expired))
         }
         TurnSessionStatus::Active => Ok(SessionSlotArbitration::Reused(existing)),
-        TurnSessionStatus::Reserved if existing.is_expired_at(params.now) => {
+        TurnSessionStatus::Reserved if is_reserved_and_expired(&existing, params.now) => {
             expire_claimed_session(tx_conn, &existing, params.now)?;
             reserve_slot(tx_conn, params, None)
         }
@@ -185,6 +185,14 @@ fn handle_existing_claim(
             std::io::Error::other("expired session row should not claim a session slot"),
         )),
     }
+}
+
+fn is_active_and_expired(session: &TurnSession, now: DateTime<Utc>) -> bool {
+    session.status() == TurnSessionStatus::Active && session.is_expired_at(now)
+}
+
+fn is_reserved_and_expired(session: &TurnSession, now: DateTime<Utc>) -> bool {
+    session.status() == TurnSessionStatus::Reserved && session.is_expired_at(now)
 }
 
 fn reserve_slot(

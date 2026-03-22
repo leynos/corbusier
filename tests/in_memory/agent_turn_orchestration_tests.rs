@@ -4,94 +4,38 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use corbusier::agent_backend::{
-    adapters::memory::{
-        InMemoryAgentRuntime, InMemoryBackendRegistry, InMemoryToolRouter,
-        InMemoryTurnSessionRepository,
-    },
     domain::{
-        PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
-        TurnExecutionResult, TurnSession, TurnSessionStatus,
+        BackendId, PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest,
+        TurnExecutionRequest, TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
     ports::{
         SessionSlotArbitration, SessionSlotKey, SessionSlotReservation, TurnSessionRepository,
     },
     services::{
-        AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
-        AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
+        AgentTurnOrchestrationError, BackendRegistryService, ExecuteAgentTurnRequest,
+        RegisterBackendRequest,
     },
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use corbusier::test_support::{InMemoryAgentTurnStack, build_in_memory_orchestrator};
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 use serde_json::json;
 use uuid::Uuid;
 
-type TestOrchestrator = AgentTurnOrchestratorService<
-    InMemoryBackendRegistry,
-    InMemoryTurnSessionRepository,
-    InMemoryAgentRuntime,
-    InMemoryToolRouter,
-    DefaultClock,
->;
-
-struct TestContext {
-    backend_registry: Arc<InMemoryBackendRegistry>,
-    session_repository: Arc<InMemoryTurnSessionRepository>,
-    runtime: Arc<InMemoryAgentRuntime>,
-    router: Arc<InMemoryToolRouter>,
-    service: TestOrchestrator,
-    ctx: RequestContext,
-}
+type TestContext = InMemoryAgentTurnStack;
 
 #[fixture]
 fn context() -> TestContext {
-    let backend_registry = Arc::new(InMemoryBackendRegistry::new());
-    let session_repository = Arc::new(InMemoryTurnSessionRepository::new());
-    let runtime = Arc::new(InMemoryAgentRuntime::new());
-    let router = Arc::new(InMemoryToolRouter::new());
-    let config = AgentTurnOrchestratorConfig::default();
-
-    let service = AgentTurnOrchestratorService::with_config(
-        AgentTurnOrchestratorPorts {
-            backend_registry: backend_registry.clone(),
-            turn_sessions: session_repository.clone(),
-            runtime: runtime.clone(),
-            tool_router: router.clone(),
-            clock: Arc::new(DefaultClock),
-        },
-        config,
-    );
-
-    TestContext {
-        backend_registry,
-        session_repository,
-        runtime,
-        router,
-        service,
-        ctx: RequestContext::new(
-            TenantId::new(),
-            CorrelationId::new(),
-            UserId::new(),
-            SessionId::new(),
-        ),
-    }
+    build_in_memory_orchestrator()
 }
 
-async fn register_backend(context: &TestContext, name: &str) -> Result<uuid::Uuid, eyre::Report> {
-    let request = corbusier::agent_backend::services::RegisterBackendRequest::new(
-        name,
-        name,
-        "1.0.0",
-        "test-provider",
-    )
-    .with_capabilities(true, true);
-
-    let registry_service = corbusier::agent_backend::services::BackendRegistryService::new(
-        context.backend_registry.clone(),
-        Arc::new(DefaultClock),
-    );
+async fn register_backend(context: &TestContext, name: &str) -> Result<BackendId, eyre::Report> {
+    let request = RegisterBackendRequest::new(name, name, "1.0.0", "test-provider")
+        .with_capabilities(true, true);
+    let registry_service =
+        BackendRegistryService::new(context.backend_registry.clone(), Arc::new(DefaultClock));
     let backend = registry_service.register(&context.ctx, request).await?;
-    Ok(backend.id().into_inner())
+    Ok(backend.id())
 }
 
 #[rstest]
@@ -99,9 +43,7 @@ async fn register_backend(context: &TestContext, name: &str) -> Result<uuid::Uui
 async fn orchestrates_turn_and_reuses_session_before_expiry(
     context: TestContext,
 ) -> Result<(), eyre::Report> {
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&context, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
 
     context.runtime.queue_turn_result(TurnExecutionResult::new(
@@ -109,7 +51,7 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
         vec![ToolCallRequest::new("lookup", json!({"q": "roadmap"}))?],
     ))?;
     context
-        .router
+        .tool_router
         .set_tool_response("lookup", json!({"result": "ok"}))?;
 
     let first = context
@@ -150,9 +92,7 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
 async fn reservation_is_persisted_before_runtime_session_creation(
     context: TestContext,
 ) -> Result<(), eyre::Report> {
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&context, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
 
     let arbitration = context
@@ -190,9 +130,7 @@ async fn reservation_is_persisted_before_runtime_session_creation(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn timed_out_reservation_is_reclaimed(context: TestContext) -> Result<(), eyre::Report> {
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&context, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     let first_now = Utc::now();
 
@@ -256,9 +194,7 @@ async fn timed_out_reservation_is_reclaimed(context: TestContext) -> Result<(), 
 async fn rotates_expired_session_and_marks_prior_session_expired(
     context: TestContext,
 ) -> Result<(), eyre::Report> {
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&context, "codex_cli").await?,
-    );
+    let backend_id = register_backend(&context, "codex_cli").await?;
     let conversation_id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -310,15 +246,15 @@ async fn rotates_expired_session_and_marks_prior_session_expired(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn propagates_tool_router_failures(context: TestContext) -> Result<(), eyre::Report> {
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&context, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&context, "claude_code_sdk").await?;
 
     context.runtime.queue_turn_result(TurnExecutionResult::new(
         "response",
         vec![ToolCallRequest::new("fail_tool", json!({"x": 1}))?],
     ))?;
-    context.router.fail_tool("fail_tool", "simulated failure")?;
+    context
+        .tool_router
+        .fail_tool("fail_tool", "simulated failure")?;
 
     let result = context
         .service

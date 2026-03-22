@@ -1078,11 +1078,12 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   marked `expired` before a new runtime session is created.
 - `execute_turn` must perform session-slot arbitration with a single database
   transaction for each `(tenant_id, backend_id, conversation_id)` slot: lock
-  the same slot key, read the claimed row from `agent_turn_sessions`, evaluate
-  `expires_at`, mark the row expired when needed, then either extend/reuse the
-  existing session or insert a replacement row and commit. This avoids
-  read-modify-write races and ensures the partial unique index never observes a
-  transient double-claimed state.
+  the owning `backend_registrations` sentinel row with `FOR UPDATE`, then read
+  the claimed row from `agent_turn_sessions`, evaluate `expires_at`, mark the
+  row expired when needed, then either extend or reuse the existing session or
+  insert a replacement row and commit. This sentinel-row lock serializes
+  concurrent claims, avoids first-claim races, and ensures the partial unique
+  index never observes a transient double-claimed state.
 - Session lifecycle handling is part of the orchestration service, while
   persistence and runtime concerns remain adapter responsibilities to preserve
   hexagonal boundaries.

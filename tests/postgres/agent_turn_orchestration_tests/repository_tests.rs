@@ -296,6 +296,9 @@ async fn postgres_reclaims_timed_out_reservation_after_crash(
     else {
         return Err(Box::new(std::io::Error::other("expected reclaimed reservation")) as BoxError);
     };
+    // Reclaiming a timed-out `Reserved` row intentionally keeps
+    // `prior_expired` empty because only previously active sessions need
+    // runtime teardown after `SessionSlotArbitration::Reserved`.
     assert!(prior_expired.is_none());
     assert_ne!(reservation.id(), initial_reservation.id());
 

@@ -73,7 +73,7 @@ pub enum AgentRuntimeError {
 
     /// Infrastructure failure from the runtime adapter.
     #[error("runtime infrastructure error: {0}")]
-    Infrastructure(Arc<dyn std::error::Error + Send + Sync>),
+    Infrastructure(#[source] Arc<dyn std::error::Error + Send + Sync>),
 }
 
 impl AgentRuntimeError {
