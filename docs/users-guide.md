@@ -668,13 +668,16 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
 Corbusier orchestrates agent turns through a single service path that validates
 the target backend, resolves or rotates a backend runtime session, executes the
 turn, and routes tool calls in deterministic order. Session continuity is
-tracked per `(backend_id, conversation_id)` until the session expires.
+tracked per `(tenant_id, backend_id, conversation_id)` until the session
+expires, with every repository query binding `RequestContext.tenant_id` so
+tenant isolation is enforced for reuse and rotation.
 
-When a stored session is still active, it is reused. When expired, the session
-is marked expired and a new runtime session is created automatically. The
-session repository now commits a `reserved` slot row before the runtime session
-is created, so expiry detection and replacement-session claiming happen at the
-database boundary before any external runtime call is made.
+When a stored session is still active within the current tenant, it is reused.
+When expired, the session is marked expired and a new runtime session is
+created automatically. The session repository commits a `reserved` slot row for
+the current tenant before the runtime session is created, so expiry detection,
+replacement-session claiming, and subsequent reuse all remain tenant-scoped and
+happen at the database boundary before any external runtime call is made.
 
 ```rust,no_run
 use std::sync::Arc;

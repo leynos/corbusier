@@ -81,7 +81,7 @@ pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v10";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v11";
 /// SQL to tenant-scope agent backend and turn-session tables.
 pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
     include_str!("../../migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql");
@@ -137,7 +137,6 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
-    map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;

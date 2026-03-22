@@ -1,6 +1,7 @@
 //! Tool routing port for orchestrated agent turns.
 
 use crate::agent_backend::domain::{BackendId, ToolCallRequest, ToolCallResult, TurnSessionId};
+use crate::context::TenantId;
 use async_trait::async_trait;
 use std::sync::Arc;
 use thiserror::Error;
@@ -12,6 +13,7 @@ pub type ToolRoutingResult<T> = Result<T, ToolRoutingError>;
 /// Context provided to tool-routing adapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ToolRoutingContext {
+    tenant: TenantId,
     backend: BackendId,
     conversation: Uuid,
     session: TurnSessionId,
@@ -21,15 +23,23 @@ impl ToolRoutingContext {
     /// Creates tool-routing context from turn execution metadata.
     #[must_use]
     pub const fn new(
+        tenant_id: TenantId,
         backend_id: BackendId,
         conversation_id: Uuid,
         turn_session_id: TurnSessionId,
     ) -> Self {
         Self {
+            tenant: tenant_id,
             backend: backend_id,
             conversation: conversation_id,
             session: turn_session_id,
         }
+    }
+
+    /// Returns tenant ID for tenant-scoped routing decisions.
+    #[must_use]
+    pub const fn tenant_id(self) -> TenantId {
+        self.tenant
     }
 
     /// Returns backend ID for routing decisions.

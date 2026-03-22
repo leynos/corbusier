@@ -156,7 +156,7 @@ where
         };
 
         let (tool_results, tool_call_audits) = match self
-            .route_tool_calls(&session, runtime_result.tool_calls())
+            .route_tool_calls(ctx.tenant_id(), &session, runtime_result.tool_calls())
             .await
         {
             Ok(routed) => routed,
@@ -167,9 +167,8 @@ where
             }
         };
 
-        let completion_time = self.clock.utc();
-        session.record_turn(completion_time)?;
-        self.turn_sessions.upsert_session(ctx, &session).await?;
+        self.persist_completed_turn(ctx, &backend, &mut session)
+            .await?;
 
         Ok(ExecuteAgentTurnResponse::new(
             &session,
@@ -240,6 +239,24 @@ where
         teardown_result
     }
 
+    async fn persist_completed_turn(
+        &self,
+        ctx: &RequestContext,
+        backend: &AgentBackendRegistration,
+        session: &mut TurnSession,
+    ) -> AgentTurnOrchestrationResult<()> {
+        let completion_time = self.clock.utc();
+        session.record_turn(completion_time)?;
+
+        if let Err(error) = self.turn_sessions.upsert_session(ctx, session).await {
+            self.expire_persist_and_teardown(ctx, backend, session)
+                .await?;
+            return Err(AgentTurnOrchestrationError::SessionRepository(error));
+        }
+
+        Ok(())
+    }
+
     async fn expire_session(
         &self,
         ctx: &RequestContext,
@@ -292,6 +309,7 @@ where
 
     async fn route_tool_calls(
         &self,
+        tenant_id: crate::context::TenantId,
         session: &TurnSession,
         tool_calls: &[ToolCallRequest],
     ) -> AgentTurnOrchestrationResult<(Vec<ToolCallResult>, Vec<ToolCallAudit>)> {
@@ -301,6 +319,7 @@ where
         for (index, tool_call) in tool_calls.iter().enumerate() {
             let call_id = deterministic_tool_call_id(tool_call, index);
             let context = ToolRoutingContext::new(
+                tenant_id,
                 session.backend_id(),
                 session.conversation_id(),
                 session.id(),
