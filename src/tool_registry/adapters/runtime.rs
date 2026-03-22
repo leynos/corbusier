@@ -260,13 +260,11 @@ impl McpServerHost for InMemoryMcpServerHost {
             .tool_call_results
             .get(&key)
             .cloned()
-            .ok_or_else(|| {
-            McpServerHostError::ToolCallFailed {
+            .ok_or_else(|| McpServerHostError::ToolCallFailed {
                 server_id: server.id(),
                 tool_name: tool_name.to_owned(),
                 reason: "no result configured for this tool".to_owned(),
-            }
-        })?;
+            })?;
         let stderr_output = refreshed_state.tool_call_stderr.get(&key).cloned();
 
         Ok(ToolCallHostResult {

@@ -6,7 +6,9 @@ use crate::hook_engine::ports::{HookEngine, HookPolicyAuditRepository};
 use crate::tool_registry::domain::{
     CatalogEntry, ToolCallRequest, ToolCallResult, ToolGovernanceDecision,
 };
-use crate::tool_registry::ports::{ToolExecutionGovernance, ToolGovernanceError};
+use crate::tool_registry::ports::{
+    CompletedToolCall, ToolExecutionGovernance, ToolGovernanceError,
+};
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
@@ -27,16 +29,6 @@ impl ToolExecutionGovernance for AllowAllPolicy {
         _entry: &CatalogEntry,
     ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
         Ok(ToolGovernanceDecision::Allow)
-    }
-
-    async fn observe_after_call(
-        &self,
-        _ctx: &RequestContext,
-        _request: &ToolCallRequest,
-        _entry: &CatalogEntry,
-        _result: &ToolCallResult,
-    ) -> Result<(), ToolGovernanceError> {
-        Ok(())
     }
 }
 
@@ -69,16 +61,6 @@ impl ToolExecutionGovernance for DenyAllPolicy {
         Ok(ToolGovernanceDecision::Deny {
             reason: self.reason.clone(),
         })
-    }
-
-    async fn observe_after_call(
-        &self,
-        _ctx: &RequestContext,
-        _request: &ToolCallRequest,
-        _entry: &CatalogEntry,
-        _result: &ToolCallResult,
-    ) -> Result<(), ToolGovernanceError> {
-        Ok(())
     }
 }
 
@@ -117,9 +99,7 @@ impl ToolExecutionGovernance for FailingPolicy {
     async fn observe_after_call(
         &self,
         _ctx: &RequestContext,
-        _request: &ToolCallRequest,
-        _entry: &CatalogEntry,
-        _result: &ToolCallResult,
+        _call: &CompletedToolCall<'_>,
     ) -> Result<(), ToolGovernanceError> {
         Err(ToolGovernanceError::EvaluationFailed {
             message: self.message.clone(),
@@ -187,10 +167,8 @@ where
             } else {
                 task_scope
             };
-        let occurred_at = result.map_or_else(
-            || request.initiated_at(),
-            ToolCallResult::completed_at,
-        );
+        let occurred_at =
+            result.map_or_else(|| request.initiated_at(), ToolCallResult::completed_at);
         HookTriggerContext::new_with_timestamp(trigger_type, execution_scope, occurred_at)
     }
 }
@@ -224,20 +202,24 @@ where
                 message: err.to_string(),
             })?;
 
-        Ok(denial_reason(events).map_or(ToolGovernanceDecision::Allow, |reason| {
-            ToolGovernanceDecision::Deny { reason }
-        }))
+        Ok(
+            denial_reason(events).map_or(ToolGovernanceDecision::Allow, |reason| {
+                ToolGovernanceDecision::Deny { reason }
+            }),
+        )
     }
 
     async fn observe_after_call(
         &self,
         ctx: &RequestContext,
-        request: &ToolCallRequest,
-        entry: &CatalogEntry,
-        result: &ToolCallResult,
+        call: &CompletedToolCall<'_>,
     ) -> Result<(), ToolGovernanceError> {
-        let trigger_context =
-            Self::build_trigger_context(HookTriggerType::PostToolUse, request, entry, Some(result));
+        let trigger_context = Self::build_trigger_context(
+            HookTriggerType::PostToolUse,
+            call.request,
+            call.entry,
+            Some(call.result),
+        );
         self.hook_engine
             .execute(ctx, trigger_context)
             .await

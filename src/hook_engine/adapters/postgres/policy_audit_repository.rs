@@ -14,6 +14,7 @@ use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_t
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
 use async_trait::async_trait;
+use diesel::pg::Pg;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -52,6 +53,35 @@ impl PostgresHookPolicyAuditRepository {
         })
         .await
         .map_err(HookPolicyAuditError::persistence_failed)?
+    }
+
+    async fn query_events_filtered<F>(
+        &self,
+        tenant_id: TenantId,
+        extra_filter: F,
+    ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>>
+    where
+        F: FnOnce(
+                hook_policy_audit_events::BoxedQuery<'static, Pg>,
+            ) -> hook_policy_audit_events::BoxedQuery<'static, Pg>
+            + Send
+            + 'static,
+    {
+        self.execute_query(tenant_id, move |connection| {
+            let query = hook_policy_audit_events::table
+                .filter(hook_policy_audit_events::tenant_id.eq(tenant_id.into_inner()))
+                .into_boxed::<Pg>();
+            let rows = extra_filter(query)
+                .order_by((
+                    hook_policy_audit_events::recorded_at.asc(),
+                    hook_policy_audit_events::action_id.asc(),
+                ))
+                .select(PolicyAuditEventRow::as_select())
+                .load::<PolicyAuditEventRow>(connection)
+                .map_err(HookPolicyAuditError::persistence_failed)?;
+            rows.into_iter().map(row_to_event).collect()
+        })
+        .await
     }
 }
 
@@ -115,18 +145,8 @@ impl HookPolicyAuditRepository for PostgresHookPolicyAuditRepository {
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
         let tenant_id = ctx.tenant_id();
         let task_uuid = task_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
-            let rows = hook_policy_audit_events::table
-                .filter(hook_policy_audit_events::tenant_id.eq(tenant_id.into_inner()))
-                .filter(hook_policy_audit_events::task_id.eq(task_uuid))
-                .order_by((
-                    hook_policy_audit_events::recorded_at.asc(),
-                    hook_policy_audit_events::action_id.asc(),
-                ))
-                .select(PolicyAuditEventRow::as_select())
-                .load::<PolicyAuditEventRow>(connection)
-                .map_err(HookPolicyAuditError::persistence_failed)?;
-            rows.into_iter().map(row_to_event).collect()
+        self.query_events_filtered(tenant_id, move |query| {
+            query.filter(hook_policy_audit_events::task_id.eq(task_uuid))
         })
         .await
     }
@@ -138,18 +158,8 @@ impl HookPolicyAuditRepository for PostgresHookPolicyAuditRepository {
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
         let tenant_id = ctx.tenant_id();
         let conversation_uuid = conversation_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
-            let rows = hook_policy_audit_events::table
-                .filter(hook_policy_audit_events::tenant_id.eq(tenant_id.into_inner()))
-                .filter(hook_policy_audit_events::conversation_id.eq(conversation_uuid))
-                .order_by((
-                    hook_policy_audit_events::recorded_at.asc(),
-                    hook_policy_audit_events::action_id.asc(),
-                ))
-                .select(PolicyAuditEventRow::as_select())
-                .load::<PolicyAuditEventRow>(connection)
-                .map_err(HookPolicyAuditError::persistence_failed)?;
-            rows.into_iter().map(row_to_event).collect()
+        self.query_events_filtered(tenant_id, move |query| {
+            query.filter(hook_policy_audit_events::conversation_id.eq(conversation_uuid))
         })
         .await
     }
@@ -161,18 +171,8 @@ impl HookPolicyAuditRepository for PostgresHookPolicyAuditRepository {
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
         let tenant_id = ctx.tenant_id();
         let trigger_context_uuid = trigger_context_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
-            let rows = hook_policy_audit_events::table
-                .filter(hook_policy_audit_events::tenant_id.eq(tenant_id.into_inner()))
-                .filter(hook_policy_audit_events::trigger_context_id.eq(trigger_context_uuid))
-                .order_by((
-                    hook_policy_audit_events::recorded_at.asc(),
-                    hook_policy_audit_events::action_id.asc(),
-                ))
-                .select(PolicyAuditEventRow::as_select())
-                .load::<PolicyAuditEventRow>(connection)
-                .map_err(HookPolicyAuditError::persistence_failed)?;
-            rows.into_iter().map(row_to_event).collect()
+        self.query_events_filtered(tenant_id, move |query| {
+            query.filter(hook_policy_audit_events::trigger_context_id.eq(trigger_context_uuid))
         })
         .await
     }

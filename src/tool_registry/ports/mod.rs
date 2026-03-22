@@ -7,7 +7,10 @@ mod log_store;
 mod repository;
 
 pub use catalog::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult};
-pub use governance::{ToolExecutionGovernance, ToolGovernanceError, ToolGovernanceResult};
+pub use governance::{
+    CompletedToolCall, PostToolCallArgs, ToolCallObservation, ToolExecutionGovernance,
+    ToolGovernanceError, ToolGovernanceResult, ToolObservationArgs,
+};
 pub use host::{
     McpServerHost, McpServerHostError, McpServerHostResult, StartHostResult, ToolCallHostResult,
 };

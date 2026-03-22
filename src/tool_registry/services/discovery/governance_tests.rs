@@ -43,6 +43,17 @@ type TestDiscoveryService<Gov> = ToolDiscoveryRoutingService<
     DefaultClock,
 >;
 
+type TestGovernance = HookBackedToolExecutionGovernance<
+    HookEngineService<
+        InMemoryHookDefinitionRepository,
+        InMemoryHookActionExecutor,
+        InMemoryHookExecutionLogRepository,
+        InMemoryHookPolicyAuditRepository,
+        DefaultClock,
+    >,
+    InMemoryHookPolicyAuditRepository,
+>;
+
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
     Ok(RegisterMcpServerRequest::new(
         name,
@@ -106,63 +117,96 @@ fn setup_success_result(host: &InMemoryMcpServerHost) -> Result<()> {
     Ok(())
 }
 
-fn pre_tool_policy_definition(action_id: &HookActionId) -> HookDefinition {
-    HookDefinition::new(
-        HookId::new("pre-tool-policy").expect("valid hook id"),
-        "Pre-tool policy",
-        HookTriggerType::PreToolUse,
-        vec![HookAction::new(
-            action_id.clone(),
-            HookActionType::PolicyCheck,
-        )],
-    )
-    .expect("pre-tool policy definition should be valid")
+struct GovernanceTestFixture {
+    ctx: crate::context::RequestContext,
+    host: Arc<InMemoryMcpServerHost>,
+    lifecycle: TestLifecycleService,
+    definition_repo: InMemoryHookDefinitionRepository,
+    action_executor: InMemoryHookActionExecutor,
+    policy_audit: InMemoryHookPolicyAuditRepository,
+    discovery: TestDiscoveryService<TestGovernance>,
 }
 
-fn post_tool_policy_definition(action_id: &HookActionId) -> HookDefinition {
+impl GovernanceTestFixture {
+    fn new() -> Self {
+        let ctx = test_request_ctx();
+        let clock = Arc::new(DefaultClock);
+        let registry = Arc::new(InMemoryMcpServerRegistry::new());
+        let host = Arc::new(InMemoryMcpServerHost::new());
+        let lifecycle =
+            McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
+
+        let definition_repo = InMemoryHookDefinitionRepository::new();
+        let action_executor = InMemoryHookActionExecutor::new();
+        let execution_log = InMemoryHookExecutionLogRepository::new();
+        let policy_audit = InMemoryHookPolicyAuditRepository::new();
+        let hook_engine = HookEngineService::new(
+            Arc::new(definition_repo.clone()),
+            Arc::new(action_executor.clone()),
+            Arc::new(execution_log),
+            Arc::new(policy_audit.clone()),
+            clock.clone(),
+        );
+        let governance = HookBackedToolExecutionGovernance::new(
+            Arc::new(hook_engine),
+            Arc::new(policy_audit.clone()),
+        );
+        let discovery = discovery_with_governance(&registry, &host, governance, &clock);
+
+        Self {
+            ctx,
+            host,
+            lifecycle,
+            definition_repo,
+            action_executor,
+            policy_audit,
+            discovery,
+        }
+    }
+}
+
+fn tool_policy_definition(
+    trigger_type: HookTriggerType,
+    action_id: &HookActionId,
+) -> HookDefinition {
+    let (hook_id_str, label) = match trigger_type {
+        HookTriggerType::PreToolUse => ("pre-tool-policy", "Pre-tool policy"),
+        HookTriggerType::PostToolUse => ("post-tool-policy", "Post-tool policy"),
+        _ => panic!("unsupported trigger type for tool policy definition fixture"),
+    };
     HookDefinition::new(
-        HookId::new("post-tool-policy").expect("valid hook id"),
-        "Post-tool policy",
-        HookTriggerType::PostToolUse,
+        HookId::new(hook_id_str).expect("valid hook id"),
+        label,
+        trigger_type,
         vec![HookAction::new(
             action_id.clone(),
             HookActionType::PolicyCheck,
         )],
     )
-    .expect("post-tool policy definition should be valid")
+    .expect("tool policy definition should be valid")
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<()> {
-    let ctx = test_request_ctx();
+    let GovernanceTestFixture {
+        ctx,
+        host,
+        lifecycle,
+        definition_repo,
+        action_executor,
+        policy_audit,
+        discovery,
+    } = GovernanceTestFixture::new();
     let task_id = TaskId::new();
     let conversation_id = ConversationId::new();
-    let clock = Arc::new(DefaultClock);
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-
-    let definition_repo = InMemoryHookDefinitionRepository::new();
-    let action_executor = InMemoryHookActionExecutor::new();
-    let execution_log = InMemoryHookExecutionLogRepository::new();
-    let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let hook_engine = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log),
-        Arc::new(policy_audit.clone()),
-        clock.clone(),
-    );
-    let governance = HookBackedToolExecutionGovernance::new(
-        Arc::new(hook_engine),
-        Arc::new(policy_audit.clone()),
-    );
-    let discovery = discovery_with_governance(&registry, &host, governance, &clock);
 
     let action_id = HookActionId::new("deny-action").expect("valid action id");
     definition_repo
-        .insert(&ctx, pre_tool_policy_definition(&action_id))
+        .insert(
+            &ctx,
+            tool_policy_definition(HookTriggerType::PreToolUse, &action_id),
+        )
         .await
         .expect("insert policy definition should succeed");
     action_executor
@@ -218,33 +262,23 @@ async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<(
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn post_tool_use_observation_records_audit_event() -> Result<()> {
-    let ctx = test_request_ctx();
+    let GovernanceTestFixture {
+        ctx,
+        host,
+        lifecycle,
+        definition_repo,
+        action_executor,
+        policy_audit,
+        discovery,
+    } = GovernanceTestFixture::new();
     let conversation_id = ConversationId::new();
-    let clock = Arc::new(DefaultClock);
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-
-    let definition_repo = InMemoryHookDefinitionRepository::new();
-    let action_executor = InMemoryHookActionExecutor::new();
-    let execution_log = InMemoryHookExecutionLogRepository::new();
-    let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let hook_engine = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log),
-        Arc::new(policy_audit.clone()),
-        clock.clone(),
-    );
-    let governance = HookBackedToolExecutionGovernance::new(
-        Arc::new(hook_engine),
-        Arc::new(policy_audit.clone()),
-    );
-    let discovery = discovery_with_governance(&registry, &host, governance, &clock);
 
     let action_id = HookActionId::new("allow-action").expect("valid action id");
     definition_repo
-        .insert(&ctx, post_tool_policy_definition(&action_id))
+        .insert(
+            &ctx,
+            tool_policy_definition(HookTriggerType::PostToolUse, &action_id),
+        )
         .await
         .expect("insert post-tool definition should succeed");
     action_executor

@@ -12,9 +12,9 @@ use crate::tool_registry::{
         validation::validate_parameters,
     },
     ports::{
-        McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
-        ToolCatalogError, ToolCatalogRepository, ToolExecutionGovernance, ToolGovernanceError,
-        ToolLogStore, ToolLogStoreError,
+        CompletedToolCall, McpServerHost, McpServerHostError, McpServerRegistryError,
+        McpServerRegistryRepository, ToolCatalogError, ToolCatalogRepository,
+        ToolExecutionGovernance, ToolGovernanceError, ToolLogStore, ToolLogStoreError,
     },
 };
 use mockable::Clock;
@@ -378,7 +378,14 @@ where
         };
         self.capture_and_audit(ctx, &completed, stderr_output).await;
         self.policy
-            .observe_after_call(ctx, request, entry, &result)
+            .observe_after_call(
+                ctx,
+                &CompletedToolCall {
+                    request,
+                    entry,
+                    result: &result,
+                },
+            )
             .await?;
 
         if let Some(host_err) = host_error {

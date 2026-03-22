@@ -44,6 +44,37 @@ type InMemoryGovernedDiscovery = ToolDiscoveryRoutingService<
     DefaultClock,
 >;
 
+struct GovernedInfrastructure {
+    definition_repo: InMemoryHookDefinitionRepository,
+    action_executor: InMemoryHookActionExecutor,
+    policy_audit: InMemoryHookPolicyAuditRepository,
+    governance: InMemoryGovernance,
+}
+
+fn build_governed_infrastructure() -> GovernedInfrastructure {
+    let definition_repo = InMemoryHookDefinitionRepository::new();
+    let action_executor = InMemoryHookActionExecutor::new();
+    let execution_log = InMemoryHookExecutionLogRepository::new();
+    let policy_audit = InMemoryHookPolicyAuditRepository::new();
+    let hook_engine = HookEngineService::new(
+        Arc::new(definition_repo.clone()),
+        Arc::new(action_executor.clone()),
+        Arc::new(execution_log),
+        Arc::new(policy_audit.clone()),
+        Arc::new(DefaultClock),
+    );
+    let governance = HookBackedToolExecutionGovernance::new(
+        Arc::new(hook_engine),
+        Arc::new(policy_audit.clone()),
+    );
+    GovernedInfrastructure {
+        definition_repo,
+        action_executor,
+        policy_audit,
+        governance,
+    }
+}
+
 fn build_discovery_with_governance(
     ctx: &IntegrationContext,
     governance: InMemoryGovernance,
@@ -63,6 +94,32 @@ fn build_discovery_with_governance(
     )
 }
 
+async fn insert_deny_pre_tool_hook(
+    ctx: &corbusier::context::RequestContext,
+    definition_repo: &InMemoryHookDefinitionRepository,
+    action_executor: &InMemoryHookActionExecutor,
+) -> Result<()> {
+    let action_id = HookActionId::new("deny-action")?;
+    let definition = HookDefinition::new(
+        HookId::new("deny-hook")?,
+        "Deny hook",
+        HookTriggerType::PreToolUse,
+        vec![HookAction::new(
+            action_id.clone(),
+            HookActionType::PolicyCheck,
+        )],
+    )?;
+    definition_repo.insert(ctx, definition).await?;
+    action_executor.set_output(
+        action_id.as_str(),
+        json!({
+            "decision": "deny",
+            "reason": "tool use is forbidden",
+        }),
+    )?;
+    Ok(())
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn denied_call_leaves_queryable_policy_audit(
@@ -70,47 +127,15 @@ async fn denied_call_leaves_queryable_policy_audit(
 ) -> Result<()> {
     let request_ctx = request_ctx();
     let task_id = TaskId::new();
-    let definition_repo = InMemoryHookDefinitionRepository::new();
-    let action_executor = InMemoryHookActionExecutor::new();
-    let execution_log = InMemoryHookExecutionLogRepository::new();
-    let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let hook_engine = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
-    let governance = HookBackedToolExecutionGovernance::new(
-        Arc::new(hook_engine),
-        Arc::new(policy_audit.clone()),
-    );
+    let GovernedInfrastructure {
+        definition_repo,
+        action_executor,
+        policy_audit,
+        governance,
+    } = build_governed_infrastructure();
     let discovery = build_discovery_with_governance(&integration_ctx, governance);
 
-    let action_id = HookActionId::new("deny-action").expect("valid action id");
-    let definition = HookDefinition::new(
-        HookId::new("deny-hook").expect("valid hook id"),
-        "Deny hook",
-        HookTriggerType::PreToolUse,
-        vec![HookAction::new(
-            action_id.clone(),
-            HookActionType::PolicyCheck,
-        )],
-    )
-    .expect("definition should be valid");
-    definition_repo
-        .insert(&request_ctx, definition)
-        .await
-        .expect("insert succeeds");
-    action_executor
-        .set_output(
-            action_id.as_str(),
-            json!({
-                "decision": "deny",
-                "reason": "tool use is forbidden",
-            }),
-        )
-        .expect("configure output succeeds");
+    insert_deny_pre_tool_hook(&request_ctx, &definition_repo, &action_executor).await?;
 
     integration_ctx.host.set_tool_catalog(
         McpServerName::new("workspace_tools")?,

@@ -8,7 +8,7 @@ use crate::hook_engine::adapters::memory::{
 use crate::hook_engine::domain::{
     ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookExecutionId,
     HookExecutionInput, HookExecutionScope, HookExecutionStatus, HookId, HookPriority,
-    HookTriggerContext, HookTriggerType,
+    HookTriggerContext, HookTriggerType, TriggerContextId,
 };
 use crate::hook_engine::ports::{
     HookEngine, HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
@@ -130,18 +130,11 @@ async fn execute_orders_hooks_by_priority_then_id(hook_engine_fixture: HookEngin
     assert_eq!(hook_ids, vec!["hook-a", "hook-c", "hook-b"]);
 }
 
-#[rstest::rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEngineFixture) {
-    let HookEngineFixture {
-        definition_repo,
-        action_executor,
-        execution_log,
-        policy_audit,
-        service,
-    } = hook_engine_fixture;
-    let ctx = request_ctx();
-
+async fn setup_failing_post_deploy_hook(
+    ctx: &RequestContext,
+    definition_repo: &InMemoryHookDefinitionRepository,
+    action_executor: &InMemoryHookActionExecutor,
+) {
     let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");
     let hook_id = HookId::new("hook-fail").expect("failing hook id should be valid");
     let definition = HookDefinition::new(
@@ -157,7 +150,7 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
     .with_priority(HookPriority::new(1));
 
     definition_repo
-        .insert(&ctx, definition)
+        .insert(ctx, definition)
         .await
         .expect("insert failing definition should succeed");
     action_executor
@@ -172,6 +165,21 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
             }),
         )
         .expect("configuring failing action output should succeed");
+}
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEngineFixture) {
+    let HookEngineFixture {
+        definition_repo,
+        action_executor,
+        execution_log,
+        policy_audit,
+        service,
+    } = hook_engine_fixture;
+    let ctx = request_ctx();
+
+    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await;
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
@@ -206,6 +214,97 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
             .expect("deny event should record violation")
             .reason(),
         "policy blocked deployment"
+    );
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The extracted fixture helper needs task and conversation correlation inputs."
+)]
+async fn setup_deny_policy_hook(
+    ctx: &RequestContext,
+    definition_repo: &InMemoryHookDefinitionRepository,
+    action_executor: &InMemoryHookActionExecutor,
+    task_id: TaskId,
+    conversation_id: ConversationId,
+) -> HookTriggerContext {
+    let action_id = HookActionId::new("policy-action").expect("policy action id should be valid");
+    let hook_id = HookId::new("hook-policy-scope").expect("hook id should be valid");
+    let definition = HookDefinition::new(
+        hook_id,
+        "Policy hook",
+        HookTriggerType::PreToolUse,
+        vec![HookAction::new(
+            action_id.clone(),
+            HookActionType::PolicyCheck,
+        )],
+    )
+    .expect("policy definition should be valid");
+
+    definition_repo
+        .insert(ctx, definition)
+        .await
+        .expect("insert policy definition should succeed");
+    action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "violation": {
+                    "code": "tool.blocked",
+                    "reason": "tool use is forbidden",
+                }
+            }),
+        )
+        .expect("configuring policy output should succeed");
+
+    HookTriggerContext::new_with_timestamp(
+        HookTriggerType::PreToolUse,
+        HookExecutionScope::default()
+            .with_task_id(task_id)
+            .with_conversation_id(conversation_id)
+            .with_metadata(json!({"tool_name": "read_file"})),
+        DefaultClock.utc(),
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The assertion helper checks the three audit lookup dimensions explicitly."
+)]
+async fn assert_policy_audit_indexed_once(
+    policy_audit: &InMemoryHookPolicyAuditRepository,
+    ctx: &RequestContext,
+    task_id: TaskId,
+    conversation_id: ConversationId,
+    trigger_context_id: TriggerContextId,
+) {
+    let by_task = policy_audit
+        .find_by_task(ctx, task_id)
+        .await
+        .expect("querying policy events by task should succeed");
+    assert_eq!(
+        by_task.len(),
+        1,
+        "expected exactly one policy event indexed by task"
+    );
+    let by_conversation = policy_audit
+        .find_by_conversation(ctx, conversation_id)
+        .await
+        .expect("querying policy events by conversation should succeed");
+    assert_eq!(
+        by_conversation.len(),
+        1,
+        "expected exactly one policy event indexed by conversation"
+    );
+    let by_trigger = policy_audit
+        .find_by_trigger_context(ctx, trigger_context_id)
+        .await
+        .expect("querying policy events by trigger should succeed");
+    assert_eq!(
+        by_trigger.len(),
+        1,
+        "expected exactly one policy event indexed by trigger context"
     );
 }
 
@@ -292,65 +391,28 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
     let ctx = request_ctx();
     let task_id = TaskId::new();
     let conversation_id = ConversationId::new();
-    let action_id = HookActionId::new("policy-action").expect("policy action id should be valid");
-    let hook_id = HookId::new("hook-policy-scope").expect("hook id should be valid");
-    let definition = HookDefinition::new(
-        hook_id,
-        "Policy hook",
-        HookTriggerType::PreToolUse,
-        vec![HookAction::new(
-            action_id.clone(),
-            HookActionType::PolicyCheck,
-        )],
+    let context = setup_deny_policy_hook(
+        &ctx,
+        &definition_repo,
+        &action_executor,
+        task_id,
+        conversation_id,
     )
-    .expect("policy definition should be valid");
-
-    definition_repo
-        .insert(&ctx, definition)
-        .await
-        .expect("insert policy definition should succeed");
-    action_executor
-        .set_output(
-            action_id.as_str(),
-            json!({
-                "decision": "deny",
-                "violation": {
-                    "code": "tool.blocked",
-                    "reason": "tool use is forbidden",
-                }
-            }),
-        )
-        .expect("configuring policy output should succeed");
-
-    let context = HookTriggerContext::new_with_timestamp(
-        HookTriggerType::PreToolUse,
-        HookExecutionScope::default()
-            .with_task_id(task_id)
-            .with_conversation_id(conversation_id)
-            .with_metadata(json!({"tool_name": "read_file"})),
-        DefaultClock.utc(),
-    );
+    .await;
     let trigger_context_id = context.id();
     service
         .execute(&ctx, context)
         .await
         .expect("policy hook execution should succeed");
 
-    let by_task = policy_audit
-        .find_by_task(&ctx, task_id)
-        .await
-        .expect("querying policy events by task should succeed");
-    assert_eq!(by_task.len(), 1);
-    let by_conversation = policy_audit
-        .find_by_conversation(&ctx, conversation_id)
-        .await
-        .expect("querying policy events by conversation should succeed");
-    assert_eq!(by_conversation.len(), 1);
-    let by_trigger = policy_audit
-        .find_by_trigger_context(&ctx, trigger_context_id)
-        .await
-        .expect("querying policy events by trigger should succeed");
-    assert_eq!(by_trigger.len(), 1);
+    assert_policy_audit_indexed_once(
+        &policy_audit,
+        &ctx,
+        task_id,
+        conversation_id,
+        trigger_context_id,
+    )
+    .await;
 }
 
 #[rstest::rstest]
