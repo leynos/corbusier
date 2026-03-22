@@ -9318,6 +9318,18 @@ flowchart TD
 
 ##### 6.4.2.4 Policy Enforcement Points
 
+For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
+`ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
+that runs a pre-tool-use check before the MCP host executes a tool and a
+post-tool-use observation after the call completes. The default adapter still
+permits all calls, but a hook-backed adapter translates tool execution requests
+into `HookTriggerContext` values and delegates evaluation to the hook engine.
+
+The execution path carries workflow correlation through a dedicated execution
+scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
+`TaskId`, `ConversationId`, and non-indexed metadata while keeping
+`RequestContext` focused on tenant and identity concerns.
+
 ###### Multi-Layer Policy Enforcement
 
 | Enforcement Layer | Implementation           | Scope                 | Performance Impact |
@@ -9371,6 +9383,21 @@ impl PolicyEnforcementPoint for ApiGatewayPEP {
 ```
 
 ##### 6.4.2.5 Audit Logging
+
+Roadmap item 2.3.2 adds a dedicated `hook_policy_audit_events` projection table
+for policy auditability. Each projection records the tenant, hook execution,
+trigger context, trigger type, hook/action identifiers, optional task and
+conversation references, decision, optional violation payload, raw policy
+payload, and timestamp. Indexed `(tenant_id, task_id, recorded_at)`,
+`(tenant_id, conversation_id, recorded_at)`, and
+`(tenant_id, trigger_context_id, recorded_at)` paths satisfy the query shapes
+required by automated workflow governance without scanning hook execution JSON.
+
+The current milestone records policy audit events for tool execution only:
+pre-tool-use hook denials block the tool call before host execution, and
+post-tool-use hooks persist audit outcomes after the call completes. Future
+API- and VCS-level enforcement points remain owned by their respective roadmap
+items.
 
 ###### Comprehensive Authorization Audit Trail
 

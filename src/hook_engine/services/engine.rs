@@ -3,12 +3,12 @@
 use crate::context::RequestContext;
 use crate::hook_engine::domain::{
     ActionResult, HookDefinition, HookExecutionInput, HookExecutionResult, HookTriggerContext,
-    HookTriggerType,
+    HookTriggerType, project_policy_audit_events,
 };
 use crate::hook_engine::ports::{
     HookActionExecutor, HookDefinitionRepository, HookEngine, HookEngineResult,
-    HookExecutionLogError, HookExecutionLogRepository, PendingExecutionRecord,
-    PendingExecutionReservation,
+    HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
+    PendingExecutionRecord, PendingExecutionReservation,
 };
 use mockable::Clock;
 use std::sync::Arc;
@@ -17,24 +17,27 @@ const SUPPORTED_TRIGGERS: [HookTriggerType; 14] = HookTriggerType::all();
 
 /// Hook execution orchestration service.
 #[derive(Clone)]
-pub struct HookEngineService<D, A, L, C>
+pub struct HookEngineService<D, A, L, P, C>
 where
     D: HookDefinitionRepository,
     A: HookActionExecutor,
     L: HookExecutionLogRepository,
+    P: HookPolicyAuditRepository,
     C: Clock + Send + Sync,
 {
     definition_repository: Arc<D>,
     action_executor: Arc<A>,
     execution_log: Arc<L>,
+    policy_audit_repository: Arc<P>,
     clock: Arc<C>,
 }
 
-impl<D, A, L, C> HookEngineService<D, A, L, C>
+impl<D, A, L, P, C> HookEngineService<D, A, L, P, C>
 where
     D: HookDefinitionRepository,
     A: HookActionExecutor,
     L: HookExecutionLogRepository,
+    P: HookPolicyAuditRepository,
     C: Clock + Send + Sync,
 {
     /// Creates a new hook engine service.
@@ -42,16 +45,22 @@ where
     /// Example: `HookEngineService::new(def_repo, executor, log_repo, clock)`
     /// wires the engine to its dependencies.
     #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Hook engine wiring needs four port dependencies plus the clock."
+    )]
     pub const fn new(
         definition_repository: Arc<D>,
         action_executor: Arc<A>,
         execution_log: Arc<L>,
+        policy_audit_repository: Arc<P>,
         clock: Arc<C>,
     ) -> Self {
         Self {
             definition_repository,
             action_executor,
             execution_log,
+            policy_audit_repository,
             clock,
         }
     }
@@ -82,14 +91,27 @@ where
         }
         Ok(action_results)
     }
+
+    async fn persist_policy_audit_events(
+        &self,
+        ctx: &RequestContext,
+        result: &HookExecutionResult,
+        context: &HookTriggerContext,
+    ) -> HookEngineResult<()> {
+        for event in project_policy_audit_events(result, context)? {
+            self.policy_audit_repository.store(ctx, &event).await?;
+        }
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
-impl<D, A, L, C> HookEngine for HookEngineService<D, A, L, C>
+impl<D, A, L, P, C> HookEngine for HookEngineService<D, A, L, P, C>
 where
     D: HookDefinitionRepository,
     A: HookActionExecutor,
     L: HookExecutionLogRepository,
+    P: HookPolicyAuditRepository,
     C: Clock + Send + Sync,
 {
     async fn execute(
@@ -134,6 +156,8 @@ where
                             "missing reserved hook execution for {existing_execution_id}"
                         ))
                     })?;
+                self.persist_policy_audit_events(ctx, &existing_result, &context)
+                    .await?;
                 results.push(existing_result);
                 continue;
             }
@@ -148,6 +172,8 @@ where
                 executed_at: self.clock.utc(),
             });
             self.execution_log.update_result(ctx, &result).await?;
+            self.persist_policy_audit_events(ctx, &result, &context)
+                .await?;
             results.push(result);
         }
         Ok(results)

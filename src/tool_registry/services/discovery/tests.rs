@@ -25,7 +25,7 @@ use test_helpers::{
 
 async fn exercise_policy_failure<Pol>(policy: Pol) -> Result<ToolDiscoveryRoutingServiceError>
 where
-    Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static,
+    Pol: crate::tool_registry::ports::ToolExecutionGovernance + 'static,
 {
     let ctx = test_request_ctx();
     let clock = Arc::new(DefaultClock);
@@ -215,7 +215,10 @@ async fn call_tool_policy_denied() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_evaluation_failed() -> Result<()> {
     let err = exercise_policy_failure(FailingPolicy::new("engine down")).await?;
-    assert!(matches!(err, ToolDiscoveryRoutingServiceError::Policy(_)));
+    assert!(matches!(
+        err,
+        ToolDiscoveryRoutingServiceError::Governance(_)
+    ));
     Ok(())
 }
 

@@ -5,6 +5,7 @@ pub mod definition;
 pub mod error;
 pub mod execution;
 pub mod ids;
+pub mod policy_audit;
 pub mod trigger;
 
 pub use action::{HookAction, HookActionType};
@@ -15,4 +16,10 @@ pub use execution::{
     HookExecutionResult, HookExecutionStatus, HookLogEntry, HookLogLevel,
 };
 pub use ids::{HookActionId, HookExecutionId, HookId, TriggerContextId};
-pub use trigger::{HookTriggerContext, HookTriggerType, ParseHookTriggerTypeError};
+pub use policy_audit::{
+    PolicyAuditDecision, PolicyAuditEvent, PolicyAuditEventId, PolicyAuditEventInput,
+    PolicyAuditProjectionError, PolicyViolation, project_policy_audit_events,
+};
+pub use trigger::{
+    HookExecutionScope, HookTriggerContext, HookTriggerType, ParseHookTriggerTypeError,
+};

@@ -16,6 +16,7 @@ use tokio::sync::RwLock;
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryHookActionExecutor {
     outcomes: Arc<RwLock<HashMap<String, ActionStatus>>>,
+    outputs: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
 impl InMemoryHookActionExecutor {
@@ -49,12 +50,46 @@ impl InMemoryHookActionExecutor {
         Ok(())
     }
 
+    /// Sets the output payload for a specific action identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookActionExecutionError`] if the output lock is unavailable.
+    pub fn set_output(
+        &self,
+        action_id: impl Into<String>,
+        output: serde_json::Value,
+    ) -> HookActionExecutionResult<()> {
+        let mut outputs = self.outputs.try_write().map_err(|err| {
+            HookActionExecutionError::dependency_failure(std::io::Error::other(format!(
+                "failed to acquire action output write lock: {err}"
+            )))
+        })?;
+        outputs.insert(action_id.into(), output);
+        Ok(())
+    }
+
     async fn resolve_status(&self, action_id: &str) -> ActionStatus {
         let outcomes = self.outcomes.read().await;
         outcomes
             .get(action_id)
             .copied()
             .unwrap_or(ActionStatus::Succeeded)
+    }
+
+    async fn resolve_output(
+        &self,
+        action_id: &str,
+        status: ActionStatus,
+        context: &HookTriggerContext,
+    ) -> serde_json::Value {
+        let outputs = self.outputs.read().await;
+        outputs.get(action_id).cloned().unwrap_or_else(|| {
+            serde_json::json!({
+                "status": status.as_str(),
+                "trigger": context.trigger_type().as_str(),
+            })
+        })
     }
 }
 
@@ -71,10 +106,9 @@ impl HookActionExecutor for InMemoryHookActionExecutor {
             format!("action {} executed with status {}", action.id(), status),
             context.occurred_at(),
         );
-        let output = serde_json::json!({
-            "status": status.as_str(),
-            "trigger": context.trigger_type().as_str(),
-        });
+        let output = self
+            .resolve_output(action.id().as_str(), status, context)
+            .await;
         Ok(ActionResult::new(ActionResultDetails {
             action_id: action.id().clone(),
             action_type: action.action_type().clone(),

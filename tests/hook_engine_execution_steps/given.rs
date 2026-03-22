@@ -6,6 +6,7 @@ use corbusier::hook_engine::domain::{
 };
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
+use serde_json::json;
 
 struct HookSetup {
     hook_id: &'static str,
@@ -60,5 +61,15 @@ fn post_deploy_hook_configured_to_fail(world: &mut HookWorld) -> Result<(), eyre
         .action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
         .wrap_err("configure failing action outcome for scenario hook")?;
+    world
+        .action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "reason": "post-deploy validation failed",
+            }),
+        )
+        .wrap_err("configure failing policy audit output for scenario hook")?;
     Ok(())
 }

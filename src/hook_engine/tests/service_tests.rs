@@ -3,17 +3,22 @@
 use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::hook_engine::adapters::memory::{
     InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
-    InMemoryHookExecutionLogRepository,
+    InMemoryHookExecutionLogRepository, InMemoryHookPolicyAuditRepository,
 };
 use crate::hook_engine::domain::{
     ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookExecutionId,
-    HookExecutionInput, HookExecutionStatus, HookId, HookPriority, HookTriggerContext,
-    HookTriggerType,
+    HookExecutionInput, HookExecutionScope, HookExecutionStatus, HookId, HookPriority,
+    HookTriggerContext, HookTriggerType,
 };
-use crate::hook_engine::ports::{HookEngine, HookExecutionLogError, HookExecutionLogRepository};
+use crate::hook_engine::ports::{
+    HookEngine, HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
+};
 use crate::hook_engine::services::HookEngineService;
-use mockable::DefaultClock;
+use crate::message::domain::ConversationId;
+use crate::task::domain::TaskId;
+use mockable::{Clock, DefaultClock};
 use rstest::fixture;
+use serde_json::json;
 use std::sync::Arc;
 
 fn request_ctx() -> RequestContext {
@@ -48,10 +53,12 @@ struct HookEngineFixture {
     definition_repo: InMemoryHookDefinitionRepository,
     action_executor: InMemoryHookActionExecutor,
     execution_log: InMemoryHookExecutionLogRepository,
+    policy_audit: InMemoryHookPolicyAuditRepository,
     service: HookEngineService<
         InMemoryHookDefinitionRepository,
         InMemoryHookActionExecutor,
         InMemoryHookExecutionLogRepository,
+        InMemoryHookPolicyAuditRepository,
         DefaultClock,
     >,
 }
@@ -61,16 +68,19 @@ fn hook_engine_fixture() -> HookEngineFixture {
     let definition_repo = InMemoryHookDefinitionRepository::new();
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
+    let policy_audit = InMemoryHookPolicyAuditRepository::new();
     let service = HookEngineService::new(
         Arc::new(definition_repo.clone()),
         Arc::new(action_executor.clone()),
         Arc::new(execution_log.clone()),
+        Arc::new(policy_audit.clone()),
         Arc::new(DefaultClock),
     );
     HookEngineFixture {
         definition_repo,
         action_executor,
         execution_log,
+        policy_audit,
         service,
     }
 }
@@ -127,6 +137,7 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
         definition_repo,
         action_executor,
         execution_log,
+        policy_audit,
         service,
     } = hook_engine_fixture;
     let ctx = request_ctx();
@@ -152,6 +163,15 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
     action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
         .expect("configuring failing action outcome should succeed");
+    action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "reason": "policy blocked deployment",
+            }),
+        )
+        .expect("configuring failing action output should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
@@ -172,6 +192,21 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
         .first()
         .expect("expected one stored execution result");
     assert_eq!(stored_result.status(), HookExecutionStatus::Failed);
+
+    let audit_events = policy_audit
+        .find_by_trigger_context(&ctx, trigger_context_id)
+        .await
+        .expect("querying policy audit events should succeed");
+    assert_eq!(audit_events.len(), 1);
+    assert_eq!(
+        audit_events
+            .first()
+            .expect("expected policy audit event")
+            .violation()
+            .expect("deny event should record violation")
+            .reason(),
+        "policy blocked deployment"
+    );
 }
 
 #[rstest::rstest]
@@ -182,18 +217,34 @@ async fn execute_reuses_existing_execution_without_replaying_actions(
     let HookEngineFixture {
         definition_repo,
         execution_log,
+        policy_audit,
+        action_executor,
         service,
         ..
     } = hook_engine_fixture;
     let ctx = request_ctx();
+    let action_id = HookActionId::new("action-hook-retry").expect("valid action id");
 
     definition_repo
         .insert(
             &ctx,
-            build_definition("hook-retry", 1).expect("retry definition should be valid for test"),
+            HookDefinition::new(
+                HookId::new("hook-retry").expect("valid hook id"),
+                "Retry hook",
+                HookTriggerType::PreCommit,
+                vec![HookAction::new(
+                    action_id.clone(),
+                    HookActionType::PolicyCheck,
+                )],
+            )
+            .expect("retry definition should be valid for test")
+            .with_priority(HookPriority::new(1)),
         )
         .await
         .expect("insert retry definition should succeed");
+    action_executor
+        .set_output(action_id.as_str(), json!({"decision": "allow"}))
+        .expect("configuring retry action output should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
     let trigger_context_id = context.id();
@@ -219,6 +270,87 @@ async fn execute_reuses_existing_execution_without_replaying_actions(
         .await
         .expect("querying stored retry execution should succeed");
     assert_eq!(stored.len(), 1);
+    let audit_events = policy_audit
+        .find_by_trigger_context(&ctx, trigger_context_id)
+        .await
+        .expect("querying retry audit events should succeed");
+    assert_eq!(audit_events.len(), 1);
+}
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_projects_policy_audit_by_task_and_conversation(
+    hook_engine_fixture: HookEngineFixture,
+) {
+    let HookEngineFixture {
+        definition_repo,
+        action_executor,
+        policy_audit,
+        service,
+        ..
+    } = hook_engine_fixture;
+    let ctx = request_ctx();
+    let task_id = TaskId::new();
+    let conversation_id = ConversationId::new();
+    let action_id = HookActionId::new("policy-action").expect("policy action id should be valid");
+    let hook_id = HookId::new("hook-policy-scope").expect("hook id should be valid");
+    let definition = HookDefinition::new(
+        hook_id,
+        "Policy hook",
+        HookTriggerType::PreToolUse,
+        vec![HookAction::new(
+            action_id.clone(),
+            HookActionType::PolicyCheck,
+        )],
+    )
+    .expect("policy definition should be valid");
+
+    definition_repo
+        .insert(&ctx, definition)
+        .await
+        .expect("insert policy definition should succeed");
+    action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "violation": {
+                    "code": "tool.blocked",
+                    "reason": "tool use is forbidden",
+                }
+            }),
+        )
+        .expect("configuring policy output should succeed");
+
+    let context = HookTriggerContext::new_with_timestamp(
+        HookTriggerType::PreToolUse,
+        HookExecutionScope::default()
+            .with_task_id(task_id)
+            .with_conversation_id(conversation_id)
+            .with_metadata(json!({"tool_name": "read_file"})),
+        DefaultClock.utc(),
+    );
+    let trigger_context_id = context.id();
+    service
+        .execute(&ctx, context)
+        .await
+        .expect("policy hook execution should succeed");
+
+    let by_task = policy_audit
+        .find_by_task(&ctx, task_id)
+        .await
+        .expect("querying policy events by task should succeed");
+    assert_eq!(by_task.len(), 1);
+    let by_conversation = policy_audit
+        .find_by_conversation(&ctx, conversation_id)
+        .await
+        .expect("querying policy events by conversation should succeed");
+    assert_eq!(by_conversation.len(), 1);
+    let by_trigger = policy_audit
+        .find_by_trigger_context(&ctx, trigger_context_id)
+        .await
+        .expect("querying policy events by trigger should succeed");
+    assert_eq!(by_trigger.len(), 1);
 }
 
 #[rstest::rstest]

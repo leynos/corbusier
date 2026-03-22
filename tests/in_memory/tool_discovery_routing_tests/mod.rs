@@ -6,6 +6,7 @@
 
 mod call_routing_tests;
 mod discovery_lifecycle_tests;
+mod policy_enforcement_tests;
 
 use std::sync::Arc;
 
@@ -42,6 +43,7 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
 >;
 
 pub struct IntegrationContext {
+    pub registry: Arc<InMemoryMcpServerRegistry>,
     pub host: Arc<InMemoryMcpServerHost>,
     pub lifecycle: TestLifecycleService,
     pub discovery: TestDiscoveryService,
@@ -59,7 +61,7 @@ pub fn integration_ctx() -> IntegrationContext {
     let discovery = ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog: catalog.clone(),
-            registry,
+            registry: registry.clone(),
             host: host.clone(),
             policy: Arc::new(AllowAllPolicy),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
@@ -69,6 +71,7 @@ pub fn integration_ctx() -> IntegrationContext {
     );
 
     IntegrationContext {
+        registry,
         host,
         lifecycle,
         discovery,

@@ -511,8 +511,8 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
 After starting an MCP server via the lifecycle service, use
 `ToolDiscoveryRoutingService` to discover its tools, persist them in a durable
 catalogue, and route tool calls by name. The service validates parameters
-against the tool's input schema, enforces a pluggable policy check, routes the
-call to the correct hosting server, and records a complete audit trail.
+against the tool's input schema, runs pluggable execution governance, routes
+the call to the correct hosting server, and records a complete audit trail.
 
 ### Discovering tools
 
@@ -538,9 +538,18 @@ parameters. The service:
 1. Resolves the tool name to a catalogue entry.
 2. Checks that the tool is available (its hosting server is running).
 3. Validates parameters against the tool's declared input schema.
-4. Enforces the configured policy (default: `AllowAllPolicy` permits all).
-5. Routes the call to the correct MCP server.
-6. Records an audit trail entry with outcome, duration, and any stderr.
+4. Runs the configured governance adapter before execution. The default
+   `AllowAllPolicy` adapter permits all calls, while hook-backed governance can
+   deny a call before the MCP host runs it.
+5. Routes the call to the correct MCP server when governance permits it.
+6. Records the existing tool-call audit trail entry with outcome, duration, and
+   any stderr.
+7. Runs post-tool-use governance observation after the call completes.
+
+When hook-backed governance is configured, `ToolCallRequest` can carry a
+`TaskId` and `ConversationId` through its execution scope. Policy audit
+outcomes are then queryable from the hook engine by task, conversation, and
+hook event (`TriggerContextId`) without inspecting arbitrary JSON payloads.
 
 ### Tool availability lifecycle
 

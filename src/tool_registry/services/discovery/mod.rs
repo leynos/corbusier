@@ -7,14 +7,14 @@
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        CatalogEntry, LogRetentionPolicy, McpServerId, PolicyDecision, ToolCallOutcome,
-        ToolCallRequest, ToolCallResult, ToolCallTiming, ToolRegistryDomainError,
+        CatalogEntry, LogRetentionPolicy, McpServerId, ToolCallOutcome, ToolCallRequest,
+        ToolCallResult, ToolCallTiming, ToolGovernanceDecision, ToolRegistryDomainError,
         validation::validate_parameters,
     },
     ports::{
         McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
-        ToolCatalogError, ToolCatalogRepository, ToolLogStore, ToolLogStoreError,
-        ToolPolicyEnforcer, ToolPolicyError,
+        ToolCatalogError, ToolCatalogRepository, ToolExecutionGovernance, ToolGovernanceError,
+        ToolLogStore, ToolLogStoreError,
     },
 };
 use mockable::Clock;
@@ -40,7 +40,7 @@ pub enum ToolDiscoveryRoutingServiceError {
     Host(#[from] McpServerHostError),
     /// Policy evaluation failed.
     #[error(transparent)]
-    Policy(#[from] ToolPolicyError),
+    Governance(#[from] ToolGovernanceError),
     /// Log store operation failed.
     #[error(transparent)]
     LogStore(#[from] ToolLogStoreError),
@@ -53,15 +53,15 @@ pub enum ToolDiscoveryRoutingServiceError {
 pub type ToolDiscoveryRoutingServiceResult<T> = Result<T, ToolDiscoveryRoutingServiceError>;
 
 /// Port dependencies for [`ToolDiscoveryRoutingService`].
-pub struct ServicePorts<Cat, Reg, H, Pol, Log> {
+pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
     /// Catalog repository.
     pub catalog: Arc<Cat>,
     /// Server registry.
     pub registry: Arc<Reg>,
     /// Server host.
     pub host: Arc<H>,
-    /// Policy enforcer.
-    pub policy: Arc<Pol>,
+    /// Tool execution governance.
+    pub policy: Arc<Gov>,
     /// Log store.
     pub log_store: Arc<Log>,
 }
@@ -71,37 +71,37 @@ pub struct ServicePorts<Cat, Reg, H, Pol, Log> {
 /// This service is a sibling to [`super::McpServerLifecycleService`],
 /// managing tool catalog persistence and call routing as distinct
 /// responsibilities from server lifecycle state transitions.
-pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
+pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
     Reg: McpServerRegistryRepository,
     H: McpServerHost,
-    Pol: ToolPolicyEnforcer,
+    Gov: ToolExecutionGovernance,
     Log: ToolLogStore,
     C: Clock + Send + Sync,
 {
     catalog: Arc<Cat>,
     registry: Arc<Reg>,
     host: Arc<H>,
-    policy: Arc<Pol>,
+    policy: Arc<Gov>,
     log_store: Arc<Log>,
     retention_policy: LogRetentionPolicy,
     clock: Arc<C>,
 }
 
-impl<Cat, Reg, H, Pol, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
+impl<Cat, Reg, H, Gov, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
     Reg: McpServerRegistryRepository,
     H: McpServerHost,
-    Pol: ToolPolicyEnforcer,
+    Gov: ToolExecutionGovernance,
     Log: ToolLogStore,
     C: Clock + Send + Sync,
 {
     /// Creates a new discovery and routing service.
     #[must_use]
     pub fn new(
-        ports: ServicePorts<Cat, Reg, H, Pol, Log>,
+        ports: ServicePorts<Cat, Reg, H, Gov, Log>,
         retention_policy: LogRetentionPolicy,
         clock: Arc<C>,
     ) -> Self {
@@ -317,11 +317,8 @@ where
                 other => other,
             }
         })?;
-        let decision = self
-            .policy
-            .evaluate(ctx, request.tool_name(), request.parameters())
-            .await?;
-        if let PolicyDecision::Deny { reason } = decision {
+        let decision = self.policy.enforce_before_call(ctx, request, entry).await?;
+        if let ToolGovernanceDecision::Deny { reason } = decision {
             return Err(ToolRegistryDomainError::PolicyDenied {
                 tool_name: request.tool_name().to_owned(),
                 reason,
@@ -380,6 +377,9 @@ where
             result: &result,
         };
         self.capture_and_audit(ctx, &completed, stderr_output).await;
+        self.policy
+            .observe_after_call(ctx, request, entry, &result)
+            .await?;
 
         if let Some(host_err) = host_error {
             return Err(host_err.into());
@@ -404,5 +404,7 @@ where
     }
 }
 
+#[cfg(test)]
+mod governance_tests;
 #[cfg(test)]
 mod tests;

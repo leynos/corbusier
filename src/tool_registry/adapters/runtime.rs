@@ -33,6 +33,7 @@ struct InMemoryHostState {
     tool_catalogs: HashMap<McpServerName, Vec<McpToolDefinition>>,
     tool_call_results: HashMap<(McpServerName, String), Value>,
     tool_call_stderr: HashMap<(McpServerName, String), bytes::Bytes>,
+    tool_call_counts: HashMap<(McpServerName, String), usize>,
     startup_stderr: HashMap<McpServerName, bytes::Bytes>,
 }
 
@@ -151,6 +152,24 @@ impl InMemoryMcpServerHost {
             s.startup_stderr.insert(server_name, stderr);
         })
     }
+
+    /// Returns how many times a tool was invoked for a given server.
+    ///
+    /// # Errors
+    ///
+    /// Returns host runtime errors when lock acquisition fails.
+    pub fn tool_call_count(
+        &self,
+        server_name: &McpServerName,
+        tool_name: &str,
+    ) -> McpServerHostResult<usize> {
+        let state = self.read_state()?;
+        Ok(state
+            .tool_call_counts
+            .get(&(server_name.clone(), tool_name.to_owned()))
+            .copied()
+            .unwrap_or_default())
+    }
 }
 
 #[async_trait]
@@ -232,14 +251,23 @@ impl McpServerHost for InMemoryMcpServerHost {
 
         let tool_name = request.tool_name();
         let key = (server.name().clone(), tool_name.to_owned());
-        let content = state.tool_call_results.get(&key).cloned().ok_or_else(|| {
+        drop(state);
+        self.modify_state(|s| {
+            *s.tool_call_counts.entry(key.clone()).or_insert(0) += 1;
+        })?;
+        let refreshed_state = self.read_state()?;
+        let content = refreshed_state
+            .tool_call_results
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| {
             McpServerHostError::ToolCallFailed {
                 server_id: server.id(),
                 tool_name: tool_name.to_owned(),
                 reason: "no result configured for this tool".to_owned(),
             }
         })?;
-        let stderr_output = state.tool_call_stderr.get(&key).cloned();
+        let stderr_output = refreshed_state.tool_call_stderr.get(&key).cloned();
 
         Ok(ToolCallHostResult {
             content,

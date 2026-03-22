@@ -8,7 +8,7 @@ use crate::tool_registry::{
     },
     ports::{
         McpServerHost, McpServerRegistryRepository, StoreLogRequest, SweepContext,
-        ToolCatalogRepository, ToolLogStore, ToolPolicyEnforcer,
+        ToolCatalogRepository, ToolExecutionGovernance, ToolLogStore,
     },
 };
 use mockable::Clock;
@@ -36,12 +36,12 @@ pub(super) struct CompletedCallContext<'a> {
     pub result: &'a ToolCallResult,
 }
 
-impl<Cat, Reg, H, Pol, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
+impl<Cat, Reg, H, Gov, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
     Reg: McpServerRegistryRepository,
     H: McpServerHost,
-    Pol: ToolPolicyEnforcer,
+    Gov: ToolExecutionGovernance,
     Log: ToolLogStore,
     C: Clock + Send + Sync,
 {

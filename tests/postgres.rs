@@ -18,6 +18,7 @@
 //! - `tool_discovery_tenant_isolation_tests`: Composite FK and index-plan checks
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and audit trail
+//! - `tool_policy_enforcement_tests`: Hook-backed policy enforcement for tool calls
 //! - `hook_engine_tests`: Hook execution log persistence
 
 mod test_helpers;
@@ -43,5 +44,6 @@ mod postgres {
     mod task_tenant_isolation_tests;
     mod tool_discovery_routing_tests;
     mod tool_discovery_tenant_isolation_tests;
+    mod tool_policy_enforcement_tests;
     mod uniqueness_tests;
 }

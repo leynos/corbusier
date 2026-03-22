@@ -535,13 +535,13 @@ flows without regressing existing policy enforcement.
     corbusier-design.md §6.3.3.
   - [x] Success criteria: hook execution results are recorded for every
     configured trigger.
-- [ ] 3.3.2 Add policy enforcement and audit capture. Requires 3.3.1. See
+- [x] 3.3.2 Add policy enforcement and audit capture. Requires 3.3.1. See
   corbusier-design.md §2.1.3 and §6.4.2.5.
-  - [ ] Implement policy evaluation at enforcement points. See
+  - [x] Implement policy evaluation at enforcement points. See
     corbusier-design.md §6.4.2.4.
-  - [ ] Persist policy violations and audit events. See
+  - [x] Persist policy violations and audit events. See
     corbusier-design.md §6.4.2.5.
-  - [ ] Success criteria: policy enforcement outcomes are queryable by task,
+  - [x] Success criteria: policy enforcement outcomes are queryable by task,
     conversation, and hook event.
 
 ### 3.4. Encapsulation and workspace management

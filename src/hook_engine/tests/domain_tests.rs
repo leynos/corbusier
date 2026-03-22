@@ -1,10 +1,16 @@
 //! Domain tests for hook engine types.
 
 use crate::hook_engine::domain::{
-    ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookDomainError,
-    HookExecutionStatus, HookId, HookPredicate, HookPriority, HookTriggerType,
+    ActionResult, ActionResultDetails, ActionStatus, HookAction, HookActionId, HookActionType,
+    HookDefinition, HookDomainError, HookExecutionInput, HookExecutionScope, HookExecutionStatus,
+    HookId, HookPredicate, HookPriority, HookTriggerContext, HookTriggerType, PolicyAuditDecision,
+    PolicyViolation, project_policy_audit_events,
 };
+use crate::message::domain::ConversationId;
+use crate::task::domain::TaskId;
+use chrono::Utc;
 use rstest::rstest;
+use serde_json::json;
 use std::collections::HashSet;
 
 #[test]
@@ -88,4 +94,122 @@ fn hook_definition_accepts_predicate_and_priority() {
         definition.predicate().data(),
         &serde_json::json!({"key": "value"})
     );
+}
+
+#[test]
+fn hook_trigger_context_preserves_execution_scope() {
+    let task_id = TaskId::new();
+    let conversation_id = ConversationId::new();
+    let scope = HookExecutionScope::default()
+        .with_task_id(task_id)
+        .with_conversation_id(conversation_id)
+        .with_metadata(json!({"tool_name": "read_file"}));
+    let context =
+        HookTriggerContext::new_with_timestamp(HookTriggerType::PreToolUse, scope, Utc::now());
+
+    assert_eq!(context.execution_scope().task_id(), Some(task_id));
+    assert_eq!(
+        context.execution_scope().conversation_id(),
+        Some(conversation_id)
+    );
+    assert_eq!(context.metadata(), &json!({"tool_name": "read_file"}));
+}
+
+#[test]
+fn project_policy_audit_events_extracts_allow_and_deny() {
+    let task_id = TaskId::new();
+    let conversation_id = ConversationId::new();
+    let context = HookTriggerContext::new_with_timestamp(
+        HookTriggerType::PreToolUse,
+        HookExecutionScope::default()
+            .with_task_id(task_id)
+            .with_conversation_id(conversation_id)
+            .with_metadata(json!({"tool_name": "read_file"})),
+        Utc::now(),
+    );
+    let hook_id = HookId::new("hook-policy").expect("valid hook id");
+    let execution = crate::hook_engine::domain::HookExecutionResult::new(HookExecutionInput {
+        execution_id: crate::hook_engine::domain::HookExecutionId::new(),
+        hook_id,
+        trigger_context_id: context.id(),
+        trigger_type: HookTriggerType::PreToolUse,
+        predicate_data: serde_json::Value::Null,
+        action_results: vec![
+            ActionResult::new(ActionResultDetails {
+                action_id: HookActionId::new("allow").expect("valid action id"),
+                action_type: HookActionType::PolicyCheck,
+                status: ActionStatus::Succeeded,
+                output: json!({"decision": "allow"}),
+                log_entries: Vec::new(),
+            }),
+            ActionResult::new(ActionResultDetails {
+                action_id: HookActionId::new("deny").expect("valid action id"),
+                action_type: HookActionType::PolicyCheck,
+                status: ActionStatus::Succeeded,
+                output: json!({
+                    "decision": "deny",
+                    "violation": {
+                        "code": "tool.blocked",
+                        "reason": "tool use is forbidden",
+                    }
+                }),
+                log_entries: Vec::new(),
+            }),
+        ],
+        executed_at: Utc::now(),
+    });
+
+    let events = project_policy_audit_events(&execution, &context)
+        .expect("policy projection should succeed");
+
+    assert_eq!(events.len(), 2);
+    let allow_event = events.first().expect("expected allow policy event");
+    let deny_event = events.get(1).expect("expected deny policy event");
+    assert_eq!(allow_event.decision(), PolicyAuditDecision::Allow);
+    assert_eq!(allow_event.task_id(), Some(task_id));
+    assert_eq!(deny_event.decision(), PolicyAuditDecision::Deny);
+    assert_eq!(
+        deny_event
+            .violation()
+            .expect("deny event should include violation")
+            .code(),
+        "tool.blocked"
+    );
+}
+
+#[test]
+fn project_policy_audit_events_rejects_missing_decision() {
+    let context = HookTriggerContext::new(HookTriggerType::PreToolUse, &mockable::DefaultClock);
+    let hook_id = HookId::new("hook-policy-invalid").expect("valid hook id");
+    let execution = crate::hook_engine::domain::HookExecutionResult::new(HookExecutionInput {
+        execution_id: crate::hook_engine::domain::HookExecutionId::new(),
+        hook_id,
+        trigger_context_id: context.id(),
+        trigger_type: HookTriggerType::PreToolUse,
+        predicate_data: serde_json::Value::Null,
+        action_results: vec![ActionResult::new(ActionResultDetails {
+            action_id: HookActionId::new("invalid").expect("valid action id"),
+            action_type: HookActionType::PolicyCheck,
+            status: ActionStatus::Succeeded,
+            output: json!({"status": "succeeded"}),
+            log_entries: Vec::new(),
+        })],
+        executed_at: Utc::now(),
+    });
+
+    let error = project_policy_audit_events(&execution, &context)
+        .expect_err("policy projection should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("missing string field 'decision'"),
+        "unexpected projection error: {error}"
+    );
+}
+
+#[test]
+fn policy_violation_rejects_blank_reason() {
+    let error = PolicyViolation::new("tool.blocked", "   ")
+        .expect_err("blank policy violation reason should fail");
+    assert!(error.to_string().contains("violation reason"));
 }

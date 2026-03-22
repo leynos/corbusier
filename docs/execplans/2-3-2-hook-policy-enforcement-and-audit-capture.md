@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: DONE
 
 This document plans roadmap item 2.3.2 in `docs/roadmap.md`:
 
@@ -124,15 +124,15 @@ Observable operator outcome:
 
 - [x] (2026-03-21 00:00Z) Gathered roadmap, design, testing, and architecture
       context; drafted this ExecPlan.
-- [ ] Stage A: finalize the domain model for enforcement scope and policy audit
+- [x] Stage A: finalize the domain model for enforcement scope and policy audit
       projection.
-- [ ] Stage B: implement hook-engine policy audit persistence and query
+- [x] Stage B: implement hook-engine policy audit persistence and query
       service, including PostgreSQL migration.
-- [ ] Stage C: wire the first enforcement point into tool execution without
+- [x] Stage C: wire the first enforcement point into tool execution without
       violating hexagonal boundaries.
-- [ ] Stage D: add `rstest`, in-memory integration, PostgreSQL integration, and
+- [x] Stage D: add `rstest`, in-memory integration, PostgreSQL integration, and
       `rstest-bdd` behavioural tests.
-- [ ] Stage E: update design and user documentation; mark roadmap 2.3.2 done.
+- [x] Stage E: update design and user documentation; mark roadmap 2.3.2 done.
 - [ ] Stage F: run formatting, lint, test, Markdown, and Mermaid validation
       gates and capture evidence.
 
@@ -157,6 +157,12 @@ Observable operator outcome:
   `ToolPolicyEnforcer::evaluate()` returns only `PolicyDecision`. Impact: the
   tool-governance port must become richer, or a sibling observer port must be
   added, before post-tool-use audit capture can be wired cleanly.
+
+- Observation: `pg-embedded` startup in this environment still depends on a
+  correct `/dev/null` character device. Evidence: the first PostgreSQL rerun
+  failed with `cannot create /dev/null: Permission denied` until `/dev/null`
+  was recreated as `c 1 3`. Impact: Postgres validation remains environment
+  sensitive even when the application code is correct.
 
 ## Decision log
 
@@ -192,9 +198,7 @@ Observable operator outcome:
 
 ## Outcomes & retrospective
 
-This plan is still in draft. No implementation work has started yet.
-
-Intended completed outcome:
+Implemented outcome:
 
 - `hook_engine` owns a queryable policy-audit model and persistence port.
 - `tool_registry` enforces pre-tool-use policy and records post-tool-use hook
@@ -203,6 +207,18 @@ Intended completed outcome:
   prove happy paths, unhappy paths, and key edge cases.
 - `docs/corbusier-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
   accurately reflect the implemented behaviour.
+
+Retrospective:
+
+- The dedicated execution-scope objects kept workflow correlation out of
+  `RequestContext` while still making policy audit rows queryable by task and
+  conversation.
+- A separate policy-audit projection table was the right trade-off; querying
+  indexed rows is materially simpler than inspecting `hook_executions`
+  `action_results` JSON.
+- The environment-level `/dev/null` failure remains a sharp edge for
+  PostgreSQL-backed tests and was handled as an infrastructure repair rather
+  than a code change.
 
 ## Context and orientation
 

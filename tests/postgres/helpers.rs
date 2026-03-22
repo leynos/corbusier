@@ -70,6 +70,10 @@ pub const ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL: &str = include_str!(
 /// SQL to enforce idempotent hook execution inserts per tenant and trigger context.
 pub const ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL: &str =
     include_str!("../../migrations/2026-03-14-000000_add_hook_executions_unique_constraint/up.sql");
+/// SQL to add hook policy audit projection storage and indexes.
+pub const ADD_HOOK_POLICY_AUDIT_EVENTS_SQL: &str =
+    include_str!("../../migrations/2026-03-22-000000_add_hook_policy_audit_events/up.sql");
+
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
@@ -88,7 +92,7 @@ pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v13";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v14";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -147,6 +151,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
     map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
+    map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
     Ok(())
 }
 

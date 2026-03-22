@@ -5,7 +5,7 @@ use std::sync::Arc;
 use corbusier::context::RequestContext;
 use corbusier::hook_engine::adapters::memory::{
     InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
-    InMemoryHookExecutionLogRepository,
+    InMemoryHookExecutionLogRepository, InMemoryHookPolicyAuditRepository,
 };
 use corbusier::hook_engine::domain::{HookExecutionResult, HookTriggerContext};
 use corbusier::hook_engine::services::HookEngineService;
@@ -18,6 +18,7 @@ pub type TestHookEngineService = HookEngineService<
     InMemoryHookDefinitionRepository,
     InMemoryHookActionExecutor,
     InMemoryHookExecutionLogRepository,
+    InMemoryHookPolicyAuditRepository,
     DefaultClock,
 >;
 
@@ -46,10 +47,12 @@ impl HookWorld {
         let definition_repo = InMemoryHookDefinitionRepository::new();
         let action_executor = InMemoryHookActionExecutor::new();
         let execution_log = InMemoryHookExecutionLogRepository::new();
+        let policy_audit = InMemoryHookPolicyAuditRepository::new();
         let service = HookEngineService::new(
             Arc::new(definition_repo.clone()),
             Arc::new(action_executor.clone()),
             Arc::new(execution_log.clone()),
+            Arc::new(policy_audit.clone()),
             Arc::new(DefaultClock),
         );
         Self {

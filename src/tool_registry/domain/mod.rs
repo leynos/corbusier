@@ -31,9 +31,12 @@ pub use log_capture::{
     LogCaptureContext, LogEntryId, LogEntryKind, LogEntryMetadata, LogRetentionPolicy,
     PersistedLogEntryData,
 };
-pub use policy::PolicyDecision;
+pub use policy::ToolGovernanceDecision;
 pub use redact::{redact_error_message, redact_outcome_content, redact_parameters};
-pub use routing::{ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming};
+pub use routing::{
+    ToolCallId, ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming,
+    ToolExecutionScope,
+};
 pub use server::{McpServerLifecycleState, McpServerRegistration, PersistedMcpServerData};
 pub use tool::McpToolDefinition;
 pub use transport::{HttpSseTransportConfig, McpTransport, StdioTransportConfig};
