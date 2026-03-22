@@ -29,26 +29,32 @@ fn assert_issue_reference(
     expected_repository: &str,
     expected_issue_number: u64,
 ) -> Result<(), eyre::Report> {
-    if issue_ref.provider().as_str() != expected_provider {
-        return Err(eyre::eyre!(
-            "expected issue provider {}, found {}",
-            expected_provider,
-            issue_ref.provider().as_str()
-        ));
-    }
-    if issue_ref.repository().as_str() != expected_repository {
-        return Err(eyre::eyre!(
-            "expected issue repository {}, found {}",
-            expected_repository,
-            issue_ref.repository().as_str()
-        ));
-    }
-    if issue_ref.issue_number().value() != expected_issue_number {
-        return Err(eyre::eyre!(
-            "expected issue number {}, found {}",
-            expected_issue_number,
-            issue_ref.issue_number().value()
-        ));
+    check_eq(
+        "issue provider",
+        &expected_provider,
+        &issue_ref.provider().as_str(),
+    )?;
+    check_eq(
+        "issue repository",
+        &expected_repository,
+        &issue_ref.repository().as_str(),
+    )?;
+    check_eq(
+        "issue number",
+        &expected_issue_number,
+        &issue_ref.issue_number().value(),
+    )?;
+
+    Ok(())
+}
+
+fn check_eq<T: PartialEq + std::fmt::Display>(
+    label: &str,
+    expected: &T,
+    actual: &T,
+) -> Result<(), eyre::Report> {
+    if actual != expected {
+        return Err(eyre::eyre!("expected {label} {expected}, found {actual}"));
     }
 
     Ok(())
@@ -109,17 +115,7 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         .clone()
         .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
     let lookup_result = run_async(world.service.find_by_issue_ref(&world.ctx, &issue_ref));
-    let found = match lookup_result {
-        Ok(found) => {
-            world.last_lookup_result = Some(Ok(found.clone()));
-            found
-        }
-        Err(err) => {
-            let message = format!("lookup failed: {err}");
-            world.last_lookup_result = Some(Err(err));
-            return Err(eyre::eyre!(message));
-        }
-    };
+    let found = record_lookup(world, lookup_result)?;
 
     if found.is_none() {
         return Err(eyre::eyre!(
@@ -132,6 +128,28 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         return Err(eyre::eyre!("lookup task does not match created task"));
     }
     Ok(())
+}
+
+fn record_lookup(
+    world: &mut TaskWorld,
+    result: Result<Option<Task>, TaskLifecycleError>,
+) -> Result<Option<Task>, eyre::Report> {
+    match result {
+        Ok(found) => {
+            world.last_lookup_result = Some(Ok(found.clone()));
+            Ok(found)
+        }
+        Err(err) => {
+            world.last_lookup_result = Some(Err(err));
+            let display = world
+                .last_lookup_result
+                .as_ref()
+                .and_then(|stored| stored.as_ref().err())
+                .map(std::string::ToString::to_string)
+                .ok_or_else(|| eyre::eyre!("lookup failed: missing stored error"))?;
+            Err(eyre::eyre!("lookup failed: {display}"))
+        }
+    }
 }
 
 #[then("task creation fails with a duplicate issue reference error")]
@@ -218,11 +236,15 @@ fn each_tenant_retrieves_own_task(world: &TaskWorld) -> Result<(), eyre::Report>
     .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
     .ok_or_else(|| eyre::eyre!("tenant B task not found"))?;
 
-    if found_a.id() != task_a.id() {
-        return Err(eyre::eyre!("tenant A lookup returned the wrong task"));
+    assert_lookup_matches(&found_a, task_a, "tenant A")?;
+    assert_lookup_matches(&found_b, task_b, "tenant B")?;
+    Ok(())
+}
+
+fn assert_lookup_matches(found: &Task, expected: &Task, label: &str) -> Result<(), eyre::Report> {
+    if found.id() != expected.id() {
+        return Err(eyre::eyre!("{label} lookup returned the wrong task"));
     }
-    if found_b.id() != task_b.id() {
-        return Err(eyre::eyre!("tenant B lookup returned the wrong task"));
-    }
+
     Ok(())
 }

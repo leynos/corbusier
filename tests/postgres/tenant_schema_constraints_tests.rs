@@ -178,19 +178,15 @@ fn insert_handoff_source_session_case(
     tenant_a: Uuid,
     tenant_b: Uuid,
 ) -> diesel::QueryResult<usize> {
-    let conversation_a = Uuid::new_v4();
-    let conversation_b = Uuid::new_v4();
-    let session_a = Uuid::new_v4();
-    insert_conversation(tx, conversation_a, tenant_a, None)?;
-    insert_conversation(tx, conversation_b, tenant_b, None)?;
-    insert_agent_session(tx, session_a, tenant_a, conversation_a)?;
+    let (session, conversation) =
+        build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Session)?;
     insert_handoff(
         tx,
         HandoffInsert {
             handoff: Uuid::new_v4(),
             tenant: tenant_b,
-            source_session: session_a,
-            conversation: conversation_b,
+            source_session: session,
+            conversation,
         },
     )
 }
@@ -200,21 +196,48 @@ fn insert_handoff_conversation_case(
     tenant_a: Uuid,
     tenant_b: Uuid,
 ) -> diesel::QueryResult<usize> {
-    let conversation_a = Uuid::new_v4();
-    let conversation_b = Uuid::new_v4();
-    let session_b = Uuid::new_v4();
-    insert_conversation(tx, conversation_a, tenant_a, None)?;
-    insert_conversation(tx, conversation_b, tenant_b, None)?;
-    insert_agent_session(tx, session_b, tenant_b, conversation_b)?;
+    let (session, conversation) =
+        build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Conversation)?;
     insert_handoff(
         tx,
         HandoffInsert {
             handoff: Uuid::new_v4(),
             tenant: tenant_b,
-            source_session: session_b,
-            conversation: conversation_a,
+            source_session: session,
+            conversation,
         },
     )
+}
+
+#[derive(Clone, Copy)]
+enum CrossTenantField {
+    Session,
+    Conversation,
+}
+
+fn build_cross_tenant_prerequisites(
+    tx: &mut PgConnection,
+    tenant_a: Uuid,
+    tenant_b: Uuid,
+    mismatched: CrossTenantField,
+) -> diesel::QueryResult<(Uuid, Uuid)> {
+    let conversation_a = Uuid::new_v4();
+    let conversation_b = Uuid::new_v4();
+    insert_conversation(tx, conversation_a, tenant_a, None)?;
+    insert_conversation(tx, conversation_b, tenant_b, None)?;
+
+    match mismatched {
+        CrossTenantField::Session => {
+            let session_a = Uuid::new_v4();
+            insert_agent_session(tx, session_a, tenant_a, conversation_a)?;
+            Ok((session_a, conversation_b))
+        }
+        CrossTenantField::Conversation => {
+            let session_b = Uuid::new_v4();
+            insert_agent_session(tx, session_b, tenant_b, conversation_b)?;
+            Ok((session_b, conversation_a))
+        }
+    }
 }
 
 fn insert_context_snapshot_session_case(
@@ -222,19 +245,15 @@ fn insert_context_snapshot_session_case(
     tenant_a: Uuid,
     tenant_b: Uuid,
 ) -> diesel::QueryResult<usize> {
-    let conversation_a = Uuid::new_v4();
-    let conversation_b = Uuid::new_v4();
-    let session_a = Uuid::new_v4();
-    insert_conversation(tx, conversation_a, tenant_a, None)?;
-    insert_conversation(tx, conversation_b, tenant_b, None)?;
-    insert_agent_session(tx, session_a, tenant_a, conversation_a)?;
+    let (session, conversation) =
+        build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Session)?;
     insert_context_snapshot(
         tx,
         ContextSnapshotInsert {
             snapshot: Uuid::new_v4(),
             tenant: tenant_b,
-            conversation: conversation_b,
-            session: session_a,
+            conversation,
+            session,
         },
     )
 }
@@ -244,19 +263,15 @@ fn insert_context_snapshot_conversation_case(
     tenant_a: Uuid,
     tenant_b: Uuid,
 ) -> diesel::QueryResult<usize> {
-    let conversation_a = Uuid::new_v4();
-    let conversation_b = Uuid::new_v4();
-    let session_b = Uuid::new_v4();
-    insert_conversation(tx, conversation_a, tenant_a, None)?;
-    insert_conversation(tx, conversation_b, tenant_b, None)?;
-    insert_agent_session(tx, session_b, tenant_b, conversation_b)?;
+    let (session, conversation) =
+        build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Conversation)?;
     insert_context_snapshot(
         tx,
         ContextSnapshotInsert {
             snapshot: Uuid::new_v4(),
             tenant: tenant_b,
-            conversation: conversation_a,
-            session: session_b,
+            conversation,
+            session,
         },
     )
 }
