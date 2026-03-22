@@ -194,13 +194,27 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
         .map_err(|err| Box::new(err) as BoxError)?;
     assert_eq!(created_sessions.len(), 1);
 
-    let active = ctx
+    let active_sessions = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
-        .await
+        .all_sessions()
         .map_err(|err| Box::new(err) as BoxError)?
+        .into_iter()
+        .filter(|session| {
+            session.backend_id() == backend_id
+                && session.conversation_id() == conversation_id
+                && session.status() == corbusier::agent_backend::domain::TurnSessionStatus::Active
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        active_sessions.len(),
+        1,
+        "expected exactly one active session row for the slot"
+    );
+    let active_session = active_sessions
+        .into_iter()
+        .next()
         .ok_or_else(|| Box::new(std::io::Error::other("expected active session")) as BoxError)?;
-    assert_eq!(active.turn_count(), 2);
+    assert_eq!(active_session.turn_count(), 2);
     Ok(())
 }
 
@@ -284,11 +298,25 @@ async fn concurrent_execute_turn_creates_single_active_session(
     let second_response = second_result.map_err(|err| Box::new(err) as BoxError)?;
     assert_eq!(first_response.session_id(), second_response.session_id());
 
-    let active_session = ctx
+    let active_sessions = ctx
         .session_repository
-        .find_active_session(&ctx.ctx, SessionSlotKey::new(backend_id, conversation_id))
-        .await
+        .all_sessions()
         .map_err(|err| Box::new(err) as BoxError)?
+        .into_iter()
+        .filter(|session| {
+            session.backend_id() == backend_id
+                && session.conversation_id() == conversation_id
+                && session.status() == corbusier::agent_backend::domain::TurnSessionStatus::Active
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        active_sessions.len(),
+        1,
+        "expected exactly one active session row for the slot"
+    );
+    let active_session = active_sessions
+        .into_iter()
+        .next()
         .expect("Expected exactly one active session to exist");
     assert_eq!(
         active_session.id(),

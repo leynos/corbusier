@@ -134,6 +134,17 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
             };
 
             if existing.status() == TurnSessionStatus::Reserved {
+                if existing.is_expired_at(now) {
+                    existing.mark_expired(now);
+                    state.active_index.remove(&index_key);
+                    let reserved_session =
+                        Self::create_reservation_session(backend_id, conversation_id, now, ttl)?;
+                    Self::reconcile_session_index(&mut state, ctx.tenant_id(), &reserved_session)?;
+                    return Ok(SessionSlotArbitration::Reserved {
+                        reservation: reserved_session,
+                        prior_expired,
+                    });
+                }
                 return Err(TurnSessionRepositoryError::active_session_conflict(
                     backend_id,
                     conversation_id,

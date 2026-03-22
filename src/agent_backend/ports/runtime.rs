@@ -59,6 +59,10 @@ pub enum AgentRuntimeError {
     #[error("runtime session creation failed: {0}")]
     SessionCreationFailed(String),
 
+    /// Session teardown failed.
+    #[error("runtime session teardown failed: {0}")]
+    SessionTeardownFailed(String),
+
     /// The runtime session ID is invalid.
     #[error("invalid runtime session id")]
     InvalidRuntimeSessionId,

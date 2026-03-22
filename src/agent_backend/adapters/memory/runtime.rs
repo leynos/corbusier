@@ -152,9 +152,10 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
         _backend: &AgentBackendRegistration,
         runtime_session_id: &RuntimeSessionId,
     ) -> AgentRuntimeResult<()> {
-        let mut state = self.state.write().map_err(|err| {
-            AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(|err| AgentRuntimeError::SessionTeardownFailed(err.to_string()))?;
         state
             .created_session_ids
             .retain(|id| id != runtime_session_id);

@@ -1,73 +1,40 @@
 //! Shared fixtures and helpers for turn orchestration unit tests.
 
-use std::sync::Arc;
-
 use crate::agent_backend::{
-    adapters::memory::{
-        InMemoryAgentRuntime, InMemoryBackendRegistry, InMemoryToolRouter,
-        InMemoryTurnSessionRepository,
-    },
     domain::{AgentBackendRegistration, AgentCapabilities, BackendId, BackendInfo, BackendName},
     ports::BackendRegistryRepository,
-    services::{
-        AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts, AgentTurnOrchestratorService,
-    },
 };
-use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use crate::context::RequestContext;
+use crate::test_support::{InMemoryAgentTurnOrchestrator, build_in_memory_orchestrator};
 use mockable::DefaultClock;
 use rstest::fixture;
 
-pub type TestOrchestrator = AgentTurnOrchestratorService<
-    InMemoryBackendRegistry,
-    InMemoryTurnSessionRepository,
-    InMemoryAgentRuntime,
-    InMemoryToolRouter,
-    DefaultClock,
->;
+pub type TestOrchestrator = InMemoryAgentTurnOrchestrator;
 
 pub struct OrchestrationContext {
-    pub backend_registry: Arc<InMemoryBackendRegistry>,
-    pub session_repository: Arc<InMemoryTurnSessionRepository>,
-    pub runtime: Arc<InMemoryAgentRuntime>,
-    pub tool_router: Arc<InMemoryToolRouter>,
+    pub backend_registry:
+        std::sync::Arc<crate::agent_backend::adapters::memory::InMemoryBackendRegistry>,
+    pub session_repository:
+        std::sync::Arc<crate::agent_backend::adapters::memory::InMemoryTurnSessionRepository>,
+    pub runtime: std::sync::Arc<crate::agent_backend::adapters::memory::InMemoryAgentRuntime>,
+    pub tool_router: std::sync::Arc<crate::agent_backend::adapters::memory::InMemoryToolRouter>,
     pub service: TestOrchestrator,
-    pub clock: Arc<DefaultClock>,
+    pub clock: std::sync::Arc<DefaultClock>,
     pub ctx: RequestContext,
 }
 
 #[fixture]
 pub fn context() -> OrchestrationContext {
-    let backend_registry = Arc::new(InMemoryBackendRegistry::new());
-    let session_repository = Arc::new(InMemoryTurnSessionRepository::new());
-    let runtime = Arc::new(InMemoryAgentRuntime::new());
-    let tool_router = Arc::new(InMemoryToolRouter::new());
-    let clock = Arc::new(DefaultClock);
-    let config = AgentTurnOrchestratorConfig::default();
-
-    let service = AgentTurnOrchestratorService::with_config(
-        AgentTurnOrchestratorPorts {
-            backend_registry: backend_registry.clone(),
-            turn_sessions: session_repository.clone(),
-            runtime: runtime.clone(),
-            tool_router: tool_router.clone(),
-            clock: clock.clone(),
-        },
-        config,
-    );
+    let stack = build_in_memory_orchestrator();
 
     OrchestrationContext {
-        backend_registry,
-        session_repository,
-        runtime,
-        tool_router,
-        service,
-        clock,
-        ctx: RequestContext::new(
-            TenantId::new(),
-            CorrelationId::new(),
-            UserId::new(),
-            SessionId::new(),
-        ),
+        backend_registry: stack.backend_registry,
+        session_repository: stack.session_repository,
+        runtime: stack.runtime,
+        tool_router: stack.tool_router,
+        service: stack.service,
+        clock: stack.clock,
+        ctx: stack.ctx,
     }
 }
 

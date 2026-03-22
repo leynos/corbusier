@@ -1070,19 +1070,19 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
 ###### Implementation decisions (2026-03-03) — roadmap 1.3.2 session management
 
 - Session continuity is persisted in a dedicated `agent_turn_sessions` table,
-  keyed by `backend_id` and `conversation_id` (tenant-scoped via
-  `backend_id -> backend_registrations(tenant_id)`), with a partial unique
-  index that enforces at most one active session for each pair.
+  keyed by `(tenant_id, backend_id, conversation_id)`, with a partial unique
+  index that enforces at most one row with `status IN ('active', 'reserved')`
+  for each slot.
 - Session expiry is managed as a sliding time-to-live (TTL) policy: successful
   turns extend `expires_at`, and sessions that are expired at turn start are
   marked `expired` before a new runtime session is created.
 - `execute_turn` must perform session-slot arbitration with a single database
-  transaction for each `(backend_id, conversation_id)` key: lock the key, read
-  the active row from `agent_turn_sessions` (`SELECT ... FOR UPDATE`), evaluate
+  transaction for each `(tenant_id, backend_id, conversation_id)` slot: lock
+  the same slot key, read the claimed row from `agent_turn_sessions`, evaluate
   `expires_at`, mark the row expired when needed, then either extend/reuse the
   existing session or insert a replacement row and commit. This avoids
   read-modify-write races and ensures the partial unique index never observes a
-  transient double-active state.
+  transient double-claimed state.
 - Session lifecycle handling is part of the orchestration service, while
   persistence and runtime concerns remain adapter responsibilities to preserve
   hexagonal boundaries.

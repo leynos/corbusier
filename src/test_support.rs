@@ -1,5 +1,14 @@
 //! Shared test utilities available to all `#[cfg(test)]` modules.
 
+use crate::agent_backend::{
+    adapters::memory::{
+        InMemoryAgentRuntime, InMemoryBackendRegistry, InMemoryToolRouter,
+        InMemoryTurnSessionRepository,
+    },
+    services::{
+        AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts, AgentTurnOrchestratorService,
+    },
+};
 use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::tool_registry::{
     domain::{
@@ -12,6 +21,34 @@ use crate::tool_registry::{
 };
 use async_trait::async_trait;
 use std::collections::HashSet;
+use std::sync::Arc;
+
+/// Shared in-memory orchestrator type for agent-turn tests.
+pub type InMemoryAgentTurnOrchestrator = AgentTurnOrchestratorService<
+    InMemoryBackendRegistry,
+    InMemoryTurnSessionRepository,
+    InMemoryAgentRuntime,
+    InMemoryToolRouter,
+    mockable::DefaultClock,
+>;
+
+/// Fully wired in-memory stack for agent-turn orchestration tests.
+pub struct InMemoryAgentTurnStack {
+    /// Backend registry adapter.
+    pub backend_registry: Arc<InMemoryBackendRegistry>,
+    /// Turn-session repository adapter.
+    pub session_repository: Arc<InMemoryTurnSessionRepository>,
+    /// Runtime adapter.
+    pub runtime: Arc<InMemoryAgentRuntime>,
+    /// Tool-router adapter.
+    pub tool_router: Arc<InMemoryToolRouter>,
+    /// Shared clock dependency.
+    pub clock: Arc<mockable::DefaultClock>,
+    /// Default request context.
+    pub ctx: RequestContext,
+    /// Orchestrator service under test.
+    pub service: InMemoryAgentTurnOrchestrator,
+}
 
 /// Creates a [`RequestContext`] with freshly generated identifiers.
 #[must_use]
@@ -34,6 +71,36 @@ pub fn other_tenant_ctx(source: &RequestContext) -> RequestContext {
         source.user_id(),
         source.session_id(),
     )
+}
+
+/// Builds the default in-memory stack used by agent-turn tests.
+#[must_use]
+pub fn build_in_memory_orchestrator() -> InMemoryAgentTurnStack {
+    let backend_registry = Arc::new(InMemoryBackendRegistry::new());
+    let session_repository = Arc::new(InMemoryTurnSessionRepository::new());
+    let runtime = Arc::new(InMemoryAgentRuntime::new());
+    let tool_router = Arc::new(InMemoryToolRouter::new());
+    let clock = Arc::new(mockable::DefaultClock);
+    let service = AgentTurnOrchestratorService::with_config(
+        AgentTurnOrchestratorPorts {
+            backend_registry: backend_registry.clone(),
+            turn_sessions: session_repository.clone(),
+            runtime: runtime.clone(),
+            tool_router: tool_router.clone(),
+            clock: clock.clone(),
+        },
+        AgentTurnOrchestratorConfig::default(),
+    );
+
+    InMemoryAgentTurnStack {
+        backend_registry,
+        session_repository,
+        runtime,
+        tool_router,
+        clock,
+        ctx: test_request_ctx(),
+        service,
+    }
 }
 
 /// Fake MCP host adapter whose [`McpServerHost::health`] always

@@ -77,11 +77,6 @@ pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
 /// SQL to tenant-scope `mcp_servers` and enforce composite child foreign keys.
 pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-03-11-000000_tenant_scope_mcp_servers/up.sql");
-/// Template database name for pre-migrated schema.
-///
-/// Bump the version suffix whenever a new migration is added so that stale
-/// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v11";
 /// SQL to tenant-scope agent backend and turn-session tables.
 pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
     include_str!("../../migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql");
@@ -89,6 +84,11 @@ pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
 pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
     "../../migrations/2026-03-20-000000_add_reserved_agent_turn_session_status/up.sql"
 );
+/// Template database name for pre-migrated schema.
+///
+/// Bump the version suffix whenever a new migration is added so that stale
+/// template databases created by earlier test runs are not reused.
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v13";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -137,8 +137,8 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
-    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
+    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;

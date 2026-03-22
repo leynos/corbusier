@@ -40,10 +40,12 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         output: Value,
     ) -> ToolRoutingResult<()> {
+        let tool_name_key = tool_name.into();
         let mut state = self.state.write().map_err(|err| {
             ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
-        state.responses.insert(tool_name.into(), output);
+        state.failures.remove(&tool_name_key);
+        state.responses.insert(tool_name_key, output);
         Ok(())
     }
 
@@ -58,10 +60,12 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         message: impl Into<String>,
     ) -> ToolRoutingResult<()> {
+        let tool_name_key = tool_name.into();
         let mut state = self.state.write().map_err(|err| {
             ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
-        state.failures.insert(tool_name.into(), message.into());
+        state.responses.remove(&tool_name_key);
+        state.failures.insert(tool_name_key, message.into());
         Ok(())
     }
 

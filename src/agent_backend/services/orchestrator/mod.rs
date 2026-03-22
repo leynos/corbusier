@@ -224,19 +224,14 @@ where
         let expire_time = self.clock.utc();
         session.mark_expired(expire_time);
 
-        let persist_result = self
-            .turn_sessions
+        self.turn_sessions
             .upsert_session(ctx, session)
             .await
-            .map_err(AgentTurnOrchestrationError::SessionRepository);
-        let teardown_result = self
-            .runtime
+            .map_err(AgentTurnOrchestrationError::SessionRepository)?;
+        self.runtime
             .teardown_session(backend, session.runtime_session_handle())
             .await
-            .map_err(AgentTurnOrchestrationError::Runtime);
-
-        persist_result?;
-        teardown_result
+            .map_err(AgentTurnOrchestrationError::Runtime)
     }
 
     async fn persist_completed_turn(

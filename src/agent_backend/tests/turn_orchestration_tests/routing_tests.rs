@@ -2,7 +2,10 @@
 
 use super::common::{OrchestrationContext, context, register_backend};
 use crate::agent_backend::{
-    domain::{ToolCallAuditStatus, ToolCallRequest, TurnExecutionRequest, TurnExecutionResult},
+    domain::{
+        ToolCallAuditStatus, ToolCallRequest, ToolCallResult, TurnExecutionRequest,
+        TurnExecutionResult,
+    },
     services::ExecuteAgentTurnRequest,
 };
 use rstest::rstest;
@@ -54,7 +57,7 @@ async fn execute_turn_routes_tool_calls_and_returns_audits(
     let result_call_ids: Vec<&str> = response
         .tool_results()
         .iter()
-        .map(crate::agent_backend::domain::ToolCallResult::call_id)
+        .map(ToolCallResult::call_id)
         .collect();
     let routed_call_refs: Vec<&str> = routed_call_ids.iter().map(String::as_str).collect();
     assert_eq!(routed_call_refs, result_call_ids);

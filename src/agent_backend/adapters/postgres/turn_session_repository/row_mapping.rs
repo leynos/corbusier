@@ -13,15 +13,10 @@ pub(crate) fn to_new_row(
     session: &TurnSession,
     tenant_id: uuid::Uuid,
 ) -> TurnSessionRepositoryResult<NewAgentTurnSessionRow> {
-    let turn_count: i64 =
-        session
-            .turn_count()
-            .try_into()
-            .map_err(|err: std::num::TryFromIntError| {
-                TurnSessionRepositoryError::invalid_domain_data(std::io::Error::other(
-                    err.to_string(),
-                ))
-            })?;
+    let turn_count: i64 = session
+        .turn_count()
+        .try_into()
+        .map_err(TurnSessionRepositoryError::invalid_domain_data)?;
 
     Ok(NewAgentTurnSessionRow {
         id: session.id().into_inner(),
@@ -81,9 +76,7 @@ pub(crate) fn row_to_turn_session(
         turn_count
             .try_into()
             .map_err(|err: std::num::TryFromIntError| {
-                TurnSessionRepositoryError::invalid_persisted_data(std::io::Error::other(
-                    err.to_string(),
-                ))
+                TurnSessionRepositoryError::invalid_persisted_data(err)
             })?;
 
     Ok(TurnSession::from_persisted(PersistedTurnSessionData {

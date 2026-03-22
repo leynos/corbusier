@@ -63,7 +63,7 @@ async fn execute_turn_reuses_active_session(
 async fn execute_turn_serializes_concurrent_calls_for_same_session_key(
     context: OrchestrationContext,
 ) -> Result<(), eyre::Report> {
-    // Note: `SessionExecutionLocks` serialises concurrent calls within a single service
+    // Note: `SessionExecutionLocks` serializes concurrent calls within a single service
     // instance. Distributed concurrency across multiple service instances requires
     // DB-level locking (see migration concurrency discussion in PR `#36`).
     let backend_id = register_backend(&context, "claude_code_sdk").await?;

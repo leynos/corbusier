@@ -2,7 +2,7 @@
 
 use super::world::{AgentTurnWorld, AuditStatusLabel, ConversationLabel};
 use corbusier::agent_backend::{
-    domain::{ToolCallAuditStatus, TurnSessionId, TurnSessionStatus},
+    domain::{ToolCallAuditStatus, TurnSession, TurnSessionId, TurnSessionStatus},
     ports::{SessionSlotKey, TurnSessionRepository},
     services::{AgentTurnOrchestrationError, ExecuteAgentTurnResponse},
 };
@@ -168,9 +168,9 @@ fn only_one_active_session_remains_for_conversation(
     let sessions = world.session_repository.all_sessions()?;
     let active_count = sessions
         .iter()
-        .filter(|session| session.backend_id() == backend_id)
-        .filter(|session| session.conversation_id() == conversation_id)
-        .filter(|session| session.status() == TurnSessionStatus::Active)
+        .filter(|session: &&TurnSession| session.backend_id() == backend_id)
+        .filter(|session: &&TurnSession| session.conversation_id() == conversation_id)
+        .filter(|session: &&TurnSession| session.status() == TurnSessionStatus::Active)
         .count();
     if active_count != 1 {
         return Err(eyre::eyre!(

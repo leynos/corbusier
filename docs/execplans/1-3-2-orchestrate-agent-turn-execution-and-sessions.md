@@ -184,6 +184,10 @@ Validation evidence:
 Deferred work:
 
 - Tool schema translation remains in roadmap 1.3.3 by design.
+- The partial unique index created in
+  `migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql` now covers
+  `status IN ('active', 'reserved')`, so concurrent reservation claims are
+  serialized at the database boundary rather than remaining deferred.
 
 ## Context and orientation
 

@@ -42,11 +42,14 @@ impl TryFrom<&str> for TurnSessionStatus {
 }
 
 fn parse_turn_session_status(value: &str) -> Option<TurnSessionStatus> {
-    let normalized = value.trim().to_ascii_lowercase();
-    match normalized.as_str() {
-        "active" => Some(TurnSessionStatus::Active),
-        "reserved" => Some(TurnSessionStatus::Reserved),
-        "expired" => Some(TurnSessionStatus::Expired),
-        _ => None,
+    let normalized = value.trim();
+    if normalized.eq_ignore_ascii_case("active") {
+        Some(TurnSessionStatus::Active)
+    } else if normalized.eq_ignore_ascii_case("reserved") {
+        Some(TurnSessionStatus::Reserved)
+    } else if normalized.eq_ignore_ascii_case("expired") {
+        Some(TurnSessionStatus::Expired)
+    } else {
+        None
     }
 }

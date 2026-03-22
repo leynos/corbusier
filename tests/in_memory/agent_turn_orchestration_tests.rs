@@ -189,6 +189,70 @@ async fn reservation_is_persisted_before_runtime_session_creation(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
+async fn timed_out_reservation_is_reclaimed(context: TestContext) -> Result<(), eyre::Report> {
+    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
+        register_backend(&context, "claude_code_sdk").await?,
+    );
+    let conversation_id = Uuid::new_v4();
+    let first_now = Utc::now();
+
+    let first = context
+        .session_repository
+        .arbitrate_session_slot(
+            &context.ctx,
+            SessionSlotReservation::new(
+                SessionSlotKey::new(backend_id, conversation_id),
+                first_now,
+                Duration::seconds(1),
+            ),
+        )
+        .await?;
+    let SessionSlotArbitration::Reserved {
+        reservation: initial_reservation,
+        ..
+    } = first
+    else {
+        return Err(eyre::eyre!("expected initial reservation"));
+    };
+
+    let second = context
+        .session_repository
+        .arbitrate_session_slot(
+            &context.ctx,
+            SessionSlotReservation::new(
+                SessionSlotKey::new(backend_id, conversation_id),
+                first_now + Duration::seconds(2),
+                Duration::minutes(5),
+            ),
+        )
+        .await?;
+    let SessionSlotArbitration::Reserved {
+        reservation,
+        prior_expired,
+    } = second
+    else {
+        return Err(eyre::eyre!("expected reclaimed reservation"));
+    };
+
+    assert!(prior_expired.is_none());
+    assert_ne!(reservation.id(), initial_reservation.id());
+
+    let sessions = context.session_repository.all_sessions()?;
+    let expired = sessions
+        .iter()
+        .find(|session| session.id() == initial_reservation.id())
+        .ok_or_else(|| eyre::eyre!("missing expired reservation"))?;
+    assert_eq!(expired.status(), TurnSessionStatus::Expired);
+    let reserved_count = sessions
+        .iter()
+        .filter(|session| session.status() == TurnSessionStatus::Reserved)
+        .count();
+    assert_eq!(reserved_count, 1);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
 async fn rotates_expired_session_and_marks_prior_session_expired(
     context: TestContext,
 ) -> Result<(), eyre::Report> {

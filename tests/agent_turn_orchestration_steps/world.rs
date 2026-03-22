@@ -10,24 +10,15 @@ use corbusier::agent_backend::{
         InMemoryTurnSessionRepository,
     },
     domain::{BackendId, TurnSessionId},
-    services::{
-        AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
-        AgentTurnOrchestratorService, ExecuteAgentTurnResponse,
-    },
+    services::{AgentTurnOrchestrationError, ExecuteAgentTurnResponse},
 };
-use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
-use mockable::DefaultClock;
+use corbusier::context::RequestContext;
+use corbusier::test_support::{InMemoryAgentTurnOrchestrator, build_in_memory_orchestrator};
 use rstest::fixture;
 use uuid::Uuid;
 
 /// Service type used by this BDD world.
-pub type TestOrchestrator = AgentTurnOrchestratorService<
-    InMemoryBackendRegistry,
-    InMemoryTurnSessionRepository,
-    InMemoryAgentRuntime,
-    InMemoryToolRouter,
-    DefaultClock,
->;
+pub type TestOrchestrator = InMemoryAgentTurnOrchestrator;
 
 /// Scenario world for agent turn orchestration behaviour tests.
 pub struct AgentTurnWorld {
@@ -62,40 +53,20 @@ impl AgentTurnWorld {
     /// Creates a world with empty scenario state.
     #[must_use]
     pub fn new() -> Self {
-        let backend_registry = Arc::new(InMemoryBackendRegistry::new());
-        let session_repository = Arc::new(InMemoryTurnSessionRepository::new());
-        let runtime = Arc::new(InMemoryAgentRuntime::new());
-        let tool_router = Arc::new(InMemoryToolRouter::new());
-        let config = AgentTurnOrchestratorConfig::default();
-
-        let service = AgentTurnOrchestratorService::with_config(
-            AgentTurnOrchestratorPorts {
-                backend_registry: backend_registry.clone(),
-                turn_sessions: session_repository.clone(),
-                runtime: runtime.clone(),
-                tool_router: tool_router.clone(),
-                clock: Arc::new(DefaultClock),
-            },
-            config,
-        );
+        let stack = build_in_memory_orchestrator();
 
         Self {
-            backend_registry,
-            session_repository,
-            runtime,
-            tool_router,
-            service,
+            backend_registry: stack.backend_registry,
+            session_repository: stack.session_repository,
+            runtime: stack.runtime,
+            tool_router: stack.tool_router,
+            service: stack.service,
             backend_id: None,
             conversations: HashMap::new(),
             last_result: None,
             concurrent_results: None,
             existing_session_id: None,
-            ctx: RequestContext::new(
-                TenantId::new(),
-                CorrelationId::new(),
-                UserId::new(),
-                SessionId::new(),
-            ),
+            ctx: stack.ctx,
         }
     }
 

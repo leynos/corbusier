@@ -90,7 +90,7 @@ pub enum ToolRoutingError {
 
     /// Infrastructure failure from the router adapter.
     #[error("tool router infrastructure error: {0}")]
-    Infrastructure(Arc<dyn std::error::Error + Send + Sync>),
+    Infrastructure(#[source] Arc<dyn std::error::Error + Send + Sync>),
 }
 
 impl ToolRoutingError {

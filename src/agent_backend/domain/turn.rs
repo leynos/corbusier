@@ -233,7 +233,7 @@ impl TurnExecutionResult {
 /// Computes a deterministic call identifier for `tool_call` at `index`.
 #[must_use]
 pub fn deterministic_tool_call_id(tool_call: &ToolCallRequest, index: usize) -> String {
-    let payload = Value::Object(Map::from_iter([
+    let payload = canonical_json_value(&Value::Object(Map::from_iter([
         ("index".to_owned(), Value::from(index)),
         (
             "tool_name".to_owned(),
@@ -243,7 +243,7 @@ pub fn deterministic_tool_call_id(tool_call: &ToolCallRequest, index: usize) -> 
             "parameters".to_owned(),
             canonical_json_value(tool_call.parameters()),
         ),
-    ]))
+    ])))
     .to_string();
     let mut hasher = Sha256::new();
     hasher.update(payload.as_bytes());

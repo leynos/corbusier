@@ -274,7 +274,7 @@ impl TurnSession {
     /// Returns `true` when the session is expired at `now`.
     #[must_use]
     pub fn is_expired_at(&self, now: DateTime<Utc>) -> bool {
-        !self.is_active() || now >= self.expires_at
+        self.status == TurnSessionStatus::Expired || now >= self.expires_at
     }
 
     /// Records a successful turn and extends expiry using a sliding TTL window.
