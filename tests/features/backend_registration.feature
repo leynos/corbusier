@@ -19,3 +19,10 @@ Feature: Agent backend registration and discovery
     When the backend is deactivated
     Then listing active backends does not include "test_backend"
     And listing all backends still includes "test_backend"
+
+  Scenario: Two tenants can register the same backend name
+    Given a backend named "claude_code_sdk" from provider "Anthropic"
+    When tenant A registers the backend
+    And tenant B registers a backend with the same name
+    Then both tenants successfully register distinct backends with that name
+    And each tenant can find its own backend by name

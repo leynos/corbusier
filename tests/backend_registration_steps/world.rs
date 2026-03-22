@@ -28,14 +28,21 @@ pub struct BackendWorld {
     pub service: TestRegistryService,
     /// Scenario-scoped request context shared across all steps.
     pub ctx: RequestContext,
+    /// Second tenant context used for cross-tenant scenarios.
+    pub other_ctx: RequestContext,
     /// Backends queued for registration.
     pub pending_backends: Vec<PendingBackend>,
     /// Last successfully registered backend.
     pub last_registered: Option<AgentBackendRegistration>,
+    /// Backend registered under the second tenant.
+    pub other_registered: Option<AgentBackendRegistration>,
     /// All registered backends (for multi-register scenarios).
     pub registered_backends: Vec<AgentBackendRegistration>,
     /// Result of the last registration attempt.
     pub last_register_result: Option<Result<AgentBackendRegistration, BackendRegistryServiceError>>,
+    /// Result of the second-tenant registration attempt.
+    pub other_register_result:
+        Option<Result<AgentBackendRegistration, BackendRegistryServiceError>>,
     /// Result of the last `list_all` call.
     pub last_list_all_result: Option<Vec<AgentBackendRegistration>>,
     /// Result of the last `list_active` call.
@@ -56,13 +63,22 @@ impl BackendWorld {
             UserId::new(),
             SessionId::new(),
         );
+        let other_ctx = RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        );
         Self {
             service,
             ctx,
+            other_ctx,
             pending_backends: Vec::new(),
             last_registered: None,
+            other_registered: None,
             registered_backends: Vec::new(),
             last_register_result: None,
+            other_register_result: None,
             last_list_all_result: None,
             last_list_active_result: None,
         }

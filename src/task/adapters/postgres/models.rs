@@ -13,6 +13,9 @@ pub struct TaskRow {
     /// Internal task identifier.
     #[diesel(sql_type = diesel::sql_types::Uuid)]
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    #[diesel(sql_type = diesel::sql_types::Uuid)]
+    pub tenant_id: uuid::Uuid,
     /// Origin JSON payload.
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
     pub origin: Value,
@@ -42,6 +45,8 @@ pub struct TaskRow {
 pub struct NewTaskRow {
     /// Internal task identifier.
     pub id: uuid::Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: uuid::Uuid,
     /// Origin JSON payload.
     pub origin: Value,
     /// Optional branch reference reserved for roadmap item 1.2.2.

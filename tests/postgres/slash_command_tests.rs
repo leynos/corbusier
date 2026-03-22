@@ -28,9 +28,16 @@ async fn slash_command_metadata_round_trip_postgres(
     let context = prepared_repo.await?;
     let repo = context.repo;
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
+    let ctx = test_request_context;
 
     let conversation_id = ConversationId::new();
-    insert_conversation(context.cluster, context.temp_db.name(), conversation_id).await?;
+    insert_conversation(
+        context.cluster,
+        context.temp_db.name(),
+        conversation_id,
+        &ctx,
+    )
+    .await?;
 
     let execution = service.execute("/review action=sync include_summary=true")?;
     let deterministic_rerun = service.execute("/review action=sync include_summary=true")?;
@@ -46,7 +53,6 @@ async fn slash_command_metadata_round_trip_postgres(
         .with_metadata(metadata)
         .build(&DefaultClock)?;
 
-    let ctx = test_request_context;
     repo.store(&ctx, &message).await?;
 
     let stored = repo
@@ -101,9 +107,16 @@ async fn slash_command_unknown_command_returns_error(
     let context = prepared_repo.await?;
     let repo = context.repo;
     let service = SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()));
+    let ctx = test_request_context;
 
     let conversation_id = ConversationId::new();
-    insert_conversation(context.cluster, context.temp_db.name(), conversation_id).await?;
+    insert_conversation(
+        context.cluster,
+        context.temp_db.name(),
+        conversation_id,
+        &ctx,
+    )
+    .await?;
 
     let error = service
         .execute("/nonexistent action=start")
@@ -115,7 +128,6 @@ async fn slash_command_unknown_command_returns_error(
         if command == "nonexistent"
     ));
 
-    let ctx = test_request_context;
     let stored_messages = repo.find_by_conversation(&ctx, conversation_id).await?;
     assert!(stored_messages.is_empty());
     Ok(())

@@ -1573,6 +1573,36 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
 - `SlashCommandRegistry` is excluded from `RequestContext` plumbing because it
   loads static command definitions, not tenant-owned data.
 
+###### Implementation decisions (2026-03-22) — tenant-aware schema and constraints (1.5.2)
+
+- Roadmap item 1.5.2 introduced a `tenants` root table plus `tenant_id` on the
+  core orchestration tables: `tasks`, `backend_registrations`, `conversations`,
+  `messages`, `agent_sessions`, `handoffs`, and `context_snapshots`. A
+  deterministic default tenant row (`00000000-0000-0000-0000-000000000001`,
+  slug `default`) backfills legacy rows safely during migration.
+- Task issue-origin uniqueness is now tenant-scoped via a partial unique index
+  over `tenant_id` plus the provider/repository/issue-number tuple when
+  `origin.type = 'issue'`. Backend registration names are now unique per tenant
+  via `(tenant_id, name)`.
+- Parent/child tenant consistency is enforced in the database with composite
+  foreign keys, for example
+  `(conversation_id, tenant_id) -> conversations(id, tenant_id)` and
+  `(session_id, tenant_id) -> agent_sessions(id, tenant_id)`.
+- Because 1.5.2 introduces foreign keys to `tenants` before a dedicated tenant
+  provisioning workflow exists, PostgreSQL write adapters lazily provision a
+  placeholder tenant row on first use of a `RequestContext.tenant_id()`. This
+  preserves the existing request contract while keeping explicit tenant
+  lifecycle management out of scope for this milestone.
+- `domain_events` and `audit_logs` deliberately remain outside the 1.5.2
+  tenant-column migration. Rationale: making those tables tenant-aware without
+  also redesigning the audit trigger/session-variable capture would blur the
+  boundary with 1.5.3. That follow-on milestone still owns broad query scoping,
+  RLS, and tenant-aware audit capture.
+- PostgreSQL adapters received the minimum query changes needed to make the new
+  per-tenant uniqueness observable before RLS: task issue lookups and backend
+  registry reads/writes now filter by `tenant_id`, while wider adapter
+  hardening remains part of 1.5.3.
+
 ### 2.3 Feature Relationships
 
 #### 2.3.1 Feature Dependencies Map

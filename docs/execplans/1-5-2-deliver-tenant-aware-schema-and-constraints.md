@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: DONE
 
 ## Purpose / big picture
 
@@ -138,17 +138,20 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
 - [x] (2026-03-21 00:00Z) Identified the two PostgreSQL adapter gaps that
   block 1.5.2 success criteria today: task issue pre-checks and backend
   registry lookups remain effectively global.
-- [ ] Stage A: add failing tests for tenant-aware uniqueness and composite
+- [x] (2026-03-22 00:00Z) Added PostgreSQL regression tests for same issue
+  reference reuse across tenants, same backend-name reuse across tenants, and
+  composite foreign key rejection for tenant-mismatched child rows.
+- [x] Stage A: add failing tests for tenant-aware uniqueness and composite
   foreign keys.
-- [ ] Stage B: add the tenant schema migration and wire it into the PostgreSQL
+- [x] Stage B: add the tenant schema migration and wire it into the PostgreSQL
   template helper.
-- [ ] Stage C: update Diesel schema/model files and PostgreSQL adapter write
+- [x] Stage C: update Diesel schema/model files and PostgreSQL adapter write
   paths.
-- [ ] Stage D: add the narrowly scoped repository query filters required to
+- [x] Stage D: add the narrowly scoped repository query filters required to
   make per-tenant uniqueness observable before 1.5.3.
-- [ ] Stage E: add or extend `rstest-bdd` scenarios for tenant-visible
+- [x] Stage E: add or extend `rstest-bdd` scenarios for tenant-visible
   behaviour.
-- [ ] Stage F: update design, user, and roadmap documentation; then run all
+- [x] Stage F: update design, user, and roadmap documentation; then run all
   quality gates.
 
 ## Surprises & discoveries
@@ -177,6 +180,23 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
   `corbusier_test_template_v8`. Evidence: `tests/postgres/helpers.rs`. Impact:
   the implementation must bump the template version or the new schema will be
   skipped by stale template reuse.
+
+- Observation: adding required `tenant_id` to `conversations` forces every raw
+  PostgreSQL test helper insert to accept a caller context, otherwise message
+  repository tests fail with composite foreign key violations when the stored
+  message row uses the request tenant and the synthetic conversation row uses a
+  default or missing tenant. Evidence: compile and helper-callsite updates in
+  `tests/postgres/helpers.rs` and the message integration tests. Impact:
+  tenant-aware helper plumbing is part of the milestone, not optional test
+  cleanup.
+
+- Observation: the new `tenants` foreign keys make random `RequestContext`
+  tenant IDs invalid until a matching tenant row exists. Evidence: the first
+  long-profile gate failed with `conversations_tenant_id_fkey` when helper and
+  adapter writes used fresh tenant IDs not present in `tenants`. Impact: 1.5.2
+  needs adapter-level tenant bootstrap on write, otherwise the schema change
+  breaks the existing request-context contract before tenant lifecycle
+  management is introduced.
 
 ## Decision log
 
@@ -209,17 +229,33 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
   not a natural Gherkin workflow. The two styles of test should each prove the
   layer they are best suited to prove. Date/Author: 2026-03-21 / plan author
 
+- Decision: defer `domain_events` and `audit_logs` tenant columns to 1.5.3.
+  Rationale: the current audit trigger and session-variable capture would need
+  to be redesigned in the same change to keep those tables coherent, which
+  would collapse the boundary between this schema/constraint milestone and the
+  later RLS/audit milestone. Date/Author: 2026-03-22 / implementation
+
+- Decision: lazily provision placeholder `tenants` rows from PostgreSQL write
+  adapters and raw PostgreSQL test helpers. Rationale: `RequestContext` already
+  treats `TenantId` as an opaque caller-supplied identifier, but the new
+  foreign keys now require a concrete parent row. This preserves public API
+  stability for 1.5.2 and defers explicit tenant lifecycle management to a
+  later milestone. Date/Author: 2026-03-22 / implementation
+
 ## Outcomes & retrospective
 
-This plan is still in draft. No implementation work has been carried out yet.
+Implementation is complete.
 
-Expected completion criteria for the eventual implementation are:
+Delivered outcomes:
 
-- tenant-owned schema tables persist `tenant_id`,
+- tenant-owned schema tables now persist `tenant_id`,
 - same issue references and backend names can coexist across tenants,
 - composite foreign keys reject tenant-mismatched parent/child rows,
-- documentation reflects the new behaviour, and
-- every required quality gate passes.
+- PostgreSQL write paths bootstrap placeholder tenant rows so the new foreign
+  keys remain compatible with the existing `RequestContext` contract, and
+- `make fmt`, `make check-fmt`, `make lint`, and
+  `make test TEST_FLAGS='--profile
+  long --all-targets --all-features'` all passed on 2026-03-22.
 
 ## Context and orientation
 

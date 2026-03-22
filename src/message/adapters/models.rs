@@ -23,6 +23,8 @@ use super::schema::{
 pub struct ConversationRow {
     /// Unique conversation identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Optional reference to the associated task.
     pub task_id: Option<Uuid>,
     /// Flexible context data.
@@ -41,6 +43,8 @@ pub struct ConversationRow {
 pub struct NewConversation {
     /// Unique conversation identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Optional reference to the associated task.
     pub task_id: Option<Uuid>,
     /// Flexible context data.
@@ -56,9 +60,10 @@ pub struct NewConversation {
 impl NewConversation {
     /// Creates a new conversation record with default state.
     #[must_use]
-    pub fn new(id: Uuid, now: DateTime<Utc>) -> Self {
+    pub fn new(id: Uuid, tenant_id: Uuid, now: DateTime<Utc>) -> Self {
         Self {
             id,
+            tenant_id,
             task_id: None,
             context: Value::Object(serde_json::Map::new()),
             state: "active".to_owned(),
@@ -79,6 +84,8 @@ impl NewConversation {
 pub struct MessageRow {
     /// Unique message identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Message role: user, assistant, tool, or system.
@@ -99,6 +106,8 @@ pub struct MessageRow {
 pub struct NewMessage {
     /// Unique message identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Message role: user, assistant, tool, or system.
@@ -126,6 +135,7 @@ impl NewMessage {
     /// - Sequence number overflows `i64`
     pub fn try_from_domain(
         message: &crate::message::domain::Message,
+        tenant_id: Uuid,
     ) -> crate::message::ports::repository::RepositoryResult<Self> {
         use crate::message::error::RepositoryError;
 
@@ -140,6 +150,7 @@ impl NewMessage {
 
         Ok(Self {
             id: message.id().into_inner(),
+            tenant_id,
             conversation_id: message.conversation_id().into_inner(),
             role: message.role().as_str().to_owned(),
             content,
@@ -222,6 +233,8 @@ pub struct NewDomainEvent {
 pub struct AgentSessionRow {
     /// Unique session identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Agent backend identifier.
@@ -252,6 +265,8 @@ pub struct AgentSessionRow {
 pub struct NewAgentSession {
     /// Unique session identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Agent backend identifier.
@@ -287,6 +302,8 @@ pub struct NewAgentSession {
 pub struct HandoffRow {
     /// Unique handoff identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Session being handed off from.
     pub source_session_id: Uuid,
     /// Conversation containing the handoff.
@@ -317,6 +334,8 @@ pub struct HandoffRow {
 pub struct NewHandoff {
     /// Unique handoff identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Session being handed off from.
     pub source_session_id: Uuid,
     /// Conversation containing the handoff.
@@ -352,6 +371,8 @@ pub struct NewHandoff {
 pub struct ContextSnapshotRow {
     /// Unique snapshot identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Reference to the agent session.
@@ -378,6 +399,8 @@ pub struct ContextSnapshotRow {
 pub struct NewContextSnapshot {
     /// Unique snapshot identifier.
     pub id: Uuid,
+    /// Owning tenant identifier.
+    pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
     /// Reference to the agent session.

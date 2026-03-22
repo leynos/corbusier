@@ -19,12 +19,16 @@ pub struct TaskWorld {
     pub service: TestTaskService,
     /// Scenario-scoped request context shared across all steps.
     pub ctx: RequestContext,
+    /// Second tenant context used for cross-tenant scenarios.
+    pub other_ctx: RequestContext,
     pub pending_issue_ref: Option<(String, String, u64)>,
     pub pending_issue_title: Option<String>,
     pub pending_request: Option<CreateTaskFromIssueRequest>,
     pub pending_lookup: Option<IssueRef>,
     pub last_created_task: Option<Task>,
+    pub other_created_task: Option<Task>,
     pub last_create_result: Option<Result<Task, TaskLifecycleError>>,
+    pub other_create_result: Option<Result<Task, TaskLifecycleError>>,
     pub last_lookup_result: Option<Result<Option<Task>, TaskLifecycleError>>,
 }
 
@@ -42,15 +46,24 @@ impl TaskWorld {
             UserId::new(),
             SessionId::new(),
         );
+        let other_ctx = RequestContext::new(
+            TenantId::new(),
+            CorrelationId::new(),
+            UserId::new(),
+            SessionId::new(),
+        );
         Self {
             service,
             ctx,
+            other_ctx,
             pending_issue_ref: None,
             pending_issue_title: None,
             pending_request: None,
             pending_lookup: None,
             last_created_task: None,
+            other_created_task: None,
             last_create_result: None,
+            other_create_result: None,
             last_lookup_result: None,
         }
     }

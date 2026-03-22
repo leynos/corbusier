@@ -114,6 +114,10 @@ retrieve it by the external issue reference. Issue-origin tasks start in the
 `draft` state and record lifecycle timestamps (`created_at`, `updated_at`) at
 creation time.
 
+Issue references are unique per tenant, not globally. Two tenants may each map
+the same external issue reference to their own internal task without colliding,
+while a duplicate within the same tenant is still rejected.
+
 ```rust,no_run
 use std::sync::Arc;
 
@@ -154,6 +158,20 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Tenant-scoped uniqueness
+
+Tenant-owned records are partitioned by
+[`RequestContext::tenant_id`](corbusier::context::RequestContext::tenant_id).
+That affects both task issue references and backend registration names:
+
+- the same issue reference may exist once per tenant,
+- the same backend name may exist once per tenant, and
+- lookups return only the caller's tenant-owned records.
+
+If you reuse an external identifier or backend name in tests or application
+code, use a distinct `RequestContext` when you intend the records to belong to
+different tenants.
 
 ## Branch and pull request association
 

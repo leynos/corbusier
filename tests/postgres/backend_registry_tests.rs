@@ -265,3 +265,49 @@ async fn postgres_scopes_backends_per_tenant(
     );
     Ok(())
 }
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_duplicate_name_is_scoped_per_tenant(
+    #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
+) -> Result<(), BoxError> {
+    let bctx = context.await?;
+    let tenant_a = test_request_context;
+    let tenant_b = other_tenant_ctx(&tenant_a);
+
+    let backend_a = bctx
+        .service
+        .register(&tenant_a, claude_request())
+        .await
+        .expect("tenant A registration should succeed");
+    let backend_b = bctx
+        .service
+        .register(&tenant_b, claude_request())
+        .await
+        .expect("tenant B registration should succeed");
+
+    assert_ne!(
+        backend_a.id(),
+        backend_b.id(),
+        "tenants must get distinct rows"
+    );
+
+    let found_a = bctx
+        .service
+        .find_by_name(&tenant_a, "claude_code_sdk")
+        .await
+        .expect("tenant A lookup should succeed")
+        .expect("tenant A backend should exist");
+    let found_b = bctx
+        .service
+        .find_by_name(&tenant_b, "claude_code_sdk")
+        .await
+        .expect("tenant B lookup should succeed")
+        .expect("tenant B backend should exist");
+
+    assert_eq!(found_a.id(), backend_a.id());
+    assert_eq!(found_b.id(), backend_b.id());
+    assert_eq!(bctx.service.list_all(&tenant_a).await?.len(), 1);
+    assert_eq!(bctx.service.list_all(&tenant_b).await?.len(), 1);
+    Ok(())
+}

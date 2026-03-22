@@ -50,7 +50,7 @@ async fn prepared_handoff_scenario(
 
     let ctx = test_request_context;
     let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id, &ctx).await?;
 
     let source_session = AgentSession::new(
         conversation_id,

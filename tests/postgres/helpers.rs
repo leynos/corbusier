@@ -88,6 +88,10 @@ pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
 pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
     "../../migrations/2026-03-20-000000_add_reserved_agent_turn_session_status/up.sql"
 );
+/// SQL to add tenant schema, tenant-aware uniqueness, and composite core FKs.
+pub const ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL: &str =
+    include_str!("../../migrations/2026-03-21-000000_add_tenant_schema_and_constraints/up.sql");
+
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
@@ -151,6 +155,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
     map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
     Ok(())
 }
@@ -260,23 +265,44 @@ pub async fn insert_conversation(
     cluster: &ManagedCluster,
     db_name: &str,
     conv_id: ConversationId,
+    ctx: &RequestContext,
 ) -> Result<(), BoxError> {
     let url = cluster.connection().database_url(db_name);
     let conv_uuid = conv_id.into_inner();
+    let tenant_id = ctx.tenant_id().into_inner();
 
     tokio::task::spawn_blocking(move || {
         let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        ensure_tenant_exists(&mut conn, tenant_id)?;
         diesel::sql_query(concat!(
-            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
-            "VALUES ($1, '{}', 'active', NOW(), NOW())",
+            "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
+            "VALUES ($1, $2, '{}', 'active', NOW(), NOW())",
         ))
         .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
+        .bind::<diesel::sql_types::Uuid, _>(tenant_id)
         .execute(&mut conn)
         .map_err(|e| Box::new(e) as BoxError)?;
         Ok(())
     })
     .await
     .map_err(|e| Box::new(e) as BoxError)?
+}
+
+fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: Uuid) -> Result<(), BoxError> {
+    let tenant_slug = format!("tenant-{tenant_id}");
+    let tenant_name = format!("Tenant {tenant_id}");
+
+    diesel::sql_query(concat!(
+        "INSERT INTO tenants (id, slug, name, status, created_at, updated_at) ",
+        "VALUES ($1, $2, $3, 'active', NOW(), NOW()) ",
+        "ON CONFLICT (id) DO NOTHING",
+    ))
+    .bind::<diesel::sql_types::Uuid, _>(tenant_id)
+    .bind::<diesel::sql_types::Text, _>(tenant_slug)
+    .bind::<diesel::sql_types::Text, _>(tenant_name)
+    .execute(conn)
+    .map(|_| ())
+    .map_err(|e| Box::new(e) as BoxError)
 }
 
 /// Row from the `audit_logs` table for verification.

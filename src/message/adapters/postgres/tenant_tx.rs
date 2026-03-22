@@ -50,10 +50,37 @@ where
     F: FnOnce(&mut PgConnection) -> Result<T, E>,
 {
     conn.transaction::<T, TxError<E>, _>(|tx| {
+        ensure_tenant_exists(tx, tenant_id)?;
         set_tenant_context(tx, tenant_id)?;
         body(tx).map_err(TxError::Domain)
     })
     .map_err(E::from_tx_error)
+}
+
+/// Ensures a lightweight tenant row exists for the given identifier.
+///
+/// Tenant lifecycle management is delivered separately from this milestone,
+/// but adapter writes already require a valid foreign key target. We
+/// therefore provision a stable placeholder row on first use so persistence
+/// remains compatible with the existing `RequestContext` contract.
+pub(crate) fn ensure_tenant_exists<E>(
+    conn: &mut PgConnection,
+    tenant_id: Uuid,
+) -> Result<(), TxError<E>> {
+    let tenant_slug = format!("tenant-{tenant_id}");
+    let tenant_name = format!("Tenant {tenant_id}");
+
+    diesel::sql_query(concat!(
+        "INSERT INTO tenants (id, slug, name, status, created_at, updated_at) ",
+        "VALUES ($1, $2, $3, 'active', NOW(), NOW()) ",
+        "ON CONFLICT (id) DO NOTHING",
+    ))
+    .bind::<diesel::sql_types::Uuid, _>(tenant_id)
+    .bind::<diesel::sql_types::Text, _>(tenant_slug)
+    .bind::<diesel::sql_types::Text, _>(tenant_name)
+    .execute(conn)?;
+
+    Ok(())
 }
 
 /// Sets the `PostgreSQL` session variable `app.tenant_id` for the current

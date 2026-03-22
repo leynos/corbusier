@@ -30,3 +30,34 @@ fn lookup_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre::Report> 
     ));
     Ok(())
 }
+
+#[when("tenant A converts the issue into a task")]
+fn tenant_a_converts_issue(world: &mut TaskWorld) -> Result<(), eyre::Report> {
+    let request = world
+        .pending_request
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
+
+    let result = run_async(world.service.create_from_issue(&world.ctx, request));
+    if let Ok(task) = &result {
+        world.last_created_task = Some(task.clone());
+        world.pending_lookup = Some(task.origin().issue_ref().clone());
+    }
+    world.last_create_result = Some(result);
+    Ok(())
+}
+
+#[when("tenant B converts the same issue into a task")]
+fn tenant_b_converts_issue(world: &mut TaskWorld) -> Result<(), eyre::Report> {
+    let request = world
+        .pending_request
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
+
+    let result = run_async(world.service.create_from_issue(&world.other_ctx, request));
+    if let Ok(task) = &result {
+        world.other_created_task = Some(task.clone());
+    }
+    world.other_create_result = Some(result);
+    Ok(())
+}

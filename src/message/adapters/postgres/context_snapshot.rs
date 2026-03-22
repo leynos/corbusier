@@ -3,7 +3,7 @@
 //! Provides production-grade persistence for context window snapshots with JSONB
 //! storage for message summaries and tool call references.
 
-use crate::context::RequestContext;
+use crate::context::{RequestContext, TenantId};
 use crate::message::{
     adapters::models::{ContextSnapshotRow, NewContextSnapshot},
     adapters::schema::context_snapshots,
@@ -15,9 +15,20 @@ use crate::message::{
 };
 use async_trait::async_trait;
 use diesel::pg::Pg;
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
+use super::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+
+impl FromTxError<Self> for SnapshotError {
+    fn from_tx_error(tx_err: TxError<Self>) -> Self {
+        match tx_err {
+            TxError::Domain(domain_err) => domain_err,
+            TxError::Diesel(diesel_err) => Self::persistence(diesel_err),
+        }
+    }
+}
 
 /// `PostgreSQL` implementation of [`ContextSnapshotPort`].
 ///
@@ -36,7 +47,7 @@ impl PostgresContextSnapshotAdapter {
     }
 
     /// Generic helper to execute a database query with standard error handling.
-    async fn execute_query<F, T>(&self, query_fn: F) -> SnapshotResult<T>
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
         T: Send + 'static,
@@ -46,30 +57,38 @@ impl PostgresContextSnapshotAdapter {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-                query_fn(&mut conn)
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             SnapshotError::persistence,
         )
         .await
     }
 
-    async fn find_one<F>(&self, build_query: F) -> SnapshotResult<Option<ContextWindowSnapshot>>
+    async fn find_one<F>(
+        &self,
+        tenant_id: TenantId,
+        build_query: F,
+    ) -> SnapshotResult<Option<ContextWindowSnapshot>>
     where
         F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
             + Send
             + 'static,
     {
-        let snapshots = self.find_many(build_query).await?;
+        let snapshots = self.find_many(tenant_id, build_query).await?;
         Ok(snapshots.into_iter().next())
     }
 
-    async fn find_many<F>(&self, build_query: F) -> SnapshotResult<Vec<ContextWindowSnapshot>>
+    async fn find_many<F>(
+        &self,
+        tenant_id: TenantId,
+        build_query: F,
+    ) -> SnapshotResult<Vec<ContextWindowSnapshot>>
     where
         F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
             + Send
             + 'static,
     {
-        self.execute_query(move |conn| {
+        self.execute_query(tenant_id, move |conn| {
             let rows = build_query(context_snapshots::table)
                 .select(ContextSnapshotRow::as_select())
                 .load::<ContextSnapshotRow>(conn)
@@ -85,29 +104,31 @@ impl PostgresContextSnapshotAdapter {
 impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
     async fn store_snapshot(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         snapshot: &ContextWindowSnapshot,
     ) -> SnapshotResult<()> {
+        let tenant_id = ctx.tenant_id();
         let pool = self.pool.clone();
-        let new_snapshot = snapshot_to_new_row(snapshot)?;
+        let new_snapshot = snapshot_to_new_row(snapshot, tenant_id.into_inner())?;
         let snapshot_id = snapshot.snapshot_id;
 
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), |tx| {
+                    let inserted = diesel::insert_into(context_snapshots::table)
+                        .values(&new_snapshot)
+                        .on_conflict(context_snapshots::id)
+                        .do_nothing()
+                        .execute(tx)
+                        .map_err(SnapshotError::persistence)?;
 
-                let inserted = diesel::insert_into(context_snapshots::table)
-                    .values(&new_snapshot)
-                    .on_conflict(context_snapshots::id)
-                    .do_nothing()
-                    .execute(&mut conn)
-                    .map_err(SnapshotError::persistence)?;
+                    if inserted == 0 {
+                        return Err(SnapshotError::Duplicate(snapshot_id));
+                    }
 
-                if inserted == 0 {
-                    return Err(SnapshotError::Duplicate(snapshot_id));
-                }
-
-                Ok(())
+                    Ok(())
+                })
             },
             SnapshotError::persistence,
         )
@@ -116,11 +137,14 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_by_id(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         snapshot_id: uuid::Uuid,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
-        self.find_one(move |table| {
+        let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
+        self.find_one(tenant_id, move |table| {
             table
+                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
                 .filter(context_snapshots::id.eq(snapshot_id))
                 .into_boxed()
         })
@@ -129,13 +153,16 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_snapshots_for_session(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>> {
+        let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let uuid = session_id.into_inner();
 
-        self.find_many(move |table| {
+        self.find_many(tenant_id, move |table| {
             table
+                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
                 .filter(context_snapshots::session_id.eq(uuid))
                 .order(context_snapshots::captured_at.asc())
                 .into_boxed()
@@ -145,13 +172,16 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 
     async fn find_latest_snapshot(
         &self,
-        _ctx: &RequestContext,
+        ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
+        let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let uuid = conversation_id.into_inner();
 
-        self.find_one(move |table| {
+        self.find_one(tenant_id, move |table| {
             table
+                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
                 .filter(context_snapshots::conversation_id.eq(uuid))
                 .order(context_snapshots::captured_at.desc())
                 .into_boxed()
@@ -161,7 +191,10 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 }
 
 /// Converts a domain `ContextWindowSnapshot` to a `NewContextSnapshot` for insertion.
-fn snapshot_to_new_row(snapshot: &ContextWindowSnapshot) -> SnapshotResult<NewContextSnapshot> {
+fn snapshot_to_new_row(
+    snapshot: &ContextWindowSnapshot,
+    tenant_id: uuid::Uuid,
+) -> SnapshotResult<NewContextSnapshot> {
     let message_summary =
         serde_json::to_value(snapshot.message_summary).map_err(SnapshotError::persistence)?;
 
@@ -182,6 +215,7 @@ fn snapshot_to_new_row(snapshot: &ContextWindowSnapshot) -> SnapshotResult<NewCo
 
     Ok(NewContextSnapshot {
         id: snapshot.snapshot_id,
+        tenant_id,
         conversation_id: snapshot.conversation_id.into_inner(),
         session_id: snapshot.session_id.into_inner(),
         sequence_start,

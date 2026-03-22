@@ -67,3 +67,43 @@ fn all_listing_includes(world: &mut BackendWorld, name: String) -> Result<(), ey
     }
     Ok(())
 }
+
+#[then("both tenants successfully register distinct backends with that name")]
+fn both_tenants_register_distinct_backends(world: &BackendWorld) -> Result<(), eyre::Report> {
+    let tenant_a = world
+        .last_registered
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A backend is missing"))?;
+    let tenant_b = world
+        .other_register_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B registration result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant B registration failed: {err}"))?;
+
+    if tenant_a.id() == tenant_b.id() {
+        return Err(eyre::eyre!(
+            "tenant registrations must produce distinct IDs"
+        ));
+    }
+    Ok(())
+}
+
+#[then("each tenant can find its own backend by name")]
+fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Report> {
+    let pending = world
+        .pending_backends
+        .last()
+        .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
+    let found_a = run_async(world.service.find_by_name(&world.ctx, &pending.name))
+        .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
+        .ok_or_else(|| eyre::eyre!("tenant A backend not found"))?;
+    let found_b = run_async(world.service.find_by_name(&world.other_ctx, &pending.name))
+        .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
+        .ok_or_else(|| eyre::eyre!("tenant B backend not found"))?;
+
+    if found_a.id() == found_b.id() {
+        return Err(eyre::eyre!("tenant lookups must return distinct backends"));
+    }
+    Ok(())
+}

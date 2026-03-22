@@ -16,11 +16,13 @@ use uuid::Uuid;
 #[rstest]
 fn new_conversation_sets_default_state() {
     let id = Uuid::new_v4();
+    let tenant_id = Uuid::new_v4();
     let now = Utc::now();
 
-    let conv = NewConversation::new(id, now);
+    let conv = NewConversation::new(id, tenant_id, now);
 
     assert_eq!(conv.id, id);
+    assert_eq!(conv.tenant_id, tenant_id);
     assert_eq!(conv.state, "active");
     assert!(conv.task_id.is_none());
     assert_eq!(conv.created_at, now);
@@ -30,9 +32,10 @@ fn new_conversation_sets_default_state() {
 #[rstest]
 fn new_conversation_has_empty_context() {
     let id = Uuid::new_v4();
+    let tenant_id = Uuid::new_v4();
     let now = Utc::now();
 
-    let conv = NewConversation::new(id, now);
+    let conv = NewConversation::new(id, tenant_id, now);
 
     assert!(conv.context.is_object());
     let context_obj = conv.context.as_object().expect("context should be object");
@@ -46,6 +49,7 @@ fn new_conversation_has_empty_context() {
 #[rstest]
 fn conversation_row_struct_holds_all_fields() {
     let id = Uuid::new_v4();
+    let tenant_id = Uuid::new_v4();
     let task_id = Some(Uuid::new_v4());
     let context = json!({"key": "value"});
     let state = "active".to_owned();
@@ -54,6 +58,7 @@ fn conversation_row_struct_holds_all_fields() {
 
     let row = ConversationRow {
         id,
+        tenant_id,
         task_id,
         context: context.clone(),
         state: state.clone(),
@@ -62,6 +67,7 @@ fn conversation_row_struct_holds_all_fields() {
     };
 
     assert_eq!(row.id, id);
+    assert_eq!(row.tenant_id, tenant_id);
     assert_eq!(row.task_id, task_id);
     assert_eq!(row.context, context);
     assert_eq!(row.state, state);
@@ -73,6 +79,7 @@ fn conversation_row_struct_holds_all_fields() {
 fn conversation_row_clone_preserves_fields() {
     let row = ConversationRow {
         id: Uuid::new_v4(),
+        tenant_id: Uuid::new_v4(),
         task_id: None,
         context: json!({}),
         state: "completed".to_owned(),
@@ -83,6 +90,7 @@ fn conversation_row_clone_preserves_fields() {
     let cloned = row.clone();
 
     assert_eq!(cloned.id, row.id);
+    assert_eq!(cloned.tenant_id, row.tenant_id);
     assert_eq!(cloned.task_id, row.task_id);
     assert_eq!(cloned.context, row.context);
     assert_eq!(cloned.state, row.state);
@@ -94,6 +102,7 @@ fn conversation_row_clone_preserves_fields() {
 fn conversation_row_debug_format() {
     let row = ConversationRow {
         id: Uuid::nil(),
+        tenant_id: Uuid::new_v4(),
         task_id: None,
         context: json!({}),
         state: "active".to_owned(),

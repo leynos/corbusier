@@ -40,7 +40,7 @@ async fn next_sequence_number_returns_max_plus_one(
 
     let ctx = test_request_context;
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(cluster, temp_db.name(), conv_id, &ctx).await?;
 
     repo.store(&ctx, &create_test_message(&clock, conv_id, 1)?)
         .await?;

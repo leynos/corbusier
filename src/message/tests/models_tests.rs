@@ -15,6 +15,7 @@ use crate::message::{
 };
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
+use uuid::Uuid;
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -48,7 +49,7 @@ fn try_from_domain_succeeds_for_valid_message(
 ) {
     let message = message_factory(1).expect("fixture should create valid message");
 
-    let result = NewMessage::try_from_domain(&message);
+    let result = NewMessage::try_from_domain(&message, Uuid::new_v4());
 
     assert!(result.is_ok());
     let new_message = result.expect("conversion should succeed");
@@ -72,9 +73,12 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
     )
     .expect("valid message");
 
-    let new_message = NewMessage::try_from_domain(&message).expect("conversion should succeed");
+    let tenant_id = Uuid::new_v4();
+    let new_message =
+        NewMessage::try_from_domain(&message, tenant_id).expect("conversion should succeed");
 
     assert_eq!(new_message.id, message.id().into_inner());
+    assert_eq!(new_message.tenant_id, tenant_id);
     assert_eq!(
         new_message.conversation_id,
         message.conversation_id().into_inner()
@@ -96,7 +100,7 @@ fn try_from_domain_handles_large_sequence_within_i64(
     let max_i64_as_u64: u64 = u64::try_from(i64::MAX).expect("i64::MAX should fit in u64");
     let message = message_factory(max_i64_as_u64).expect("fixture should create valid message");
 
-    let result = NewMessage::try_from_domain(&message);
+    let result = NewMessage::try_from_domain(&message, Uuid::new_v4());
 
     assert!(result.is_ok());
     let new_message = result.expect("conversion should succeed");
@@ -111,7 +115,7 @@ fn try_from_domain_fails_for_sequence_overflow(
     let overflow_value: u64 = u64::MAX;
     let message = message_factory(overflow_value).expect("fixture should create valid message");
 
-    let result = NewMessage::try_from_domain(&message);
+    let result = NewMessage::try_from_domain(&message, Uuid::new_v4());
 
     assert!(result.is_err());
     let err = result.expect_err("should fail for overflow");
@@ -200,7 +204,8 @@ fn try_from_domain_serializes_role_correctly(
     )
     .expect("valid message");
 
-    let new_message = NewMessage::try_from_domain(&message).expect("conversion should succeed");
+    let new_message =
+        NewMessage::try_from_domain(&message, Uuid::new_v4()).expect("conversion should succeed");
 
     assert_eq!(new_message.role, expected);
 }
@@ -216,7 +221,8 @@ fn try_from_domain_serializes_metadata_correctly(clock: DefaultClock) {
     )
     .expect("valid message");
 
-    let new_message = NewMessage::try_from_domain(&message).expect("conversion should succeed");
+    let new_message =
+        NewMessage::try_from_domain(&message, Uuid::new_v4()).expect("conversion should succeed");
 
     // Verify metadata is valid JSON
     assert!(new_message.metadata.is_object());

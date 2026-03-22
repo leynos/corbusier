@@ -72,6 +72,7 @@ pub(super) fn map_update_error(
 /// (used during updates to allow re-saving the same active session).
 pub(super) fn check_no_active_session(
     conn: &mut PgConnection,
+    tenant_id: uuid::Uuid,
     conversation_id: ConversationId,
     exclude_id: Option<AgentSessionId>,
 ) -> SessionResult<()> {
@@ -79,6 +80,7 @@ pub(super) fn check_no_active_session(
     let conv_uuid = conversation_id.into_inner();
 
     let mut query = agent_sessions::table
+        .filter(agent_sessions::tenant_id.eq(tenant_id))
         .filter(agent_sessions::conversation_id.eq(conv_uuid))
         .filter(agent_sessions::state.eq(active_state))
         .into_boxed();

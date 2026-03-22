@@ -31,9 +31,10 @@ async fn insert_message_maps_duplicate_id_constraint(
     test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
+    let req_ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let msg_id = MessageId::new();
     let message1 = Message::new_with_id(
@@ -55,9 +56,6 @@ async fn insert_message_maps_duplicate_id_constraint(
         &clock,
     )
     .expect("valid message");
-
-    let req_ctx = test_request_context;
-
     // Store first message
     ctx.repo.store(&req_ctx, &message1).await?;
 
@@ -81,9 +79,10 @@ async fn insert_message_maps_duplicate_sequence_constraint(
     test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
+    let req_ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let message1 = Message::new(
         conv_id,
@@ -102,9 +101,6 @@ async fn insert_message_maps_duplicate_sequence_constraint(
         &clock,
     )
     .expect("valid message");
-
-    let req_ctx = test_request_context;
-
     // Store first message
     ctx.repo.store(&req_ctx, &message1).await?;
 
@@ -143,15 +139,14 @@ async fn set_audit_context_propagates_fields(
     #[case] include_causation: bool,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
-
-    let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
-
     let req_ctx = if include_causation {
         test_request_context.with_causation_id(CausationId::new())
     } else {
         test_request_context
     };
+
+    let conv_id = ConversationId::new();
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let message = Message::new(
         conv_id,
@@ -206,9 +201,10 @@ async fn insert_message_succeeds_for_valid_message(
     test_request_context: RequestContext,
 ) -> Result<(), BoxError> {
     let ctx = prepared_repo.await?;
+    let req_ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let message = Message::new(
         conv_id,
@@ -218,8 +214,6 @@ async fn insert_message_succeeds_for_valid_message(
         &clock,
     )
     .expect("valid message");
-
-    let req_ctx = test_request_context;
     ctx.repo.store(&req_ctx, &message).await?;
 
     // Verify the message was stored

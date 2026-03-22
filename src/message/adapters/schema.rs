@@ -15,6 +15,8 @@ diesel::table! {
     conversations (id) {
         /// Unique conversation identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Optional reference to the associated task.
         task_id -> Nullable<Uuid>,
         /// Flexible context data stored as JSONB.
@@ -36,6 +38,8 @@ diesel::table! {
     messages (id) {
         /// Unique message identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Reference to the containing conversation.
         conversation_id -> Uuid,
         /// Message role: user, assistant, tool, or system.
@@ -128,6 +132,8 @@ diesel::table! {
     agent_sessions (id) {
         /// Unique agent session identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Reference to the containing conversation.
         conversation_id -> Uuid,
         /// Agent backend identifier (e.g., "claude-code", "opus-agent").
@@ -164,6 +170,8 @@ diesel::table! {
     handoffs (id) {
         /// Unique handoff identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Session being handed off from.
         source_session_id -> Uuid,
         /// Conversation containing the handoff.
@@ -201,6 +209,8 @@ diesel::table! {
     context_snapshots (id) {
         /// Unique snapshot identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Reference to the containing conversation.
         conversation_id -> Uuid,
         /// Reference to the agent session.

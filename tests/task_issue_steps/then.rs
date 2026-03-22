@@ -170,3 +170,59 @@ fn no_task_is_returned(world: &TaskWorld) -> Result<(), eyre::Report> {
     }
     Ok(())
 }
+
+#[then("both tenants successfully create distinct tasks from the same issue")]
+fn both_tenants_create_distinct_tasks(world: &TaskWorld) -> Result<(), eyre::Report> {
+    let task_a = world
+        .last_create_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A create result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant A task creation failed: {err}"))?;
+    let task_b = world
+        .other_create_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B create result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant B task creation failed: {err}"))?;
+
+    if task_a.id() == task_b.id() {
+        return Err(eyre::eyre!("tenant task IDs must be distinct"));
+    }
+    Ok(())
+}
+
+#[then("each tenant can retrieve its own task by the external issue reference")]
+fn each_tenant_retrieves_own_task(world: &TaskWorld) -> Result<(), eyre::Report> {
+    let issue_ref = world
+        .pending_lookup
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
+    let task_a = world
+        .last_created_task
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A created task is missing"))?;
+    let task_b = world
+        .other_created_task
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B created task is missing"))?;
+
+    let found_a = run_async(world.service.find_by_issue_ref(&world.ctx, &issue_ref))
+        .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
+        .ok_or_else(|| eyre::eyre!("tenant A task not found"))?;
+    let found_b = run_async(
+        world
+            .service
+            .find_by_issue_ref(&world.other_ctx, &issue_ref),
+    )
+    .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
+    .ok_or_else(|| eyre::eyre!("tenant B task not found"))?;
+
+    if found_a.id() != task_a.id() {
+        return Err(eyre::eyre!("tenant A lookup returned the wrong task"));
+    }
+    if found_b.id() != task_b.id() {
+        return Err(eyre::eyre!("tenant B lookup returned the wrong task"));
+    }
+    Ok(())
+}

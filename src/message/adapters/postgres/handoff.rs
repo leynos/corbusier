@@ -105,7 +105,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             handoff = handoff.with_reason(r);
         }
 
-        let new_handoff = handoff_to_new_row(&handoff, params.conversation_id)?;
+        let new_handoff = handoff_to_new_row(&handoff, params.conversation_id, tenant_id)?;
 
         self.execute_query(tenant_id, move |conn| {
             diesel::insert_into(handoffs::table)
@@ -132,6 +132,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             // prevent concurrent state transitions from interleaving.
             let row = handoffs::table
                 .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .select(HandoffRow::as_select())
                 .for_update()
                 .first::<HandoffRow>(conn)
@@ -151,14 +152,18 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             handoff = handoff.complete(target_session_id, &clock);
             let completed_at = handoff.completed_at;
 
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set((
-                    handoffs::target_session_id.eq(target_session_id.into_inner()),
-                    handoffs::completed_at.eq(completed_at),
-                    handoffs::status.eq(HandoffStatus::Completed.as_str()),
-                ))
-                .execute(conn)
-                .map_err(HandoffError::persistence)?;
+            diesel::update(
+                handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .filter(handoffs::tenant_id.eq(tenant_id.into_inner())),
+            )
+            .set((
+                handoffs::target_session_id.eq(target_session_id.into_inner()),
+                handoffs::completed_at.eq(completed_at),
+                handoffs::status.eq(HandoffStatus::Completed.as_str()),
+            ))
+            .execute(conn)
+            .map_err(HandoffError::persistence)?;
 
             Ok(handoff)
         })
@@ -179,6 +184,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             // prevent concurrent state transitions from interleaving.
             let row = handoffs::table
                 .filter(handoffs::id.eq(handoff_id.into_inner()))
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .select(HandoffRow::as_select())
                 .for_update()
                 .first::<HandoffRow>(conn)
@@ -196,13 +202,17 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
                 ));
             }
 
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set((
-                    handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
-                    handoffs::reason.eq(owned_reason.or(row.reason)),
-                ))
-                .execute(conn)
-                .map_err(HandoffError::persistence)?;
+            diesel::update(
+                handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .filter(handoffs::tenant_id.eq(tenant_id.into_inner())),
+            )
+            .set((
+                handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
+                handoffs::reason.eq(owned_reason.or(row.reason)),
+            ))
+            .execute(conn)
+            .map_err(HandoffError::persistence)?;
 
             Ok(())
         })
@@ -220,6 +230,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         self.execute_query(tenant_id, move |conn| {
             handoffs::table
                 .filter(handoffs::id.eq(uuid))
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .select(HandoffRow::as_select())
                 .first::<HandoffRow>(conn)
                 .optional()
@@ -240,6 +251,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
         self.execute_query(tenant_id, move |conn| {
             let rows = handoffs::table
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .filter(handoffs::conversation_id.eq(uuid))
                 .select(HandoffRow::as_select())
                 .order(handoffs::initiated_at.asc())
@@ -260,12 +272,14 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 fn handoff_to_new_row(
     handoff: &HandoffMetadata,
     conversation_id: ConversationId,
+    tenant_id: TenantId,
 ) -> HandoffResult<NewHandoff> {
     let triggering_tool_calls =
         serde_json::to_value(&handoff.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
     Ok(NewHandoff {
         id: handoff.handoff_id.into_inner(),
+        tenant_id: tenant_id.into_inner(),
         source_session_id: handoff.source_session_id.into_inner(),
         conversation_id: conversation_id.into_inner(),
         target_session_id: handoff.target_session_id.map(AgentSessionId::into_inner),

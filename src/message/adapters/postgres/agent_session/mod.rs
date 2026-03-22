@@ -109,7 +109,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
         let tenant_id = ctx.tenant_id();
-        let new_session = session_to_new_row(session)?;
+        let new_session = session_to_new_row(session, tenant_id.into_inner())?;
         let session_id = session.session_id;
         let conversation_id = session.conversation_id;
         let is_active = session.state == AgentSessionState::Active;
@@ -124,7 +124,12 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                         .map_err(|err| map_insert_error(err, session_id, conversation_id))?;
 
                     if is_active {
-                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                        check_no_active_session(
+                            tx,
+                            tenant_id.into_inner(),
+                            conversation_id,
+                            Some(session_id),
+                        )?;
                     }
 
                     Ok(())
@@ -149,7 +154,8 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), |tx| {
                     let updated_rows = diesel::update(
                         agent_sessions::table
-                            .filter(agent_sessions::id.eq(session_id.into_inner())),
+                            .filter(agent_sessions::id.eq(session_id.into_inner()))
+                            .filter(agent_sessions::tenant_id.eq(tenant_id.into_inner())),
                     )
                     .set(&updated)
                     .execute(tx)
@@ -160,7 +166,12 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                     }
 
                     if is_active {
-                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                        check_no_active_session(
+                            tx,
+                            tenant_id.into_inner(),
+                            conversation_id,
+                            Some(session_id),
+                        )?;
                     }
 
                     Ok(())
@@ -177,10 +188,14 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         id: AgentSessionId,
     ) -> SessionResult<Option<AgentSession>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let uuid = id.into_inner();
 
         self.find_one(tenant_id, move |table| {
-            table.filter(agent_sessions::id.eq(uuid)).into_boxed()
+            table
+                .filter(agent_sessions::tenant_id.eq(tenant_uuid))
+                .filter(agent_sessions::id.eq(uuid))
+                .into_boxed()
         })
         .await
     }
@@ -202,10 +217,12 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         conversation_id: ConversationId,
     ) -> SessionResult<Vec<AgentSession>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let uuid = conversation_id.into_inner();
 
         self.find_many(tenant_id, move |table| {
             table
+                .filter(agent_sessions::tenant_id.eq(tenant_uuid))
                 .filter(agent_sessions::conversation_id.eq(uuid))
                 .order(agent_sessions::started_at.asc())
                 .into_boxed()

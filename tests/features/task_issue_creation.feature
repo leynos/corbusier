@@ -18,3 +18,11 @@ Feature: Issue-to-task creation and tracking
     Given an unknown issue reference "github" "corbusier/core" #9999
     When the task is requested by external issue reference
     Then no task is returned
+
+  Scenario: Two tenants can create tasks from the same issue reference
+    Given an external issue "github" "corbusier/core" #120
+    And the issue has title "Track issue metadata"
+    When tenant A converts the issue into a task
+    And tenant B converts the same issue into a task
+    Then both tenants successfully create distinct tasks from the same issue
+    And each tenant can retrieve its own task by the external issue reference
