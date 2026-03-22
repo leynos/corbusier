@@ -23,9 +23,7 @@ async fn postgres_detects_concurrent_active_session_conflict(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -87,9 +85,7 @@ async fn postgres_arbitration_commits_reservation_before_runtime_creation(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -142,9 +138,7 @@ async fn postgres_rejects_sequential_duplicate_reservation_claim(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
     let reservation = SessionSlotReservation::new(
@@ -189,9 +183,7 @@ async fn postgres_detects_concurrent_reservation_conflict_before_runtime_creatio
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -251,9 +243,7 @@ async fn postgres_reclaims_timed_out_reservation_after_crash(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -327,9 +317,7 @@ async fn postgres_session_repository_scopes_lookup_by_tenant(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 

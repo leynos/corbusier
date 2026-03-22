@@ -19,6 +19,9 @@ use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use row_mapping::{row_to_turn_session, to_new_row};
 use slot_arbitration::arbitrate_session_slot_tx;
 
+pub(crate) const CONSTRAINT_IDX_TURN_SESSIONS_ACTIVE: &str =
+    "idx_agent_turn_sessions_tenant_backend_conversation_active";
+
 /// `PostgreSQL`-backed turn-session repository.
 #[derive(Debug, Clone)]
 pub struct PostgresTurnSessionRepository {
@@ -196,9 +199,7 @@ pub(crate) fn map_upsert_error(
         DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, db_error)
             if db_error
                 .constraint_name()
-                .is_some_and(
-                    |name| name == "idx_agent_turn_sessions_tenant_backend_conversation_active"
-                )
+                .is_some_and(|name| name == CONSTRAINT_IDX_TURN_SESSIONS_ACTIVE)
     );
     if is_active_session_conflict {
         TurnSessionRepositoryError::active_session_conflict(

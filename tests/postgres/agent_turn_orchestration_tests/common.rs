@@ -8,6 +8,7 @@ use corbusier::agent_backend::{
         memory::{InMemoryAgentRuntime, InMemoryToolRouter},
         postgres::{BackendPgPool, PostgresBackendRegistry, PostgresTurnSessionRepository},
     },
+    domain::BackendId,
     services::{
         AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts, AgentTurnOrchestratorService,
         BackendRegistryService, RegisterBackendRequest,
@@ -114,7 +115,7 @@ pub async fn ensure_conversation_exists(
 pub async fn register_backend(
     context: &OrchestrationContext,
     name: &str,
-) -> Result<Uuid, BoxError> {
+) -> Result<BackendId, BoxError> {
     let backend = context
         .registry_service
         .register(
@@ -124,7 +125,7 @@ pub async fn register_backend(
         )
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
-    Ok(backend.id().into_inner())
+    Ok(backend.id())
 }
 
 pub fn other_tenant_context(ctx: &RequestContext) -> RequestContext {

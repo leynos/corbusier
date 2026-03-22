@@ -25,9 +25,7 @@ async fn postgres_orchestrates_turn_and_reuses_session(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -84,9 +82,7 @@ async fn postgres_rotates_expired_session(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "codex_cli").await?,
-    );
+    let backend_id = register_backend(&ctx, "codex_cli").await?;
     let conversation_id = Uuid::new_v4();
     let now = Utc::now();
     ensure_conversation_exists(&ctx, conversation_id).await?;
@@ -149,9 +145,7 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -227,9 +221,7 @@ async fn postgres_propagates_tool_routing_failure(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "claude_code_sdk").await?,
-    );
+    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
@@ -270,9 +262,7 @@ async fn concurrent_execute_turn_creates_single_active_session(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
     let ctx = context.await?;
-    let backend_id = corbusier::agent_backend::domain::BackendId::from_uuid(
-        register_backend(&ctx, "concurrent_test_backend").await?,
-    );
+    let backend_id = register_backend(&ctx, "concurrent_test_backend").await?;
     let conversation_id = Uuid::new_v4();
     ensure_conversation_exists(&ctx, conversation_id).await?;
 
