@@ -126,12 +126,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
 
         self.run_blocking(move |connection| {
             connection.transaction(|tx_conn| {
-                slot_arbitration::lock_session_key(
-                    tx_conn,
-                    tenant_id,
-                    backend_id,
-                    conversation_id,
-                )?;
+                slot_arbitration::lock_session_key(tx_conn, tenant_id, backend_id)?;
 
                 let updated = diesel::update(
                     agent_turn_sessions::table

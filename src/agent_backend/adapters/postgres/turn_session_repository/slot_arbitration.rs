@@ -35,12 +35,7 @@ pub(crate) fn arbitrate_session_slot_tx(
         ttl,
     };
 
-    lock_session_key(
-        tx_conn,
-        tenant_id,
-        params.backend_id.into_inner(),
-        params.conversation_id,
-    )?;
+    lock_session_key(tx_conn, tenant_id, params.backend_id.into_inner())?;
     expire_stale_reservations(tx_conn, params)?;
 
     match load_claimed_session(tx_conn, params)? {
@@ -51,13 +46,15 @@ pub(crate) fn arbitrate_session_slot_tx(
     }
 }
 
-// Acquires a row-level lock on the owning backend registration so empty-slot
-// arbitration is serialized by a durable database sentinel row.
+// Acquires a row-level lock on the owning backend registration. This lock is
+// intentionally scoped to the backend, not to an individual conversation, so
+// slot arbitration is serialized for a backend while keeping lock cardinality
+// and sentinel-row overhead low. `conversation_id` is therefore not required
+// for this lock path.
 pub(crate) fn lock_session_key(
     connection: &mut PgConnection,
     tenant_id: uuid::Uuid,
     backend_id: uuid::Uuid,
-    _conversation_id: uuid::Uuid,
 ) -> TurnSessionRepositoryResult<()> {
     backend_registrations::table
         .filter(backend_registrations::tenant_id.eq(tenant_id))
