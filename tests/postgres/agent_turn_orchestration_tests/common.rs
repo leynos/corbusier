@@ -108,6 +108,7 @@ pub async fn ensure_conversation_exists(
         context.cluster,
         context.temp_db.name(),
         ConversationId::from_uuid(conversation_id),
+        &context.ctx,
     )
     .await
 }
