@@ -254,8 +254,8 @@ Delivered outcomes:
 - PostgreSQL write paths bootstrap placeholder tenant rows so the new foreign
   keys remain compatible with the existing `RequestContext` contract, and
 - `make fmt`, `make check-fmt`, `make lint`, and
-  `make test TEST_FLAGS='--profile
-  long --all-targets --all-features'` all passed on 2026-03-22.
+  `make test TEST_FLAGS='--profile long --all-targets --all-features'` all
+  passed on 2026-03-22.
 
 ## Context and orientation
 

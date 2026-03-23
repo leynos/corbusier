@@ -20,8 +20,10 @@ use crate::tool_registry::{
     },
 };
 use async_trait::async_trait;
+use diesel::pg::PgConnection;
 use std::collections::HashSet;
 use std::sync::Arc;
+use uuid::Uuid;
 
 /// Shared in-memory orchestrator type for agent-turn tests.
 pub type InMemoryAgentTurnOrchestrator = AgentTurnOrchestratorService<
@@ -101,6 +103,27 @@ pub fn build_in_memory_orchestrator() -> InMemoryAgentTurnStack {
         ctx: test_request_ctx(),
         service,
     }
+}
+/// Inserts a placeholder tenant row if one does not already exist.
+///
+/// Delegates to the canonical [`bootstrap_tenant_row`] in `tenant_tx`,
+/// exposed here so integration tests can seed tenant foreign-key targets
+/// without duplicating the SQL.
+///
+/// # Errors
+///
+/// Returns a Diesel error if the insert query fails.
+///
+/// # Examples
+///
+/// ```ignore
+/// bootstrap_tenant_row(&mut conn, tenant_uuid)?;
+/// ```
+pub fn bootstrap_tenant_row(
+    conn: &mut PgConnection,
+    tenant_id: Uuid,
+) -> diesel::QueryResult<usize> {
+    crate::message::adapters::postgres::tenant_tx::bootstrap_tenant_row(conn, tenant_id)
 }
 
 /// Fake MCP host adapter whose [`McpServerHost::health`] always

@@ -289,20 +289,9 @@ pub async fn insert_conversation(
 }
 
 fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: Uuid) -> Result<(), BoxError> {
-    let tenant_slug = format!("tenant-{tenant_id}");
-    let tenant_name = format!("Tenant {tenant_id}");
-
-    diesel::sql_query(concat!(
-        "INSERT INTO tenants (id, slug, name, status, created_at, updated_at) ",
-        "VALUES ($1, $2, $3, 'active', NOW(), NOW()) ",
-        "ON CONFLICT (id) DO NOTHING",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(tenant_id)
-    .bind::<diesel::sql_types::Text, _>(tenant_slug)
-    .bind::<diesel::sql_types::Text, _>(tenant_name)
-    .execute(conn)
-    .map(|_| ())
-    .map_err(|e| Box::new(e) as BoxError)
+    corbusier::test_support::bootstrap_tenant_row(conn, tenant_id)
+        .map(|_| ())
+        .map_err(|e| Box::new(e) as BoxError)
 }
 
 /// Row from the `audit_logs` table for verification.

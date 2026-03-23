@@ -12,6 +12,7 @@ use crate::postgres::helpers::{
     BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
     test_request_ctx,
 };
+use corbusier::test_support::bootstrap_tenant_row as ensure_tenant_exists;
 
 struct TenantConstraintContext {
     temp_db: TemporaryDatabase,
@@ -390,20 +391,5 @@ fn insert_context_snapshot(
     .bind::<diesel::sql_types::Uuid, _>(params.tenant)
     .bind::<diesel::sql_types::Uuid, _>(params.conversation)
     .bind::<diesel::sql_types::Uuid, _>(params.session)
-    .execute(conn)
-}
-
-fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: Uuid) -> diesel::QueryResult<usize> {
-    let tenant_slug = format!("tenant-{tenant_id}");
-    let tenant_name = format!("Tenant {tenant_id}");
-
-    diesel::sql_query(concat!(
-        "INSERT INTO tenants (id, slug, name, status, created_at, updated_at) ",
-        "VALUES ($1, $2, $3, 'active', NOW(), NOW()) ",
-        "ON CONFLICT (id) DO NOTHING",
-    ))
-    .bind::<diesel::sql_types::Uuid, _>(tenant_id)
-    .bind::<diesel::sql_types::Text, _>(tenant_slug)
-    .bind::<diesel::sql_types::Text, _>(tenant_name)
     .execute(conn)
 }

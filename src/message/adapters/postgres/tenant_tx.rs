@@ -67,6 +67,28 @@ pub(crate) fn ensure_tenant_exists<E>(
     conn: &mut PgConnection,
     tenant_id: Uuid,
 ) -> Result<(), TxError<E>> {
+    bootstrap_tenant_row(conn, tenant_id)?;
+    Ok(())
+}
+
+/// Inserts a placeholder tenant row if one does not already exist.
+///
+/// This is the single source of truth for lazy tenant bootstrapping. The
+/// slug is formatted as `tenant-{id}` and the display name as
+/// `Tenant {id}`. An `ON CONFLICT (id) DO NOTHING` guard makes the
+/// operation idempotent.
+///
+/// Returns the number of rows affected (1 on first insert, 0 on conflict).
+///
+/// # Examples
+///
+/// ```ignore
+/// bootstrap_tenant_row(&mut conn, tenant_uuid)?;
+/// ```
+pub(crate) fn bootstrap_tenant_row(
+    conn: &mut PgConnection,
+    tenant_id: Uuid,
+) -> diesel::QueryResult<usize> {
     let tenant_slug = format!("tenant-{tenant_id}");
     let tenant_name = format!("Tenant {tenant_id}");
 
@@ -78,9 +100,7 @@ pub(crate) fn ensure_tenant_exists<E>(
     .bind::<diesel::sql_types::Uuid, _>(tenant_id)
     .bind::<diesel::sql_types::Text, _>(tenant_slug)
     .bind::<diesel::sql_types::Text, _>(tenant_name)
-    .execute(conn)?;
-
-    Ok(())
+    .execute(conn)
 }
 
 /// Sets the `PostgreSQL` session variable `app.tenant_id` for the current
