@@ -234,10 +234,6 @@ where
             .map_err(AgentTurnOrchestrationError::Runtime)
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "cleanup-on-failure branch adds necessary error-handling depth"
-    )]
     async fn persist_completed_turn(
         &self,
         ctx: &RequestContext,
@@ -247,22 +243,43 @@ where
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
 
+        self.persist_session_or_cleanup(ctx, backend, session).await
+    }
+
+    async fn persist_session_or_cleanup(
+        &self,
+        ctx: &RequestContext,
+        backend: &AgentBackendRegistration,
+        session: &mut TurnSession,
+    ) -> AgentTurnOrchestrationResult<()> {
         if let Err(error) = self.turn_sessions.upsert_session(ctx, session).await {
-            // Attempt cleanup but preserve the original persistence error regardless.
-            if let Err(cleanup_err) = self
-                .expire_persist_and_teardown(ctx, backend, session)
-                .await
-            {
-                tracing::warn!(
-                    error = ?cleanup_err,
-                    backend_id = %session.backend_id(),
-                    "cleanup failed after session upsert failure; session may leak"
-                );
-            }
+            self.cleanup_after_upsert_failure(ctx, backend, session)
+                .await;
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
-
         Ok(())
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "nested error handling is necessary for proper cleanup logging"
+    )]
+    async fn cleanup_after_upsert_failure(
+        &self,
+        ctx: &RequestContext,
+        backend: &AgentBackendRegistration,
+        session: &mut TurnSession,
+    ) {
+        if let Err(cleanup_err) = self
+            .expire_persist_and_teardown(ctx, backend, session)
+            .await
+        {
+            tracing::warn!(
+                error = ?cleanup_err,
+                backend_id = %session.backend_id(),
+                "cleanup failed after session upsert failure; session may leak"
+            );
+        }
     }
 
     async fn expire_session(
