@@ -10,6 +10,6 @@ ALTER TABLE agent_turn_sessions
 
 DROP INDEX IF EXISTS idx_agent_turn_sessions_tenant_backend_conversation_active;
 
-CREATE UNIQUE INDEX idx_agent_turn_sessions_tenant_backend_conversation_active
-    ON agent_turn_sessions (tenant_id, backend_id, conversation_id)
-    WHERE status IN ('active', 'reserved');
+CREATE UNIQUE INDEX idx_agent_turn_sessions_backend_conversation_active
+    ON agent_turn_sessions (backend_id, conversation_id)
+    WHERE status = 'active';

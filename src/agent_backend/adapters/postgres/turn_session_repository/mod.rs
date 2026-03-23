@@ -20,7 +20,7 @@ use row_mapping::{row_to_turn_session, to_new_row};
 use slot_arbitration::arbitrate_session_slot_tx;
 
 pub(crate) const CONSTRAINT_IDX_TURN_SESSIONS_ACTIVE: &str =
-    "idx_agent_turn_sessions_tenant_backend_conversation_active";
+    "idx_agent_turn_sessions_backend_conversation_active";
 
 /// `PostgreSQL`-backed turn-session repository.
 #[derive(Debug, Clone)]
@@ -154,14 +154,12 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                 let inserted = diesel::insert_into(agent_turn_sessions::table)
                     .values(&new_row)
                     .on_conflict((
-                        agent_turn_sessions::tenant_id,
                         agent_turn_sessions::backend_id,
                         agent_turn_sessions::conversation_id,
                     ))
-                    .filter_target(agent_turn_sessions::status.eq_any([
-                        TurnSessionStatus::Active.as_str(),
-                        TurnSessionStatus::Reserved.as_str(),
-                    ]))
+                    .filter_target(
+                        agent_turn_sessions::status.eq(TurnSessionStatus::Active.as_str()),
+                    )
                     .do_nothing()
                     .execute(tx_conn)
                     .map_err(|error| map_upsert_error(error, backend_id, conversation_id))?;
