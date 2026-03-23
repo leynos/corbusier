@@ -1603,6 +1603,134 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
   registry reads/writes now filter by `tenant_id`, while wider adapter
   hardening remains part of 1.5.3.
 
+For screen readers: The following sequence diagram shows two tenants using the
+task service with the same external issue reference. Tenant A stores and reads
+its own task through tenant-scoped repository calls and SQL filters, while
+tenant B can store the same issue reference independently because uniqueness is
+enforced per tenant.
+
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.5.1: Sequence diagram showing tenant-scoped task creation and issue
+lookup.
+```mermaid
+sequenceDiagram
+    actor TenantA
+    participant Service as TaskService
+    participant RepoPort as TaskRepositoryPort
+    participant PgRepo as PostgresTaskRepository
+    participant DB as PostgresDB
+
+    TenantA->>Service: create_task(issue_ref, tenant_id_A)
+    Service->>RepoPort: store(ctx_A, task)
+    RepoPort->>PgRepo: store(ctx_A, task)
+    PgRepo->>DB: INSERT tasks(tenant_id_A, issue_ref)
+    DB-->>PgRepo: ok
+
+    TenantA->>Service: get_task_by_issue(issue_ref, tenant_id_A)
+    Service->>RepoPort: find_task_by_issue_ref(ctx_A, issue_ref)
+    RepoPort->>PgRepo: find_task_by_issue_ref(ctx_A, issue_ref)
+    PgRepo->>DB: SELECT * FROM tasks WHERE tenant_id = tenant_id_A AND issue_ref
+    DB-->>PgRepo: task_row_A
+    PgRepo-->>TenantA: task_A
+
+    actor TenantB
+    TenantB->>Service: create_task(issue_ref, tenant_id_B)
+    Service->>RepoPort: store(ctx_B, task)
+    RepoPort->>PgRepo: store(ctx_B, task)
+    PgRepo->>DB: INSERT tasks(tenant_id_B, issue_ref)
+    DB-->>PgRepo: ok (per_tenant_unique)
+```
+<!-- markdownlint-enable MD031 -->
+
+For screen readers: The following entity-relationship diagram shows the tenant
+root table and the tenant-owned task, backend, conversation, message, agent
+session, handoff, and context snapshot tables. Each child row carries
+`tenant_id`, and conversations and sessions anchor the tenant-consistent links
+used by downstream message, handoff, and snapshot records.
+
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.5.2: Entity-relationship diagram showing tenant-owned orchestration
+tables and their main foreign-key paths.
+```mermaid
+erDiagram
+    tenants {
+        uuid id
+        string slug
+        string name
+        string status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    tasks {
+        uuid id
+        uuid tenant_id
+        string provider
+        string repository
+        int issue_number
+    }
+
+    backend_registrations {
+        uuid id
+        uuid tenant_id
+        string name
+        string provider
+        string config
+    }
+
+    conversations {
+        uuid id
+        uuid tenant_id
+        uuid task_id
+    }
+
+    messages {
+        uuid id
+        uuid tenant_id
+        uuid conversation_id
+        int sequence_number
+        string role
+        text content
+    }
+
+    agent_sessions {
+        uuid id
+        uuid tenant_id
+        uuid conversation_id
+        string status
+    }
+
+    handoffs {
+        uuid id
+        uuid tenant_id
+        uuid source_session_id
+        uuid conversation_id
+    }
+
+    context_snapshots {
+        uuid id
+        uuid tenant_id
+        uuid session_id
+        uuid conversation_id
+    }
+
+    tenants ||--o{ tasks : has
+    tenants ||--o{ backend_registrations : has
+    tenants ||--o{ conversations : has
+    tenants ||--o{ messages : has
+    tenants ||--o{ agent_sessions : has
+    tenants ||--o{ handoffs : has
+    tenants ||--o{ context_snapshots : has
+    tasks ||--o{ conversations : has
+    conversations ||--o{ messages : has
+    conversations ||--o{ agent_sessions : has
+    agent_sessions ||--o{ handoffs : source_session
+    conversations ||--o{ handoffs : conversation
+    agent_sessions ||--o{ context_snapshots : session
+    conversations ||--o{ context_snapshots : conversation
+```
+<!-- markdownlint-enable MD031 -->
+
 ### 2.3 Feature Relationships
 
 #### 2.3.1 Feature Dependencies Map
