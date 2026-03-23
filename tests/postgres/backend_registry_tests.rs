@@ -16,7 +16,8 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_context,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
+    test_request_context,
 };
 
 type TestService = BackendRegistryService<PostgresBackendRegistry, DefaultClock>;
@@ -207,5 +208,60 @@ async fn postgres_list_all_includes_inactive(
         .await
         .expect("listing should succeed");
     assert_eq!(all.len(), 2);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_scopes_backends_per_tenant(
+    #[future] context: Result<BackendTestContext, BoxError>,
+    test_request_context: RequestContext,
+) -> Result<(), BoxError> {
+    let bctx = context.await?;
+    let tenant_a_ctx = test_request_context;
+    let tenant_b_ctx = other_tenant_ctx(&tenant_a_ctx);
+
+    let tenant_a_backend = bctx
+        .service
+        .register(&tenant_a_ctx, claude_request())
+        .await
+        .expect("tenant A registration should succeed");
+
+    let tenant_b_backend = bctx
+        .service
+        .register(&tenant_b_ctx, claude_request())
+        .await
+        .expect("tenant B registration should succeed with same name");
+
+    assert_ne!(tenant_a_backend.id(), tenant_b_backend.id());
+
+    let lookup_from_b = bctx
+        .service
+        .find_by_id(&tenant_b_ctx, tenant_a_backend.id())
+        .await
+        .expect("tenant-scoped lookup should succeed");
+    assert!(lookup_from_b.is_none());
+
+    let list_a = bctx
+        .service
+        .list_all(&tenant_a_ctx)
+        .await
+        .expect("tenant A list should succeed");
+    let list_b = bctx
+        .service
+        .list_all(&tenant_b_ctx)
+        .await
+        .expect("tenant B list should succeed");
+
+    assert_eq!(list_a.len(), 1);
+    assert_eq!(list_b.len(), 1);
+    assert_eq!(
+        list_a.first().expect("tenant A backend").id(),
+        tenant_a_backend.id()
+    );
+    assert_eq!(
+        list_b.first().expect("tenant B backend").id(),
+        tenant_b_backend.id()
+    );
     Ok(())
 }

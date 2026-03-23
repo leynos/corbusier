@@ -43,9 +43,14 @@ pub const ADD_BRANCH_PR_INDEXES_SQL: &str =
 /// SQL to add agent backend registrations table for roadmap 1.3.1.
 pub const ADD_BACKEND_REGISTRATIONS_SQL: &str =
     include_str!("../../migrations/2026-02-25-000000_add_backend_registrations_table/up.sql");
+
 /// SQL to add MCP server registry table for roadmap 2.1.1.
 pub const ADD_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-02-28-000000_add_mcp_servers_table/up.sql");
+
+/// SQL to add agent turn sessions table for roadmap 1.3.2.
+pub const ADD_AGENT_TURN_SESSIONS_SQL: &str =
+    include_str!("../../migrations/2026-03-03-000000_add_agent_turn_sessions_table/up.sql");
 
 /// SQL to add tool catalog, audit log, and log metadata tables for roadmap 2.1.2.
 pub const ADD_TOOL_CATALOG_SQL: &str =
@@ -65,21 +70,25 @@ pub const ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL: &str = include_str!(
 /// SQL to enforce idempotent hook execution inserts per tenant and trigger context.
 pub const ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL: &str =
     include_str!("../../migrations/2026-03-14-000000_add_hook_executions_unique_constraint/up.sql");
-
 /// SQL to enforce unique active agent session per conversation.
 pub const ADD_UNIQUE_ACTIVE_SESSION_SQL: &str = include_str!(
     "../../migrations/2026-03-06-000000_add_unique_active_session_per_conversation/up.sql"
 );
-
 /// SQL to tenant-scope `mcp_servers` and enforce composite child foreign keys.
 pub const ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL: &str =
     include_str!("../../migrations/2026-03-11-000000_tenant_scope_mcp_servers/up.sql");
-
+/// SQL to tenant-scope agent backend and turn-session tables.
+pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
+    include_str!("../../migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql");
+/// SQL to allow reserved turn-session rows during atomic slot claims.
+pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
+    "../../migrations/2026-03-20-000000_add_reserved_agent_turn_session_status/up.sql"
+);
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v10";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v13";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -129,12 +138,15 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
     map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
+    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
     map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
     map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
+    map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
     Ok(())
 }
 

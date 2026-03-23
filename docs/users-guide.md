@@ -662,3 +662,105 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Agent turn orchestration and sessions
+
+Corbusier orchestrates agent turns through a single service path that validates
+the target backend, resolves or rotates a backend runtime session, executes the
+turn, and routes tool calls in deterministic order. Session continuity is
+tracked per `(tenant_id, backend_id, conversation_id)` until the session
+expires, with every repository query binding `RequestContext.tenant_id` so
+tenant isolation is enforced for reuse and rotation.
+
+When a stored session is still active within the current tenant, it is reused.
+When expired, the session is marked expired and a new runtime session is
+created automatically. The session repository commits a `reserved` slot row for
+the current tenant before the runtime session is created, so expiry detection,
+replacement-session claiming, and subsequent reuse all remain tenant-scoped and
+happen at the database boundary before any external runtime call is made.
+
+```rust,no_run
+use std::sync::Arc;
+
+use corbusier::agent_backend::{
+    adapters::memory::{
+        InMemoryAgentRuntime, InMemoryBackendRegistry, InMemoryToolRouter,
+        InMemoryTurnSessionRepository,
+    },
+    domain::{BackendId, ToolCallRequest, TurnExecutionRequest, TurnExecutionResult},
+    ports::BackendRegistryRepository,
+    services::{
+        AgentTurnOrchestratorPorts, AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
+    },
+};
+use chrono::Duration;
+use corbusier::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
+use mockable::DefaultClock;
+use serde_json::json;
+use uuid::Uuid;
+
+async fn execute_orchestrated_turn() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Arc::new(InMemoryBackendRegistry::new());
+    let sessions = Arc::new(InMemoryTurnSessionRepository::new());
+    let runtime = Arc::new(InMemoryAgentRuntime::new());
+    let router = Arc::new(InMemoryToolRouter::new());
+    let clock = Arc::new(DefaultClock);
+    let ctx = RequestContext::new(
+        TenantId::new(),
+        CorrelationId::new(),
+        UserId::new(),
+        SessionId::new(),
+    );
+
+    // Register one backend used for orchestration.
+    let backend = corbusier::agent_backend::services::BackendRegistryService::new(
+        registry.clone(),
+        clock.clone(),
+    )
+    .register(
+        &ctx,
+        corbusier::agent_backend::services::RegisterBackendRequest::new(
+            "claude_code_sdk",
+            "Claude Code SDK",
+            "1.0.0",
+            "Anthropic",
+        )
+        .with_capabilities(true, true),
+    )
+    .await?;
+
+    // Configure runtime and tool router behaviour for demonstration.
+    runtime.queue_turn_result(TurnExecutionResult::new(
+        "assistant response",
+        vec![ToolCallRequest::new("search_docs", json!({"query": "roadmap"}))?],
+    ))?;
+    router.set_tool_response("search_docs", json!({"matches": 3}))?;
+
+    let orchestrator = AgentTurnOrchestratorService::with_config(
+        AgentTurnOrchestratorPorts {
+            backend_registry: registry,
+            turn_sessions: sessions,
+            runtime,
+            tool_router: router,
+            clock,
+        },
+        corbusier::agent_backend::services::AgentTurnOrchestratorConfig::new(
+            Duration::minutes(5),
+        )?,
+    );
+
+    let response = orchestrator
+        .execute_turn(
+            &ctx,
+            ExecuteAgentTurnRequest::new(
+                BackendId::from_uuid(backend.id().into_inner()),
+                TurnExecutionRequest::new(Uuid::new_v4(), "Please summarize this", Vec::new()),
+            ),
+        )
+        .await?;
+
+    assert_eq!(response.tool_results().len(), 1);
+    assert!(!response.rotated_session());
+    Ok(())
+}
+```

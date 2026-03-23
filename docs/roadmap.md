@@ -73,13 +73,13 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-design.md §6.2.3.
   - [x] Success criteria: at least two backends can be registered and listed
     via the registry API.
-- [ ] 1.3.2 Orchestrate agent turn execution and sessions. Requires 1.3.1 and
+- [x] 1.3.2 Orchestrate agent turn execution and sessions. Requires 1.3.1 and
   1.1.1. See corbusier-design.md §2.2.3.
-  - [ ] Coordinate turn execution with tool calls and responses. See
+  - [x] Coordinate turn execution with tool calls and responses. See
     corbusier-design.md §4.2.1.1.
-  - [ ] Maintain session state and expiry rules. See
+  - [x] Maintain session state and expiry rules. See
     corbusier-design.md §2.2.3.
-  - [ ] Success criteria: agent turns execute with consistent tool routing and
+  - [x] Success criteria: agent turns execute with consistent tool routing and
     session continuity.
 - [ ] 1.3.3 Translate tool schemas per backend. Requires 2.1.1. See
   corbusier-design.md §2.2.3 and §2.2.4.
