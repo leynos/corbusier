@@ -44,11 +44,11 @@ impl PostgresTurnSessionRepository {
         tokio::task::spawn_blocking(move || {
             let mut connection = pool
                 .get()
-                .map_err(TurnSessionRepositoryError::persistence)?;
+                .map_err(TurnSessionRepositoryError::storage_failure)?;
             f(&mut connection)
         })
         .await
-        .map_err(TurnSessionRepositoryError::persistence)?
+        .map_err(TurnSessionRepositoryError::storage_failure)?
     }
 
     /// Returns all persisted sessions for integration-test assertions.
@@ -61,12 +61,12 @@ impl PostgresTurnSessionRepository {
         let mut connection = self
             .pool
             .get()
-            .map_err(TurnSessionRepositoryError::persistence)?;
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
         let rows = agent_turn_sessions::table
             .order(agent_turn_sessions::started_at.asc())
             .select(AgentTurnSessionRow::as_select())
             .load::<AgentTurnSessionRow>(&mut connection)
-            .map_err(TurnSessionRepositoryError::persistence)?;
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
 
         rows.into_iter().map(row_to_turn_session).collect()
     }
@@ -108,7 +108,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                 .select(AgentTurnSessionRow::as_select())
                 .first::<AgentTurnSessionRow>(connection)
                 .optional()
-                .map_err(TurnSessionRepositoryError::persistence)?;
+                .map_err(TurnSessionRepositoryError::storage_failure)?;
 
             row.map(row_to_turn_session).transpose()
         })
@@ -145,7 +145,7 @@ impl TurnSessionRepository for PostgresTurnSessionRepository {
                     agent_turn_sessions::turn_count.eq(new_row.turn_count),
                 ))
                 .execute(tx_conn)
-                .map_err(TurnSessionRepositoryError::persistence)?;
+                .map_err(|error| map_upsert_error(error, backend_id, conversation_id))?;
 
                 if updated > 0 {
                     return Ok(());
@@ -201,12 +201,12 @@ pub(crate) fn map_upsert_error(
             conversation_id,
         )
     } else {
-        TurnSessionRepositoryError::persistence(error)
+        TurnSessionRepositoryError::storage_failure(error)
     }
 }
 
 impl From<DieselError> for TurnSessionRepositoryError {
     fn from(error: DieselError) -> Self {
-        Self::persistence(error)
+        Self::storage_failure(error)
     }
 }

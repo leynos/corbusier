@@ -4,7 +4,6 @@ use crate::agent_backend::domain::{BackendId, TurnSession};
 use crate::context::RequestContext;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -123,16 +122,29 @@ pub enum TurnSessionRepositoryError {
     },
 
     /// Persisted data could not be reconstructed into domain values.
-    #[error("invalid persisted turn session data: {0}")]
-    InvalidPersistedData(Arc<dyn std::error::Error + Send + Sync>),
+    #[error("invalid persisted turn session data for '{field}': {reason}")]
+    InvalidPersistedData {
+        /// Name of the field that failed reconstruction.
+        field: &'static str,
+        /// Human-readable reason.
+        reason: String,
+    },
 
     /// Domain data could not be converted for persistence.
-    #[error("invalid turn session domain data: {0}")]
-    InvalidDomainData(Arc<dyn std::error::Error + Send + Sync>),
+    #[error("invalid turn session domain data for '{field}': {reason}")]
+    InvalidDomainData {
+        /// Name of the field that failed serialisation.
+        field: &'static str,
+        /// Human-readable reason.
+        reason: String,
+    },
 
-    /// Persistence-layer failure.
-    #[error("turn session persistence error: {0}")]
-    Persistence(Arc<dyn std::error::Error + Send + Sync>),
+    /// Persistence-layer failure (infrastructure error, not inspectable by callers).
+    #[error("turn session storage failure: {message}")]
+    StorageFailure {
+        /// Human-readable description of the infrastructure fault.
+        message: String,
+    },
 }
 
 impl TurnSessionRepositoryError {
@@ -147,19 +159,27 @@ impl TurnSessionRepositoryError {
 
     /// Wraps a persisted-data reconstruction failure.
     #[must_use]
-    pub fn invalid_persisted_data(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InvalidPersistedData(Arc::new(err))
+    pub fn invalid_persisted_data(field: &'static str, reason: impl std::fmt::Display) -> Self {
+        Self::InvalidPersistedData {
+            field,
+            reason: reason.to_string(),
+        }
     }
 
     /// Wraps an outbound domain-to-persistence conversion failure.
     #[must_use]
-    pub fn invalid_domain_data(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InvalidDomainData(Arc::new(err))
+    pub fn invalid_domain_data(field: &'static str, reason: impl std::fmt::Display) -> Self {
+        Self::InvalidDomainData {
+            field,
+            reason: reason.to_string(),
+        }
     }
 
     /// Wraps an infrastructure persistence failure.
     #[must_use]
-    pub fn persistence(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Persistence(Arc::new(err))
+    pub fn storage_failure(err: impl std::fmt::Display) -> Self {
+        Self::StorageFailure {
+            message: err.to_string(),
+        }
     }
 }
