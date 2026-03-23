@@ -140,15 +140,15 @@ fn load_claimed_session(
     tx_conn: &mut PgConnection,
     params: ReservedSessionInsertParams,
 ) -> TurnSessionRepositoryResult<Option<AgentTurnSessionRow>> {
-    diesel::sql_query(
-        "SELECT id, tenant_id, backend_id, conversation_id, runtime_session_id, status, \
-         ttl_seconds, started_at, last_used_at, expires_at, ended_at, turn_count \
-         FROM agent_turn_sessions \
-         WHERE tenant_id = $1 AND backend_id = $2 AND conversation_id = $3 \
-           AND status IN ($4, $5) \
-         ORDER BY last_used_at DESC, id DESC \
-         FOR UPDATE",
-    )
+    diesel::sql_query(concat!(
+        "SELECT id, tenant_id, backend_id, conversation_id, runtime_session_id, status, ",
+        "ttl_seconds, started_at, last_used_at, expires_at, ended_at, turn_count ",
+        "FROM agent_turn_sessions ",
+        "WHERE tenant_id = $1 AND backend_id = $2 AND conversation_id = $3 ",
+        "  AND status IN ($4, $5) ",
+        "ORDER BY last_used_at DESC, id DESC ",
+        "FOR UPDATE",
+    ))
     .bind::<SqlUuid, _>(params.tenant_id)
     .bind::<SqlUuid, _>(params.backend_id.into_inner())
     .bind::<SqlUuid, _>(params.conversation_id)

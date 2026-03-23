@@ -56,6 +56,7 @@ impl PostgresTurnSessionRepository {
     /// # Errors
     ///
     /// Returns [`TurnSessionRepositoryError`] on persistence failures.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn all_sessions(&self) -> TurnSessionRepositoryResult<Vec<TurnSession>> {
         let mut connection = self
             .pool
