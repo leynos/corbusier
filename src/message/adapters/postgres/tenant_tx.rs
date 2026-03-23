@@ -50,7 +50,7 @@ where
     F: FnOnce(&mut PgConnection) -> Result<T, E>,
 {
     conn.transaction::<T, TxError<E>, _>(|tx| {
-        ensure_tenant_exists(tx, tenant_id)?;
+        ensure_tenant_exists(tx, tenant_id).map_err(TxError::Diesel)?;
         set_tenant_context(tx, tenant_id)?;
         body(tx).map_err(TxError::Domain)
     })
@@ -63,10 +63,10 @@ where
 /// but adapter writes already require a valid foreign key target. We
 /// therefore provision a stable placeholder row on first use so persistence
 /// remains compatible with the existing `RequestContext` contract.
-pub(crate) fn ensure_tenant_exists<E>(
+pub(crate) fn ensure_tenant_exists(
     conn: &mut PgConnection,
     tenant_id: Uuid,
-) -> Result<(), TxError<E>> {
+) -> diesel::QueryResult<()> {
     bootstrap_tenant_row(conn, tenant_id)?;
     Ok(())
 }

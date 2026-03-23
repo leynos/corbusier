@@ -132,12 +132,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                         .map_err(|err| map_insert_error(err, session_id, conversation_id))?;
 
                     if is_active {
-                        check_no_active_session(
-                            tx,
-                            tenant_id.into_inner(),
-                            conversation_id,
-                            Some(session_id),
-                        )?;
+                        check_no_active_session(tx, tenant_id, conversation_id, Some(session_id))?;
                     }
 
                     Ok(())
@@ -174,12 +169,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                     }
 
                     if is_active {
-                        check_no_active_session(
-                            tx,
-                            tenant_id.into_inner(),
-                            conversation_id,
-                            Some(session_id),
-                        )?;
+                        check_no_active_session(tx, tenant_id, conversation_id, Some(session_id))?;
                     }
 
                     Ok(())

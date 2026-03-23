@@ -3,6 +3,7 @@
 use diesel::Connection;
 use diesel::PgConnection;
 use diesel::RunQueryDsl;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use rstest::{fixture, rstest};
 use serde_json::json;
 use uuid::Uuid;
@@ -115,9 +116,61 @@ async fn composite_foreign_keys_reject_cross_tenant_links(
     .await
     .expect("spawn_blocking should not panic");
 
+    // We expect a foreign key violation (SQLSTATE 23503), not just any error.
+    let err = result.expect_err(&format!(
+        "cross-tenant insert should violate {}, but succeeded",
+        case.label()
+    ));
+
+    let diesel_err = err
+        .downcast_ref::<DieselError>()
+        .expect("expected diesel::result::Error from run_fk_case");
+
+    match diesel_err {
+        DieselError::DatabaseError(DatabaseErrorKind::ForeignKeyViolation, _) => {
+            // Expected path: cross-tenant FK insert is rejected.
+        }
+        other => panic!(
+            "expected ForeignKeyViolation (SQLSTATE 23503) for {}, got: {:?}",
+            case.label(),
+            other
+        ),
+    }
+
+    Ok(())
+}
+
+#[rstest]
+#[case(CompositeFkCase::ConversationTask)]
+#[case(CompositeFkCase::MessageConversation)]
+#[case(CompositeFkCase::AgentSessionConversation)]
+#[case(CompositeFkCase::HandoffSourceSession)]
+#[case(CompositeFkCase::HandoffConversation)]
+#[case(CompositeFkCase::ContextSnapshotSession)]
+#[case(CompositeFkCase::ContextSnapshotConversation)]
+#[tokio::test(flavor = "multi_thread")]
+async fn composite_foreign_keys_accept_same_tenant_links(
+    #[future] context: Result<TenantConstraintContext, BoxError>,
+    #[case] case: CompositeFkCase,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let tenant = test_request_ctx();
+    let db_url = ctx.temp_db.url().to_owned();
+
+    let result = tokio::task::spawn_blocking(move || {
+        run_fk_case(
+            &db_url,
+            case,
+            tenant.tenant_id().into_inner(),
+            tenant.tenant_id().into_inner(),
+        )
+    })
+    .await
+    .expect("spawn_blocking should not panic");
+
     assert!(
-        result.is_err(),
-        "cross-tenant insert should violate {}",
+        result.is_ok(),
+        "same-tenant insert should succeed for {}",
         case.label()
     );
     Ok(())

@@ -475,7 +475,7 @@ behaviour. A natural fit is:
 - one scenario in which tenant A and tenant B both register the same backend
   name and each sees its own registration.
 
-Use the standard BDD layout:
+Use the standard BDD (behaviour-driven development) layout:
 
 - `tests/features/<feature>.feature`
 - `tests/<feature>_steps/`

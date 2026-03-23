@@ -169,9 +169,9 @@ That affects both task issue references and backend registration names:
 - the same backend name may exist once per tenant, and
 - lookups return only the caller's tenant-owned records.
 
-If you reuse an external identifier or backend name in tests or application
-code, use a distinct `RequestContext` when you intend the records to belong to
-different tenants.
+When reusing an external identifier or backend name in tests or application
+code, use a distinct `RequestContext` when the records are intended to belong
+to different tenants.
 
 ## Branch and pull request association
 
