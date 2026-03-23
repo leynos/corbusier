@@ -234,6 +234,10 @@ where
             .map_err(AgentTurnOrchestrationError::Runtime)
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "cleanup-on-failure branch adds necessary error-handling depth"
+    )]
     async fn persist_completed_turn(
         &self,
         ctx: &RequestContext,
@@ -244,8 +248,17 @@ where
         session.record_turn(completion_time)?;
 
         if let Err(error) = self.turn_sessions.upsert_session(ctx, session).await {
-            self.expire_persist_and_teardown(ctx, backend, session)
-                .await?;
+            // Attempt cleanup but preserve the original persistence error regardless.
+            if let Err(cleanup_err) = self
+                .expire_persist_and_teardown(ctx, backend, session)
+                .await
+            {
+                tracing::warn!(
+                    error = ?cleanup_err,
+                    backend_id = %session.backend_id(),
+                    "cleanup failed after session upsert failure; session may leak"
+                );
+            }
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
 

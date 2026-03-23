@@ -78,10 +78,10 @@ Observable outcomes:
   port; add regression tests for handoff scenarios to ensure no behavioural
   drift.
 
-- Risk: Tool routing contracts are underspecified before roadmap 3.1.1 (MCP
-  lifecycle) lands. Severity: medium Likelihood: high Mitigation: define a
-  narrow `ToolRouterPort` for deterministic routing and stubbed execution now,
-  with schema translation deferred to roadmap 2.3.3.
+- Risk: Tool routing contracts are underspecified before roadmap 2.1.1 (Model
+  Context Protocol (MCP) lifecycle) lands. Severity: medium Likelihood: high
+  Mitigation: define a narrow `ToolRouterPort` for deterministic routing and
+  stubbed execution now, with schema translation deferred to roadmap 1.3.3.
 
 - Risk: Expiry logic can become time-flaky if wall-clock access is not
   injected. Severity: medium Likelihood: medium Mitigation: use
