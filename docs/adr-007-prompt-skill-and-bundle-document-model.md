@@ -68,8 +68,8 @@ owned separately by ADR 008.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 4.5, "Normalized launch contract", because prompts, bundles, skill
-  selection, hook subscriptions, and wire references must feed one normalized
+- Step 4.5, "Normalised launch contract", because prompts, bundles, skill
+  selection, hook subscriptions, and wire references must feed one normalised
   launch plan.
 - Step 4.8, "Prompt, bundle, and validation surfaces", because Podbot needs
   documented prompt and bundle contracts that can align with the Corbusier
@@ -125,6 +125,10 @@ as validation errors unless a field is declared optional by the document model.
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 2 (durability and document surfaces). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the prompt document shape, bundle manifest shape, and normative
@@ -159,6 +163,11 @@ bundle and prompt surfaces.
 ## Architectural Rationale
 
 This direction keeps Corbusier aligned with the external skill ecosystem while
-adding the higher-level grouping that the companion design requires. It also
-gives later validation and security work a stable, typed document surface
+adding the higher-level grouping that the companion design[^cd] requires. It
+also gives later validation and security work a stable, typed document surface
 rather than a loose collection of Markdown conventions.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

@@ -10,10 +10,10 @@ Proposed.
 
 ## Context and Problem Statement
 
-Corbusier already contains an MCP server registry and a tool routing model. The
-Podbot conformance design shifts the runtime shape: agents should consume
-workspace-scoped MCP wires that Podbot provisions, while Corbusier remains the
-catalogue and policy authority.
+Corbusier already contains a Model Context Protocol (MCP) server registry and a
+tool routing model. The Podbot conformance design shifts the runtime shape:
+agents should consume workspace-scoped MCP wires that Podbot provisions, while
+Corbusier remains the catalogue and policy authority.
 
 That creates a decision boundary that must be settled exactly once. For
 Podbot-hosted agents, does Corbusier stay in the tool call path, or does the
@@ -69,13 +69,13 @@ for MCP definitions; ADR 004 owns that lower-level model.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 4.5, "Normalized launch contract", because wire selection and injection
-  details need to be normalized before launch.
+- Step 4.5, "Normalised launch contract", because wire selection and injection
+  details need to be normalised before launch.
 - Step 4.6, "Hosted session control plane", because Corbusier needs typed
   runtime events for wire status without moving tool calls back into its inline
   path.
 - Step 4.7, "MCP wire provisioning and injection", because that step is the
-  direct upstream Podbot surface that materializes workspace-scoped wires.
+  direct upstream Podbot surface that materialises workspace-scoped wires.
 
 ## Options Considered
 
@@ -124,6 +124,10 @@ Under this model:
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 1 (foundational architecture). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Separate Corbusier's catalogue concepts from runtime wire attachment concepts.
@@ -157,6 +161,11 @@ telemetry and audit ingestion are in place.
 ## Architectural Rationale
 
 This direction preserves the control-plane and data-plane split proposed in the
-companion design. Corbusier decides what is allowed. Podbot makes those
+companion design[^cd]. Corbusier decides what is allowed. Podbot makes those
 decisions concrete inside a specific workspace runtime. That keeps the runtime
 path narrow and avoids building a second routing layer on top of Podbot.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

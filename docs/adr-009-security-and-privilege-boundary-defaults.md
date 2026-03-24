@@ -129,6 +129,10 @@ merely documented as discouraged.
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 3 (security tightening and retirement). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the default privilege matrix for hosted agents, hooks, helper
@@ -162,7 +166,12 @@ surfaces are in place.
 
 ## Architectural Rationale
 
-The companion design increases the number of host-adjacent capabilities that
-Corbusier and Podbot can expose. Least-privilege defaults keep that surface
-coherent, and explicit overrides preserve the review and audit authority that
-Corbusier is meant to retain.
+The companion design[^cd] increases the number of host-adjacent capabilities
+that Corbusier and Podbot can expose. Least-privilege defaults keep that
+surface coherent, and explicit overrides preserve the review and audit
+authority that Corbusier is meant to retain.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

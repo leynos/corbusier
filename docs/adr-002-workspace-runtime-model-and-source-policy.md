@@ -74,8 +74,8 @@ This ADR depends on the following upstream Podbot roadmap steps:
   hosting schema.
 - Step 4.4, "Workspace strategies", because that step delivers the clone and
   host-mount runtime behaviours that this ADR relies on.
-- Step 4.5, "Normalized launch contract", because workspace source, mount
-  policy, and access mode should be resolved through one normalized launch path.
+- Step 4.5, "Normalised launch contract", because workspace source, mount
+  policy, and access mode should be resolved through one normalised launch path.
 
 ## Options Considered
 
@@ -126,6 +126,10 @@ The proposed workspace model is:
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 1 (foundational architecture). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Introduce the Corbusier workspace runtime record and lifecycle state machine.
@@ -160,4 +164,10 @@ explicit read-only or read-write access controls.
 This direction keeps the Corbusier record rich enough for orchestration,
 restart recovery, and audit, while avoiding a second runtime implementation. It
 also gives later ADRs a stable unit of attachment for wires, hooks, and prompt
-validation.
+validation. The design boundaries in this ADR trace back to the companion
+design[^cd].
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

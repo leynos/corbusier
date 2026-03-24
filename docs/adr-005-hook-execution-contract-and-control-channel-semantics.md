@@ -10,8 +10,8 @@ Proposed.
 
 ## Context and Problem Statement
 
-The Podbot conformance design treats hooks as generic execution artefacts that
-Podbot runs after Corbusier acknowledges a hook message. That differs
+The Podbot conformance design[^cd] treats hooks as generic execution artefacts
+that Podbot runs after Corbusier acknowledges a hook message. That differs
 materially from the earlier Corbusier idea of a bespoke in-process hook engine.
 
 This change introduces a new control channel and a new state machine for hosted
@@ -126,6 +126,10 @@ The proposed contract is:
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 1 (foundational architecture). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the hook request, acknowledgement, and completion message shapes.
@@ -163,3 +167,8 @@ This direction preserves the boundary established by ADR 001 and avoids making
 Corbusier a second execution host. Corbusier governs hooks through policy and
 acknowledgement. Podbot executes them inside the same runtime boundary that
 owns the workspace and hosted session.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

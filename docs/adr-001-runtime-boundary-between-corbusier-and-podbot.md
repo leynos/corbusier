@@ -77,7 +77,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
   the library API as the normative runtime surface.
 - Step 4.3b, "App server startup", because the hosted app-server path is part
   of the runtime boundary that this ADR assigns to Podbot.
-- Step 4.5, "Normalized launch contract", because Corbusier needs one typed
+- Step 4.5, "Normalised launch contract", because Corbusier needs one typed
   launch seam rather than a mix of ad hoc runtime entry points.
 - Step 4.6, "Hosted session control plane", because Corbusier depends on a
   typed control and event surface instead of CLI scraping.
@@ -129,6 +129,10 @@ Under this direction:
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 1 (foundational architecture). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define a Corbusier port for the Podbot library API and route new hosted-agent
@@ -163,5 +167,11 @@ replacement path is stable and covered by tests.
 
 This boundary preserves a clean hexagonal split. Corbusier remains the system
 of record for intent, policy, and audit, while Podbot becomes the execution
-engine for hosted sessions. That improves conformance with the companion design
-and prevents later ADRs from re-opening the question of runtime ownership.
+engine for hosted sessions. That improves conformance with the companion
+design[^cd] and prevents later ADRs from re-opening the question of runtime
+ownership.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

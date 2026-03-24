@@ -10,9 +10,9 @@ Proposed.
 
 ## Context and Problem Statement
 
-ADR 003 proposes that Podbot-hosted agents consume workspace-scoped wires
-directly. That model depends on a clean distinction between three separate
-concepts:
+ADR 003 proposes that Podbot-hosted agents consume workspace-scoped Model
+Context Protocol (MCP) wires directly. That model depends on a clean
+distinction between three separate concepts:
 
 - a persisted source definition that Corbusier owns,
 - a workspace-scoped wire instance that Podbot realises, and
@@ -124,6 +124,10 @@ the migration completes.
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 1 (foundational architecture). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the canonical source taxonomy in Corbusier's domain model and adapters.
@@ -156,7 +160,12 @@ code paths before eventual removal.
 
 ## Architectural Rationale
 
-The companion design assumes that source definitions, wires, and agent-visible
-endpoints are distinct concepts. A canonical source taxonomy makes that
-distinction explicit in Corbusier's types, persistence model, and review
-language, which reduces confusion in both implementation and future ADRs.
+The companion design[^cd] assumes that source definitions, wires, and
+agent-visible endpoints are distinct concepts. A canonical source taxonomy
+makes that distinction explicit in Corbusier's types, persistence model, and
+review language, which reduces confusion in both implementation and future ADRs.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

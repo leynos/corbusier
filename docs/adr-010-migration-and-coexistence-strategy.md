@@ -22,7 +22,7 @@ rollback expectations, and coexistence rules for the transition.
 ## Decision Drivers
 
 - Continuous repository health during migration
-- Minimized operational risk
+- Minimised operational risk
 - Predictable deprecation of legacy terms and code paths
 - Controlled introduction of new schemas and services
 - Clear reviewer checkpoints
@@ -66,7 +66,7 @@ This ADR depends on the following upstream Podbot roadmap steps because they
 define the external surfaces that Corbusier must migrate against:
 
 - Step 1.4, "Hosting schema migration and compatibility matrix"
-- Step 4.5, "Normalized launch contract"
+- Step 4.5, "Normalised launch contract"
 - Step 4.6, "Hosted session control plane"
 - Step 4.7, "MCP wire provisioning and injection"
 - Step 4.8, "Prompt, bundle, and validation surfaces"
@@ -165,7 +165,12 @@ Security tightening and retirement
 
 ## Architectural Rationale
 
-The companion design is too broad to deliver safely as one cutover. A staged
-migration respects the repository's existing architecture, keeps the review
-surface comprehensible, and gives maintainers a disciplined way to retire old
-assumptions once the Podbot-conformant path is proven.
+The companion design[^cd] is too broad to deliver safely as one cutover. A
+staged migration respects the repository's existing architecture, keeps the
+review surface comprehensible, and gives maintainers a disciplined way to
+retire old assumptions once the Podbot-conformant path is proven.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

@@ -79,7 +79,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 
 ## Options Considered
 
-### Option A: Normalized relational runtime state with explicit state machines
+### Option A: Normalised relational runtime state with explicit state machines
 
 Corbusier persists runtime entities in relational tables with explicit states,
 correlation identifiers, transition rules, and separate references to logs or
@@ -125,6 +125,10 @@ should remain out of the primary runtime tables and be linked by reference.
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 2 (durability and document surfaces). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the runtime entities, identifiers, and state machines in Corbusier's
@@ -159,7 +163,12 @@ remaining best-effort-only runtime paths.
 
 ## Architectural Rationale
 
-The companion design needs Corbusier to remain the durable authority even while
-Podbot owns runtime execution. A relational state model with explicit state
-machines matches that role, supports incremental migration, and is easier to
-review and operate than either best-effort logging or full event sourcing.
+The companion design[^cd] needs Corbusier to remain the durable authority even
+while Podbot owns runtime execution. A relational state model with explicit
+state machines matches that role, supports incremental migration, and is easier
+to review and operate than either best-effort logging or full event sourcing.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

@@ -176,11 +176,10 @@ pub enum WorkspaceSource {
 
 **Unspecified detail:** Corbusier’s repo currently lacks a concrete “workspace
 manager” implementation in code; the Corbusier design doc contains a conceptual
-`EncapsulationProvider` but no corresponding crate module.
-citeturn26view0turn24view0 You must create this module and decide whether
-Corbusier itself provisions the host workspace directory (recommended for
-determinism) or delegates cloning to Podbot (aligns with Podbot’s existing
-`github_clone` flow). citeturn28view0
+`EncapsulationProvider` but no corresponding crate module. The implementation
+must create this module and decide whether Corbusier itself provisions the host
+workspace directory (recommended for determinism) or delegates cloning to
+Podbot (aligns with Podbot’s existing `github_clone` flow).
 
 ### McpEndpointSource
 

@@ -72,8 +72,8 @@ This ADR depends on the following upstream Podbot roadmap steps:
 
 - Step 2.6, "ACP capability masking enforcement", because capability
   dispositions must reflect Podbot's host-enforced ACP masking behaviour.
-- Step 4.5, "Normalized launch contract", because validation needs the same
-  normalized runtime inputs that launch uses.
+- Step 4.5, "Normalised launch contract", because validation needs the same
+  normalised runtime inputs that launch uses.
 - Step 4.8, "Prompt, bundle, and validation surfaces", because that step is
   the direct upstream Podbot surface for `validate_prompt` and bundle-aware
   diagnostics.
@@ -130,6 +130,10 @@ free-text warnings.
 
 ## Migration Plan
 
+This ADR lands during ADR 010 Phase 2 (durability and document surfaces). The
+implementation steps below are scoped to this ADR; see ADR 010 for the
+cross-cutting migration sequence and advancement criteria.
+
 ### Phase 1
 
 Define the capability vocabulary, request shape, response shape, and diagnostic
@@ -166,7 +170,12 @@ warn-only to blocking behaviour where the migration plan allows.
 
 ## Architectural Rationale
 
-The companion design treats validation as a product surface rather than an
+The companion design[^cd] treats validation as a product surface rather than an
 internal convenience. Structured dispositions match that requirement, support
 CI and design review, and make capability degradation explicit instead of
 turning it into hidden runtime surprise.
+
+[^cd]: The companion design is
+    `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
+    Podbot roadmap steps referenced in this ADR are defined in the upstream
+    [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).
