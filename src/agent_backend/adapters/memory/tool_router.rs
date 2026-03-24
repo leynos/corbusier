@@ -3,8 +3,8 @@
 use crate::agent_backend::{
     domain::{ToolCallRequest, ToolCallResult},
     ports::{
-        tool_router::ToolRoutingInfrastructureError, ToolRouterPort, ToolRoutingContext,
-        ToolRoutingError, ToolRoutingResult,
+        ToolRouterPort, ToolRoutingContext, ToolRoutingError, ToolRoutingResult,
+        tool_router::ToolRoutingInfrastructureError,
     },
 };
 use async_trait::async_trait;

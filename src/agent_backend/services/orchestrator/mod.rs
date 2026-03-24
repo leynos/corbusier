@@ -53,6 +53,12 @@ struct SessionResolutionParams<'a> {
     now: chrono::DateTime<Utc>,
 }
 
+struct SessionPersistenceParams<'a> {
+    ctx: &'a RequestContext,
+    backend: &'a AgentBackendRegistration,
+    reused_session: bool,
+}
+
 /// Service that orchestrates backend turns and session lifecycle.
 #[derive(Clone)]
 pub struct AgentTurnOrchestratorService<R, S, RT, TR, C>
@@ -167,8 +173,15 @@ where
             }
         };
 
-        self.persist_completed_turn(ctx, &backend, &mut session, reused_session)
-            .await?;
+        self.persist_completed_turn(
+            &SessionPersistenceParams {
+                ctx,
+                backend: &backend,
+                reused_session,
+            },
+            &mut session,
+        )
+        .await?;
 
         Ok(ExecuteAgentTurnResponse::new(
             &session,
@@ -234,38 +247,24 @@ where
             .map_err(AgentTurnOrchestrationError::Runtime)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "all parameters are necessary for session persistence and cleanup"
-    )]
     async fn persist_completed_turn(
         &self,
-        ctx: &RequestContext,
-        backend: &AgentBackendRegistration,
+        params: &SessionPersistenceParams<'_>,
         session: &mut TurnSession,
-        reused_session: bool,
     ) -> AgentTurnOrchestrationResult<()> {
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
 
-        self.persist_session_or_cleanup(ctx, backend, session, reused_session)
-            .await
+        self.persist_session_or_cleanup(params, session).await
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "all parameters are necessary for session persistence and cleanup"
-    )]
     async fn persist_session_or_cleanup(
         &self,
-        ctx: &RequestContext,
-        backend: &AgentBackendRegistration,
+        params: &SessionPersistenceParams<'_>,
         session: &mut TurnSession,
-        reused_session: bool,
     ) -> AgentTurnOrchestrationResult<()> {
-        if let Err(error) = self.turn_sessions.upsert_session(ctx, session).await {
-            self.cleanup_after_upsert_failure(ctx, backend, session, reused_session)
-                .await;
+        if let Err(error) = self.turn_sessions.upsert_session(params.ctx, session).await {
+            self.cleanup_after_upsert_failure(params, session).await;
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
         Ok(())
@@ -275,20 +274,14 @@ where
         clippy::cognitive_complexity,
         reason = "let-chain pattern contributes to complexity but improves readability"
     )]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "all parameters are necessary for conditional cleanup logic"
-    )]
     async fn cleanup_after_upsert_failure(
         &self,
-        ctx: &RequestContext,
-        backend: &AgentBackendRegistration,
+        params: &SessionPersistenceParams<'_>,
         session: &mut TurnSession,
-        reused_session: bool,
     ) {
-        if !reused_session
+        if !params.reused_session
             && let Err(cleanup_err) = self
-                .expire_persist_and_teardown(ctx, backend, session)
+                .expire_persist_and_teardown(params.ctx, params.backend, session)
                 .await
         {
             tracing::warn!(
