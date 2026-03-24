@@ -448,50 +448,60 @@ Add concise excerpts proving success/failure states as implementation proceeds.
 
 ## Interfaces and dependencies
 
-Planned interface surface at completion (exact names may vary, behaviour must
-match):
+Implemented interface surface:
 
 ```rust
 #[async_trait::async_trait]
 pub trait AgentRuntimePort: Send + Sync {
-    async fn create_or_resume_session(
+    async fn create_session(
         &self,
-        backend_id: BackendId,
-        conversation_id: ConversationId,
-    ) -> Result<RuntimeSessionHandle, AgentRuntimeError>;
+        backend: &AgentBackendRegistration,
+        conversation_id: Uuid,
+    ) -> AgentRuntimeResult<RuntimeSessionId>;
+
+    async fn teardown_session(
+        &self,
+        backend: &AgentBackendRegistration,
+        runtime_session_id: &RuntimeSessionId,
+    ) -> AgentRuntimeResult<()>;
 
     async fn execute_turn(
         &self,
-        session: &RuntimeSessionHandle,
-        request: TurnExecutionRequest,
-    ) -> Result<TurnExecutionStream, AgentRuntimeError>;
+        backend: &AgentBackendRegistration,
+        runtime_session_id: &RuntimeSessionId,
+        request: &TurnExecutionRequest,
+    ) -> AgentRuntimeResult<TurnExecutionResult>;
 }
 
 #[async_trait::async_trait]
 pub trait ToolRouterPort: Send + Sync {
     async fn route_tool_call(
         &self,
-        call: PlannedToolCall,
+        call_id: &str,
+        tool_call: &ToolCallRequest,
         context: ToolRoutingContext,
-    ) -> Result<ToolRoutingResult, ToolRoutingError>;
+    ) -> ToolRoutingResult<ToolCallResult>;
 }
 
 #[async_trait::async_trait]
-pub trait AgentTurnSessionRepository: Send + Sync {
-    async fn find_active(
+pub trait TurnSessionRepository: Send + Sync {
+    async fn arbitrate_session_slot(
         &self,
-        conversation_id: ConversationId,
-    ) -> Result<Option<OrchestrationSession>, SessionStoreError>;
+        ctx: &RequestContext,
+        reservation: SessionSlotReservation,
+    ) -> TurnSessionRepositoryResult<SessionSlotArbitration>;
 
-    async fn store_or_update(
+    async fn find_active_session(
         &self,
-        session: &OrchestrationSession,
-    ) -> Result<(), SessionStoreError>;
+        ctx: &RequestContext,
+        key: SessionSlotKey,
+    ) -> TurnSessionRepositoryResult<Option<TurnSession>>;
 
-    async fn expire_before(
+    async fn upsert_session(
         &self,
-        deadline: chrono::DateTime<chrono::Utc>,
-    ) -> Result<u64, SessionStoreError>;
+        ctx: &RequestContext,
+        session: &TurnSession,
+    ) -> TurnSessionRepositoryResult<()>;
 }
 ```
 

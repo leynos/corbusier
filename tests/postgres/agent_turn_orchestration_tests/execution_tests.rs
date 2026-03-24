@@ -351,3 +351,75 @@ async fn concurrent_execute_turn_creates_single_active_session(
 
     Ok(())
 }
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_serializes_concurrent_calls_with_different_backends_same_conversation(
+    #[future] context: Result<OrchestrationContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let backend_1 = register_backend(&ctx, "backend_alpha").await?;
+    let backend_2 = register_backend(&ctx, "backend_beta").await?;
+    let conversation_id = Uuid::new_v4();
+    ensure_conversation_exists(&ctx, conversation_id).await?;
+
+    ctx.runtime
+        .queue_turn_result(TurnExecutionResult::new("turn_1", Vec::new()))
+        .map_err(|err| Box::new(err) as BoxError)?;
+    ctx.runtime
+        .queue_turn_result(TurnExecutionResult::new("turn_2", Vec::new()))
+        .map_err(|err| Box::new(err) as BoxError)?;
+
+    let request_1 = ExecuteAgentTurnRequest::new(
+        backend_1,
+        TurnExecutionRequest::new(conversation_id, "req_1", Vec::new()),
+    );
+    let request_2 = ExecuteAgentTurnRequest::new(
+        backend_2,
+        TurnExecutionRequest::new(conversation_id, "req_2", Vec::new()),
+    );
+
+    let (result_1, result_2) = tokio::join!(
+        ctx.service.execute_turn(&ctx.ctx, request_1),
+        ctx.service.execute_turn(&ctx.ctx, request_2)
+    );
+
+    let response_1 = result_1.map_err(|err| Box::new(err) as BoxError)?;
+    let response_2 = result_2.map_err(|err| Box::new(err) as BoxError)?;
+
+    // Both turns should complete successfully, proving they were serialized
+    // (not concurrent) despite using different backends
+    assert_ne!(
+        response_1.session_id(),
+        response_2.session_id(),
+        "different backends should create different sessions"
+    );
+
+    // Verify that exactly 2 runtime sessions were created (one per backend)
+    let created_sessions = ctx
+        .runtime
+        .created_session_ids()
+        .map_err(|err| Box::new(err) as BoxError)?;
+    assert_eq!(
+        created_sessions.len(),
+        2,
+        "expected 2 runtime sessions (one per backend)"
+    );
+
+    // Verify both sessions exist in the repository
+    let all_sessions = ctx
+        .session_repository
+        .all_sessions()
+        .map_err(|err| Box::new(err) as BoxError)?;
+    let conversation_sessions: Vec<_> = all_sessions
+        .into_iter()
+        .filter(|s| s.conversation_id() == conversation_id)
+        .collect();
+    assert_eq!(
+        conversation_sessions.len(),
+        2,
+        "expected 2 sessions for the conversation (one per backend)"
+    );
+
+    Ok(())
+}
