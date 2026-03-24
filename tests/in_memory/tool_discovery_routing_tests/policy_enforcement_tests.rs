@@ -9,7 +9,7 @@ use corbusier::hook_engine::domain::{
     HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };
 use corbusier::hook_engine::ports::HookPolicyAuditRepository;
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::task::domain::TaskId;
 use corbusier::tool_registry::adapters::HookBackedToolExecutionGovernance;
 use corbusier::tool_registry::domain::{
@@ -56,13 +56,13 @@ fn build_governed_infrastructure() -> GovernedInfrastructure {
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let hook_engine = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let hook_engine = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor.clone()),
+        execution_log: Arc::new(execution_log),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
     let governance = HookBackedToolExecutionGovernance::new(
         Arc::new(hook_engine),
         Arc::new(policy_audit.clone()),

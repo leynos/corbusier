@@ -13,7 +13,7 @@ use corbusier::hook_engine::domain::{
 use corbusier::hook_engine::ports::{
     HookEngine, HookExecutionLogRepository, HookPolicyAuditRepository,
 };
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::test_support::other_tenant_ctx;
 use corbusier::test_support::test_request_ctx;
 use corbusier::{message::domain::ConversationId, task::domain::TaskId};
@@ -63,13 +63,13 @@ async fn setup_hook_engine_context(
     let policy_audit = PostgresHookPolicyAuditRepository::new(pool);
     let definition_repo = InMemoryHookDefinitionRepository::new();
     let action_executor = InMemoryHookActionExecutor::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor),
-        Arc::new(execution_log.clone()),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(execution_log.clone()),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
 
     Ok(HookEngineTestContext {
         service,
@@ -284,13 +284,13 @@ async fn postgres_policy_audit_is_queryable_and_tenant_scoped(
         )
         .expect("configure policy output succeeds");
 
-    let service = HookEngineService::new(
-        Arc::new(ctx.definition_repo.clone()),
-        Arc::new(action_executor),
-        Arc::new(ctx.execution_log.clone()),
-        Arc::new(ctx.policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(ctx.definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(ctx.execution_log.clone()),
+        policy_audit_repository: Arc::new(ctx.policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
     let trigger_context = HookTriggerContext::new_with_timestamp(
         HookTriggerType::PreToolUse,
         HookExecutionScope::default()

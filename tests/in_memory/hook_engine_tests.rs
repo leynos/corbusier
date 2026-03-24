@@ -11,7 +11,7 @@ use corbusier::hook_engine::domain::{
 use corbusier::hook_engine::ports::{
     HookEngine, HookExecutionLogRepository, HookPolicyAuditRepository,
 };
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::test_support::other_tenant_ctx;
 use corbusier::test_support::test_request_ctx;
 use corbusier::{message::domain::ConversationId, task::domain::TaskId};
@@ -38,13 +38,13 @@ fn policy_audit_fixture() -> PolicyAuditFixture {
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor.clone()),
+        execution_log: Arc::new(execution_log),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
     PolicyAuditFixture {
         service,
         definition_repo,
@@ -109,13 +109,13 @@ async fn in_memory_pre_commit_hook_persists_results() {
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor),
-        Arc::new(execution_log.clone()),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(execution_log.clone()),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
 
     let ctx = test_request_ctx();
     let hook_id = HookId::new("hook-pre-commit").expect("valid hook id");
@@ -159,13 +159,13 @@ async fn in_memory_hook_history_is_tenant_isolated() {
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor),
-        Arc::new(execution_log.clone()),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(execution_log.clone()),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
 
     let tenant_a = test_request_ctx();
     let tenant_b = other_tenant_ctx(&tenant_a);

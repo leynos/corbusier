@@ -32,6 +32,27 @@ where
     clock: Arc<C>,
 }
 
+/// Dependencies for constructing a [`HookEngineService`].
+pub struct HookEngineServiceDeps<D, A, L, P, C>
+where
+    D: HookDefinitionRepository,
+    A: HookActionExecutor,
+    L: HookExecutionLogRepository,
+    P: HookPolicyAuditRepository,
+    C: Clock + Send + Sync,
+{
+    /// Repository for retrieving hook definitions.
+    pub definition_repository: Arc<D>,
+    /// Executor for running hook actions.
+    pub action_executor: Arc<A>,
+    /// Repository for persisting execution logs.
+    pub execution_log: Arc<L>,
+    /// Repository for storing policy audit events.
+    pub policy_audit_repository: Arc<P>,
+    /// Clock for timestamping execution records.
+    pub clock: Arc<C>,
+}
+
 impl<D, A, L, P, C> HookEngineService<D, A, L, P, C>
 where
     D: HookDefinitionRepository,
@@ -41,27 +62,14 @@ where
     C: Clock + Send + Sync,
 {
     /// Creates a new hook engine service.
-    ///
-    /// Example: `HookEngineService::new(def_repo, executor, log_repo, clock)`
-    /// wires the engine to its dependencies.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Hook engine wiring needs four port dependencies plus the clock."
-    )]
-    pub const fn new(
-        definition_repository: Arc<D>,
-        action_executor: Arc<A>,
-        execution_log: Arc<L>,
-        policy_audit_repository: Arc<P>,
-        clock: Arc<C>,
-    ) -> Self {
+    pub fn new(deps: HookEngineServiceDeps<D, A, L, P, C>) -> Self {
         Self {
-            definition_repository,
-            action_executor,
-            execution_log,
-            policy_audit_repository,
-            clock,
+            definition_repository: deps.definition_repository,
+            action_executor: deps.action_executor,
+            execution_log: deps.execution_log,
+            policy_audit_repository: deps.policy_audit_repository,
+            clock: deps.clock,
         }
     }
 

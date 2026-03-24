@@ -13,7 +13,7 @@ use crate::hook_engine::domain::{
 use crate::hook_engine::ports::{
     HookEngine, HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
 };
-use crate::hook_engine::services::HookEngineService;
+use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
 use mockable::{Clock, DefaultClock};
@@ -69,13 +69,13 @@ fn hook_engine_fixture() -> HookEngineFixture {
     let action_executor = InMemoryHookActionExecutor::new();
     let execution_log = InMemoryHookExecutionLogRepository::new();
     let policy_audit = InMemoryHookPolicyAuditRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log.clone()),
-        Arc::new(policy_audit.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor.clone()),
+        execution_log: Arc::new(execution_log.clone()),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
     HookEngineFixture {
         definition_repo,
         action_executor,
@@ -269,18 +269,22 @@ async fn setup_deny_policy_hook(
 }
 
 #[expect(
-    clippy::too_many_arguments,
-    reason = "The assertion helper checks the three audit lookup dimensions explicitly."
+    clippy::struct_field_names,
+    reason = "ID suffix provides clarity for distinct identifier types"
 )]
-async fn assert_policy_audit_indexed_once(
-    policy_audit: &InMemoryHookPolicyAuditRepository,
-    ctx: &RequestContext,
+struct PolicyAuditQueryKeys {
     task_id: TaskId,
     conversation_id: ConversationId,
     trigger_context_id: TriggerContextId,
+}
+
+async fn assert_policy_audit_indexed_once(
+    policy_audit: &InMemoryHookPolicyAuditRepository,
+    ctx: &RequestContext,
+    keys: PolicyAuditQueryKeys,
 ) {
     let by_task = policy_audit
-        .find_by_task(ctx, task_id)
+        .find_by_task(ctx, keys.task_id)
         .await
         .expect("querying policy events by task should succeed");
     assert_eq!(
@@ -289,7 +293,7 @@ async fn assert_policy_audit_indexed_once(
         "expected exactly one policy event indexed by task"
     );
     let by_conversation = policy_audit
-        .find_by_conversation(ctx, conversation_id)
+        .find_by_conversation(ctx, keys.conversation_id)
         .await
         .expect("querying policy events by conversation should succeed");
     assert_eq!(
@@ -298,7 +302,7 @@ async fn assert_policy_audit_indexed_once(
         "expected exactly one policy event indexed by conversation"
     );
     let by_trigger = policy_audit
-        .find_by_trigger_context(ctx, trigger_context_id)
+        .find_by_trigger_context(ctx, keys.trigger_context_id)
         .await
         .expect("querying policy events by trigger should succeed");
     assert_eq!(
@@ -408,9 +412,7 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
     assert_policy_audit_indexed_once(
         &policy_audit,
         &ctx,
-        task_id,
-        conversation_id,
-        trigger_context_id,
+        PolicyAuditQueryKeys { task_id, conversation_id, trigger_context_id },
     )
     .await;
 }

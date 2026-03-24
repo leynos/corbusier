@@ -8,7 +8,7 @@ use crate::hook_engine::domain::{
     HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };
 use crate::hook_engine::ports::HookPolicyAuditRepository;
-use crate::hook_engine::services::HookEngineService;
+use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
 use crate::test_support::test_request_ctx;
@@ -140,13 +140,13 @@ impl GovernanceTestFixture {
         let action_executor = InMemoryHookActionExecutor::new();
         let execution_log = InMemoryHookExecutionLogRepository::new();
         let policy_audit = InMemoryHookPolicyAuditRepository::new();
-        let hook_engine = HookEngineService::new(
-            Arc::new(definition_repo.clone()),
-            Arc::new(action_executor.clone()),
-            Arc::new(execution_log),
-            Arc::new(policy_audit.clone()),
-            clock.clone(),
-        );
+        let hook_engine = HookEngineService::new(HookEngineServiceDeps {
+            definition_repository: Arc::new(definition_repo.clone()),
+            action_executor: Arc::new(action_executor.clone()),
+            execution_log: Arc::new(execution_log),
+            policy_audit_repository: Arc::new(policy_audit.clone()),
+            clock: clock.clone(),
+        });
         let governance = HookBackedToolExecutionGovernance::new(
             Arc::new(hook_engine),
             Arc::new(policy_audit.clone()),

@@ -8,7 +8,7 @@ use corbusier::hook_engine::adapters::memory::{
     InMemoryHookExecutionLogRepository, InMemoryHookPolicyAuditRepository,
 };
 use corbusier::hook_engine::domain::PolicyAuditEvent;
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::message::domain::ConversationId;
 use corbusier::test_support::test_request_ctx;
 use corbusier::tool_registry::adapters::{
@@ -80,13 +80,13 @@ impl HookPolicyWorld {
         let action_executor = InMemoryHookActionExecutor::new();
         let execution_log = InMemoryHookExecutionLogRepository::new();
         let policy_audit = InMemoryHookPolicyAuditRepository::new();
-        let hook_engine = HookEngineService::new(
-            Arc::new(definition_repo.clone()),
-            Arc::new(action_executor.clone()),
-            Arc::new(execution_log),
-            Arc::new(policy_audit.clone()),
-            clock.clone(),
-        );
+        let hook_engine = HookEngineService::new(HookEngineServiceDeps {
+            definition_repository: Arc::new(definition_repo.clone()),
+            action_executor: Arc::new(action_executor.clone()),
+            execution_log: Arc::new(execution_log),
+            policy_audit_repository: Arc::new(policy_audit.clone()),
+            clock: clock.clone(),
+        });
         let governance = HookBackedToolExecutionGovernance::new(
             Arc::new(hook_engine),
             Arc::new(policy_audit.clone()),

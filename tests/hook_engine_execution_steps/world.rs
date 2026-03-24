@@ -8,7 +8,7 @@ use corbusier::hook_engine::adapters::memory::{
     InMemoryHookExecutionLogRepository, InMemoryHookPolicyAuditRepository,
 };
 use corbusier::hook_engine::domain::{HookExecutionResult, HookTriggerContext};
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::test_support::test_request_ctx;
 use mockable::DefaultClock;
 use rstest::fixture;
@@ -48,13 +48,13 @@ impl HookWorld {
         let action_executor = InMemoryHookActionExecutor::new();
         let execution_log = InMemoryHookExecutionLogRepository::new();
         let policy_audit = InMemoryHookPolicyAuditRepository::new();
-        let service = HookEngineService::new(
-            Arc::new(definition_repo.clone()),
-            Arc::new(action_executor.clone()),
-            Arc::new(execution_log.clone()),
-            Arc::new(policy_audit.clone()),
-            Arc::new(DefaultClock),
-        );
+        let service = HookEngineService::new(HookEngineServiceDeps {
+            definition_repository: Arc::new(definition_repo.clone()),
+            action_executor: Arc::new(action_executor.clone()),
+            execution_log: Arc::new(execution_log.clone()),
+            policy_audit_repository: Arc::new(policy_audit.clone()),
+            clock: Arc::new(DefaultClock),
+        });
         Self {
             service,
             definition_repo,
