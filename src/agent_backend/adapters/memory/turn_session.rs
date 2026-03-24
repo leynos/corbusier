@@ -55,7 +55,7 @@ impl InMemoryTurnSessionRepository {
     ///
     /// # Errors
     ///
-    /// Returns [`TurnSessionRepositoryError::Persistence`] when the in-memory
+    /// Returns [`TurnSessionRepositoryError::StorageFailure`] when the in-memory
     /// state lock cannot be acquired.
     pub fn all_sessions(&self) -> TurnSessionRepositoryResult<Vec<TurnSession>> {
         let state = self

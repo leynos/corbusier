@@ -133,7 +133,7 @@ pub enum TurnSessionRepositoryError {
     /// Domain data could not be converted for persistence.
     #[error("invalid turn session domain data for '{field}': {reason}")]
     InvalidDomainData {
-        /// Name of the field that failed serialisation.
+        /// Name of the field that failed serialization.
         field: &'static str,
         /// Human-readable reason.
         reason: String,

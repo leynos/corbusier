@@ -273,7 +273,7 @@ where
 
     #[expect(
         clippy::cognitive_complexity,
-        reason = "nested error handling is necessary for proper cleanup logging"
+        reason = "let-chain pattern contributes to complexity but improves readability"
     )]
     #[expect(
         clippy::too_many_arguments,

@@ -2,7 +2,10 @@
 
 use crate::agent_backend::{
     domain::{ToolCallRequest, ToolCallResult},
-    ports::{ToolRouterPort, ToolRoutingContext, ToolRoutingError, ToolRoutingResult},
+    ports::{
+        tool_router::ToolRoutingInfrastructureError, ToolRouterPort, ToolRoutingContext,
+        ToolRoutingError, ToolRoutingResult,
+    },
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -41,9 +44,10 @@ impl InMemoryToolRouter {
         output: Value,
     ) -> ToolRoutingResult<()> {
         let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
         state.failures.remove(&tool_name_key);
         state.responses.insert(tool_name_key, output);
         Ok(())
@@ -61,9 +65,10 @@ impl InMemoryToolRouter {
         message: impl Into<String>,
     ) -> ToolRoutingResult<()> {
         let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
         state.responses.remove(&tool_name_key);
         state.failures.insert(tool_name_key, message.into());
         Ok(())
@@ -76,9 +81,10 @@ impl InMemoryToolRouter {
     /// Returns [`ToolRoutingError::Infrastructure`] when the in-memory state
     /// lock cannot be acquired.
     pub fn routed_call_ids(&self) -> ToolRoutingResult<Vec<String>> {
-        let state = self.state.read().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self
+            .state
+            .read()
+            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
         Ok(state.routed_call_ids.clone())
     }
 }
@@ -91,13 +97,14 @@ impl ToolRouterPort for InMemoryToolRouter {
         tool_call: &ToolCallRequest,
         _context: ToolRoutingContext,
     ) -> ToolRoutingResult<ToolCallResult> {
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
         state.routed_call_ids.push(call_id.to_owned());
 
         if let Some(message) = state.failures.get(tool_call.tool_name()) {
-            return Err(ToolRoutingError::ToolExecutionFailed(message.clone()));
+            return Err(ToolRoutingError::ToolExecutionFailed(message.to_owned()));
         }
 
         let output = state
