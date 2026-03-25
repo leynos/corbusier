@@ -406,7 +406,7 @@ async fn postgres_serializes_concurrent_calls_with_different_backends_same_conve
         "expected 2 runtime sessions (one per backend)"
     );
 
-    // Verify both sessions exist in the repository
+    // Verify both sessions exist in the repository with correct backend partitioning
     let all_sessions = ctx
         .session_repository
         .all_sessions()
@@ -419,6 +419,25 @@ async fn postgres_serializes_concurrent_calls_with_different_backends_same_conve
         conversation_sessions.len(),
         2,
         "expected 2 sessions for the conversation (one per backend)"
+    );
+
+    // Verify backend partitioning: each backend should have exactly one session
+    let backend_ids: std::collections::HashSet<_> = conversation_sessions
+        .iter()
+        .map(corbusier::agent_backend::domain::TurnSession::backend_id)
+        .collect();
+    assert_eq!(
+        backend_ids.len(),
+        2,
+        "expected sessions for 2 distinct backends"
+    );
+    assert!(
+        backend_ids.contains(&backend_1),
+        "expected session for backend_1"
+    );
+    assert!(
+        backend_ids.contains(&backend_2),
+        "expected session for backend_2"
     );
 
     Ok(())
