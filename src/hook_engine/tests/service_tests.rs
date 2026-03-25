@@ -217,16 +217,11 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
     );
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "The extracted fixture helper needs task and conversation correlation inputs."
-)]
 async fn setup_deny_policy_hook(
     ctx: &RequestContext,
     definition_repo: &InMemoryHookDefinitionRepository,
     action_executor: &InMemoryHookActionExecutor,
-    task_id: TaskId,
-    conversation_id: ConversationId,
+    scope: HookExecutionScope,
 ) -> HookTriggerContext {
     let action_id = HookActionId::new("policy-action").expect("policy action id should be valid");
     let hook_id = HookId::new("hook-policy-scope").expect("hook id should be valid");
@@ -260,10 +255,7 @@ async fn setup_deny_policy_hook(
 
     HookTriggerContext::new_with_timestamp(
         HookTriggerType::PreToolUse,
-        HookExecutionScope::default()
-            .with_task_id(task_id)
-            .with_conversation_id(conversation_id)
-            .with_metadata(json!({"tool_name": "read_file"})),
+        scope.with_metadata(json!({"tool_name": "read_file"})),
         DefaultClock.utc(),
     )
 }
@@ -395,14 +387,10 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
     let ctx = request_ctx();
     let task_id = TaskId::new();
     let conversation_id = ConversationId::new();
-    let context = setup_deny_policy_hook(
-        &ctx,
-        &definition_repo,
-        &action_executor,
-        task_id,
-        conversation_id,
-    )
-    .await;
+    let scope = HookExecutionScope::default()
+        .with_task_id(task_id)
+        .with_conversation_id(conversation_id);
+    let context = setup_deny_policy_hook(&ctx, &definition_repo, &action_executor, scope).await;
     let trigger_context_id = context.id();
     service
         .execute(&ctx, context)
@@ -412,7 +400,11 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
     assert_policy_audit_indexed_once(
         &policy_audit,
         &ctx,
-        PolicyAuditQueryKeys { task_id, conversation_id, trigger_context_id },
+        PolicyAuditQueryKeys {
+            task_id,
+            conversation_id,
+            trigger_context_id,
+        },
     )
     .await;
 }
