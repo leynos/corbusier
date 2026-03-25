@@ -66,7 +66,7 @@ This ADR depends on the following upstream Podbot roadmap steps because they
 define the external surfaces that Corbusier must migrate against:
 
 - Step 1.4, "Hosting schema migration and compatibility matrix"
-- Step 4.5, "Normalised launch contract"
+- Step 4.5, "Normalized launch contract"
 - Step 4.6, "Hosted session control plane"
 - Step 4.7, "MCP wire provisioning and injection"
 - Step 4.8, "Prompt, bundle, and validation surfaces"

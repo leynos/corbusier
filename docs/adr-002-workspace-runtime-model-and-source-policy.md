@@ -74,7 +74,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
   hosting schema.
 - Step 4.4, "Workspace strategies", because that step delivers the clone and
   host-mount runtime behaviours that this ADR relies on.
-- Step 4.5, "Normalised launch contract", because workspace source, mount
+- Step 4.5, "Normalized launch contract", because workspace source, mount
   policy, and access mode should be resolved through one normalised launch path.
 
 ## Options Considered

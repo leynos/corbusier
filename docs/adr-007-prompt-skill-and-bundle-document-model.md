@@ -68,7 +68,7 @@ owned separately by ADR 008.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 4.5, "Normalised launch contract", because prompts, bundles, skill
+- Step 4.5, "Normalized launch contract", because prompts, bundles, skill
   selection, hook subscriptions, and wire references must feed one normalised
   launch plan.
 - Step 4.8, "Prompt, bundle, and validation surfaces", because Podbot needs

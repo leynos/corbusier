@@ -72,7 +72,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 
 - Step 2.6, "ACP capability masking enforcement", because capability
   dispositions must reflect Podbot's host-enforced ACP masking behaviour.
-- Step 4.5, "Normalised launch contract", because validation needs the same
+- Step 4.5, "Normalized launch contract", because validation needs the same
   normalised runtime inputs that launch uses.
 - Step 4.8, "Prompt, bundle, and validation surfaces", because that step is
   the direct upstream Podbot surface for `validate_prompt` and bundle-aware

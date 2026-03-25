@@ -79,7 +79,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 
 ## Options Considered
 
-### Option A: Normalised relational runtime state with explicit state machines
+### Option A: Normalized relational runtime state with explicit state machines
 
 Corbusier persists runtime entities in relational tables with explicit states,
 correlation identifiers, transition rules, and separate references to logs or
