@@ -73,6 +73,30 @@ def list_clusters() -> list[dict[str, Any]]:
     return parsed
 
 
+def _ingress_port_from_mappings(mappings: list[Any]) -> int | None:
+    """Return the first loopback HostPort from a list of port-mapping dicts."""
+    for mapping in mappings:
+        if not isinstance(mapping, dict):
+            continue
+        if mapping.get("HostIp") != "127.0.0.1":
+            continue
+        host_port = mapping.get("HostPort")
+        if isinstance(host_port, str) and host_port.isdigit():
+            return int(host_port)
+    return None
+
+
+def _ingress_port_from_node(node: dict[str, Any]) -> int | None:
+    """Return the loopback ingress port for a single k3d node, or None."""
+    port_mappings = node.get("portMappings")
+    if not isinstance(port_mappings, dict):
+        return None
+    mappings = port_mappings.get("80/tcp")
+    if not isinstance(mappings, list):
+        return None
+    return _ingress_port_from_mappings(mappings)
+
+
 def _ingress_port_from_cluster(cluster: dict[str, Any]) -> int | None:
     """Extract the loopback ingress port from a parsed k3d cluster record."""
     nodes = cluster.get("nodes")
@@ -82,20 +106,9 @@ def _ingress_port_from_cluster(cluster: dict[str, Any]) -> int | None:
     for node in nodes:
         if not isinstance(node, dict):
             continue
-        port_mappings = node.get("portMappings")
-        if not isinstance(port_mappings, dict):
-            continue
-        mappings = port_mappings.get("80/tcp")
-        if not isinstance(mappings, list):
-            continue
-        for mapping in mappings:
-            if not isinstance(mapping, dict):
-                continue
-            if mapping.get("HostIp") != "127.0.0.1":
-                continue
-            host_port = mapping.get("HostPort")
-            if isinstance(host_port, str) and host_port.isdigit():
-                return int(host_port)
+        port = _ingress_port_from_node(node)
+        if port is not None:
+            return port
     return None
 
 
