@@ -24,6 +24,8 @@ Inspect the current state of the preview deployment:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from plumbum import local
 
 from local_k8s.cnpg import create_cnpg_cluster, install_cnpg_operator, read_pg_app_uri, wait_for_cnpg_ready
@@ -179,6 +181,22 @@ def teardown_environment(cluster_name: str) -> int:
     return 0
 
 
+def _with_cluster(
+    cluster_name: str,
+    namespace: str,
+    action: Callable[[Config, dict[str, str]], None],
+) -> int:
+    """Verify the cluster exists, build config/env, and invoke *action*."""
+    require_exe("kubectl")
+    if not cluster_exists(cluster_name):
+        print(f"Cluster '{cluster_name}' does not exist.")
+        return 1
+    cfg = Config(cluster_name=cluster_name, namespace=namespace)
+    env = kubeconfig_env(cluster_name)
+    action(cfg, env)
+    return 0
+
+
 def show_environment_status(cluster_name: str, namespace: str) -> int:
     """Show current pod and ingress status for the preview environment.
 
@@ -202,15 +220,7 @@ def show_environment_status(cluster_name: str, namespace: str) -> int:
     plumbum.commands.processes.ProcessExecutionError
         Raised when status queries fail.
     """
-    require_exe("k3d")
-    require_exe("kubectl")
-    if not cluster_exists(cluster_name):
-        print(f"Cluster '{cluster_name}' does not exist.")
-        return 1
-    cfg = Config(cluster_name=cluster_name, namespace=namespace)
-    env = kubeconfig_env(cluster_name)
-    print_status(cfg, env)
-    return 0
+    return _with_cluster(cluster_name, namespace, print_status)
 
 
 def stream_environment_logs(cluster_name: str, namespace: str, *, follow: bool) -> int:
@@ -239,12 +249,8 @@ def stream_environment_logs(cluster_name: str, namespace: str, *, follow: bool) 
     plumbum.commands.processes.ProcessExecutionError
         Raised when log streaming fails.
     """
-    require_exe("k3d")
-    require_exe("kubectl")
-    if not cluster_exists(cluster_name):
-        print(f"Cluster '{cluster_name}' does not exist.")
-        return 1
-    cfg = Config(cluster_name=cluster_name, namespace=namespace)
-    env = kubeconfig_env(cluster_name)
-    tail_logs(cfg, env, follow=follow)
-    return 0
+    return _with_cluster(
+        cluster_name,
+        namespace,
+        lambda cfg, env: tail_logs(cfg, env, follow=follow),
+    )
