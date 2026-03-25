@@ -436,6 +436,39 @@ pub trait HookCoordinator: Send + Sync {
 }
 ```
 
+#### Transitional HookEngine compatibility bridge
+
+The current hook engine contract in `src/hook_engine/ports/engine.rs` is
+synchronous from the caller’s perspective: `HookEngine::execute(...)` returns
+`Vec<HookExecutionResult>`, and `HookEngineService` in
+`src/hook_engine/services/engine.rs` runs actions in definition order before it
+returns. That behaviour is still appropriate for existing in-process Corbusier
+flows, but it does not match Podbot’s acknowledgement-first hook lifecycle.
+
+To bridge those models without breaking current callers, add a transitional
+adapter beside `HookCoordinator`:
+
+- `PodbotHookAckBridge` (or similarly named) accepts `PodbotHookMessage`,
+  resolves a `HookTriggerContext`, and returns a `PodbotHookAck` immediately.
+- For approved Podbot-hosted flows, the bridge returns an acknowledgement that
+  carries a stable execution identifier or background handle, then delegates
+  the actual work to the existing `HookEngine::execute(...)` path.
+- For denied or aborted flows, the bridge returns only the corresponding ack
+  semantics and never invokes the engine.
+- Route this behaviour behind a feature flag or phase gate such as
+  `podbot_hook_ack_bridge` so non-Podbot flows can continue to call
+  `HookEngine::execute(...)` directly during migration.
+
+Deprecation path:
+
+- Podbot-hosted flows move first to the ack bridge.
+- Existing callers keep using `HookEngine::execute(...)` until the bridge path
+  is proven stable.
+- Once Podbot-hosted flows no longer depend on synchronous waiting,
+  `HookCoordinator::on_podbot_hook_message(...)` becomes the sole Podbot-facing
+  contract and direct blocking use of `HookEngine::execute(...)` is treated as
+  legacy for hosted-runtime integration.
+
 **Unspecified detail:** the Podbot hook message schema and transport
 (“podbot→orchestrator channel”) do not exist in current Podbot docs. This must
 be implemented either as a typed callback channel in the embedding library or
@@ -595,6 +628,9 @@ messages (e.g. after restart) must not cause duplicate approvals.
 The following table maps existing Corbusier files (plus a few “new file”
 touchpoints) to required refactors. File existence and module layout are
 derived from the current repository tree.
+
+Table 1. Required file and module refactors for Corbusier’s Podbot-conformance
+work.
 
 | File path                                               | Current responsibility                                                                               | Proposed change                                                                                                                                                      | Risk / effort |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
@@ -907,13 +943,22 @@ registry while introducing Podbot-wired operation safely.
   legacy and isolated behind an adapter boundary.
 
 - **Staged rollout**  
-  1) Ship schema + domain-type changes; keep existing lifecycle tests green
-     (using in-memory host).  
-  2) Add Podbot-wire provisioning for one “golden path” MCP server and one
-     workspace strategy (likely host_mount).  
-  3) Enable prompt/bundle parsing and validation in “warn-only” mode
-     (diagnostics logged/audited but not blocking).  
-  4) Enforce policy gates and hook acknowledgements in “block” mode.
+  - [ ] 1.0 Ship schema and domain-type changes. Dependencies: None. Finish
+    criteria: existing lifecycle tests remain green for 5 consecutive runs
+    using the in-memory host path and the new schema types appear in the
+    migration preview without compatibility regressions.
+  - [ ] 2.0 Add Podbot-wire provisioning for one golden-path MCP server and
+    one workspace strategy. Dependencies: 1.0. Finish criteria: provisioning is
+    validated for 1 MCP server and 1 workspace strategy (`host_mount` or
+    `github_clone`) in 3 consecutive integration runs.
+  - [ ] 3.0 Enable prompt and bundle parsing with warn-only validation.
+    Dependencies: 2.0. Finish criteria: diagnostics are logged and audited for
+    at least 10 representative prompt samples, and 0 of those samples are
+    blocked solely by warn-only validation.
+  - [ ] 4.0 Enforce policy gates and hook acknowledgements in block mode.
+    Dependencies: 3.0. Finish criteria: deny-path tests fail closed in 3
+    consecutive runs and ack state is recorded for 100% of Podbot-hosted hook
+    requests in the acceptance suite.
 
 ### Tests and QA requirements
 
@@ -954,6 +999,12 @@ runtime mechanics:
   - prompt validation milestone (external interface + governance).
 
 ### Implementation timeline
+
+Accessible description: Gantt chart showing the Corbusier–Podbot conformance
+timeline, major workstreams, and their dependencies across foundations,
+integration, hooks, prompts, and quality work.
+
+Figure 3. Corbusier–Podbot conformance implementation timeline.
 
 ```mermaid
 gantt

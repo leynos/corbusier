@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -75,7 +75,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 - Step 4.4, "Workspace strategies", because that step delivers the clone and
   host-mount runtime behaviours that this ADR relies on.
 - Step 4.5, "Normalized launch contract", because workspace source, mount
-  policy, and access mode should be resolved through one normalised launch path.
+  policy, and access mode should be resolved through one normalized launch path.
 
 ## Options Considered
 
@@ -95,6 +95,8 @@ only receives enough information to start the container.
 Corbusier stores only opaque workspace identifiers returned by Podbot and
 relies on Podbot to remain the sole source of truth for all workspace detail.
 
+_Table 1: Trade-offs for the workspace runtime model._
+
 | Topic                    | Option A | Option B | Option C |
 | ------------------------ | -------- | -------- | -------- |
 | Corbusier auditability   | Strong   | Strong   | Weak     |
@@ -102,8 +104,6 @@ relies on Podbot to remain the sole source of truth for all workspace detail.
 | Restart recovery clarity | Strong   | Medium   | Weak     |
 | Podbot coupling          | Medium   | Low      | High     |
 | Operator debuggability   | Strong   | Medium   | Weak     |
-
-_Table 1: Trade-offs for the workspace runtime model._
 
 ## Decision Outcome / Proposed Direction
 

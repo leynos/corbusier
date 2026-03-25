@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -73,7 +73,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 - Step 2.6, "ACP capability masking enforcement", because capability
   dispositions must reflect Podbot's host-enforced ACP masking behaviour.
 - Step 4.5, "Normalized launch contract", because validation needs the same
-  normalised runtime inputs that launch uses.
+  normalized runtime inputs that launch uses.
 - Step 4.8, "Prompt, bundle, and validation surfaces", because that step is
   the direct upstream Podbot surface for `validate_prompt` and bundle-aware
   diagnostics.
@@ -94,6 +94,8 @@ Validation returns only pass or fail plus human-readable warning text.
 No preflight validation exists beyond parsing. The hosted runtime exposes
 problems only when the session starts or fails.
 
+_Table 1: Trade-offs for prompt validation semantics._
+
 | Topic                   | Option A | Option B | Option C |
 | ----------------------- | -------- | -------- | -------- |
 | Operator clarity        | Strong   | Medium   | Weak     |
@@ -101,8 +103,6 @@ problems only when the session starts or fails.
 | Capability truthfulness | Strong   | Weak     | Weak     |
 | Implementation effort   | Medium   | Low      | Low      |
 | Reviewability           | Strong   | Weak     | Weak     |
-
-_Table 1: Trade-offs for prompt validation semantics._
 
 ## Decision Outcome / Proposed Direction
 

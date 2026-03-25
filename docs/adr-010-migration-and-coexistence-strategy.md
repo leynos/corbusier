@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -91,6 +91,8 @@ transition.
 Corbusier keeps the old and new architectural paths side by side with no hard
 deprecation point.
 
+_Table 1: Trade-offs for the migration strategy._
+
 | Topic                  | Option A | Option B | Option C |
 | ---------------------- | -------- | -------- | -------- |
 | Delivery risk          | Low      | High     | Medium   |
@@ -98,8 +100,6 @@ deprecation point.
 | Migration duration     | Medium   | Low      | High     |
 | Technical debt control | Strong   | Medium   | Weak     |
 | Rollback safety        | Strong   | Weak     | Medium   |
-
-_Table 1: Trade-offs for the migration strategy._
 
 ## Decision Outcome / Proposed Direction
 
@@ -130,23 +130,44 @@ re-litigated in implementation pull requests.
 
 Foundational architecture
 
-- Ratify ADRs 001 through 005.
-- Add Podbot-facing adapters and compatibility seams.
+- [ ] 1.1 Ratify ADRs 001 through 005. Finish criteria: ADRs 001 through 005
+  remain `Proposed` or advance together with no contradictory dependency text
+  and all referenced companion links resolve in CI preview. Dependencies: None.
+- [ ] 1.2 Add Podbot-facing adapters and compatibility seams. Finish criteria:
+  the Podbot-facing adapter interfaces compile behind the selected feature
+  gate, and one integration fixture exercises the adapter boundary without
+  reviving inline runtime ownership. Dependencies: 1.1.
 
 ### Phase 2
 
 Durability and document surfaces
 
-- Land ADRs 006 through 008 with backing schemas, parsers, and fixtures.
-- Run warn-only validation where blocking behaviour would break active flows.
+- [ ] 2.1 Land ADRs 006 through 008 with backing schemas, parsers, and
+  fixtures. Finish criteria: runtime-state schema migrations apply cleanly in
+  fresh and upgrade paths, and fixtures cover workspace, wire, hook, and
+  validation records across at least 3 representative scenarios. Dependencies:
+  1.1, 1.2.
+- [ ] 2.2 Run warn-only validation where blocking behaviour would break active
+  flows. Finish criteria: warn-only validation runs against at least 10
+  reviewed prompt samples, records diagnostics for each sample, and blocks 0
+  production paths solely due to validation. Dependencies: 2.1.
 
 ### Phase 3
 
 Security tightening and retirement
 
-- Land ADR 009 defaults and override controls.
-- Remove legacy routing and legacy transport write paths.
-- Promote warnings to blocking checks according to defined gates.
+- [ ] 3.1 Land ADR 009 defaults and override controls. Finish criteria:
+  privilege defaults, override records, and approval hooks are persisted and
+  surfaced in operator review flows for 100% of override requests in the
+  acceptance suite. Dependencies: 2.1.
+- [ ] 3.2 Remove legacy routing and legacy transport write paths. Finish
+  criteria: no new writes use legacy routing or legacy transport labels, and
+  the migration suite proves compatibility reads still succeed for retained
+  historical records. Dependencies: 2.1, 3.1.
+- [ ] 3.3 Promote warnings to blocking checks according to defined gates.
+  Finish criteria: blocking gates fail closed in CI for all deny-path fixtures
+  and pass in 3 consecutive full acceptance runs with no manual bypasses.
+  Dependencies: 2.2, 3.1, 3.2.
 
 ## Known Risks and Limitations
 

@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -70,12 +70,12 @@ for MCP definitions; ADR 004 owns that lower-level model.
 This ADR depends on the following upstream Podbot roadmap steps:
 
 - Step 4.5, "Normalized launch contract", because wire selection and injection
-  details need to be normalised before launch.
+  details need to be normalized before launch.
 - Step 4.6, "Hosted session control plane", because Corbusier needs typed
   runtime events for wire status without moving tool calls back into its inline
   path.
 - Step 4.7, "MCP wire provisioning and injection", because that step is the
-  direct upstream Podbot surface that materialises workspace-scoped wires.
+  direct upstream Podbot surface that materializes workspace-scoped wires.
 
 ## Options Considered
 
@@ -95,6 +95,8 @@ runtime call path and dispatches work to MCP servers indirectly.
 Some tools are exposed as direct MCP wires while others remain proxied through
 Corbusier for the same hosted-agent session.
 
+_Table 1: Trade-offs for tool-plane ownership in Podbot-hosted sessions._
+
 | Topic                      | Option A | Option B | Option C |
 | -------------------------- | -------- | -------- | -------- |
 | Podbot conformance         | Strong   | Weak     | Weak     |
@@ -102,8 +104,6 @@ Corbusier for the same hosted-agent session.
 | Audit ingestion complexity | Medium   | Low      | High     |
 | Duplicate routing layers   | None     | High     | High     |
 | Session predictability     | Strong   | Medium   | Weak     |
-
-_Table 1: Trade-offs for tool-plane ownership in Podbot-hosted sessions._
 
 ## Decision Outcome / Proposed Direction
 
@@ -114,7 +114,7 @@ catalogue and policy authority rather than the inline runtime caller.
 Under this model:
 
 - Corbusier stores source definitions and policy rules.
-- Corbusier asks Podbot to materialise a wire set for a specific workspace.
+- Corbusier asks Podbot to materialize a wire set for a specific workspace.
 - Podbot injects agent-visible endpoints and required headers into the hosted
   runtime.
 - Corbusier receives tool-call telemetry and lifecycle events out of band for

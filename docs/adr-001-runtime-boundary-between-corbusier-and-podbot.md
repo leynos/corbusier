@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -72,14 +72,14 @@ depend on this one.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 1.4, "Hosting schema migration and compatibility matrix", because the
+- Step 1.4, "Hosting schema migration and compatibility matrix" because the
   library-facing hosting configuration must exist before Corbusier can treat
   the library API as the normative runtime surface.
-- Step 4.3b, "App server startup", because the hosted app-server path is part
+- Step 4.3b, "App server startup" because the hosted app-server path is part
   of the runtime boundary that this ADR assigns to Podbot.
-- Step 4.5, "Normalized launch contract", because Corbusier needs one typed
+- Step 4.5, "Normalized launch contract" because Corbusier needs one typed
   launch seam rather than a mix of ad hoc runtime entry points.
-- Step 4.6, "Hosted session control plane", because Corbusier depends on a
+- Step 4.6, "Hosted session control plane" because Corbusier depends on a
   typed control and event surface instead of CLI scraping.
 
 ## Options Considered
@@ -101,6 +101,8 @@ Corbusier keeps selected execution responsibilities, such as direct hook
 execution or some workspace mechanics, while Podbot handles only the remaining
 runtime tasks.
 
+_Table 1: Trade-offs for the runtime ownership boundary._
+
 | Topic                     | Option A                | Option B                 | Option C            |
 | ------------------------- | ----------------------- | ------------------------ | ------------------- |
 | Runtime ownership         | Clear single owner      | Implicit and brittle     | Split and ambiguous |
@@ -108,8 +110,6 @@ runtime tasks.
 | Testability               | High with fake adapters | Low due to text coupling | Medium              |
 | Failure diagnosis         | Clear boundaries        | Noisy and indirect       | Diffuse             |
 | Long-term maintainability | Strong                  | Weak                     | Weak                |
-
-_Table 1: Trade-offs for the runtime ownership boundary._
 
 ## Decision Outcome / Proposed Direction
 

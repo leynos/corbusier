@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -66,17 +66,17 @@ does not redefine the underlying workspace, wire, or hook models.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 1.4, "Hosting schema migration and compatibility matrix", because the
+- Step 1.4, "Hosting schema migration and compatibility matrix" because the
   security-sensitive hosting fields and defaults must exist in Podbot's
   configuration model.
-- Step 2.6, "ACP capability masking enforcement", because delegated host
+- Step 2.6, "ACP capability masking enforcement" because delegated host
   capability rules are part of the security boundary this ADR sets.
-- Step 4.4, "Workspace strategies", because host-mount policy and allowed-root
+- Step 4.4, "Workspace strategies" because host-mount policy and allowed-root
   enforcement are core privilege-boundary controls.
-- Step 4.7, "MCP wire provisioning and injection", because helper-container
+- Step 4.7, "MCP wire provisioning and injection" because helper-container
   `RepoAccess` defaults and wire injection details affect the runtime trust
   boundary.
-- Step 4.9, "Hook execution and orchestrator acknowledgement", because hook
+- Step 4.9, "Hook execution and orchestrator acknowledgement" because hook
   workspace access and environment allowlist policy are security-critical
   defaults.
 
@@ -97,6 +97,8 @@ most dangerous combinations.
 Development uses permissive defaults while production uses stricter ones, with
 the effective privilege stance changing by deployment environment.
 
+_Table 1: Trade-offs for privilege defaults and overrides._
+
 | Topic                      | Option A | Option B | Option C |
 | -------------------------- | -------- | -------- | -------- |
 | Security posture           | Strong   | Weak     | Medium   |
@@ -104,8 +106,6 @@ the effective privilege stance changing by deployment environment.
 | Operator surprise          | Low      | Medium   | High     |
 | Blast radius               | Low      | High     | Medium   |
 | Implementation convenience | Medium   | High     | Medium   |
-
-_Table 1: Trade-offs for privilege defaults and overrides._
 
 ## Decision Outcome / Proposed Direction
 

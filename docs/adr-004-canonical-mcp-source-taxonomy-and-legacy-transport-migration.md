@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -15,7 +15,7 @@ Context Protocol (MCP) wires directly. That model depends on a clean
 distinction between three separate concepts:
 
 - a persisted source definition that Corbusier owns,
-- a workspace-scoped wire instance that Podbot realises, and
+- a workspace-scoped wire instance that Podbot realizes, and
 - an agent-visible endpoint that the hosted runtime consumes.
 
 Corbusier's current transport vocabulary is too close to older integration
@@ -92,6 +92,8 @@ Corbusier preserves the current transport model and asks readers and
 maintainers to infer the difference between source definitions and wire
 instances from surrounding prose.
 
+_Table 1: Trade-offs for the canonical MCP source model._
+
 | Topic                     | Option A | Option B | Option C |
 | ------------------------- | -------- | -------- | -------- |
 | Type clarity              | Strong   | Medium   | Weak     |
@@ -99,8 +101,6 @@ instances from surrounding prose.
 | Long-term maintainability | Strong   | Medium   | Weak     |
 | Wire-model alignment      | Strong   | Medium   | Weak     |
 | Legacy ambiguity          | Low      | Medium   | High     |
-
-_Table 1: Trade-offs for the canonical MCP source model._
 
 ## Decision Outcome / Proposed Direction
 
