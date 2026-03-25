@@ -46,40 +46,47 @@ def _require_tools(skip_build: bool) -> None:
         require_exe("docker")
 
 
-def _ensure_cluster(cluster_name: str, ingress_port: int | None) -> int:
-    """Create or reuse the k3d cluster and return the ingress port."""
-    if cluster_exists(cluster_name):
-        existing_port = get_cluster_ingress_port(cluster_name)
-        if existing_port is None:
-            raise LocalK8sError(
-                f"Could not determine the ingress port for existing cluster '{cluster_name}'"
-            )
-        if ingress_port is not None and ingress_port != existing_port:
-            raise PortMismatchError(
-                f"Cluster '{cluster_name}' already uses ingress port {existing_port}, "
-                f"not requested port {ingress_port}"
-            )
-        print(f"Reusing existing k3d cluster '{cluster_name}' on port {existing_port}...")
-        return existing_port
+def _reuse_cluster(cluster_name: str, ingress_port: int | None) -> int:
+    """Validate and return the ingress port of an already-existing cluster."""
+    existing_port = get_cluster_ingress_port(cluster_name)
+    if existing_port is None:
+        raise LocalK8sError(
+            f"Could not determine the ingress port for existing cluster '{cluster_name}'"
+        )
+    if ingress_port is not None and ingress_port != existing_port:
+        raise PortMismatchError(
+            f"Cluster '{cluster_name}' already uses ingress port {existing_port}, "
+            f"not requested port {ingress_port}"
+        )
+    print(f"Reusing existing k3d cluster '{cluster_name}' on port {existing_port}...")
+    return existing_port
 
-    if ingress_port is not None:
-        print(f"Creating k3d cluster '{cluster_name}' on port {ingress_port}...")
-        create_k3d_cluster(cluster_name, ingress_port)
-        return ingress_port
 
+def _create_cluster_with_retry(cluster_name: str) -> int:
+    """Pick a free loopback port and create the cluster, retrying on bind conflicts."""
     for _attempt in range(5):
         candidate_port = pick_free_loopback_port()
         print(f"Creating k3d cluster '{cluster_name}' on port {candidate_port}...")
         try:
             create_k3d_cluster(cluster_name, candidate_port)
+            return candidate_port
         except ProcessExecutionError as error:
             command_output = f"{error.stdout}\n{error.stderr}".lower()
             if "address already in use" in command_output:
                 continue
             raise
-        return candidate_port
-
     raise LocalK8sError("Failed to bind an ingress port after 5 attempts")
+
+
+def _ensure_cluster(cluster_name: str, ingress_port: int | None) -> int:
+    """Create or reuse the k3d cluster and return the ingress port."""
+    if cluster_exists(cluster_name):
+        return _reuse_cluster(cluster_name, ingress_port)
+    if ingress_port is not None:
+        print(f"Creating k3d cluster '{cluster_name}' on port {ingress_port}...")
+        create_k3d_cluster(cluster_name, ingress_port)
+        return ingress_port
+    return _create_cluster_with_retry(cluster_name)
 
 
 def _print_success_banner(port: int) -> None:
