@@ -97,7 +97,7 @@ mod tests {
         .await;
         let req = actix_test::TestRequest::get().uri(path).to_request();
         let resp = actix_test::call_service(&app, req).await;
-        assert_eq!(resp.status(), expected_status);
+        assert_eq!(resp.status().as_u16(), expected_status);
     }
 
     #[rstest]
