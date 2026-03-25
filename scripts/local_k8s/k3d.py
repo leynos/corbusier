@@ -44,6 +44,8 @@ def _ingress_port_from_cluster(cluster: dict[str, Any]) -> int | None:
         for mapping in mappings:
             if not isinstance(mapping, dict):
                 continue
+            if mapping.get("HostIp") != "127.0.0.1":
+                continue
             host_port = mapping.get("HostPort")
             if isinstance(host_port, str) and host_port.isdigit():
                 return int(host_port)
