@@ -24,6 +24,7 @@
 //! - `test_support` (feature-gated): Shared fixtures and fakes for tests
 
 pub mod context;
+pub mod health;
 pub mod tenant;
 
 pub mod agent_backend;
