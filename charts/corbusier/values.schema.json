@@ -190,11 +190,22 @@
     "existingSecretName": { "type": "string" },
     "secretEnvFromKeys": {
       "type": "object",
-      "propertyNames": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+      "propertyNames": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
       "additionalProperties": { "type": "string", "minLength": 1 }
     },
     "allowMissingSecret": { "type": "boolean", "default": true },
     "validateExistingSecret": { "type": "boolean", "default": false },
+    "topologySpread": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostnamePolicy": {
+          "type": "string",
+          "enum": ["", "DoNotSchedule", "ScheduleAnyway"]
+        }
+      },
+      "additionalProperties": false
+    },
     "affinity": { "type": "object" },
     "podSecurityContext": { "type": "object" },
     "securityContext": { "type": "object" },
@@ -215,6 +226,7 @@
   "allOf": [
     {
       "if": {
+        "required": ["externalSecret"],
         "properties": {
           "externalSecret": {
             "properties": {
@@ -227,6 +239,7 @@
       "then": {
         "properties": {
           "externalSecret": {
+            "required": ["secretStoreRef", "data"],
             "properties": {
               "secretStoreRef": {
                 "properties": {
@@ -241,6 +254,7 @@
     },
     {
       "if": {
+        "required": ["secretEnvFromKeys"],
         "properties": {
           "secretEnvFromKeys": { "minProperties": 1 }
         }

@@ -1,4 +1,26 @@
-"""High-level orchestration for the local preview workflow."""
+"""High-level orchestration for the local preview workflow.
+
+This module coordinates the end-to-end Corbusier preview lifecycle. It ties
+cluster creation, namespace preparation, operator installation, Secret
+generation, image import, and Helm deployment into a small set of commands that
+the CLI exposes as `up`, `down`, `status`, and `logs`.
+
+Use this layer when repository-local tooling needs the same behaviour as the
+CLI without rebuilding command parsing. Callers are expected to pass the
+resolved cluster and namespace names explicitly.
+
+Examples
+--------
+Bring up the preview environment without rebuilding the image:
+
+>>> setup_environment("corbusier-local", "corbusier", None, skip_build=True)
+0
+
+Inspect the current state of the preview deployment:
+
+>>> show_environment_status("corbusier-local", "corbusier")
+0
+"""
 
 from __future__ import annotations
 
@@ -57,7 +79,32 @@ def _print_success_banner(port: int) -> None:
 
 
 def setup_environment(cluster_name: str, namespace: str, ingress_port: int | None, *, skip_build: bool) -> int:
-    """Provision platform services and deploy Corbusier into k3d."""
+    """Provision platform services and deploy Corbusier into `k3d`.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the `k3d` cluster to create or reuse.
+    namespace : str
+        Namespace where Corbusier and its data services will be deployed.
+    ingress_port : int | None
+        Requested loopback ingress port. When `None`, a free port is selected.
+    skip_build : bool
+        When `True`, skip the local Docker build and image import steps.
+
+    Returns
+    -------
+    int
+        Process-style success code. `0` indicates success.
+
+    Raises
+    ------
+    LocalK8sError
+        Raised when tool validation, cluster reconciliation, or secret assembly
+        fails.
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when an underlying external command fails.
+    """
     _require_tools(skip_build)
 
     port = _ensure_cluster(cluster_name, ingress_port)
@@ -103,7 +150,26 @@ def setup_environment(cluster_name: str, namespace: str, ingress_port: int | Non
 
 
 def teardown_environment(cluster_name: str) -> int:
-    """Delete the local k3d cluster."""
+    """Delete the local `k3d` cluster.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the cluster to delete.
+
+    Returns
+    -------
+    int
+        Process-style success code. `0` indicates success or that the cluster
+        was already absent.
+
+    Raises
+    ------
+    ExecutableNotFoundError
+        Raised when `k3d` is not installed.
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when cluster deletion fails.
+    """
     require_exe("k3d")
     if not cluster_exists(cluster_name):
         print(f"Cluster '{cluster_name}' does not exist.")
@@ -114,7 +180,29 @@ def teardown_environment(cluster_name: str) -> int:
 
 
 def show_environment_status(cluster_name: str, namespace: str) -> int:
-    """Show current pod and ingress status for the preview environment."""
+    """Show current pod and ingress status for the preview environment.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the `k3d` cluster to inspect.
+    namespace : str
+        Namespace containing the Corbusier preview deployment.
+
+    Returns
+    -------
+    int
+        Process-style success code. Returns `1` when the cluster does not
+        exist.
+
+    Raises
+    ------
+    ExecutableNotFoundError
+        Raised when `kubectl` or `k3d` is not installed.
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when status queries fail.
+    """
+    require_exe("k3d")
     require_exe("kubectl")
     if not cluster_exists(cluster_name):
         print(f"Cluster '{cluster_name}' does not exist.")
@@ -126,7 +214,32 @@ def show_environment_status(cluster_name: str, namespace: str) -> int:
 
 
 def stream_environment_logs(cluster_name: str, namespace: str, *, follow: bool) -> int:
-    """Stream logs from Corbusier pods in the preview namespace."""
+    """Stream logs from Corbusier pods in the preview namespace.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the `k3d` cluster to inspect.
+    namespace : str
+        Namespace containing the Corbusier preview deployment.
+    follow : bool
+        When `True`, stream logs until interrupted. When `False`, print the
+        current log output and return.
+
+    Returns
+    -------
+    int
+        Process-style success code. Returns `1` when the cluster does not
+        exist.
+
+    Raises
+    ------
+    ExecutableNotFoundError
+        Raised when `kubectl` or `k3d` is not installed.
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when log streaming fails.
+    """
+    require_exe("k3d")
     require_exe("kubectl")
     if not cluster_exists(cluster_name):
         print(f"Cluster '{cluster_name}' does not exist.")

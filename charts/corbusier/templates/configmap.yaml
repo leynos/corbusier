@@ -7,6 +7,6 @@ metadata:
     {{- include "corbusier.labels" . | nindent 4 }}
 data:
 {{- range $key := keys .Values.config | sortAlpha }}
-  {{ $key }}: "{{ index $.Values.config $key | toString }}"
+  {{ $key }}: {{ index $.Values.config $key | toString | quote }}
 {{- end }}
 {{- end }}

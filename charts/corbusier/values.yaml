@@ -21,7 +21,7 @@ resources:
 
 pdb:
   enabled: true
-  minAvailable: 0
+  minAvailable: 1
 
 service:
   type: ClusterIP
@@ -40,6 +40,10 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+topologySpread:
+  enabled: true
+  hostnamePolicy: DoNotSchedule
 
 # Non-secret configuration. Keys become environment variables via a ConfigMap.
 config:

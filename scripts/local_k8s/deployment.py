@@ -74,7 +74,7 @@ def print_status(cfg: Config, env: dict[str, str]) -> None:
         kubectl["get", "service,ingress", f"--namespace={cfg.namespace}"] & FG
 
 
-def tail_logs(cfg: Config, env: dict[str, str], follow: bool = False) -> None:
+def tail_logs(cfg: Config, env: dict[str, str], *, follow: bool = False) -> None:
     """Tail application logs from Corbusier pods."""
     with local.env(**env):
         command = local["kubectl"][

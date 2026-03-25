@@ -103,11 +103,16 @@ Key values:
   `validateExistingSecret`
 - `externalSecret.enabled`, `externalSecret.secretStoreRef.*`,
   `externalSecret.targetName`, `externalSecret.data`
+- `topologySpread.enabled`, `topologySpread.hostnamePolicy`
 - `resources`, `podSecurityContext`, `securityContext`
 - `container.livenessProbe`, `container.readinessProbe`,
   `container.startupProbe`
 - `serviceAccount.*`
 - `pdb.*`
+
+The default PodDisruptionBudget keeps one replica available when the chart is
+scaled beyond a single pod, while single-replica local preview deployments do
+not render a PDB at all.
 
 ### Ingress behaviour
 
@@ -212,6 +217,12 @@ The intended observable success signals are:
 - `make local-k8s-down` deletes the cluster cleanly.
 
 ## Sequence diagram
+
+This sequence shows the full local preview flow. A developer runs
+`make local-k8s-up`, which invokes `scripts/local_k8s.py` to create or reuse a
+`k3d` cluster, install the CloudNativePG and Valkey operators with Helm,
+provision the Postgres and cache instances, import the locally built Corbusier
+image, deploy the chart, and finally print the preview and health URLs.
 
 ```mermaid
 sequenceDiagram

@@ -72,4 +72,4 @@ def read_valkey_uri(cfg: Config, env: dict[str, str]) -> str:
     """Build a Valkey URI from the operator-managed Secret."""
     password = read_secret_field(cfg.valkey_name, "password", cfg.namespace, env)
     host = f"{cfg.valkey_name}.{cfg.namespace}.svc.cluster.local"
-    return f"valkey://:{password}@{host}:6379"
+    return f"redis://:{password}@{host}:6379"

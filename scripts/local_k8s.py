@@ -8,9 +8,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import functools
 import sys
-from typing import Annotated, Callable
+from typing import Annotated
 
 from cyclopts import App, Parameter
 from plumbum.commands.processes import ProcessExecutionError
@@ -29,7 +30,7 @@ DEFAULT_CONFIG = Config()
 
 
 def handle_cli_errors(func: Callable[..., int]) -> Callable[..., int]:
-    """Normalize CLI exceptions into user-facing errors and exit codes."""
+    """Normalise CLI exceptions into user-facing errors and exit codes."""
 
     @functools.wraps(func)
     def wrapper(*args: object, **kwargs: object) -> int:
