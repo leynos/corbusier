@@ -1,6 +1,6 @@
-FROM rust:1.87-slim-bookworm AS build
+FROM rust:1.94-slim-bookworm AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev pkg-config && rm -rf /var/lib/apt/lists/*
+    build-essential libpq-dev perl pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src/ src/

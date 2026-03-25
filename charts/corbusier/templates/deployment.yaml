@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "corbusier.fullname" . }}
+  labels:
+    {{- include "corbusier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "corbusier.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "corbusier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+      annotations:
+        checksum/config: {{ if .Values.config }}{{ toYaml .Values.config | sha256sum }}{{ end }}
+    spec:
+      serviceAccountName: {{ include "corbusier.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "corbusier.selectorLabels" . | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              {{- include "corbusier.selectorLabels" . | nindent 14 }}
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: app
+          {{- $tag := .Values.image.tag | default .Chart.AppVersion }}
+          image: "{{ .Values.image.repository }}:{{ $tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default (ternary "Always" "IfNotPresent" (eq $tag "latest")) }}
+          ports:
+            - name: {{ .Values.service.portName | default "http" }}
+              containerPort: 8080
+          {{- $cfg := .Values.config | default dict }}
+          {{- $sec := .Values.secretEnvFromKeys | default dict }}
+          {{- $name := .Values.existingSecretName }}
+          {{- include "corbusier.validateSecrets" . -}}
+          {{- if or (gt (len $cfg) 0) (gt (len $sec) 0) }}
+          env:
+            {{- range $k, $_ := $cfg }}
+            - name: {{ $k }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "corbusier.fullname" $ }}-config
+                  key: {{ $k }}
+            {{- end }}
+            {{- range $k, $secretKey := $sec }}
+            - name: {{ $k }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name | quote }}
+                  key: {{ $secretKey | quote }}
+                  optional: {{ $.Values.allowMissingSecret | default true }}
+            {{- end }}
+          {{- end }}
+{{- with .Values.securityContext }}
+          securityContext:
+{{ toYaml . | replace "drop:\n  -" "drop:\n    -" | nindent 12 }}
+{{- end }}
+{{- with .Values.container.readinessProbe }}
+          readinessProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.container.livenessProbe }}
+          livenessProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.container.startupProbe }}
+          startupProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
