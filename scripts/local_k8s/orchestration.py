@@ -27,6 +27,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from plumbum import local
+from plumbum.commands.processes import ProcessExecutionError
 
 from local_k8s.cnpg import create_cnpg_cluster, install_cnpg_operator, read_pg_app_uri, wait_for_cnpg_ready
 from local_k8s.config import Config
@@ -61,10 +62,24 @@ def _ensure_cluster(cluster_name: str, ingress_port: int | None) -> int:
         print(f"Reusing existing k3d cluster '{cluster_name}' on port {existing_port}...")
         return existing_port
 
-    selected_port = ingress_port or pick_free_loopback_port()
-    print(f"Creating k3d cluster '{cluster_name}' on port {selected_port}...")
-    create_k3d_cluster(cluster_name, selected_port)
-    return selected_port
+    if ingress_port is not None:
+        print(f"Creating k3d cluster '{cluster_name}' on port {ingress_port}...")
+        create_k3d_cluster(cluster_name, ingress_port)
+        return ingress_port
+
+    for _attempt in range(5):
+        candidate_port = pick_free_loopback_port()
+        print(f"Creating k3d cluster '{cluster_name}' on port {candidate_port}...")
+        try:
+            create_k3d_cluster(cluster_name, candidate_port)
+        except ProcessExecutionError as error:
+            command_output = f"{error.stdout}\n{error.stderr}".lower()
+            if "address already in use" in command_output:
+                continue
+            raise
+        return candidate_port
+
+    raise LocalK8sError("Failed to bind an ingress port after 5 attempts")
 
 
 def _print_success_banner(port: int) -> None:

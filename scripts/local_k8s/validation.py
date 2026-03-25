@@ -102,12 +102,14 @@ def require_exe(name: str) -> None:
 
 
 def pick_free_loopback_port() -> int:
-    """Pick a currently unused loopback port.
+    """Pick a candidate loopback port for create-and-retry workflows.
 
     Returns
     -------
     int
-        Free TCP port bound on `127.0.0.1`.
+        Currently free TCP port bound on `127.0.0.1`. The port is not reserved
+        after this function returns, so callers must use it inside a bounded
+        create-and-retry loop rather than treating it as a reservation.
 
     Raises
     ------
