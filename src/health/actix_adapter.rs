@@ -31,14 +31,21 @@ pub fn health_routes(cfg: &mut web::ServiceConfig) {
 }
 
 async fn liveness(check: web::Data<dyn HealthCheck>) -> HttpResponse {
-    status_to_response(check.liveness())
+    liveness_status_to_response(check.liveness())
 }
 
 async fn readiness(check: web::Data<dyn HealthCheck>) -> HttpResponse {
-    status_to_response(check.readiness())
+    readiness_status_to_response(check.readiness())
 }
 
-fn status_to_response(status: HealthStatus) -> HttpResponse {
+fn liveness_status_to_response(status: HealthStatus) -> HttpResponse {
+    match status {
+        HealthStatus::Healthy | HealthStatus::Degraded => HttpResponse::Ok().body("ok"),
+        HealthStatus::Unhealthy => HttpResponse::ServiceUnavailable().body("unavailable"),
+    }
+}
+
+fn readiness_status_to_response(status: HealthStatus) -> HttpResponse {
     match status {
         HealthStatus::Healthy => HttpResponse::Ok().body("ok"),
         HealthStatus::Degraded | HealthStatus::Unhealthy => {
@@ -53,30 +60,79 @@ mod tests {
 
     use actix_web::App;
     use actix_web::test as actix_test;
-    use rstest::{fixture, rstest};
+    use rstest::rstest;
 
     use super::*;
-    use crate::health::SimpleHealthCheck;
 
-    #[fixture]
-    fn health_check() -> Arc<dyn HealthCheck> {
-        Arc::new(SimpleHealthCheck)
+    struct TestHealthCheck {
+        liveness: HealthStatus,
+        readiness: HealthStatus,
     }
 
-    #[rstest]
-    #[case("/health/live")]
-    #[case("/health/ready")]
-    #[actix_web::test]
-    async fn health_routes_return_ok(health_check: Arc<dyn HealthCheck>, #[case] path: &str) {
+    impl HealthCheck for TestHealthCheck {
+        fn liveness(&self) -> HealthStatus {
+            self.liveness
+        }
+
+        fn readiness(&self) -> HealthStatus {
+            self.readiness
+        }
+    }
+
+    async fn assert_endpoint_status(
+        liveness: HealthStatus,
+        readiness: HealthStatus,
+        path: &str,
+        expected_status: u16,
+    ) {
+        let health_check: Arc<dyn HealthCheck> = Arc::new(TestHealthCheck {
+            liveness,
+            readiness,
+        });
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::from(health_check))
                 .configure(health_routes),
         )
         .await;
-
         let req = actix_test::TestRequest::get().uri(path).to_request();
         let resp = actix_test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.status(), expected_status);
+    }
+
+    #[rstest]
+    #[case(HealthStatus::Healthy, 200)]
+    #[case(HealthStatus::Degraded, 200)]
+    #[case(HealthStatus::Unhealthy, 503)]
+    #[actix_web::test]
+    async fn liveness_routes_map_statuses(
+        #[case] liveness: HealthStatus,
+        #[case] expected_status: u16,
+    ) {
+        assert_endpoint_status(
+            liveness,
+            HealthStatus::Healthy,
+            "/health/live",
+            expected_status,
+        )
+        .await;
+    }
+
+    #[rstest]
+    #[case(HealthStatus::Healthy, 200)]
+    #[case(HealthStatus::Degraded, 503)]
+    #[case(HealthStatus::Unhealthy, 503)]
+    #[actix_web::test]
+    async fn readiness_routes_map_statuses(
+        #[case] readiness: HealthStatus,
+        #[case] expected_status: u16,
+    ) {
+        assert_endpoint_status(
+            HealthStatus::Healthy,
+            readiness,
+            "/health/ready",
+            expected_status,
+        )
+        .await;
     }
 }
