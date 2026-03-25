@@ -517,13 +517,14 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     image builds.
   - [x] Success criteria: the release image runs as non-root and exposes
     stable health endpoints on port 8080.
-- [x] 6.1.2 Add a Helm chart compatible with local preview and GitOps.
+- [x] 6.1.2 Add a Helm chart compatible with local preview and GitOps
+  (Git-based operations).
   - [x] Create `charts/corbusier` with deployment, service, ingress,
     ConfigMap, ServiceAccount, PDB, and `ExternalSecret` templates.
   - [x] Add a values schema and local preview values file.
   - [x] Success criteria: the chart can render a hostless local ingress and a
     GitOps-friendly explicit-host ingress from the same values contract.
-- [x] 6.1.3 Add a local k3d lifecycle workflow.
+- [x] 6.1.3 Add a local k3d (Kubernetes in Docker) lifecycle workflow.
   - [x] Create `scripts/local_k8s.py` and the supporting `scripts/local_k8s/`
     package using Cyclopts and `plumbum`.
   - [x] Add `make local-k8s-up`, `local-k8s-status`, `local-k8s-logs`, and

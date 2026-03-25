@@ -6,7 +6,7 @@ import json
 
 from plumbum import FG, local
 
-from local_k8s.validation import b64decode_k8s_secret_field
+from local_k8s.validation import LocalK8sSecretError, b64decode_k8s_secret_field
 
 
 def namespace_exists(namespace: str, env: dict[str, str]) -> bool:
@@ -63,12 +63,12 @@ def read_secret_field(secret_name: str, field: str, namespace: str, env: dict[st
     payload = json.loads(output)
     data = payload.get("data", {})
     if not isinstance(data, dict) or field not in data:
-        raise ValueError(
+        raise LocalK8sSecretError(
             f"Secret '{secret_name}' in namespace '{namespace}' does not contain field '{field}'"
         )
     value = data[field]
     if not isinstance(value, str) or not value:
-        raise ValueError(
+        raise LocalK8sSecretError(
             f"Secret '{secret_name}' field '{field}' in namespace '{namespace}' is empty"
         )
     return b64decode_k8s_secret_field(value)

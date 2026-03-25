@@ -47,10 +47,20 @@ Validate that secretEnvFromKeys references an existing Secret when set.
 {{- $sec := $raw | default dict -}}
 {{- $name := .Values.existingSecretName -}}
 {{- $allowMissing := .Values.allowMissingSecret | default true -}}
+{{- $validateExistingSecret := .Values.validateExistingSecret | default false -}}
 {{- if and (gt (len $sec) 0) (not $name) -}}
 {{- fail "existingSecretName is required when secretEnvFromKeys is set" -}}
 {{- end -}}
 {{- if and (gt (len $sec) 0) $name -}}
+{{- range $k, $secretKey := $sec -}}
+{{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $k) -}}
+{{- fail (printf "secretEnvFromKeys has invalid env var name %q (must match ^[A-Za-z_][A-Za-z0-9_]*$)" $k) -}}
+{{- end -}}
+{{- if not $secretKey -}}
+{{- fail (printf "secretEnvFromKeys maps %q to an empty secret key" $k) -}}
+{{- end -}}
+{{- end -}}
+{{- if $validateExistingSecret -}}
 {{- if not (semverCompare ">=3.2.0" .Capabilities.HelmVersion.Version) -}}
 {{- fail "corbusier.validateSecrets requires Helm >= 3.2.0" -}}
 {{- end -}}
@@ -64,18 +74,13 @@ Validate that secretEnvFromKeys references an existing Secret when set.
 {{- $stringData := (get $found "stringData") | default dict -}}
 {{- $missing := list -}}
 {{- range $k, $secretKey := $sec -}}
-{{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $k) -}}
-{{- fail (printf "secretEnvFromKeys has invalid env var name %q (must match ^[A-Za-z_][A-Za-z0-9_]*$)" $k) -}}
-{{- end -}}
-{{- if not $secretKey -}}
-{{- fail (printf "secretEnvFromKeys maps %q to an empty secret key" $k) -}}
-{{- end -}}
 {{- if not (or (hasKey $data $secretKey) (hasKey $stringData $secretKey)) -}}
 {{- $missing = append $missing $secretKey -}}
 {{- end -}}
 {{- end -}}
 {{- if gt (len $missing) 0 -}}
 {{- fail (printf "Secret %q missing keys: %s" $name (join ", " $missing)) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

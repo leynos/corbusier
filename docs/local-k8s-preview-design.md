@@ -1,10 +1,11 @@
-# Local k3d preview and Nile Valley integration for Corbusier
+# Local k3d (Kubernetes in Docker) preview and Nile Valley integration for Corbusier
 
 ## Purpose
 
 Define the local Kubernetes preview workflow for Corbusier so the same
 container image and Helm chart can be used both in a developer-owned `k3d`
-cluster and in the Nile Valley GitOps pipeline.
+(Kubernetes in Docker) cluster and in the Nile Valley GitOps (Git-based
+operations) pipeline.
 
 ## Goals
 
@@ -51,8 +52,8 @@ The feature is made of three deliverables:
 
 The repository root `Dockerfile` uses a multi-stage build:
 
-- The build stage uses `rust:1.87-slim-bookworm` with `libpq-dev` and
-  `pkg-config` to compile the release binary.
+- The build stage uses `rust:1.94-slim-bookworm` with `build-essential`,
+  `libpq-dev`, `perl`, and `pkg-config` to compile the release binary.
 - The runtime stage uses `debian:bookworm-slim`, installs `libpq5` and
   `ca-certificates`, creates a `corbusier` user, and runs the binary as
   non-root.
@@ -98,7 +99,8 @@ Key values:
 - `ingress.enabled`, `ingress.className`, `ingress.annotations`,
   `ingress.hosts`, `ingress.tls`
 - `config`
-- `existingSecretName`, `secretEnvFromKeys`, `allowMissingSecret`
+- `existingSecretName`, `secretEnvFromKeys`, `allowMissingSecret`,
+  `validateExistingSecret`
 - `externalSecret.enabled`, `externalSecret.secretStoreRef.*`,
   `externalSecret.targetName`, `externalSecret.data`
 - `resources`, `podSecurityContext`, `securityContext`
@@ -136,6 +138,10 @@ The chart supports two secret sources:
 
 Both paths ultimately provide `DATABASE_URL` and `VALKEY_URL` to the container
 via `secretKeyRef`.
+
+`validateExistingSecret` defaults to `false` so offline `helm template`
+rendering stays clean. Set it to `true` when rendering against a live cluster
+and you want Helm to verify that the referenced Secret and keys already exist.
 
 ## Local k3d workflow design
 

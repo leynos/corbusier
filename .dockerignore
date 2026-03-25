@@ -5,3 +5,4 @@ scripts/
 charts/
 tests/
 *.md
+*.log

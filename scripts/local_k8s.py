@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import functools
 import sys
-from typing import Annotated, Callable, ParamSpec, TypeVar
+from typing import Annotated, Callable
 
 from cyclopts import App, Parameter
 from plumbum.commands.processes import ProcessExecutionError
 
+from local_k8s.config import Config
 from local_k8s.orchestration import (
     setup_environment,
     show_environment_status,
@@ -24,17 +25,16 @@ from local_k8s.orchestration import (
 from local_k8s.validation import LocalK8sError
 
 
-P = ParamSpec("P")
-R = TypeVar("R")
+DEFAULT_CONFIG = Config()
 
 
-def handle_cli_errors(func: Callable[P, int]) -> Callable[P, int]:
+def handle_cli_errors(func: Callable[..., int]) -> Callable[..., int]:
     """Normalize CLI exceptions into user-facing errors and exit codes."""
 
     @functools.wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> int:
+    def wrapper(*args: object, **kwargs: object) -> int:
         try:
-            return int(func(*args, **kwargs))
+            return func(*args, **kwargs)
         except LocalK8sError as error:
             print(f"Error: {error}", file=sys.stderr)
             return 1
@@ -54,8 +54,8 @@ app = App(name="local_k8s", help="Local k3d preview environment for Corbusier", 
 @handle_cli_errors
 def up(
     *,
-    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = "corbusier-local",
-    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = "corbusier",
+    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = DEFAULT_CONFIG.cluster_name,
+    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = DEFAULT_CONFIG.namespace,
     ingress_port: Annotated[int | None, Parameter(env_var="CORBUSIER_K3D_PORT")] = None,
     skip_build: bool = False,
 ) -> int:
@@ -67,7 +67,7 @@ def up(
 @handle_cli_errors
 def down(
     *,
-    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = "corbusier-local",
+    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = DEFAULT_CONFIG.cluster_name,
 ) -> int:
     """Delete the local preview cluster."""
     return teardown_environment(cluster_name)
@@ -77,8 +77,8 @@ def down(
 @handle_cli_errors
 def status(
     *,
-    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = "corbusier-local",
-    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = "corbusier",
+    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = DEFAULT_CONFIG.cluster_name,
+    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = DEFAULT_CONFIG.namespace,
 ) -> int:
     """Show local preview status."""
     return show_environment_status(cluster_name, namespace)
@@ -88,8 +88,8 @@ def status(
 @handle_cli_errors
 def logs(
     *,
-    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = "corbusier-local",
-    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = "corbusier",
+    cluster_name: Annotated[str, Parameter(env_var="CORBUSIER_K3D_CLUSTER")] = DEFAULT_CONFIG.cluster_name,
+    namespace: Annotated[str, Parameter(env_var="CORBUSIER_K3D_NAMESPACE")] = DEFAULT_CONFIG.namespace,
     follow: bool = False,
 ) -> int:
     """Tail logs from the local preview environment."""
@@ -99,7 +99,7 @@ def logs(
 def main() -> int:
     """Run the CLI application."""
     result = app()
-    return int(result) if result is not None else 0
+    return result if result is not None else 0
 
 
 if __name__ == "__main__":

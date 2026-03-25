@@ -53,40 +53,29 @@ mod tests {
 
     use actix_web::App;
     use actix_web::test as actix_test;
+    use rstest::{fixture, rstest};
 
     use super::*;
     use crate::health::SimpleHealthCheck;
 
-    #[actix_web::test]
-    async fn liveness_returns_ok() {
-        let check: Arc<dyn HealthCheck> = Arc::new(SimpleHealthCheck);
-        let app = actix_test::init_service(
-            App::new()
-                .app_data(web::Data::from(check))
-                .configure(health_routes),
-        )
-        .await;
-
-        let req = actix_test::TestRequest::get()
-            .uri("/health/live")
-            .to_request();
-        let resp = actix_test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+    #[fixture]
+    fn health_check() -> Arc<dyn HealthCheck> {
+        Arc::new(SimpleHealthCheck)
     }
 
+    #[rstest]
+    #[case("/health/live")]
+    #[case("/health/ready")]
     #[actix_web::test]
-    async fn readiness_returns_ok() {
-        let check: Arc<dyn HealthCheck> = Arc::new(SimpleHealthCheck);
+    async fn health_routes_return_ok(health_check: Arc<dyn HealthCheck>, #[case] path: &str) {
         let app = actix_test::init_service(
             App::new()
-                .app_data(web::Data::from(check))
+                .app_data(web::Data::from(health_check))
                 .configure(health_routes),
         )
         .await;
 
-        let req = actix_test::TestRequest::get()
-            .uri("/health/ready")
-            .to_request();
+        let req = actix_test::TestRequest::get().uri(path).to_request();
         let resp = actix_test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
     }

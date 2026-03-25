@@ -48,6 +48,7 @@ config:
 # Reference an externally managed Secret; map environment variables to keys.
 existingSecretName: ""
 allowMissingSecret: true
+validateExistingSecret: false
 secretEnvFromKeys: {}
 
 externalSecret:

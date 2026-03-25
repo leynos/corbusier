@@ -1,24 +1,25 @@
-# Local k3d preview and Nile Valley integration for Corbusier
+# Local k3d (Kubernetes in Docker) preview and Nile Valley integration for Corbusier
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
 Corbusier is an AI agent orchestration platform written in Rust. It depends on
-PostgreSQL (via Diesel ORM) and will eventually depend on Valkey for caching.
-Today there is no container image, no Helm chart, and no local Kubernetes
-workflow.
+PostgreSQL (via Diesel ORM) and now ships a Kubernetes-ready container image,
+Helm chart, and local preview workflow. Valkey support is included in the local
+preview path for parity with Nile Valley deployment assumptions.
 
 After this work, a developer can run a single command (`make local-k8s-up`) to
-spin up a k3d cluster containing Corbusier backed by a real Postgres instance
-(provisioned by CloudNativePG) and a Valkey instance (provisioned by the Valkey
-operator). The same Helm chart deploys unchanged into the Nile Valley
-platform's GitOps pipeline for ephemeral previews and production.
+spin up a k3d (Kubernetes in Docker) cluster containing Corbusier backed by a
+real Postgres instance (provisioned by CloudNativePG) and a Valkey instance
+(provisioned by the Valkey operator). The same Helm chart deploys unchanged
+into the Nile Valley platform's GitOps (Git-based operations) pipeline for
+ephemeral previews and production.
 
 Observable success: `make local-k8s-up` prints a preview URL; `curl`-ing that
 URL's health endpoint returns HTTP 200; `make local-k8s-status` shows ready
@@ -60,15 +61,12 @@ pods; `make local-k8s-down` tears the cluster down cleanly.
 
 ## Risks
 
-- Risk: Corbusier has no HTTP server or health endpoint yet (`main.rs` is
-  a stub printing "Hello from Corbusier!"). The Helm chart needs a container
-  that runs and stays alive for Kubernetes probes. Severity: high Likelihood:
-  certain Mitigation: Stage B introduces a minimal HTTP health endpoint using a
-  lightweight Rust HTTP server (e.g., `axum` or `hyper`) behind a feature flag
-  or as a separate binary target. Alternatively, the initial deployment can use
-  a long-running sleep loop with liveness based on process existence, deferring
-  the health endpoint to a follow-up. The decision is recorded when Stage B
-  begins.
+- Risk: Full local-cluster verification still depends on a machine with `k3d`,
+  `kubectl`, `helm`, and `docker` installed together. Severity: medium
+  Likelihood: medium Mitigation: keep the workflow validated with `helm lint`,
+  `helm template`, `docker build`, and Rust quality gates in CI-like
+  environments, then run `make local-k8s-up` end to end on a workstation with
+  the full Kubernetes toolchain.
 
 - Risk: Diesel requires `libpq` at compile time for the `postgres`
   feature. The Dockerfile must include `libpq-dev` in the build stage and
@@ -76,11 +74,11 @@ pods; `make local-k8s-down` tears the cluster down cleanly.
   Mitigation: Document the exact Debian packages in the Dockerfile sketch and
   verify in Stage C.
 
-- Risk: The Valkey operator CRD names and secret field names may differ
-  from Ghillie's assumptions. Severity: low Likelihood: medium Mitigation: The
-  local k8s script will read connection details from the operator-generated
-  secret, matching Ghillie's proven approach. Confirm field names during Stage
-  D.
+- Risk: The Valkey operator CustomResourceDefinition (CRD) names and secret
+  field names may differ from Ghillie's assumptions. Severity: low Likelihood:
+  medium Mitigation: the local k8s script will read connection details from the
+  operator-generated secret, matching Ghillie's proven approach. Confirm field
+  names during Stage D.
 
 - Risk: Corbusier's `pg-embed-setup-unpriv` dependency (used for test
   Postgres) may conflict with the production Diesel migration workflow.
@@ -142,20 +140,22 @@ Corbusier is a single-crate Rust workspace at the repository root. Key paths:
 
 - `Cargo.toml` — workspace and crate definition; depends on Diesel
   (Postgres), Tokio, serde, chrono, uuid, tracing, and others.
-- `src/main.rs` — stub entry point (prints a greeting and exits).
+- `src/main.rs` — Actix Web entry point exposing `/health/live` and
+  `/health/ready`.
 - `src/lib.rs` — library root with modules for agent backends, context,
   hooks, messages, tasks, tenants, and tool registry.
 - `Makefile` — build, test, lint, and format targets.
 - `docs/` — design documents, roadmap, and scripting standards.
 - `docs/execplans/` — execution plans (this file lives here).
 
-There is no `Dockerfile`, no `charts/` directory, no `scripts/local_k8s`
-package, and no `values.yaml` today.
+The repository now includes a root `Dockerfile`, `charts/corbusier/`,
+`scripts/local_k8s/`, and the values files required for local preview and Nile
+Valley deployment.
 
 ### Reference implementation (Ghillie)
 
-The Ghillie repository (`../../ghillie/`) has a complete local k3d preview
-workflow that serves as the template for this plan:
+The Ghillie repository (`../../ghillie/`) has a complete local k3d (Kubernetes
+in Docker) preview workflow that serves as the template for this plan:
 
 - `charts/ghillie/` — Helm chart with Deployment, Service, Ingress,
   ConfigMap, ExternalSecret, and ServiceAccount templates.
@@ -173,7 +173,7 @@ The Nile Valley platform repository (`../../nile-valley/`) provides:
 - `deploy/charts/example-app/` — reference Helm chart for applications
   deployed on the platform. Uses ConfigMap for non-secret config,
   `existingSecretName` for secrets, hardened security contexts, health probes,
-  PDB, HPA, and topology spread constraints.
+  PDB, HPA (Horizontal Pod Autoscaler), and topology spread constraints.
 - `infra/modules/` — Terraform/OpenTofu modules for platform services
   (CNPG, Valkey, Traefik, cert-manager, ExternalDNS, Vault, ESO).
 - `scripts/` — Python scripts for cluster provisioning, GitOps manifest

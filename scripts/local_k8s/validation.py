@@ -23,6 +23,10 @@ class SecretDecodeError(LocalK8sError):
     """Raised when a Kubernetes Secret field cannot be decoded."""
 
 
+class LocalK8sSecretError(LocalK8sError):
+    """Raised when a Kubernetes Secret is missing required fields or values."""
+
+
 def require_exe(name: str) -> None:
     """Ensure a required executable is available."""
     if shutil.which(name) is None:

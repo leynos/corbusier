@@ -194,6 +194,7 @@
       "additionalProperties": { "type": "string", "minLength": 1 }
     },
     "allowMissingSecret": { "type": "boolean", "default": true },
+    "validateExistingSecret": { "type": "boolean", "default": false },
     "affinity": { "type": "object" },
     "podSecurityContext": { "type": "object" },
     "securityContext": { "type": "object" },
