@@ -66,7 +66,9 @@ spec:
               containerPort: 8080
           {{- $cfg := .Values.config | default dict }}
           {{- $sec := .Values.secretEnvFromKeys | default dict }}
-          {{- $name := .Values.existingSecretName }}
+          {{- $esEnabled := .Values.externalSecret.enabled | default false }}
+          {{- $esTarget := .Values.externalSecret.targetName }}
+          {{- $name := .Values.existingSecretName | default (ternary (default (include "corbusier.fullname" $) $esTarget) "" $esEnabled) }}
           {{- include "corbusier.validateSecrets" . -}}
           {{- if or (gt (len $cfg) 0) (gt (len $sec) 0) }}
           env:

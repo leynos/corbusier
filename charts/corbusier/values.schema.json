@@ -260,10 +260,25 @@
         }
       },
       "then": {
-        "required": ["existingSecretName"],
-        "properties": {
-          "existingSecretName": { "type": "string", "minLength": 1 }
-        }
+        "anyOf": [
+          {
+            "required": ["existingSecretName"],
+            "properties": {
+              "existingSecretName": { "type": "string", "minLength": 1 }
+            }
+          },
+          {
+            "required": ["externalSecret"],
+            "properties": {
+              "externalSecret": {
+                "properties": {
+                  "enabled": { "const": true }
+                },
+                "required": ["enabled"]
+              }
+            }
+          }
+        ]
       }
     }
   ]

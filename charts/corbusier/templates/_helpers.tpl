@@ -45,11 +45,13 @@ Validate that secretEnvFromKeys references an existing Secret when set.
 {{- fail (printf "secretEnvFromKeys must be a map, got %s" (typeOf $raw)) -}}
 {{- end -}}
 {{- $sec := $raw | default dict -}}
-{{- $name := .Values.existingSecretName -}}
+{{- $esEnabled := .Values.externalSecret.enabled | default false -}}
+{{- $esTarget := .Values.externalSecret.targetName -}}
+{{- $name := .Values.existingSecretName | default (ternary (default (include "corbusier.fullname" .) $esTarget) "" $esEnabled) -}}
 {{- $allowMissing := .Values.allowMissingSecret | default true -}}
 {{- $validateExistingSecret := .Values.validateExistingSecret | default false -}}
 {{- if and (gt (len $sec) 0) (not $name) -}}
-{{- fail "existingSecretName is required when secretEnvFromKeys is set" -}}
+{{- fail "existingSecretName (or externalSecret.targetName / externalSecret.enabled) is required when secretEnvFromKeys is set" -}}
 {{- end -}}
 {{- if and (gt (len $sec) 0) $name -}}
 {{- range $k, $secretKey := $sec -}}
