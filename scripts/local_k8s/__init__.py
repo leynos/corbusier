@@ -16,7 +16,7 @@ Run the preview environment from the command line:
 
 >>> # uv run scripts/local_k8s.py up
 
-Import the orchestration layer directly:
+Import the orchestration layer directly when `scripts/` is on `PYTHONPATH`:
 
 >>> from local_k8s.orchestration import setup_environment
 >>> setup_environment("corbusier-local", "corbusier", None, skip_build=True)

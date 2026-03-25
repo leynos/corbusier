@@ -202,6 +202,7 @@ def _with_cluster(
     action: Callable[[Config, dict[str, str]], None],
 ) -> int:
     """Verify the cluster exists, build config/env, and invoke *action*."""
+    require_exe("k3d")
     require_exe("kubectl")
     if not cluster_exists(cluster_name):
         print(f"Cluster '{cluster_name}' does not exist.")

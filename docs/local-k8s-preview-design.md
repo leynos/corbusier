@@ -146,7 +146,7 @@ via `secretKeyRef`.
 
 `validateExistingSecret` defaults to `false` so offline `helm template`
 rendering stays clean. Set it to `true` when rendering against a live cluster
-and you want Helm to verify that the referenced Secret and keys already exist.
+and Helm should verify that the referenced Secret and keys already exist.
 
 ## Local k3d workflow design
 
@@ -223,7 +223,8 @@ This sequence shows the full local preview flow. A developer runs
 `k3d` cluster, install the CloudNativePG and Valkey operators with Helm,
 provision the Postgres and cache instances, import the locally built Corbusier
 image, deploy the chart, and finally print the preview and health URLs.
-
+<!-- markdownlint-disable MD031 -->
+_Figure 1: Sequence diagram for the local k3d preview workflow._
 ```mermaid
 sequenceDiagram
     actor Developer
@@ -248,3 +249,4 @@ sequenceDiagram
     Helm->>App: deploy Deployment, Service, Ingress
     Script-->>Developer: print preview and health URLs
 ```
+<!-- markdownlint-enable MD031 -->
