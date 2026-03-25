@@ -1,4 +1,22 @@
-"""k3d cluster lifecycle helpers."""
+"""Helpers for managing local `k3d` clusters used by Corbusier previews.
+
+This module wraps the `k3d` CLI operations needed by the local preview
+workflow. It provides helpers for listing clusters, checking whether a cluster
+exists, inspecting the loopback ingress port, writing `KUBECONFIG` overrides,
+and importing locally built images into a cluster.
+
+Unlike earlier probe-and-fallback helpers, these functions now treat command
+failures and malformed JSON output as operational errors rather than as
+"cluster not found" signals. Callers should surface those failures to the user
+so local preview setup does not silently continue with stale assumptions.
+
+Examples
+--------
+Check whether the default preview cluster exists:
+
+>>> cluster_exists("corbusier-local")
+False
+"""
 
 from __future__ import annotations
 
@@ -8,22 +26,51 @@ from typing import Any
 from plumbum import FG, local
 from plumbum.commands.processes import ProcessExecutionError
 
+from local_k8s.validation import LocalK8sError
 
 def list_clusters() -> list[dict[str, Any]]:
-    """Return `k3d cluster list` output, or an empty list on error."""
+    """Return parsed cluster records from `k3d cluster list`.
+
+    Parameters
+    ----------
+    None
+        This helper reads cluster metadata from the local `k3d` CLI.
+
+    Returns
+    -------
+    list[dict[str, typing.Any]]
+        Parsed cluster records emitted by `k3d cluster list -o json`. A
+        genuine empty cluster list returns `[]`.
+
+    Raises
+    ------
+    local_k8s.validation.LocalK8sError
+        Raised when `k3d` fails, emits empty output, or returns JSON that does
+        not match the expected list-of-dicts structure.
+    """
     try:
         output = local["k3d"]["cluster", "list", "-o", "json"]().strip()
-    except ProcessExecutionError:
-        return []
+    except ProcessExecutionError as error:
+        command_output = "\n".join(
+            part for part in (str(error.stdout).strip(), str(error.stderr).strip()) if part
+        )
+        raise LocalK8sError(
+            "Failed to list k3d clusters"
+            + (f": {command_output}" if command_output else "")
+        ) from error
     if not output:
-        return []
+        raise LocalK8sError("Failed to list k3d clusters: command returned empty output")
     try:
         parsed = json.loads(output)
-    except json.JSONDecodeError:
-        return []
-    if isinstance(parsed, list) and all(isinstance(item, dict) for item in parsed):
-        return parsed
-    return []
+    except json.JSONDecodeError as error:
+        raise LocalK8sError(
+            f"Failed to parse k3d cluster list JSON: {error}; output was: {output}"
+        ) from error
+    if not isinstance(parsed, list):
+        raise LocalK8sError(f"Failed to parse k3d cluster list: expected a list, got {type(parsed).__name__}")
+    if not all(isinstance(item, dict) for item in parsed):
+        raise LocalK8sError("Failed to parse k3d cluster list: expected every cluster record to be an object")
+    return parsed
 
 
 def _ingress_port_from_cluster(cluster: dict[str, Any]) -> int | None:
@@ -53,12 +100,46 @@ def _ingress_port_from_cluster(cluster: dict[str, Any]) -> int | None:
 
 
 def cluster_exists(cluster_name: str) -> bool:
-    """Check whether a cluster exists."""
+    """Check whether a cluster exists.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the `k3d` cluster to look up.
+
+    Returns
+    -------
+    bool
+        `True` when a cluster with the requested name exists, otherwise
+        `False`.
+
+    Raises
+    ------
+    local_k8s.validation.LocalK8sError
+        Raised when cluster listing fails or produces malformed output.
+    """
     return any(cluster.get("name") == cluster_name for cluster in list_clusters())
 
 
 def get_cluster_ingress_port(cluster_name: str) -> int | None:
-    """Read the host ingress port from a k3d cluster definition."""
+    """Read the host ingress port from a `k3d` cluster definition.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the `k3d` cluster to inspect.
+
+    Returns
+    -------
+    int | None
+        Loopback ingress port when the cluster exists and exposes one,
+        otherwise `None`.
+
+    Raises
+    ------
+    local_k8s.validation.LocalK8sError
+        Raised when cluster listing fails or produces malformed output.
+    """
     for cluster in list_clusters():
         if cluster.get("name") != cluster_name:
             continue
@@ -67,22 +148,93 @@ def get_cluster_ingress_port(cluster_name: str) -> int | None:
 
 
 def create_k3d_cluster(cluster_name: str, ingress_port: int) -> None:
-    """Create a k3d cluster with loopback-only ingress exposure."""
+    """Create a `k3d` cluster with loopback-only ingress exposure.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the cluster to create.
+    ingress_port : int
+        Loopback host port to bind to container port `80` on the load
+        balancer.
+
+    Returns
+    -------
+    None
+        This function is called for its side effects.
+
+    Raises
+    ------
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when `k3d cluster create` fails.
+    """
     port_mapping = f"127.0.0.1:{ingress_port}:80@loadbalancer"
     local["k3d"]["cluster", "create", cluster_name, "--agents", "1", "--port", port_mapping] & FG
 
 
 def delete_k3d_cluster(cluster_name: str) -> None:
-    """Delete a k3d cluster."""
+    """Delete a `k3d` cluster.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the cluster to delete.
+
+    Returns
+    -------
+    None
+        This function is called for its side effects.
+
+    Raises
+    ------
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when `k3d cluster delete` fails.
+    """
     local["k3d"]["cluster", "delete", cluster_name] & FG
 
 
 def kubeconfig_env(cluster_name: str) -> dict[str, str]:
-    """Return an environment override pointing kubectl/helm at the cluster."""
+    """Return an environment override pointing `kubectl` and `helm` at a cluster.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the cluster whose kubeconfig should be written.
+
+    Returns
+    -------
+    dict[str, str]
+        Environment override containing a `KUBECONFIG` path for the cluster.
+
+    Raises
+    ------
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when `k3d kubeconfig write` fails.
+    """
     kubeconfig = local["k3d"]["kubeconfig", "write", cluster_name]().strip()
     return {"KUBECONFIG": kubeconfig}
 
 
 def import_image_to_k3d(cluster_name: str, image_repo: str, image_tag: str) -> None:
-    """Import a locally built image into k3d."""
+    """Import a locally built image into a `k3d` cluster.
+
+    Parameters
+    ----------
+    cluster_name : str
+        Name of the cluster that should receive the image.
+    image_repo : str
+        Image repository name.
+    image_tag : str
+        Image tag to import.
+
+    Returns
+    -------
+    None
+        This function is called for its side effects.
+
+    Raises
+    ------
+    plumbum.commands.processes.ProcessExecutionError
+        Raised when `k3d image import` fails.
+    """
     local["k3d"]["image", "import", f"{image_repo}:{image_tag}", "-c", cluster_name] & FG

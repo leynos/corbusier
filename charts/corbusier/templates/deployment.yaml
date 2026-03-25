@@ -23,8 +23,10 @@ spec:
         {{- include "corbusier.labels" . | nindent 8 }}
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: {{ .Chart.Name }}
+      {{- if .Values.config }}
       annotations:
-        checksum/config: {{ if .Values.config }}{{ toYaml .Values.config | sha256sum }}{{ end }}
+        checksum/config: {{ toYaml .Values.config | sha256sum }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "corbusier.serviceAccountName" . }}
       terminationGracePeriodSeconds: 30
