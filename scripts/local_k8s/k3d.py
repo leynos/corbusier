@@ -28,6 +28,48 @@ from plumbum.commands.processes import ProcessExecutionError
 
 from local_k8s.validation import LocalK8sError
 
+
+def _k3d_cluster_list_output() -> str:
+    """Run `k3d cluster list -o json` and return the stripped stdout."""
+    try:
+        return local["k3d"]["cluster", "list", "-o", "json"]().strip()
+    except ProcessExecutionError as error:
+        command_output = "\n".join(
+            part
+            for part in (str(error.stdout).strip(), str(error.stderr).strip())
+            if part
+        )
+        raise LocalK8sError(
+            "Failed to list k3d clusters"
+            + (f": {command_output}" if command_output else "")
+        ) from error
+
+
+def _parse_k3d_cluster_list(output: str) -> list[dict[str, Any]]:
+    """Parse and validate the JSON output of `k3d cluster list -o json`."""
+    if not output:
+        raise LocalK8sError(
+            "Failed to list k3d clusters: command returned empty output"
+        )
+    try:
+        parsed = json.loads(output)
+    except json.JSONDecodeError as error:
+        raise LocalK8sError(
+            f"Failed to parse k3d cluster list JSON: {error}; output was: {output}"
+        ) from error
+    if not isinstance(parsed, list):
+        raise LocalK8sError(
+            f"Failed to parse k3d cluster list: expected a list, got "
+            f"{type(parsed).__name__}"
+        )
+    if not all(isinstance(item, dict) for item in parsed):
+        raise LocalK8sError(
+            "Failed to parse k3d cluster list: expected every cluster record "
+            "to be an object"
+        )
+    return parsed
+
+
 def list_clusters() -> list[dict[str, Any]]:
     """Return parsed cluster records from `k3d cluster list`.
 
@@ -48,29 +90,7 @@ def list_clusters() -> list[dict[str, Any]]:
         Raised when `k3d` fails, emits empty output, or returns JSON that does
         not match the expected list-of-dicts structure.
     """
-    try:
-        output = local["k3d"]["cluster", "list", "-o", "json"]().strip()
-    except ProcessExecutionError as error:
-        command_output = "\n".join(
-            part for part in (str(error.stdout).strip(), str(error.stderr).strip()) if part
-        )
-        raise LocalK8sError(
-            "Failed to list k3d clusters"
-            + (f": {command_output}" if command_output else "")
-        ) from error
-    if not output:
-        raise LocalK8sError("Failed to list k3d clusters: command returned empty output")
-    try:
-        parsed = json.loads(output)
-    except json.JSONDecodeError as error:
-        raise LocalK8sError(
-            f"Failed to parse k3d cluster list JSON: {error}; output was: {output}"
-        ) from error
-    if not isinstance(parsed, list):
-        raise LocalK8sError(f"Failed to parse k3d cluster list: expected a list, got {type(parsed).__name__}")
-    if not all(isinstance(item, dict) for item in parsed):
-        raise LocalK8sError("Failed to parse k3d cluster list: expected every cluster record to be an object")
-    return parsed
+    return _parse_k3d_cluster_list(_k3d_cluster_list_output())
 
 
 def _ingress_port_from_mappings(mappings: list[Any]) -> int | None:
