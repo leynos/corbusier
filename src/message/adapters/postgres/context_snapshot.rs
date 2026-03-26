@@ -19,7 +19,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use super::tenant_tx::{FromTxError, TxError, with_tenant_read_tx, with_tenant_tx};
 
 impl FromTxError<Self> for SnapshotError {
     fn from_tx_error(tx_err: TxError<Self>) -> Self {
@@ -46,7 +46,7 @@ impl PostgresContextSnapshotAdapter {
         Self { pool }
     }
 
-    /// Generic helper to execute a database query with standard error handling.
+    /// Generic helper to execute a write query with standard error handling.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
@@ -58,6 +58,24 @@ impl PostgresContextSnapshotAdapter {
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            SnapshotError::persistence,
+        )
+        .await
+    }
+
+    /// Generic helper to execute a read-only query with standard error handling.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             SnapshotError::persistence,
         )
@@ -88,7 +106,7 @@ impl PostgresContextSnapshotAdapter {
             + Send
             + 'static,
     {
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let rows = build_query(context_snapshots::table)
                 .select(ContextSnapshotRow::as_select())
                 .load::<ContextSnapshotRow>(conn)

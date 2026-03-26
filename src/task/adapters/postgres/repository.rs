@@ -14,7 +14,9 @@ use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::blocking_helpers::{
     PgPool, get_conn_with, run_blocking_with,
 };
-use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use crate::message::adapters::postgres::tenant_tx::{
+    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+};
 use crate::task::{
     domain::{
         BranchRef, IssueRef, PersistedTaskData, PullRequestRef, Task, TaskId, TaskOrigin, TaskState,
@@ -58,7 +60,7 @@ impl PostgresTaskRepository {
     #[rustfmt::skip]
     pub const fn new(pool: TaskPgPool) -> Self { Self { pool } }
 
-    /// Executes a query inside a transaction with tenant context.
+    /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> TaskRepositoryResult<T>
     where
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
@@ -75,6 +77,24 @@ impl PostgresTaskRepository {
         )
         .await
     }
+
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> TaskRepositoryResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, TaskRepositoryError::persistence)?;
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            TaskRepositoryError::persistence,
+        )
+        .await
+    }
 }
 
 /// Generates a `find_by_*_ref` body that filters `tasks` by a nullable
@@ -83,7 +103,7 @@ macro_rules! find_tasks_by_ref_column {
     ($self:expr, $tenant_id:expr, $ref_str:expr, $column:expr) => {{
         let value = $ref_str;
         $self
-            .execute_query($tenant_id, move |conn| {
+            .execute_read_query($tenant_id, move |conn| {
                 let rows = tasks::table
                     .filter(tasks::tenant_id.eq($tenant_id.into_inner()))
                     .filter($column.eq(&value))
@@ -170,7 +190,7 @@ impl TaskRepository for PostgresTaskRepository {
     ) -> TaskRepositoryResult<Option<Task>> {
         let tenant_id = ctx.tenant_id();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let row = tasks::table
                 .filter(tasks::id.eq(id.into_inner()))
                 .filter(tasks::tenant_id.eq(tenant_id.into_inner()))
@@ -191,7 +211,7 @@ impl TaskRepository for PostgresTaskRepository {
         let tenant_id = ctx.tenant_id();
         let lookup_issue_ref = issue_ref.clone();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let row = find_task_by_issue_ref(conn, tenant_id, &lookup_issue_ref)?;
             row.map(row_to_task).transpose()
         })

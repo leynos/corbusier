@@ -26,7 +26,7 @@ use crate::message::{
 };
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use super::tenant_tx::{FromTxError, TxError, with_tenant_read_tx, with_tenant_tx};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
@@ -60,7 +60,7 @@ impl PostgresHandoffAdapter {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a query inside a transaction with tenant context.
+    /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
     where
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
@@ -72,6 +72,24 @@ impl PostgresHandoffAdapter {
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            HandoffError::persistence,
+        )
+        .await
+    }
+
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             HandoffError::persistence,
         )
@@ -227,7 +245,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let tenant_id = ctx.tenant_id();
         let uuid = handoff_id.into_inner();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             handoffs::table
                 .filter(handoffs::id.eq(uuid))
                 .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
@@ -249,7 +267,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let rows = handoffs::table
                 .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .filter(handoffs::conversation_id.eq(uuid))

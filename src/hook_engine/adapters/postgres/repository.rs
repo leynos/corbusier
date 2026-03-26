@@ -11,7 +11,9 @@ use crate::hook_engine::ports::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
     PendingExecutionRecord, PendingExecutionReservation,
 };
-use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use crate::message::adapters::postgres::tenant_tx::{
+    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+};
 use async_trait::async_trait;
 use diesel::OptionalExtension;
 use diesel::pg::PgConnection;
@@ -51,6 +53,26 @@ impl PostgresHookExecutionLogRepository {
                 .get()
                 .map_err(HookExecutionLogError::persistence_failed)?;
             with_tenant_tx(&mut connection, tenant_id.into_inner(), query_fn)
+        })
+        .await
+        .map_err(HookExecutionLogError::persistence_failed)?
+    }
+
+    async fn execute_read_query<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> HookExecutionLogResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HookExecutionLogResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut connection = pool
+                .get()
+                .map_err(HookExecutionLogError::persistence_failed)?;
+            with_tenant_read_tx(&mut connection, tenant_id.into_inner(), query_fn)
         })
         .await
         .map_err(HookExecutionLogError::persistence_failed)?
@@ -207,9 +229,9 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
     ) -> HookExecutionLogResult<Vec<HookExecutionResult>> {
         let tenant_id = ctx.tenant_id();
         let trigger_context_uuid = trigger_context_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
+        self.execute_read_query(tenant_id, move |connection| {
             let rows = hook_executions::table
-                // Defence-in-depth: explicit tenant_id filter even though with_tenant_tx
+                // Defence-in-depth: explicit tenant_id filter even though with_tenant_read_tx
                 // sets app.tenant_id for RLS. Retains multi-tenant isolation if RLS is
                 // not configured on the table.
                 .filter(hook_executions::tenant_id.eq(tenant_id.into_inner()))

@@ -17,7 +17,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::with_tenant_tx;
+use super::tenant_tx::{with_tenant_read_tx, with_tenant_tx};
 use crate::context::{RequestContext, TenantId};
 use crate::message::{
     adapters::models::AgentSessionRow,
@@ -48,7 +48,7 @@ impl PostgresAgentSessionRepository {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a query inside a transaction with tenant context.
+    /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
@@ -60,6 +60,24 @@ impl PostgresAgentSessionRepository {
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            SessionError::persistence,
+        )
+        .await
+    }
+
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             SessionError::persistence,
         )
@@ -96,7 +114,7 @@ impl PostgresAgentSessionRepository {
             + Send
             + 'static,
     {
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let tenant_uuid = tenant_id.into_inner();
             let base = agent_sessions::table
                 .filter(agent_sessions::tenant_id.eq(tenant_uuid))

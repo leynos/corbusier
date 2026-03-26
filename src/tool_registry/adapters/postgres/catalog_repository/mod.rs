@@ -13,7 +13,9 @@ use super::{
 };
 use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
-use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use crate::message::adapters::postgres::tenant_tx::{
+    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+};
 use crate::tool_registry::{
     domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
@@ -57,7 +59,7 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    /// Executes a query inside a transaction with tenant context.
+    /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
@@ -69,6 +71,24 @@ impl PostgresToolCatalog {
                 let mut conn =
                     get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            |e| ToolCatalogError::persistence("spawn_blocking", e),
+        )
+        .await
+    }
+
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+        run_blocking_with(
+            move || {
+                let mut conn =
+                    get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             |e| ToolCatalogError::persistence("spawn_blocking", e),
         )
@@ -323,7 +343,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
-        self.execute_query(tenant_id, move |connection| {
+        self.execute_read_query(tenant_id, move |connection| {
             Self::load_entries_for_tenant(connection, tid, Some(name.as_str()))
         })
         .await
@@ -332,7 +352,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
     async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
+        self.execute_read_query(tenant_id, move |connection| {
             Self::load_entries_for_tenant(connection, tid, None)
         })
         .await

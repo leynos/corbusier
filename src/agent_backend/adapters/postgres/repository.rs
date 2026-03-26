@@ -12,7 +12,9 @@ use crate::agent_backend::{
     ports::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult},
 };
 use crate::context::{RequestContext, TenantId};
-use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use crate::message::adapters::postgres::tenant_tx::{
+    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+};
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -135,14 +137,16 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
         self.run_blocking(move |connection| {
-            let row = backend_registrations::table
-                .filter(backend_registrations::id.eq(id.into_inner()))
-                .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
-                .select(BackendRegistrationRow::as_select())
-                .first::<BackendRegistrationRow>(connection)
-                .optional()
-                .map_err(BackendRegistryError::persistence)?;
-            row.map(row_to_registration).transpose()
+            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+                let row = backend_registrations::table
+                    .filter(backend_registrations::id.eq(id.into_inner()))
+                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .select(BackendRegistrationRow::as_select())
+                    .first::<BackendRegistrationRow>(tx)
+                    .optional()
+                    .map_err(BackendRegistryError::persistence)?;
+                row.map(row_to_registration).transpose()
+            })
         })
         .await
     }
@@ -155,14 +159,16 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         let tenant_id = ctx.tenant_id();
         let name_str = name.as_str().to_owned();
         self.run_blocking(move |connection| {
-            let row = backend_registrations::table
-                .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
-                .filter(backend_registrations::name.eq(&name_str))
-                .select(BackendRegistrationRow::as_select())
-                .first::<BackendRegistrationRow>(connection)
-                .optional()
-                .map_err(BackendRegistryError::persistence)?;
-            row.map(row_to_registration).transpose()
+            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+                let row = backend_registrations::table
+                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::name.eq(&name_str))
+                    .select(BackendRegistrationRow::as_select())
+                    .first::<BackendRegistrationRow>(tx)
+                    .optional()
+                    .map_err(BackendRegistryError::persistence)?;
+                row.map(row_to_registration).transpose()
+            })
         })
         .await
     }
@@ -173,13 +179,15 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
         self.run_blocking(move |connection| {
-            let rows = backend_registrations::table
-                .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
-                .filter(backend_registrations::status.eq(BackendStatus::Active.as_str()))
-                .select(BackendRegistrationRow::as_select())
-                .load::<BackendRegistrationRow>(connection)
-                .map_err(BackendRegistryError::persistence)?;
-            rows.into_iter().map(row_to_registration).collect()
+            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+                let rows = backend_registrations::table
+                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::status.eq(BackendStatus::Active.as_str()))
+                    .select(BackendRegistrationRow::as_select())
+                    .load::<BackendRegistrationRow>(tx)
+                    .map_err(BackendRegistryError::persistence)?;
+                rows.into_iter().map(row_to_registration).collect()
+            })
         })
         .await
     }
@@ -190,12 +198,14 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
         self.run_blocking(move |connection| {
-            let rows = backend_registrations::table
-                .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
-                .select(BackendRegistrationRow::as_select())
-                .load::<BackendRegistrationRow>(connection)
-                .map_err(BackendRegistryError::persistence)?;
-            rows.into_iter().map(row_to_registration).collect()
+            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+                let rows = backend_registrations::table
+                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .select(BackendRegistrationRow::as_select())
+                    .load::<BackendRegistrationRow>(tx)
+                    .map_err(BackendRegistryError::persistence)?;
+                rows.into_iter().map(row_to_registration).collect()
+            })
         })
         .await
     }
