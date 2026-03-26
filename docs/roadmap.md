@@ -10,12 +10,46 @@ This phase captures the ADR-driven migration work needed to align Corbusier
 with Podbot-hosted execution without renumbering the established roadmap and
 execplan references. External Podbot dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
+It sits ahead of phases 1 through 5: phase 0 establishes the runtime,
+workspace, wire, validation, and security boundaries that the later
+orchestration, API, and operator-facing phases assume.
+
+Table 1: Phase 0 subphases and delivery goals.
+
+| Subphase | Goal |
+| --- | --- |
+| 0.1 | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam. |
+| 0.2 | Introduce the canonical workspace runtime model and source-policy controls. |
+| 0.3 | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts. |
+| 0.4 | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
+| 0.5 | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults. |
+| 0.6 | Run staged migration gates and declare the evidence needed to retire legacy paths. |
+
+Use the shared dependency labels below to keep phase 0 task text readable:
+
+- Phase 0 hosting schema dependency: Podbot Step 1.4, "Hosting schema
+  migration and compatibility matrix".
+- Phase 0 workspace strategy dependency: Podbot Step 4.4, "Workspace
+  strategies".
+- Phase 0 hosting core dependencies: Podbot Step 4.5, "Normalized launch
+  contract", Podbot Step 4.6, "Hosted session control plane", and Podbot Step
+  4.7, "MCP wire provisioning and injection".
+- Phase 0 prompt-validation dependencies: Podbot Step 2.6, "ACP capability
+  masking enforcement", and Podbot Step 4.8, "Prompt, bundle, and validation
+  surfaces".
+- Phase 0 hook-recovery dependencies: Podbot Step 4.9, "Hook execution and
+  orchestrator acknowledgement", and Podbot Step 4.10, "Recovery, replay, and
+  restart safety".
+- Phase 0 conformance dependencies: Podbot Step 4.11, "Gated e2e
+  orchestration suite", Podbot Step 8.2, "ACP transport conformance harness",
+  Podbot Step 8.3, "Host lifecycle and output-purity tests", and Podbot Step
+  8.4, "Wire, hook, and validation conformance tests".
 
 ### 0.1. Migration governance and runtime boundary
 
 - [ ] 0.1.1 Ratify the staged migration boundary and phase gates. Requires
-  Podbot Step 1.4, "Hosting schema migration and compatibility matrix", and
-  Podbot Step 4.5, "Normalized launch contract". See
+  the phase 0 hosting schema dependency and Podbot Step 4.5, "Normalized
+  launch contract". See
   adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
   Direction and §Migration Plan.
   - [ ] Ratify ADRs 001 through 005 together, so no foundational migration
@@ -30,8 +64,8 @@ execplan references. External Podbot dependencies refer to the
   - [ ] Success criteria: ADRs 001 through 005 cite consistent Podbot
     dependencies, and each migration phase has explicit entry and exit gates.
 - [ ] 0.1.2 Establish the Podbot-hosted runtime seam. Requires 1.5.1, Podbot
-  Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted
-  session control plane". See
+  Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted session
+  control plane". See
   adr-001-runtime-boundary-between-corbusier-and-podbot.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Define a Corbusier port for the Podbot library API and route hosted
@@ -51,9 +85,9 @@ execplan references. External Podbot dependencies refer to the
 ### 0.2. Workspace runtime model and source policy
 
 - [ ] 0.2.1 Introduce the canonical workspace runtime record. Requires 1.5.2,
-  Podbot Step 1.4, "Hosting schema migration and compatibility matrix", Podbot
-  Step 4.4, "Workspace strategies", and Podbot Step 4.5, "Normalized launch
-  contract". See adr-002-workspace-runtime-model-and-source-policy.md
+  the phase 0 hosting schema dependency, the phase 0 workspace strategy
+  dependency, and Podbot Step 4.5, "Normalized launch contract". See
+  adr-002-workspace-runtime-model-and-source-policy.md
   §Decision Outcome / Proposed Direction and
   adr-006-durable-runtime-state-and-audit-model.md §Migration Plan.
   - [ ] Persist stable workspace identifiers linked to tenant, task, and
@@ -69,9 +103,8 @@ execplan references. External Podbot dependencies refer to the
     hosted sessions, and distinguish logical identity from concrete runtime
     state.
 - [ ] 0.2.2 Replace legacy transport labels with the canonical MCP source
-  taxonomy. Requires 0.2.1, Podbot Step 1.4, "Hosting schema migration and
-  compatibility matrix", and Podbot Step 4.7, "MCP wire provisioning and
-  injection". See
+  taxonomy. Requires 0.2.1, the phase 0 hosting schema dependency, and Podbot
+  Step 4.7, "MCP wire provisioning and injection". See
   adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define canonical source variants for local stdio, helper-container
@@ -89,7 +122,7 @@ execplan references. External Podbot dependencies refer to the
   injection", Podbot Step 3.1, "App authentication", Podbot Step 3.2,
   "Installation token acquisition", Podbot Step 3.3, "Token daemon", Podbot
   Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and
-  Podbot Step 4.4, "Workspace strategies". See
+  the phase 0 workspace strategy dependency. See
   adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
   Proposed Direction and
   adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
@@ -112,9 +145,7 @@ execplan references. External Podbot dependencies refer to the
 
 - [ ] 0.3.1 Move hosted MCP attachment onto Podbot-owned wire provisioning.
   Requires 0.1.2, 0.2.2, Podbot Step 2.5, "Protocol-safe execution (stdio
-  proxy)", Podbot Step 4.5, "Normalized launch contract", Podbot Step 4.6,
-  "Hosted session control plane", and Podbot Step 4.7, "MCP wire provisioning
-  and injection". See
+  proxy)", and the phase 0 hosting core dependencies. See
   adr-003-mcp-wire-model-and-tool-plane-ownership.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Separate Corbusier's source catalogue from runtime wire attachment and
@@ -131,9 +162,7 @@ execplan references. External Podbot dependencies refer to the
     protocol noise.
 - [ ] 0.3.2 Replace inline hook assumptions with control-channel
   acknowledgement flow. Requires 0.1.2, Podbot Step 4.6, "Hosted session
-  control plane", Podbot Step 4.9, "Hook execution and orchestrator
-  acknowledgement", and Podbot Step 4.10, "Recovery, replay, and restart
-  safety". See
+  control plane", and the phase 0 hook-recovery dependencies. See
   adr-005-hook-execution-contract-and-control-channel-semantics.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed hook request, acknowledgement, completion, timeout, and
@@ -170,8 +199,7 @@ execplan references. External Podbot dependencies refer to the
 
 - [ ] 0.4.1 Persist hosted runtime entities with idempotent state machines.
   Requires 0.2.1, 0.3.1, 0.3.2, Podbot Step 4.6, "Hosted session control
-  plane", Podbot Step 4.9, "Hook execution and orchestrator acknowledgement",
-  and Podbot Step 4.10, "Recovery, replay, and restart safety". See
+  plane", and the phase 0 hook-recovery dependencies. See
   adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Persist hosted sessions, workspaces, wires, hook invocations,
@@ -188,10 +216,7 @@ execplan references. External Podbot dependencies refer to the
     state transitions, and every persisted runtime record links to a tenant,
     task, and hosted session.
 - [ ] 0.4.2 Add retention, cleanup, and conformance gates for runtime state.
-  Requires 0.4.1, Podbot Step 4.11, "Gated e2e orchestration suite", Podbot
-  Step 8.2, "ACP transport conformance harness", Podbot Step 8.3, "Host
-  lifecycle and output-purity tests", and Podbot Step 8.4, "Wire, hook, and
-  validation conformance tests". See
+  Requires 0.4.1 and the phase 0 conformance dependencies. See
   adr-006-durable-runtime-state-and-audit-model.md §Migration Plan and
   adr-010-migration-and-coexistence-strategy.md §Migration Plan.
   - [ ] Move cleanup and retention jobs onto the hosted-session, workspace,
@@ -229,9 +254,8 @@ execplan references. External Podbot dependencies refer to the
     from repository state, and documentation examples match the normative
     schema.
 - [ ] 0.5.2 Implement structured prompt validation with capability
-  dispositions. Requires 0.5.1, Podbot Step 2.6, "ACP capability masking
-  enforcement", Podbot Step 4.5, "Normalized launch contract", and Podbot Step
-  4.8, "Prompt, bundle, and validation surfaces". See
+  dispositions. Requires 0.5.1, the phase 0 prompt-validation dependencies,
+  and Podbot Step 4.5, "Normalized launch contract". See
   adr-008-prompt-validation-semantics-and-capability-dispositions.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed validation request and response shapes, including the
@@ -250,11 +274,10 @@ execplan references. External Podbot dependencies refer to the
     supported hosted targets, and fixture coverage includes blocked, degraded,
     and clean outcomes.
 - [ ] 0.5.3 Enforce least-privilege defaults and override controls. Requires
-  0.2.3, 0.3.2, 0.5.2, Podbot Step 1.4, "Hosting schema migration and
-  compatibility matrix", Podbot Step 2.6, "ACP capability masking
-  enforcement", Podbot Step 4.4, "Workspace strategies", Podbot Step 4.7, "MCP
-  wire provisioning and injection", and Podbot Step 4.9, "Hook execution and
-  orchestrator acknowledgement". See
+  0.2.3, 0.3.2, 0.5.2, the phase 0 hosting schema dependency, the phase 0
+  workspace strategy dependency, the phase 0 prompt-validation dependencies,
+  Podbot Step 4.7, "MCP wire provisioning and injection", and Podbot Step 4.9,
+  "Hook execution and orchestrator acknowledgement". See
   adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Define the default privilege matrix for hosted agents, hooks,
@@ -274,13 +297,10 @@ execplan references. External Podbot dependencies refer to the
 ### 0.6. Migration closure and legacy retirement
 
 - [ ] 0.6.1 Run staged compatibility, warn-only, and blocking migration gates.
-  Requires 0.1.1, 0.2.2, 0.3.1, 0.4.2, 0.5.2, 0.5.3, Podbot Step 1.4,
-  "Hosting schema migration and compatibility matrix", Podbot Step 4.5,
-  "Normalized launch contract", Podbot Step 4.6, "Hosted session control
-  plane", Podbot Step 4.7, "MCP wire provisioning and injection", Podbot Step
-  4.8, "Prompt, bundle, and validation surfaces", Podbot Step 4.9, "Hook
-  execution and orchestrator acknowledgement", and Podbot Step 4.10,
-  "Recovery, replay, and restart safety". See
+  Requires 0.1.1, 0.2.2, 0.3.1, 0.4.2, 0.5.2, 0.5.3, the phase 0 hosting
+  schema dependency, the phase 0 hosting core dependencies, the phase 0
+  prompt-validation dependencies, and the phase 0 hook-recovery dependencies.
+  See
   adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
   Direction and §Migration Plan.
   - [ ] Run warn-only validation where blocking behaviour would break active
@@ -708,7 +728,11 @@ enforcement.
     `aggregate_type`, `event_type`, `event_data`, and `occurred_at`). See
     corbusier-api-design.md §Replay storage.
   - [ ] Implement SSE endpoint skeleton at `GET /api/v1/events` with event
-    identifier emission and `Last-Event-ID` parsing.[^4]
+    identifier emission and `Last-Event-ID` parsing. See
+    [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+    and
+    [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+    for `Last-Event-ID` replay semantics.
   - [ ] Success criteria: SSE endpoint emits well-formed events with stable
     identifiers; `Last-Event-ID` header is parsed on reconnect.
 
@@ -777,8 +801,12 @@ enforcement.
     `GET /api/v1/events/conversations/{conversation_id}`. See
     corbusier-api-design.md §Recommended SSE endpoints.
   - [ ] Replay events from the `domain_events` store on reconnect using
-    `Last-Event-ID`; emit `stream_reset` when events are no longer
-    retained.[^4]
+    `Last-Event-ID`; emit `stream_reset` when events are no longer retained.
+    See
+    [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+    and
+    [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+    for `Last-Event-ID` replay semantics.
   - [ ] Success criteria: reconnecting clients receive replayed events;
     deterministic replay is verified in streaming tests.
 
@@ -814,7 +842,6 @@ enforcement.
     all phase 5 endpoints. See corbusier-api-design.md §Test strategy.
   - [ ] Success criteria: contract tests validate error schema stability and
     pagination envelope shape; tenant isolation tests pass.
-
 [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
 and
 [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
