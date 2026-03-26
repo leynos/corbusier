@@ -95,6 +95,8 @@ telemetry for reconstruction when failures occur.
 Corbusier records runtime changes only as events and builds projections for
 operator views and reconciliation workflows.
 
+Table 1: Trade-offs for durable runtime state.
+
 | Topic                     | Option A | Option B | Option C |
 | ------------------------- | -------- | -------- | -------- |
 | Restart recovery          | Strong   | Weak     | Strong   |
@@ -102,8 +104,6 @@ operator views and reconciliation workflows.
 | Audit completeness        | Strong   | Weak     | Strong   |
 | Incremental migration fit | Strong   | Medium   | Weak     |
 | Query simplicity          | Strong   | Medium   | Weak     |
-
-Table 1: Trade-offs for durable runtime state.
 
 ## Decision Outcome / Proposed Direction
 
