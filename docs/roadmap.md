@@ -4,6 +4,312 @@ The roadmap translates the Corbusier design into phased, measurable delivery
 steps. Work is ordered by dependency and avoids time-based commitments, while
 staying within the in-scope capabilities defined in corbusier-design.md.
 
+## 0. Podbot conformance and migration
+
+This phase captures the ADR-driven migration work needed to align Corbusier
+with Podbot-hosted execution without renumbering the established roadmap and
+execplan references. External Podbot dependencies refer to the
+[Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
+
+### 0.1. Migration governance and runtime boundary
+
+- [ ] 0.1.1 Ratify the staged migration boundary and phase gates. Requires
+  Podbot Step 1.4, "Hosting schema migration and compatibility matrix", and
+  Podbot Step 4.5, "Normalized launch contract". See
+  adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
+  Direction and §Migration Plan.
+  - [ ] Ratify ADRs 001 through 005 together, so no foundational migration
+    ADR carries contradictory dependency or ownership text.
+  - [ ] Record advancement criteria for warn-only, compatibility, and blocking
+    phases in repository-facing documentation and review checklists.
+  - Design note: migration gates should advance only when Podbot-facing
+    surfaces are stable enough to avoid reviving inline runtime ownership in
+    Corbusier.
+  - Outstanding decisions: which phases require accepted ADRs before merge,
+    and which roadmap or documentation updates gate the end of migration.
+  - [ ] Success criteria: ADRs 001 through 005 cite consistent Podbot
+    dependencies, and each migration phase has explicit entry and exit gates.
+- [ ] 0.1.2 Establish the Podbot-hosted runtime seam. Requires 1.5.1, Podbot
+  Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted
+  session control plane". See
+  adr-001-runtime-boundary-between-corbusier-and-podbot.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
+  - [ ] Define a Corbusier port for the Podbot library API and route hosted
+    sessions through that port instead of inline runtime ownership.
+  - [ ] Define typed adapter errors, retries, and fake-runtime seams that
+    mirror the Podbot boundary rather than recreating a second production
+    runtime inside Corbusier.
+  - Design note: Podbot owns workspace shaping, container lifecycle, MCP wire
+    bridging, and generic hook execution; Corbusier owns policy, registry,
+    orchestration, durable state, and audit interpretation.
+  - Outstanding decisions: whether CLI fallback remains valid for development
+    or recovery, which side owns low-level runtime retries, and whether any
+    runtime action may bypass Podbot.
+  - [ ] Success criteria: all hosted-session launches use the Podbot-facing
+    adapter, and no production path depends on inline hosted runtime code.
+
+### 0.2. Workspace runtime model and source policy
+
+- [ ] 0.2.1 Introduce the canonical workspace runtime record. Requires 1.5.2,
+  Podbot Step 1.4, "Hosting schema migration and compatibility matrix", Podbot
+  Step 4.4, "Workspace strategies", and Podbot Step 4.5, "Normalized launch
+  contract". See adr-002-workspace-runtime-model-and-source-policy.md
+  §Decision Outcome / Proposed Direction and
+  adr-006-durable-runtime-state-and-audit-model.md §Migration Plan.
+  - [ ] Persist stable workspace identifiers linked to tenant, task, and
+    hosted-session context with explicit lifecycle states.
+  - [ ] Record requested source type, access mode, and runtime identifiers
+    returned by Podbot for prepared workspaces.
+  - Design note: Corbusier owns the logical workspace record; Podbot owns the
+    prepared runtime workspace for hosted execution.
+  - Outstanding decisions: whether repository clone and host mount share the
+    same lifecycle semantics, and how long failed workspaces remain available
+    for debugging before cleanup.
+  - [ ] Success criteria: workspace records survive restart, link cleanly to
+    hosted sessions, and distinguish logical identity from concrete runtime
+    state.
+- [ ] 0.2.2 Replace legacy transport labels with the canonical MCP source
+  taxonomy. Requires 0.2.1, Podbot Step 1.4, "Hosting schema migration and
+  compatibility matrix", and Podbot Step 4.7, "MCP wire provisioning and
+  injection". See
+  adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
+  - [ ] Define canonical source variants for local stdio, helper-container
+    stdio, and direct Streamable HTTP sources in Corbusier's domain model.
+  - [ ] Add compatibility parsing for legacy transport records and write
+    canonical values on update paths.
+  - Design note: agent-visible wire endpoints are runtime artefacts and must
+    not be persisted as source definitions.
+  - Outstanding decisions: how much automatic migration is safe for ambiguous
+    legacy records, and which health semantics belong to sources versus wires.
+  - [ ] Success criteria: new writes use canonical taxonomy values only, while
+    compatibility reads still accept retained legacy transport records.
+- [ ] 0.2.3 Enforce workspace source safety and access policy. Requires 0.2.1,
+  Podbot Step 2.2, "Container creation", Podbot Step 2.3, "Credential
+  injection", Podbot Step 3.1, "App authentication", Podbot Step 3.2,
+  "Installation token acquisition", Podbot Step 3.3, "Token daemon", Podbot
+  Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and
+  Podbot Step 4.4, "Workspace strategies". See
+  adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
+  Proposed Direction and
+  adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
+  Proposed Direction.
+  - [ ] Add canonical path resolution, allowed-root validation, and symlink
+    escape protection for host mounts before Podbot is allowed to mount them.
+  - [ ] Enforce explicit read-only or read-write access modes for clone-backed
+    and host-mounted workspaces, including helper-container repository access.
+  - Design note: the initial production default is repository clone into a
+    Podbot-owned runtime workspace, with host mounts allowed only through
+    explicit policy and safety checks.
+  - Outstanding decisions: whether hooks may widen access from read-only to
+    read-write, and whether helper-container sources may inherit repository
+    access by default.
+  - [ ] Success criteria: unsafe mount paths are rejected deterministically,
+    Git-backed workspace preparation uses rotated credentials, and access mode
+    is recorded for every prepared workspace.
+
+### 0.3. Hosted tool plane and hook control
+
+- [ ] 0.3.1 Move hosted MCP attachment onto Podbot-owned wire provisioning.
+  Requires 0.1.2, 0.2.2, Podbot Step 2.5, "Protocol-safe execution (stdio
+  proxy)", Podbot Step 4.5, "Normalized launch contract", Podbot Step 4.6,
+  "Hosted session control plane", and Podbot Step 4.7, "MCP wire provisioning
+  and injection". See
+  adr-003-mcp-wire-model-and-tool-plane-ownership.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
+  - [ ] Separate Corbusier's source catalogue from runtime wire attachment and
+    request Podbot-managed wire sets for each hosted workspace.
+  - [ ] Publish the agent-visible wire view at session start and ingest
+    wire-related lifecycle events for audit and operator visibility.
+  - Design note: Corbusier remains the tool catalogue and policy authority,
+    but the hosted agent becomes the MCP client for Podbot-hosted sessions.
+  - Outstanding decisions: how tool-call telemetry enters Corbusier when it is
+    no longer inline, whether mixed-mode tool invocation is ever justified,
+    and whether wire attachment may change during a live session.
+  - [ ] Success criteria: hosted agents receive workspace-scoped wire
+    attachments from Podbot, and stdout remains free of Corbusier-owned
+    protocol noise.
+- [ ] 0.3.2 Replace inline hook assumptions with control-channel
+  acknowledgement flow. Requires 0.1.2, Podbot Step 4.6, "Hosted session
+  control plane", Podbot Step 4.9, "Hook execution and orchestrator
+  acknowledgement", and Podbot Step 4.10, "Recovery, replay, and restart
+  safety". See
+  adr-005-hook-execution-contract-and-control-channel-semantics.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
+  - [ ] Define typed hook request, acknowledgement, completion, timeout, and
+    abort message shapes with stable correlation identifiers.
+  - [ ] Suspend the hosted execution path until Corbusier replies with an
+    idempotent approval, denial, or abort decision.
+  - Design note: Podbot executes hooks after acknowledgement, while Corbusier
+    evaluates policy and records audit outcomes over a dedicated control
+    channel.
+  - Outstanding decisions: whether denial aborts the session, skips the hook,
+    or fails the current step, and whether any completion event may be optional
+    for specific trigger types.
+  - [ ] Success criteria: hosted hook flows are restart-safe, duplicate
+    deliveries are idempotent, and every completed hook has a matching
+    acknowledgement record.
+- [ ] 0.3.3 Align hosted-session launch and command surfaces with the Podbot
+  control plane. Requires 0.3.1, Podbot Step 4.5, "Normalized launch
+  contract", Podbot Step 4.6, "Hosted session control plane", Podbot Step 6.1,
+  "Subcommand dispatch", and Podbot Step 6.5, "Host subcommand". See
+  adr-001-runtime-boundary-between-corbusier-and-podbot.md §Migration Plan and
+  adr-010-migration-and-coexistence-strategy.md §Podbot roadmap dependencies.
+  - [ ] Route hosted launch requests through the same normalized command and
+    library contract used by Podbot's `host` interface.
+  - [ ] Ensure Corbusier-facing library and operator tooling consume one typed
+    control surface instead of CLI scraping or ad hoc wrapper logic.
+  - Design note: Corbusier should integrate against Podbot's normative library
+    and command contracts, not against transient CLI text.
+  - Outstanding decisions: whether any low-level development tooling may
+    remain CLI-bound after the hosted control plane is stable.
+  - [ ] Success criteria: hosted control operations use one normalized launch
+    contract across library, operator, and recovery paths.
+
+### 0.4. Durable runtime state and audit ingestion
+
+- [ ] 0.4.1 Persist hosted runtime entities with idempotent state machines.
+  Requires 0.2.1, 0.3.1, 0.3.2, Podbot Step 4.6, "Hosted session control
+  plane", Podbot Step 4.9, "Hook execution and orchestrator acknowledgement",
+  and Podbot Step 4.10, "Recovery, replay, and restart safety". See
+  adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
+  - [ ] Persist hosted sessions, workspaces, wires, hook invocations,
+    acknowledgements, and validation snapshots with explicit terminal and
+    non-terminal states.
+  - [ ] Reconcile restart and replay events idempotently using stable
+    correlation identifiers and event identifiers from Podbot.
+  - Design note: large logs, transcripts, and runtime artefacts belong outside
+    the primary runtime tables and should be linked by reference.
+  - Outstanding decisions: whether direct tool-call telemetry arrives as raw
+    events or derived audit logs, and which failure states are terminal versus
+    reconcilable.
+  - [ ] Success criteria: restart recovery replays do not duplicate runtime
+    state transitions, and every persisted runtime record links to a tenant,
+    task, and hosted session.
+- [ ] 0.4.2 Add retention, cleanup, and conformance gates for runtime state.
+  Requires 0.4.1, Podbot Step 4.11, "Gated e2e orchestration suite", Podbot
+  Step 8.2, "ACP transport conformance harness", Podbot Step 8.3, "Host
+  lifecycle and output-purity tests", and Podbot Step 8.4, "Wire, hook, and
+  validation conformance tests". See
+  adr-006-durable-runtime-state-and-audit-model.md §Migration Plan and
+  adr-010-migration-and-coexistence-strategy.md §Migration Plan.
+  - [ ] Move cleanup and retention jobs onto the hosted-session, workspace,
+    wire, and hook entities introduced in 0.4.1.
+  - [ ] Gate phase advancement on end-to-end orchestration, transport
+    conformance, host lifecycle, and wire or hook validation suites.
+  - Design note: phase advancement should depend on conformance evidence rather
+    than on successful ad hoc manual runs.
+  - Outstanding decisions: whether retention differs by tenant or runtime
+    surface, and how cleanup avoids deleting data still needed for review or
+    incident analysis.
+  - [ ] Success criteria: cleanup preserves immutable audit references, and
+    hosted conformance suites pass before downstream runtime-facing phases
+    advance.
+
+### 0.5. Prompt, bundle, validation, and privilege defaults
+
+- [ ] 0.5.1 Define the prompt, skill, and bundle document model. Requires
+  0.4.1, Podbot Step 4.5, "Normalized launch contract", Podbot Step 4.8,
+  "Prompt, bundle, and validation surfaces", and Podbot Step 5.3, "Stabilize
+  public library boundaries". See
+  adr-007-prompt-skill-and-bundle-document-model.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
+  - [ ] Define prompt document frontmatter, bundle manifest fields, namespaced
+    extension fields, and attachment references.
+  - [ ] Add repository parsing, rendering, and bundle assembly logic that keeps
+    standard skill directories portable.
+  - Design note: bundles sit above standard skill directories and group
+    prompts, skill selections, wire defaults, hook defaults, and other runtime
+    dependencies.
+  - Outstanding decisions: whether frontmatter is templated by default,
+    whether bundles may carry runtime defaults, and how artefact versioning and
+    immutability are represented.
+  - [ ] Success criteria: prompt and bundle artefacts render deterministically
+    from repository state, and documentation examples match the normative
+    schema.
+- [ ] 0.5.2 Implement structured prompt validation with capability
+  dispositions. Requires 0.5.1, Podbot Step 2.6, "ACP capability masking
+  enforcement", Podbot Step 4.5, "Normalized launch contract", and Podbot Step
+  4.8, "Prompt, bundle, and validation surfaces". See
+  adr-008-prompt-validation-semantics-and-capability-dispositions.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
+  - [ ] Define typed validation request and response shapes, including the
+    `native`, `host-enforced`, `translated`, `ignored`, and `rejected`
+    dispositions.
+  - [ ] Return structured diagnostics and effective prompt previews for
+    supported hosted targets, and persist representative degraded-case
+    fixtures.
+  - Design note: required capabilities ending in `ignored` or `rejected`
+    should block execution, while preferred capabilities may degrade with a
+    warning during the migration window.
+  - Outstanding decisions: whether validation is exposed through a user-facing
+    command as well as the library surface, whether rendering happens before or
+    after validation, and whether validation results are persisted for audit.
+  - [ ] Success criteria: validation reports deterministic diagnostics for
+    supported hosted targets, and fixture coverage includes blocked, degraded,
+    and clean outcomes.
+- [ ] 0.5.3 Enforce least-privilege defaults and override controls. Requires
+  0.2.3, 0.3.2, 0.5.2, Podbot Step 1.4, "Hosting schema migration and
+  compatibility matrix", Podbot Step 2.6, "ACP capability masking
+  enforcement", Podbot Step 4.4, "Workspace strategies", Podbot Step 4.7, "MCP
+  wire provisioning and injection", and Podbot Step 4.9, "Hook execution and
+  orchestrator acknowledgement". See
+  adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
+  - [ ] Define the default privilege matrix for hosted agents, hooks,
+    helper-container sources, and delegated host capabilities.
+  - [ ] Persist override records, approval hooks, and audit capture for each
+    privileged deviation from the default matrix.
+  - Design note: hosted agents begin with the narrowest access needed for the
+    task and prompt, and helper-container sources default to no repository
+    access unless policy grants otherwise.
+  - Outstanding decisions: who may approve privilege overrides, whether
+    development-mode overrides remain ephemeral, and which capability
+    combinations remain permanently unsupported.
+  - [ ] Success criteria: unsafe privilege combinations fail validation or
+    policy evaluation by default, and every override request is reviewable and
+    auditable.
+
+### 0.6. Migration closure and legacy retirement
+
+- [ ] 0.6.1 Run staged compatibility, warn-only, and blocking migration gates.
+  Requires 0.1.1, 0.2.2, 0.3.1, 0.4.2, 0.5.2, 0.5.3, Podbot Step 1.4,
+  "Hosting schema migration and compatibility matrix", Podbot Step 4.5,
+  "Normalized launch contract", Podbot Step 4.6, "Hosted session control
+  plane", Podbot Step 4.7, "MCP wire provisioning and injection", Podbot Step
+  4.8, "Prompt, bundle, and validation surfaces", Podbot Step 4.9, "Hook
+  execution and orchestrator acknowledgement", and Podbot Step 4.10,
+  "Recovery, replay, and restart safety". See
+  adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
+  Direction and §Migration Plan.
+  - [ ] Run warn-only validation where blocking behaviour would break active
+    flows, and record diagnostics for reviewed prompt and bundle samples.
+  - [ ] Freeze legacy routing and legacy transport labels on new writes while
+    retaining compatibility reads for historical records until retirement.
+  - Design note: migration should move from compatibility, to warning, to
+    blocking behaviour with explicit evidence at each gate rather than by
+    silent tightening.
+  - Outstanding decisions: how long legacy transport parsing remains
+    supported, and when in-memory or legacy runtime adapters can be deleted.
+  - [ ] Success criteria: compatibility reads still succeed for retained
+    history, while new writes and CI gates move onto blocking behaviour in the
+    documented order.
+- [ ] 0.6.2 Declare end-of-migration retirement criteria. Requires 0.6.1 and
+  4.3.2. See adr-010-migration-and-coexistence-strategy.md §Migration Plan and
+  §Outstanding Decisions.
+  - [ ] Define the evidence bundle required to remove inline hosted runtime
+    ownership, legacy routing, and legacy transport write paths.
+  - [ ] Require roadmap, ADR, and operator-documentation updates before any
+    legacy removal pull request is considered complete.
+  - Design note: migration is complete only when the architectural boundary,
+    operator expectations, and test gates all point at the same hosted path.
+  - Outstanding decisions: what granularity of acceptance criteria is required
+    for final phase transitions, and which documentation changes must land
+    before legacy retirement.
+  - [ ] Success criteria: legacy path removals are blocked until the evidence
+    bundle, documentation updates, and conformance gates are all complete.
+
 ## 1. Core orchestration foundation
 
 ### 1.1. Conversation management
@@ -51,17 +357,17 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [x] Success criteria: task records include branch and pull request
     references for all linked work items.
 - [x] 1.2.3 Enforce task state transitions with validation. Requires
-      1.2.1.[^1]
+  1.2.1.[^1]
   - [x] Define allowed transitions and terminal states.[^2]
   - [x] Reject invalid transitions with typed errors.[^3]
   - [x] Success criteria: unit tests cover all 36 source/target transition
     pairs, invalid transitions return typed error variants, and terminal states
     reject all outgoing transitions in tested paths.
 
-[^1]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
-  §4.4.1.1.
-[^2]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
-[^3]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
+\[^1\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
+§4.4.1.1.
+\[^2\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
+\[^3\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
 
 ### 1.3. Agent backend orchestration
 
@@ -192,6 +498,10 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 2.3. Hook engine and policy enforcement
 
+The tasks below establish the current Corbusier-owned hook baseline. Phase 0.3
+extends hosted-session execution onto Podbot control-channel acknowledgement
+flows without regressing existing policy enforcement.
+
 - [x] 2.3.1 Implement hook engine execution. Requires 1.2.3 and 2.1.2. See
   corbusier-design.md §2.1.3 and §6.3.3.
   - [x] Define hook triggers for turn start/end, tool use before/after, and
@@ -213,6 +523,10 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 2.4. Encapsulation and workspace management
 
+Phase 0.2 expands this work from generic encapsulation into a canonical
+workspace runtime model shared with Podbot-hosted execution and source-policy
+enforcement.
+
 - [ ] 2.4.1 Implement workspace encapsulation for tool execution. Requires
   2.1.1. See corbusier-design.md §2.1.3 and §6.2.4.
   - [ ] Provision Podbot-backed workspaces per task. See
@@ -226,7 +540,10 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 
 ### 3.1. VCS integration and review ingestion
 
-- [ ] 3.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 1.2.2. See
+- [ ] 3.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 1.2.2, 0.2.3,
+  Podbot Step 3.1, "App authentication", Podbot Step 3.2, "Installation token
+  acquisition", Podbot Step 3.3, "Token daemon", and Podbot Step 3.4,
+  "GIT_ASKPASS mechanism (Git credential helper variable)". See
   corbusier-design.md §2.1.4 and §6.3.1.
   - [ ] Implement branch, pull request, and issue operations. See
     corbusier-design.md §2.1.4.
@@ -256,7 +573,7 @@ staying within the in-scope capabilities defined in corbusier-design.md.
 ### 3.3. Real-time event streaming
 
 - [ ] 3.3.1 Provide real-time event streaming for orchestration updates.
-  Requires 3.2.1. See corbusier-design.md §2.1.4 and §6.2.2.
+  Requires 3.2.1 and 0.4.1. See corbusier-design.md §2.1.4 and §6.2.2.
   - [ ] Implement event schema for conversation and task updates. See
     corbusier-design.md §6.2.2.
   - [ ] Publish events through SSE or equivalent transport. See
@@ -486,8 +803,8 @@ staying within the in-scope capabilities defined in corbusier-design.md.
     corbusier-api-design.md §Endpoint inventory -- Suggestions.
   - [ ] Success criteria: accepted suggestions produce tasks in backlog;
     `SuggestionCardDto` matches mockup fields.
-- [ ] 5.4.3 Add governance CRUD and system endpoint hardening. Requires 2.3.1
-  and 5.4.1. See corbusier-api-design.md §Governance domain.
+- [ ] 5.4.3 Add governance CRUD and system endpoint hardening. Requires 2.3.1,
+  0.3.2, 0.5.3, and 5.4.1. See corbusier-api-design.md §Governance domain.
   - [ ] Implement `PolicyAggregate` and `HookAggregate` with enable/disable
     lifecycle. See corbusier-api-design.md §Governance domain -- Write-side
     model.
@@ -498,11 +815,16 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   - [ ] Success criteria: contract tests validate error schema stability and
     pagination envelope shape; tenant isolation tests pass.
 
+[HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+and
+[MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+for `Last-Event-ID` replay semantics.
+
 [^4]: See
       [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
   and
   [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
-   for `Last-Event-ID` replay semantics.
+  for `Last-Event-ID` replay semantics.
 
 ## 6. Deployment and preview environments
 
