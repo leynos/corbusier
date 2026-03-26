@@ -11,7 +11,7 @@ pub use types::{AgentTurnOrchestratorConfig, ExecuteAgentTurnRequest, ExecuteAge
 
 use crate::agent_backend::{
     domain::{
-        AgentBackendRegistration, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
+        AgentBackendRegistration, BackendId, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
         ToolCallRequest, ToolCallResult, TurnSession, deterministic_tool_call_id,
     },
     ports::{
@@ -127,17 +127,7 @@ where
             .lock(ctx.tenant_id(), conversation_id)
             .await;
 
-        let backend = self
-            .backend_registry
-            .find_by_id(ctx, request.backend_id)
-            .await?
-            .ok_or(AgentTurnOrchestrationError::BackendNotFound(
-                request.backend_id,
-            ))?;
-
-        if backend.status() != BackendStatus::Active {
-            return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
-        }
+        let backend = self.resolve_backend(ctx, request.backend_id).await?;
 
         let resolution_params = SessionResolutionParams {
             ctx,
@@ -193,6 +183,22 @@ where
                 rotated_session,
             },
         ))
+    }
+
+    async fn resolve_backend(
+        &self,
+        ctx: &RequestContext,
+        backend_id: BackendId,
+    ) -> AgentTurnOrchestrationResult<AgentBackendRegistration> {
+        let backend = self
+            .backend_registry
+            .find_by_id(ctx, backend_id)
+            .await?
+            .ok_or(AgentTurnOrchestrationError::BackendNotFound(backend_id))?;
+        if backend.status() != BackendStatus::Active {
+            return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
+        }
+        Ok(backend)
     }
 
     async fn resolve_session(
@@ -290,6 +296,8 @@ where
         tracing::warn!(
             error = ?error,
             backend_id = %session.backend_id(),
+            conversation_id = %session.conversation_id(),
+            session_id = ?session.id(),
             "cleanup failed after session upsert failure; session may leak"
         );
     }
