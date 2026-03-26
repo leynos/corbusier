@@ -14,7 +14,7 @@ use super::{
 use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
 use crate::message::adapters::postgres::tenant_tx::{
-    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use crate::tool_registry::{
     domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
@@ -70,6 +70,8 @@ impl PostgresToolCatalog {
             move || {
                 let mut conn =
                     get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
+                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
+                    .map_err(|e| ToolCatalogError::persistence("ensure_tenant", e))?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             |e| ToolCatalogError::persistence("spawn_blocking", e),

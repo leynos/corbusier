@@ -15,7 +15,7 @@ use crate::message::adapters::postgres::blocking_helpers::{
     PgPool, get_conn_with, run_blocking_with,
 };
 use crate::message::adapters::postgres::tenant_tx::{
-    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use crate::task::{
     domain::{
@@ -71,6 +71,8 @@ impl PostgresTaskRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, TaskRepositoryError::persistence)?;
+                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
+                    .map_err(TaskRepositoryError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             TaskRepositoryError::persistence,

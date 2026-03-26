@@ -35,7 +35,7 @@ use blocking_helpers::{get_conn_with, run_blocking_with};
 pub(crate) use conversion_helpers::row_to_message;
 use conversion_helpers::ser_err;
 use sql_helpers::{InsertIds, insert_message, set_audit_context};
-use tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use tenant_tx::{FromTxError, TxError, ensure_tenant_exists, with_tenant_tx};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
@@ -97,6 +97,8 @@ impl PostgresMessageRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, RepositoryError::database)?;
+                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
+                    .map_err(RepositoryError::database)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             RepositoryError::database,

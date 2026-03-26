@@ -12,7 +12,7 @@ use crate::hook_engine::ports::{
     PendingExecutionRecord, PendingExecutionReservation,
 };
 use crate::message::adapters::postgres::tenant_tx::{
-    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use async_trait::async_trait;
 use diesel::OptionalExtension;
@@ -51,6 +51,8 @@ impl PostgresHookExecutionLogRepository {
         tokio::task::spawn_blocking(move || {
             let mut connection = pool
                 .get()
+                .map_err(HookExecutionLogError::persistence_failed)?;
+            ensure_tenant_exists(&mut connection, tenant_id.into_inner())
                 .map_err(HookExecutionLogError::persistence_failed)?;
             with_tenant_tx(&mut connection, tenant_id.into_inner(), query_fn)
         })
