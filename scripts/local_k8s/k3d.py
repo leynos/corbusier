@@ -198,9 +198,16 @@ def create_k3d_cluster(cluster_name: str, ingress_port: int) -> None:
 
     Raises
     ------
+    ValueError
+        Raised when `ingress_port` is not an integer in the TCP port range
+        `1..65535`.
     plumbum.commands.processes.ProcessExecutionError
         Raised when `k3d cluster create` fails.
     """
+    if not isinstance(ingress_port, int) or not 1 <= ingress_port <= 65535:
+        raise ValueError(
+            f"Invalid ingress port {ingress_port!r}; expected an integer in the range 1..65535"
+        )
     port_mapping = f"127.0.0.1:{ingress_port}:80@loadbalancer"
     local["k3d"]["cluster", "create", cluster_name, "--agents", "1", "--port", port_mapping] & FG
 
