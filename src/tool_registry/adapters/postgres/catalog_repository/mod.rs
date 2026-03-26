@@ -78,7 +78,11 @@ impl PostgresToolCatalog {
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
-    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
+    async fn execute_read_query<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,

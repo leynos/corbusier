@@ -46,24 +46,6 @@ impl PostgresContextSnapshotAdapter {
         Self { pool }
     }
 
-    /// Generic helper to execute a write query with standard error handling.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            SnapshotError::persistence,
-        )
-        .await
-    }
-
     /// Generic helper to execute a read-only query with standard error handling.
     async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
     where

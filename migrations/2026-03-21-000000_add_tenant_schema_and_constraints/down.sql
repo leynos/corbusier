@@ -108,8 +108,8 @@ CREATE UNIQUE INDEX idx_backend_registrations_name
 CREATE INDEX idx_agent_sessions_conversation_id
     ON agent_sessions (conversation_id);
 
-CREATE INDEX idx_agent_sessions_conversation_state
-    ON agent_sessions (conversation_id, state)
+CREATE UNIQUE INDEX idx_agent_sessions_one_active_per_conversation
+    ON agent_sessions (conversation_id)
     WHERE state = 'active';
 
 ALTER TABLE context_snapshots

@@ -48,24 +48,6 @@ impl PostgresAgentSessionRepository {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a write query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, SessionError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            SessionError::persistence,
-        )
-        .await
-    }
-
     /// Executes a read-only query inside a transaction with tenant context.
     async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
     where
