@@ -512,14 +512,19 @@ Introduce new persistent entities:
     workspace)
   - `workspace_id`
   - `wire_name` (stable name referenced by prompts)
-  - `server_id` (FK to `mcp_servers`)
+  - `mcp_server_id` (FK to `mcp_servers`)
   - `agent_url` (Streamable HTTP URL returned from Podbot)
   - `headers` (auth headers returned from Podbot)
   - `status` and timestamps
-- `hook_invocation` / `hook_executions` records with:
+- `hook_invocation` records with:
   - `tenant_id` (or an inherited tenant constraint from the owning workspace)
   - workspace/session correlation fields
   - hook trigger, ack, completion, and audit fields
+- `validation_snapshot` records with:
+  - `tenant_id` (or an inherited tenant constraint from the owning prompt
+    definition and hosted session)
+  - prompt/session correlation fields
+  - request, response, and validation timestamps
 
 This matches Podbot’s contract: Corbusier says *what to wire*; Podbot returns
 *how the container reaches it* (URL + headers).
@@ -533,6 +538,14 @@ tool-registry, log-store, and hook-execution adapters already follow this
 pattern; the future workspace-runtime and wire repositories must do the same to
 avoid cross-tenant wire or hook-audit leakage.
 
+The same rule applies to the future `validation_snapshot_repository` port:
+`create`, `read`, `update`, and `delete` operations must all accept
+`RequestContext`, include `tenant_id` in their lookup predicates and indexes,
+and avoid joins on shared hosted-session identifiers unless the tenant filter
+is also present. That prevents prompt-validation history from leaking across
+tenants when session or prompt identifiers are reused in tests, imports, or
+reconcile flows.
+
 Figure 1. Entity-relationship diagram for durable runtime state. It shows how
 workspace runtimes connect hosted sessions, MCP wires, hook invocations, and
 prompt-validation snapshots so the control plane can audit both provisioning
@@ -540,11 +553,11 @@ and prompt execution decisions.
 
 ```mermaid
 erDiagram
-    TENANT ||--o{ WORKSPACE_RUNTIME : has
-    TASK ||--o{ WORKSPACE_RUNTIME : uses
-    HOSTED_SESSION ||--|| WORKSPACE_RUNTIME : "runs_in"
+    TENANT ||--o{ workspace_runtime : has
+    TASK ||--o{ workspace_runtime : uses
+    HOSTED_SESSION ||--|| workspace_runtime : "runs_in"
 
-    WORKSPACE_RUNTIME {
+    workspace_runtime {
         uuid id
         uuid tenant_id
         uuid task_id
@@ -557,8 +570,8 @@ erDiagram
         timestamptz updated_at
     }
 
-    MCP_SERVER ||--o{ WORKSPACE_MCP_WIRE : provides
-    WORKSPACE_RUNTIME ||--o{ WORKSPACE_MCP_WIRE : owns
+    MCP_SERVER ||--o{ workspace_mcp_wire : provides
+    workspace_runtime ||--o{ workspace_mcp_wire : owns
 
     MCP_SERVER {
         uuid id
@@ -570,7 +583,7 @@ erDiagram
         timestamptz updated_at
     }
 
-    WORKSPACE_MCP_WIRE {
+    workspace_mcp_wire {
         uuid id
         uuid tenant_id
         uuid workspace_id
@@ -583,9 +596,9 @@ erDiagram
         timestamptz updated_at
     }
 
-    WORKSPACE_RUNTIME ||--o{ HOOK_INVOCATION : has
+    workspace_runtime ||--o{ hook_invocation : has
 
-    HOOK_INVOCATION {
+    hook_invocation {
         uuid id
         uuid tenant_id
         uuid workspace_id
@@ -602,8 +615,8 @@ erDiagram
         text logs_ref
     }
 
-    PROMPT_DEFINITION ||--o{ VALIDATION_SNAPSHOT : has
-    HOSTED_SESSION ||--o{ VALIDATION_SNAPSHOT : uses
+    PROMPT_DEFINITION ||--o{ validation_snapshot : has
+    HOSTED_SESSION ||--o{ validation_snapshot : uses
 
     PROMPT_DEFINITION {
         uuid id
@@ -615,8 +628,9 @@ erDiagram
         timestamptz updated_at
     }
 
-    VALIDATION_SNAPSHOT {
+    validation_snapshot {
         uuid id
+        uuid tenant_id
         uuid prompt_definition_id
         uuid hosted_session_id
         jsonb request_payload
@@ -661,7 +675,7 @@ work.
 | `src/tool_registry/services/discovery/log_and_audit.rs` | Tool discovery logging/audit capture.                                                                | Convert to “registry audit” and “wire provisioning audit” for Option A; add ingestion hooks for Podbot-provided tool call logs if implemented (unspecified).         | Med/High      |
 | `src/tool_registry/domain/validation.rs`                | Lightweight schema validation for tool parameters.                                                   | Extend or reuse for prompt input schema validation; consider adding full JSON Schema later (explicitly assess).                                                      | Med           |
 | `src/tool_registry/adapters/runtime.rs`                 | In-memory MCP host adapter for tests.                                                                | Keep; add Podbot-wire fakes for integration tests; do not overload this module with real Podbot wiring.                                                              | Low/Med       |
-| `migrations/..._add_mcp_servers_table/up.sql`           | Adds `mcp_servers` with `transport` JSONB.                                                           | New migrations: `workspace_runtimes`, `workspace_mcp_wires`, `hook_executions`, prompt/bundle registries if persisted.                                               | Med           |
+| `migrations/..._add_mcp_servers_table/up.sql`           | Adds `mcp_servers` with `transport` JSONB.                                                           | New migrations: `workspace_runtimes`, `workspace_mcp_wires`, `hook_invocations`, `validation_snapshots`, prompt/bundle registries if persisted.                      | Med           |
 | `src/agent_backend/domain/capabilities.rs`              | Agent capability flags (`supports_streaming`, `supports_tool_calls`, content types).                 | Extend with `PromptSurfaceCapabilities` and ACP-related constraints; create capability-to-disposition mapping for validation.                                        | Med           |
 | `src/agent_backend/services/registry.rs`                | Backend registry and discovery.                                                                      | Add runtime-spec resolution: map backend registry entries to `AgentRuntimeSpec` and launch via Podbot when backend is “podbot-hosted”.                               | Med           |
 | `src/worker/*` and `src/bin/pg_worker.rs`               | Background work infrastructure.                                                                      | Add background sweeps: stale wire cleanup, hook timeout handling, and possibly Podbot reconcile loops.                                                               | Med           |
