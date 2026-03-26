@@ -78,11 +78,6 @@ def _validate_k3d_cluster_list_shape(parsed: Any) -> list[dict[str, Any]]:
 def list_clusters() -> list[dict[str, Any]]:
     """Return parsed cluster records from `k3d cluster list`.
 
-    Parameters
-    ----------
-    None
-        This helper reads cluster metadata from the local `k3d` CLI.
-
     Returns
     -------
     list[dict[str, Any]]
