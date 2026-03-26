@@ -74,8 +74,17 @@ impl PostgresContextSnapshotAdapter {
             + Send
             + 'static,
     {
-        let snapshots = self.find_many(tenant_id, build_query).await?;
-        Ok(snapshots.into_iter().next())
+        self.execute_read_query(tenant_id, move |conn| {
+            let row_opt = build_query(context_snapshots::table)
+                .select(ContextSnapshotRow::as_select())
+                .limit(1)
+                .first::<ContextSnapshotRow>(conn)
+                .optional()
+                .map_err(SnapshotError::persistence)?;
+
+            row_opt.map(row_to_snapshot).transpose()
+        })
+        .await
     }
 
     async fn find_many<F>(
