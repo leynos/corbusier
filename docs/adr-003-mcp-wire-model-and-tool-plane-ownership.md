@@ -69,12 +69,12 @@ for MCP definitions; ADR 004 owns that lower-level model.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 4.5, "Normalized launch contract", because wire selection and injection
+- Step 4.5, "Normalized launch contract" because wire selection and injection
   details need to be normalized before launch.
-- Step 4.6, "Hosted session control plane", because Corbusier needs typed
+- Step 4.6, "Hosted session control plane" because Corbusier needs typed
   runtime events for wire status without moving tool calls back into its inline
   path.
-- Step 4.7, "MCP wire provisioning and injection", because that step is the
+- Step 4.7, "MCP wire provisioning and injection" because that step is the
   direct upstream Podbot surface that materializes workspace-scoped wires.
 
 ## Options Considered

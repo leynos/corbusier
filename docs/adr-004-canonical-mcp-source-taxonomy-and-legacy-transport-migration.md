@@ -67,10 +67,10 @@ transport records.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 1.4, "Hosting schema migration and compatibility matrix", because the
+- Step 1.4, "Hosting schema migration and compatibility matrix" because the
   hosting-era configuration must carry the MCP-related defaults that align with
   the new source taxonomy.
-- Step 4.7, "MCP wire provisioning and injection", because Podbot's wire
+- Step 4.7, "MCP wire provisioning and injection" because Podbot's wire
   request and response models must consume the source taxonomy that this ADR
   defines.
 

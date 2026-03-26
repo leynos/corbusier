@@ -186,12 +186,12 @@ Security tightening and retirement
 
 ## Architectural Rationale
 
-The companion design[^cd] is too broad to deliver safely as one cutover. A
+The companion design[^1] is too broad to deliver safely as one cutover. A
 staged migration respects the repository's existing architecture, keeps the
 review surface comprehensible, and gives maintainers a disciplined way to
 retire old assumptions once the Podbot-conformant path is proven.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

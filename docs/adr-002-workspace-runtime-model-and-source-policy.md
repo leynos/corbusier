@@ -69,12 +69,12 @@ record itself.
 
 This ADR depends on the following upstream Podbot roadmap steps:
 
-- Step 1.4, "Hosting schema migration and compatibility matrix", because
+- Step 1.4, "Hosting schema migration and compatibility matrix" because
   workspace source and mount-related configuration must exist in Podbot's typed
   hosting schema.
-- Step 4.4, "Workspace strategies", because that step delivers the clone and
+- Step 4.4, "Workspace strategies" because that step delivers the clone and
   host-mount runtime behaviours that this ADR relies on.
-- Step 4.5, "Normalized launch contract", because workspace source, mount
+- Step 4.5, "Normalized launch contract" because workspace source, mount
   policy, and access mode should be resolved through one normalized launch path.
 
 ## Options Considered

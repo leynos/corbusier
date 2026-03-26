@@ -17,7 +17,7 @@ container regardless of upstream source.
 
 Under the user’s hook assumptions, Corbusier must add a **HookCoordinator**
 that consumes Podbot hook events over a *podbot → orchestrator* channel and
-deterministically acknowledges them, because Podbot suspends execution until
+deterministically acknowledges them because Podbot suspends execution until
 Corbusier acks. (This hook channel is not described in current Podbot docs; it
 is a new integration requirement and must be specified/implemented explicitly
 as part of the integration contract.)
@@ -100,7 +100,7 @@ integration design:
   require a Podbot→Corbusier tool-call bridge API that is **unspecified** in
   current Podbot docs.
 
-The rest of this document designs for **Option A**, because it matches the
+The rest of this document designs for **Option A** because it matches the
 primary Podbot MCP hosting design and avoids inventing an unstated Podbot
 service. Where Option A implies new audit/telemetry pathways, those are called
 out as required additions.

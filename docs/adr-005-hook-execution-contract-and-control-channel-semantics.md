@@ -10,7 +10,7 @@ Proposed.
 
 ## Context and Problem Statement
 
-The Podbot conformance design[^cd] treats hooks as generic execution artefacts
+The Podbot conformance design[^1] treats hooks as generic execution artefacts
 that Podbot runs after Corbusier acknowledges a hook message. That differs
 materially from the earlier Corbusier idea of a bespoke in-process hook engine.
 
@@ -168,7 +168,7 @@ Corbusier a second execution host. Corbusier governs hooks through policy and
 acknowledgement. Podbot executes them inside the same runtime boundary that
 owns the workspace and hosted session.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

@@ -93,6 +93,8 @@ for both bundles and prompts.
 Corbusier stores prompt content, skill declarations, and bundle metadata in the
 same document type and relies on conventions to distinguish roles.
 
+Table 1: Trade-offs for the prompt and bundle document model.
+
 | Topic                     | Option A | Option B | Option C |
 | ------------------------- | -------- | -------- | -------- |
 | Skill portability         | Strong   | Weak     | Medium   |
@@ -100,8 +102,6 @@ same document type and relies on conventions to distinguish roles.
 | Extension flexibility     | Strong   | Medium   | Weak     |
 | Ecosystem fit             | Strong   | Weak     | Weak     |
 | Implementation simplicity | Medium   | Medium   | High     |
-
-Table 1: Trade-offs for the prompt and bundle document model.
 
 ## Decision Outcome / Proposed Direction
 
