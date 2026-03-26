@@ -122,12 +122,12 @@ where
         request: ExecuteAgentTurnRequest,
     ) -> AgentTurnOrchestrationResult<ExecuteAgentTurnResponse> {
         let conversation_id = request.turn.conversation_id();
+        let backend = self.resolve_backend(ctx, request.backend_id).await?;
+
         let _execution_guard = self
             .execution_locks
             .lock(ctx.tenant_id(), conversation_id)
             .await;
-
-        let backend = self.resolve_backend(ctx, request.backend_id).await?;
 
         let resolution_params = SessionResolutionParams {
             ctx,
