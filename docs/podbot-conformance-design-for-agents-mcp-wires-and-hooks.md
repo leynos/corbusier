@@ -508,15 +508,30 @@ Introduce new persistent entities:
   volume and correlates to `task_id` and possibly `conversation_id`. (Corbusier
   already has task lifecycle and agent sessions/handoffs persistence patterns.)
 - `workspace_mcp_wires` with:
+  - `tenant_id` (or a persisted inherited tenant constraint from the owning
+    workspace)
   - `workspace_id`
   - `wire_name` (stable name referenced by prompts)
   - `server_id` (FK to `mcp_servers`)
   - `agent_url` (Streamable HTTP URL returned from Podbot)
   - `headers` (auth headers returned from Podbot)
   - `status` and timestamps
+- `hook_invocation` / `hook_executions` records with:
+  - `tenant_id` (or an inherited tenant constraint from the owning workspace)
+  - workspace/session correlation fields
+  - hook trigger, ack, completion, and audit fields
 
 This matches Podbot’s contract: Corbusier says *what to wire*; Podbot returns
 *how the container reaches it* (URL + headers).
+
+All repository ports and persistence paths for these entities must bind
+`RequestContext.tenant_id` on create/read/update/delete operations. In-memory
+adapters must key state by tenant, and Postgres adapters must apply
+tenant-filtered predicates on selects, updates, and deletes in addition to any
+`SET LOCAL app.tenant_id` or row-level security guardrails. Existing
+tool-registry, log-store, and hook-execution adapters already follow this
+pattern; the future workspace-runtime and wire repositories must do the same to
+avoid cross-tenant wire or hook-audit leakage.
 
 Figure 1. Entity-relationship diagram for durable runtime state. It shows how
 workspace runtimes connect hosted sessions, MCP wires, hook invocations, and
@@ -557,6 +572,7 @@ erDiagram
 
     WORKSPACE_MCP_WIRE {
         uuid id
+        uuid tenant_id
         uuid workspace_id
         uuid mcp_server_id
         string wire_name
@@ -571,6 +587,7 @@ erDiagram
 
     HOOK_INVOCATION {
         uuid id
+        uuid tenant_id
         uuid workspace_id
         uuid hosted_session_id
         string hook_name
@@ -1004,7 +1021,7 @@ Accessible description: Gantt chart showing the Corbusier–Podbot conformance
 timeline, major workstreams, and their dependencies across foundations,
 integration, hooks, prompts, and quality work.
 
-Figure 3. Corbusier–Podbot conformance implementation timeline.
+Figure 2. Corbusier–Podbot conformance implementation timeline.
 
 ```mermaid
 gantt
@@ -1041,7 +1058,7 @@ execution suspends until Corbusier acknowledges” assumption, without violating
 Podbot stdout purity (hook events travel over a dedicated library event
 channel, not stdout).
 
-Figure 2. Sequence diagram for hook authorization and resume flow. It shows the
+Figure 3. Sequence diagram for hook authorization and resume flow. It shows the
 control-channel exchange from agent-triggered hook request through Podbot,
 Corbusier, and policy evaluation, including the allow and deny paths and the
 point where hosted execution resumes.
