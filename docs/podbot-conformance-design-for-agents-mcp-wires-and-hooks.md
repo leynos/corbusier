@@ -1,0 +1,1113 @@
+# Corbusier–Podbot Conformance Design for Agents, MCP Wires, and Hooks
+
+## Executive summary
+
+Corbusier can conform to the Podbot library API surface by treating Podbot as
+the **single owner of container orchestration and sandbox wiring**, while
+Corbusier retains **policy, registry, and orchestration authority**. This
+matches the intended dual-delivery model (CLI + embeddable library) and the
+hosting requirement to keep protocol bytes separate from diagnostics.
+
+The highest-impact architectural change is to **split Corbusier’s tool plane
+into a registry/control plane and a per-workspace “wire” plane**. The Podbot
+Model Context Protocol (MCP) hosting design recommends that Corbusier remains
+the policy and registry layer while Podbot owns transport bridging, auth token
+injection, and lifecycle clean-up, presenting **Streamable HTTP** to the
+container regardless of upstream source.
+
+Under the user’s hook assumptions, Corbusier must add a **HookCoordinator**
+that consumes Podbot hook events over a *podbot → orchestrator* channel and
+deterministically acknowledges them because Podbot suspends execution until
+Corbusier acks. (This hook channel is not described in current Podbot docs; it
+is a new integration requirement and must be specified/implemented explicitly
+as part of the integration contract.)
+
+Finally, to support consistent agent behaviour across backends, Corbusier
+should introduce a **prompt + skill bundle abstraction** modelled on
+Anthropic’s “skills as folders with YAML-frontmatter SKILL.md”, with harmonized
+frontmatter across prompts, bundles, and skills and Jinja2 (Goose-style)
+interpolation, plus a **Podbot `validate_prompt` surface** that reports ignored
+and rejected capabilities for a target agent runtime.
+
+## Current state and required alignment
+
+Corbusier is organized as hexagonal modules (domain/ports/adapters) with key
+subsystems including `agent_backend` and `tool_registry`, and an explicit
+`worker` module. The roadmap shows that *workspace encapsulation* and a *hook
+engine* remain planned (not delivered), while the MCP server lifecycle and tool
+routing portions are already implemented.
+
+### Corbusier tool registry today
+
+Corbusier already models an MCP server registry and lifecycle persistence:
+
+- `mcp_servers` table stores a `transport` JSONB plus lifecycle and health
+  state.
+- Tenant scoping is being added via `tenant_id` on `mcp_servers` with composite
+  foreign keys to dependent tables.
+- `tool_registry/services` exports a `McpServerLifecycleService` and a
+  `ToolDiscoveryRoutingService`.
+- Tool-call parameter validation currently uses a lightweight structural
+  checker (object type + required keys) rather than full JSON Schema.
+
+Corbusier’s design document still frames tool hosting as “MCP server hosting
+with stdio and HTTP+SSE managers” and positions a tool router in Corbusier’s
+call path. Its initial lifecycle implementation provides an
+`InMemoryMcpServerHost` adapter for deterministic tests, which currently
+appears as the concrete “runtime host” adapter in the repo.
+
+### Podbot contract constraints Corbusier must respect
+
+Podbot’s design asserts three constraints that materially affect Corbusier's
+integration:
+
+- Podbot is **both** CLI and embeddable Rust library; library functions return
+  typed results and must not write directly to stdout/stderr.
+- In hosting mode, Podbot must preserve **stdout purity**: container-protocol
+  bytes only, with diagnostics on stderr.
+- For Agent Client Protocol (ACP) hosting, Podbot enforces **capability
+  masking** by rewriting the ACP `initialize` exchange to remove `terminal/*`
+  and `fs/*`, and may reject those calls if attempted. An explicit opt-in may
+  allow delegation.
+
+On workspace strategy, Podbot’s config explicitly supports
+`workspace.source = github_clone | host_mount`, and defines hard safety
+requirements for host mounts (canonicalization, allowlisted roots, symlink
+escape rejection).
+
+### Model Context Protocol (MCP) hosting alignment target
+
+The Podbot MCP hosting design recommends:
+
+- Corbusier chooses which MCP servers / wires a task may use (policy/registry),
+- Podbot creates “wires”, performs bridging and clean-up, injects the resulting
+  URL + auth material into the agent container,
+- the agent consumes **Streamable HTTP** endpoints, even when the true source
+  is stdio.
+
+This creates a **direct mismatch** with Corbusier’s current “tool registry &
+router in the call path” mental model: if the agent container talks to MCP
+wires directly, Corbusier cannot remain the runtime “router” for those tool
+calls unless Podbot additionally proxies through Corbusier (not described).
+This is a pivotal open design choice and must be made explicit in the
+integration design:
+
+- **Option A (recommended by Podbot docs):** agent container is the MCP client;
+  Corbusier moves from “tool router” to “tool policy + wire provisioning +
+  audit ingestion”.
+- **Option B (legacy Corbusier model):** Corbusier remains the caller; Podbot
+  executes tools inside container and returns results to Corbusier. This would
+  require a Podbot→Corbusier tool-call bridge API that is **unspecified** in
+  current Podbot docs.
+
+The rest of this document designs for **Option A** because it matches the
+primary Podbot MCP hosting design and avoids inventing an unstated Podbot
+service. Where Option A implies new audit/telemetry pathways, those are called
+out as required additions.
+
+## Domain model changes
+
+This section defines the concrete models Corbusier needs (or needs to evolve)
+to align with Podbot’s design surface and the hook assumptions. All type
+sketches are Rust-like and intentionally “library-facing” (serializable
+request/response shapes, stable enums).
+
+### AgentRuntimeSpec
+
+Corbusier needs a runtime description that maps cleanly to Podbot’s
+`agent.kind`, `agent.mode`, and optional custom command fields, plus an env
+allowlist.
+
+```rust
+/// Corbusier-owned description of the agent runtime to launch via Podbot.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AgentRuntimeSpec {
+    pub kind: AgentKind,          // claude | codex | custom
+    pub mode: AgentMode,          // podbot(interactive) | codex_app_server | acp
+    pub command: Option<String>,  // required when kind=custom (per Podbot design)
+    pub args: Vec<String>,        // required when kind=custom
+    pub env_allowlist: Vec<String>,
+    pub working_dir: Option<String>, // container path; default derived from workspace
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum AgentKind { Claude, Codex, Custom }
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum AgentMode { Interactive, CodexAppServer, Acp }
+```
+
+Conformance requirements:
+
+- `AgentMode::Acp` must assume that `terminal/*` and `fs/*` are masked by
+  Podbot and are not reliable capabilities.
+- `env_allowlist` must be enforced in Corbusier configuration generation, not
+  left as an “advisory” field (Podbot treats this as a contract boundary).
+
+### WorkspaceSource
+
+Corbusier needs to decide whether Podbot clones into a container-local volume
+(`github_clone`) or bind-mounts a host workspace (`host_mount`). Podbot’s
+existing config describes both modes and imposes safety policy for host mounts.
+
+```rust
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum WorkspaceSource {
+    GitHubClone {
+        owner: String,
+        repo: String,
+        branch: String,
+        // token material is not in this struct; it comes via Podbot GitHub config
+    },
+    HostMount {
+        host_path: std::path::PathBuf,
+        container_path: String, // absolute; default "/workspace"
+        read_only: bool,        // strongly recommended default for prompts; tasks may opt-in
+    },
+}
+```
+
+**Unspecified detail:** Corbusier’s repo currently lacks a concrete “workspace
+manager” implementation in code; the Corbusier design doc contains a conceptual
+`EncapsulationProvider` but no corresponding crate module. The implementation
+must create this module and decide whether Corbusier itself provisions the host
+workspace directory (recommended for determinism) or delegates cloning to
+Podbot (aligns with Podbot’s existing `github_clone` flow).
+
+### McpEndpointSource
+
+Corbusier’s persistent transport model should be updated to match Podbot’s
+recommended `McpSource` shape: `Stdio`, `StdioContainer`, `StreamableHttp`,
+with explicit repo volume sharing for helper containers.
+
+```rust
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum McpEndpointSource {
+    Stdio {
+        command: String,
+        args: Vec<String>,
+        env: Vec<(String, String)>,
+        cwd: Option<String>,
+    },
+    StdioContainer {
+        image: String,
+        command: Vec<String>,
+        env: Vec<(String, String)>,
+        repo_access: RepoAccess, // none/ro/rw (for helper container only)
+    },
+    StreamableHttp {
+        url: String,
+        headers: Vec<(String, String)>, // injected upstream auth if needed
+    },
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum RepoAccess { None, ReadOnly, ReadWrite }
+```
+
+This aligns with Podbot’s MCP hosting design, where Podbot normalizes the
+agent-facing transport to Streamable HTTP even when the source is stdio.
+
+**Required Corbusier schema change:** Corbusier’s existing
+`mcp_servers.transport` JSONB column is flexible, but the *meaning* of stored
+transports must evolve: stop modelling “HTTP+SSE” as first-class, and align
+persisted transport shapes to *source definitions*
+(stdio/stdio-container/streamable-http), leaving “agent-facing URL” as a
+per-workspace wire artefact rather than a global server attribute.
+
+### HookArtifact and HookSubscription
+
+Based on the user’s hook assumptions, Corbusier needs:
+
+- a “hook artefact” model that Podbot can execute (single script OR tar OR
+  optional container image),
+- a subscription model that says which hooks should fire at which points for
+  which workspaces,
+- a runtime state model for acknowledgements.
+
+```rust
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct HookArtifact {
+    pub kind: HookArtifactKind,           // script | tar
+    pub digest: Option<String>,           // strongly recommended; sha256:...
+    pub container_image: Option<String>,  // optional override for execution environment
+    pub entrypoint: Option<String>,       // optional; tar needs some entrypoint (unspecified)
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum HookArtifactKind {
+    Script { path: String }, // workspace-relative or bundle-relative (policy decides)
+    Tar { path: String },    // contains runnable content
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct HookSubscription {
+    pub hook_name: String,
+    pub triggers: Vec<HookTrigger>,
+    pub workspace_access: WorkspaceAccessMode, // r/o or r/w mount policy for workspace volume
+    pub env_allowlist: Vec<String>,
+    pub timeout_ms: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum WorkspaceAccessMode { ReadOnly, ReadWrite }
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum HookTrigger {
+    // Concrete trigger taxonomy is currently unspecified in Podbot docs;
+    // Corbusier design doc lists commit/merge/deploy style governance triggers conceptually.
+    PreTurn,
+    PostTurn,
+    PreToolCall,
+    PostToolCall,
+    PreCommit,
+    PreMerge,
+    PreDeploy,
+}
+```
+
+**Unspecified but required:** a concrete mapping between Corbusier’s workflow
+events and hook triggers (including which component emits them) is not
+implemented in Corbusier today, and Podbot has no hook spec in its current
+design docs. A binding spec must be authored inside the Corbusier–Podbot
+integration layer that at minimum defines: trigger names, payload schema, ack
+semantics, timeout/resume rules, and audit persistence fields.
+
+### Prompt validation request/response and capability dispositions
+
+Corbusier already has an agent capability model (`supports_streaming`,
+`supports_tool_calls`, supported content types). Podbot adds a runtime-enforced
+capability mask for ACP (`terminal/*`, `fs/*`). To unify these, introduce
+prompt-surface capabilities and dispositions.
+
+```rust
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ValidatePromptRequest {
+    pub agent: AgentRuntimeSpec,
+    pub prompt: PromptDocument,          // parsed frontmatter + body
+    pub bundle_refs: Vec<BundleRef>,     // optional: skills/bundles used by the prompt
+    pub assumed_mcp_wires: Vec<String>,  // names or ids referenced in frontmatter
+    pub assumed_hooks: Vec<String>,      // hook names referenced in frontmatter
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ValidatePromptResponse {
+    pub ok: bool,
+    pub effective_prompt: Option<EffectivePrompt>, // body + evaluated metadata after drops
+    pub diagnostics: Vec<PromptDiagnostic>,
+    pub capability_report: Vec<CapabilityDispositionReport>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CapabilityDispositionReport {
+    pub capability: String,              // e.g. "acp.terminal", "prompt.jinja2", "mcp.wire:weaver"
+    pub disposition: CapabilityDisposition,
+    pub details: Option<String>,
+    pub execution_effect: ExecutionEffect,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CapabilityDisposition {
+    Native,
+    HostEnforced,
+    Translated,
+    Ignored,
+    Rejected,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ExecutionEffect {
+    NonBlocking,
+    BlocksExecution,
+}
+```
+
+This is the core of the requested “validate endpoint” behaviour: identify
+capabilities the prompt requests that a specific agent runtime will ignore (or
+reject), with explicit reasons. This disposition vocabulary is intentionally
+aligned with ADR 008. Blocking semantics are carried separately in
+`ExecutionEffect`, rather than being inferred from the disposition term.
+
+## Ports, services, and refactors
+
+This section specifies the concrete ports/traits and the refactors needed in
+Corbusier.
+
+### New ports/traits
+
+Corbusier should add three new port families. They mirror the Podbot
+recommended responsibility split (policy in Corbusier, wiring in Podbot).
+
+#### PodbotAgentLauncher
+
+A Corbusier port that wraps Podbot’s library orchestration into a stable
+Corbusier interface.
+
+```rust
+#[async_trait::async_trait]
+pub trait PodbotAgentLauncher: Send + Sync {
+    async fn prepare_workspace(
+        &self,
+        ctx: &crate::context::RequestContext,
+        workspace: &WorkspaceRuntimeSpec,
+    ) -> Result<PreparedWorkspace, PodbotLaunchError>;
+
+    async fn launch_agent(
+        &self,
+        ctx: &crate::context::RequestContext,
+        request: LaunchAgentRequest,
+    ) -> Result<LaunchedAgent, PodbotLaunchError>;
+
+    async fn stop_agent(
+        &self,
+        ctx: &crate::context::RequestContext,
+        agent_id: AgentInstanceId,
+    ) -> Result<(), PodbotLaunchError>;
+}
+```
+
+This port must be implemented as a Podbot adapter that does not violate
+Podbot’s stdout-purity and no-direct-print requirements.
+
+#### WorkspaceMcpWires
+
+A Corbusier port that calls Podbot’s MCP wire surface (as proposed in Podbot’s
+MCP hosting design) and returns injection details.
+
+```rust
+#[async_trait::async_trait]
+pub trait WorkspaceMcpWires: Send + Sync {
+    async fn create_wire(
+        &self,
+        ctx: &crate::context::RequestContext,
+        req: CreateWorkspaceMcpWireRequest,
+    ) -> Result<CreateWorkspaceMcpWireResponse, McpWireError>;
+
+    async fn remove_wire(
+        &self,
+        ctx: &crate::context::RequestContext,
+        wire_id: WireId,
+    ) -> Result<(), McpWireError>;
+
+    async fn list_wires(
+        &self,
+        ctx: &crate::context::RequestContext,
+        workspace_id: WorkspaceId,
+    ) -> Result<Vec<WorkspaceMcpWire>, McpWireError>;
+}
+```
+
+This is the key boundary where Corbusier transitions from “MCP server lifecycle
+manager” to “MCP wire provisioning manager”, matching Podbot’s design.
+
+#### HookCoordinator, HookRegistry, HookPolicyService
+
+Corbusier needs a workflow-governance subsystem consistent with its own design
+goals (hook engine and encapsulation management appear as planned features).
+Under the user’s hook assumptions, HookCoordinator must also coordinate
+acknowledgements to Podbot.
+
+```rust
+#[async_trait::async_trait]
+pub trait HookRegistry: Send + Sync {
+    async fn subscriptions_for(
+        &self,
+        ctx: &crate::context::RequestContext,
+        scope: HookScope,
+    ) -> Result<Vec<HookSubscription>, HookError>;
+}
+
+#[async_trait::async_trait]
+pub trait HookPolicyService: Send + Sync {
+    async fn authorize_hook(
+        &self,
+        ctx: &crate::context::RequestContext,
+        request: HookRequestContext,
+    ) -> Result<HookDecision, HookPolicyError>;
+}
+
+#[async_trait::async_trait]
+pub trait HookCoordinator: Send + Sync {
+    async fn on_podbot_hook_message(
+        &self,
+        ctx: &crate::context::RequestContext,
+        msg: PodbotHookMessage, // integration type; see flows below
+    ) -> Result<PodbotHookAck, HookError>;
+}
+```
+
+#### Transitional HookEngine compatibility bridge
+
+The current hook engine contract in `src/hook_engine/ports/engine.rs` is
+synchronous from the caller’s perspective: `HookEngine::execute(...)` returns
+`Vec<HookExecutionResult>`, and `HookEngineService` in
+`src/hook_engine/services/engine.rs` runs actions in definition order before it
+returns. That behaviour is still appropriate for existing in-process Corbusier
+flows, but it does not match Podbot’s acknowledgement-first hook lifecycle.
+
+To bridge those models without breaking current callers, add a transitional
+adapter beside `HookCoordinator`:
+
+- `PodbotHookAckBridge` (or similarly named) accepts `PodbotHookMessage`,
+  resolves a `HookTriggerContext`, and returns a `PodbotHookAck` immediately.
+- For approved Podbot-hosted flows, the bridge returns an acknowledgement that
+  carries a stable execution identifier or background handle, then delegates
+  the actual work to the existing `HookEngine::execute(...)` path.
+- For denied or aborted flows, the bridge returns only the corresponding ack
+  semantics and never invokes the engine.
+- Route this behaviour behind a feature flag or phase gate such as
+  `podbot_hook_ack_bridge` so non-Podbot flows can continue to call
+  `HookEngine::execute(...)` directly during migration.
+
+Deprecation path:
+
+- Podbot-hosted flows move first to the ack bridge.
+- Existing callers keep using `HookEngine::execute(...)` until the bridge path
+  is proven stable.
+- Once Podbot-hosted flows no longer depend on synchronous waiting,
+  `HookCoordinator::on_podbot_hook_message(...)` becomes the sole Podbot-facing
+  contract and direct blocking use of `HookEngine::execute(...)` is treated as
+  legacy for hosted-runtime integration.
+
+**Unspecified detail:** the Podbot hook message schema and transport
+(“podbot→orchestrator channel”) do not exist in current Podbot docs. This must
+be implemented either as a typed callback channel in the embedding library or
+an out-of-band transport (e.g. UDS) for CLI mode. Either way, it must not
+violate Podbot hosting stdout purity.
+
+### Lifecycle and service refactors
+
+#### Tool registry lifecycle split
+
+Currently, Corbusier’s `tool_registry/services` exports
+`McpServerLifecycleService` and `ToolDiscoveryRoutingService`. Corbusier must
+split “server definition lifecycle” from “workspace wiring lifecycle”:
+
+- **Keep:** `McpServerLifecycleService` as the CRUD/health layer for globally
+  registered MCP server *definitions* (sources), stored in
+  `mcp_servers.transport`.
+- **Add:** `WorkspaceMcpWireService` as the per-workspace provisioning layer
+  that calls Podbot to create wires and persists the returned Streamable HTTP
+  endpoints by workspace.
+- **Change:** `ToolDiscoveryRoutingService` should no longer assume Corbusier
+  is the runtime invoker for containerized agents (Option A). Instead it
+  becomes:
+  - a “catalogue service” used to materialize tool lists for UI/audit, and/or
+  - a “bootstrap tool manifest builder” for agents (by creating wires and
+    passing endpoints to agent startup).
+
+This refactor also aligns with Corbusier’s design doc, which already
+anticipates a workspace manager and Podbot adapter, but currently only at the
+conceptual level.
+
+#### Workspace-wire service & schema
+
+Introduce new persistent entities:
+
+- `workspaces` (or `workspace_runtimes`) that identifies a Podbot workspace /
+  volume and correlates to `task_id` and possibly `conversation_id`. (Corbusier
+  already has task lifecycle and agent sessions/handoffs persistence patterns.)
+- `workspace_mcp_wires` with:
+  - `tenant_id` (or a persisted inherited tenant constraint from the owning
+    workspace)
+  - `workspace_id`
+  - `wire_name` (stable name referenced by prompts)
+  - `mcp_server_id` (FK to `mcp_servers`)
+  - `agent_url` (Streamable HTTP URL returned from Podbot)
+  - `headers` (auth headers returned from Podbot)
+  - `status` and timestamps
+- `hook_invocation` records with:
+  - `tenant_id` (or an inherited tenant constraint from the owning workspace)
+  - workspace/session correlation fields
+  - hook trigger, ack, completion, and audit fields
+- `validation_snapshot` records with:
+  - `tenant_id` (or an inherited tenant constraint from the owning prompt
+    definition and hosted session)
+  - prompt/session correlation fields
+  - request, response, and validation timestamps
+
+This matches Podbot’s contract: Corbusier says *what to wire*; Podbot returns
+*how the container reaches it* (URL + headers).
+
+All repository ports and persistence paths for these entities must bind
+`RequestContext.tenant_id` on create/read/update/delete operations. In-memory
+adapters must key state by tenant, and Postgres adapters must apply
+tenant-filtered predicates on selects, updates, and deletes in addition to any
+`SET LOCAL app.tenant_id` or row-level security guardrails. Existing
+tool-registry, log-store, and hook-execution adapters already follow this
+pattern; the future workspace-runtime and wire repositories must do the same to
+avoid cross-tenant wire or hook-audit leakage.
+
+The same rule applies to the future `validation_snapshot_repository` port:
+`create`, `read`, `update`, and `delete` operations must all accept
+`RequestContext`, include `tenant_id` in their lookup predicates and indexes,
+and avoid joins on shared hosted-session identifiers unless the tenant filter
+is also present. That prevents prompt-validation history from leaking across
+tenants when session or prompt identifiers are reused in tests, imports, or
+reconcile flows.
+
+Figure 1. Entity-relationship diagram for durable runtime state. It shows how
+workspace runtimes connect hosted sessions, MCP wires, hook invocations, and
+prompt-validation snapshots so the control plane can audit both provisioning
+and prompt execution decisions.
+
+```mermaid
+erDiagram
+    TENANT ||--o{ workspace_runtime : has
+    TASK ||--o{ workspace_runtime : uses
+    HOSTED_SESSION ||--|| workspace_runtime : "runs_in"
+
+    workspace_runtime {
+        uuid id
+        uuid tenant_id
+        uuid task_id
+        uuid hosted_session_id
+        string source_type
+        string source_config_json
+        string access_mode
+        string state
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    MCP_SERVER ||--o{ workspace_mcp_wire : provides
+    workspace_runtime ||--o{ workspace_mcp_wire : owns
+
+    MCP_SERVER {
+        uuid id
+        uuid tenant_id
+        jsonb transport
+        string name
+        string health_status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    workspace_mcp_wire {
+        uuid id
+        uuid tenant_id
+        uuid workspace_id
+        uuid mcp_server_id
+        string wire_name
+        text agent_url
+        jsonb headers
+        string status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    workspace_runtime ||--o{ hook_invocation : has
+
+    hook_invocation {
+        uuid id
+        uuid tenant_id
+        uuid workspace_id
+        uuid hosted_session_id
+        string hook_name
+        string trigger
+        string access_mode
+        string state
+        text podbot_correlation_id
+        timestamptz requested_at
+        timestamptz acknowledged_at
+        timestamptz completed_at
+        text outcome
+        text logs_ref
+    }
+
+    PROMPT_DEFINITION ||--o{ validation_snapshot : has
+    HOSTED_SESSION ||--o{ validation_snapshot : uses
+
+    PROMPT_DEFINITION {
+        uuid id
+        uuid tenant_id
+        text path
+        text frontmatter
+        text body
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    validation_snapshot {
+        uuid id
+        uuid tenant_id
+        uuid prompt_definition_id
+        uuid hosted_session_id
+        jsonb request_payload
+        jsonb response_payload
+        timestamptz validated_at
+    }
+```
+
+#### Hook coordinator state machine
+
+Corbusier must store hook execution and acknowledgement for auditability
+(consistent with its broader audit goals in tool calls and agent handoffs). A
+concrete minimal state machine for hook gating:
+
+- `Pending` (hook requested by Podbot, not yet authorized)
+- `Authorized` or `Denied` (after HookPolicyService decision)
+- `Acked` (ack delivered to Podbot)
+- `Completed` / `Failed` (if Podbot also emits completion events;
+  **unspecified**)
+
+Corbusier must guarantee idempotent ack behaviour: repeated hook request
+messages (e.g. after restart) must not cause duplicate approvals.
+
+### Concrete Corbusier file changes mapping
+
+The following table maps existing Corbusier files (plus a few “new file”
+touchpoints) to required refactors. File existence and module layout are
+derived from the current repository tree.
+
+Table 1. Required file and module refactors for Corbusier’s Podbot-conformance
+work.
+
+| File path                                               | Current responsibility                                                                               | Proposed change                                                                                                                                                      | Risk / effort |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `src/lib.rs`                                            | Declares top-level modules (`agent_backend`, `tool_registry`, etc.).                                 | Add new modules: `workspace` (encapsulation), `hook_engine`, `prompt`, `bundle`, `podbot_adapter`.                                                                   | Med           |
+| `src/main.rs`                                           | Stub entry point.                                                                                    | Replace with real server/daemon bootstrap only when Corbusier’s HTTP/event surfaces are delivered; not strictly required for library-integration work.               | Low           |
+| `docs/corbusier-design.md`                              | High-level architecture incl. workspace management and `EncapsulationProvider` concept.              | Update to reflect Podbot MCP wire model (Streamable HTTP), hook ack channel, prompt validation surface, and tool router role shift (Option A).                       | Med           |
+| `docs/roadmap.md`                                       | Delivery plan; workspace encapsulation and hook engine remain planned.                               | Add explicit milestones for Podbot wire provisioning + hook coordinator + prompt validation.                                                                         | Low           |
+| `src/tool_registry/domain/transport.rs`                 | Transport modelling for MCP server connectivity (currently includes legacy shapes such as HTTP+SSE). | Replace/alias to `McpEndpointSource` (`Stdio`, `StdioContainer`, `StreamableHttp`) and treat Streamable HTTP as the default agent-facing injection.                  | High          |
+| `src/tool_registry/ports/host.rs`                       | Defines MCP server hosting port (start/stop/health/list_tools/call_tool).                            | Deprecate for Podbot-hosted agents; keep only for tests/local. Introduce new ports `WorkspaceMcpWires` and (optionally) `McpCatalogReader` for registry UI.          | High          |
+| `src/tool_registry/services/lifecycle/mod.rs`           | Service orchestration for MCP server lifecycle.                                                      | Split: definition lifecycle vs workspace-wire lifecycle. Move wire operations out of “server lifecycle” into `workspace/wires.rs` service.                           | High          |
+| `src/tool_registry/services/discovery/log_and_audit.rs` | Tool discovery logging/audit capture.                                                                | Convert to “registry audit” and “wire provisioning audit” for Option A; add ingestion hooks for Podbot-provided tool call logs if implemented (unspecified).         | Med/High      |
+| `src/tool_registry/domain/validation.rs`                | Lightweight schema validation for tool parameters.                                                   | Extend or reuse for prompt input schema validation; consider adding full JSON Schema later (explicitly assess).                                                      | Med           |
+| `src/tool_registry/adapters/runtime.rs`                 | In-memory MCP host adapter for tests.                                                                | Keep; add Podbot-wire fakes for integration tests; do not overload this module with real Podbot wiring.                                                              | Low/Med       |
+| `migrations/..._add_mcp_servers_table/up.sql`           | Adds `mcp_servers` with `transport` JSONB.                                                           | New migrations: `workspace_runtimes`, `workspace_mcp_wires`, `hook_invocations`, `validation_snapshots`, prompt/bundle registries if persisted.                      | Med           |
+| `src/agent_backend/domain/capabilities.rs`              | Agent capability flags (`supports_streaming`, `supports_tool_calls`, content types).                 | Extend with `PromptSurfaceCapabilities` and ACP-related constraints; create capability-to-disposition mapping for validation.                                        | Med           |
+| `src/agent_backend/services/registry.rs`                | Backend registry and discovery.                                                                      | Add runtime-spec resolution: map backend registry entries to `AgentRuntimeSpec` and launch via Podbot when backend is “podbot-hosted”.                               | Med           |
+| `src/worker/*` and `src/bin/pg_worker.rs`               | Background work infrastructure.                                                                      | Add background sweeps: stale wire cleanup, hook timeout handling, and possibly Podbot reconcile loops.                                                               | Med           |
+
+## Prompt, bundles, and validation
+
+This section proposes a concrete prompt/bundle system that aligns with:
+
+- Anthropic’s skill structure: “skills are folders” with a `SKILL.md`
+  containing YAML frontmatter and instructions (minimum frontmatter keys:
+  `name`, `description`).
+- Claude Code’s use of Markdown + YAML frontmatter for other agent-facing
+  instruction artefacts (e.g. output styles).
+- Jinja2 template syntax for interpolation (`{{ ... }}` and `{% ... %}`), which
+  Goose-style templating uses.
+
+### File taxonomy
+
+1. **Skill** (Anthropic-compatible): directory `skills/<skill-id>/SKILL.md` +
+   optional supporting files (`scripts/*`, `references/*`, etc.).
+
+2. **Prompt** (Corbusier/Podbot-compatible): a Markdown prompt that can be run
+   by an agent, with YAML frontmatter harmonized with SKILL.md.
+3. **Bundle**: a distributable package of skills + prompts + optional MCP
+   server definitions + optional hook artefacts.
+
+**Important design choice:** Keep SKILL.md *compatible* with Anthropic by
+limiting required frontmatter to `name` and `description`, while permitting
+additional namespaced keys under `x-corbusier`, `x-podbot`, etc. This preserves
+progressive disclosure conventions while enabling extra metadata.
+
+### Harmonized frontmatter schema
+
+Define a shared “frontmatter contract” used in:
+
+- SKILL.md (compatible superset)
+- PROMPT.md (new)
+- BUNDLE.yaml (new; not necessarily Markdown)
+
+Core keys:
+
+- `apiVersion`: e.g. `corbusier.dev/v1alpha1`
+- `kind`: `Skill | Prompt | Bundle`
+- `name`: string (skill id / prompt id)
+- `description`: string
+- `inputs`: optional schema for prompt parameters
+- `capabilities`: prompt-surface requirements (MCP wires, hooks, ACP)
+- `mcp`: wire requirements (names and sources)
+- `hooks`: subscriptions
+- `x-*`: extension namespace blocks
+
+### Prompt file example with Goose/Jinja2 interpolation
+
+```markdown
+---
+apiVersion: corbusier.dev/v1alpha1
+kind: Prompt
+name: review-and-fix
+description: Review a change set, run configured hooks, and propose a minimal fix.
+inputs:
+  schema:
+    type: object
+    required: [task_id]
+    properties:
+      task_id: { type: string }
+      focus: { type: string, default: "correctness" }
+capabilities:
+  require:
+    - mcp.wire:weaver
+    - hook:pre-commit
+  prefer:
+    - mcp.wire:search
+  forbid:
+    - acp.terminal
+    - acp.fs
+mcp:
+  wires:
+    - name: weaver
+      server_ref: "mcp_servers/weaver"
+    - name: search
+      server_ref: "mcp_servers/search"
+hooks:
+  subscribe:
+    - hook_name: pre-commit
+      trigger: pre_commit
+      workspace_access: read_only
+---
+# Task: {{ inputs.task_id }}
+
+Working directory: `{{ workspace.container_path }}`
+
+## Instructions
+
+1. Load the relevant files using Weaver (do **not** directly edit files).
+2. Analyse the repo for {{ inputs.focus }} risks.
+3. Before proposing a patch, ensure the `pre-commit` hook has been acknowledged and allowed by policy.
+4. Produce:
+   - a short diagnosis
+   - a Weaver change plan
+   - a validation plan
+```
+
+Jinja2 syntax and semantics for `{{ ... }}` substitution and `{% ... %}`
+control flow are documented in the upstream Jinja template reference.
+
+### Skill bundle abstraction
+
+Model the bundle after Anthropic’s “skills as folders”, but extend it to
+include *prompts*, *MCP definitions*, and *hook artefacts*.
+
+Bundle layout:
+
+```text
+bundle/
+  BUNDLE.yaml
+  skills/<skill-id>/SKILL.md
+  prompts/<prompt-id>.md
+  mcp-servers/<server-id>.yaml
+  hooks/<hook-id>.(sh|tar)
+```
+
+Example `BUNDLE.yaml`:
+
+```yaml
+apiVersion: corbusier.dev/v1alpha1
+kind: Bundle
+name: repo-quality-gates
+description: A set of skills and prompts for governance and quality enforcement.
+version: 0.1.0
+
+skills:
+  - id: linting
+    path: skills/linting/SKILL.md
+  - id: security-review
+    path: skills/security-review/SKILL.md
+
+prompts:
+  - id: review-and-fix
+    path: prompts/review-and-fix.md
+
+mcp_servers:
+  - id: weaver
+    source:
+      stdio:
+        command: weaver-mcp
+        args: ["--stdio"]
+        env: []
+  - id: search
+    source:
+      streamable_http:
+        url: "https://search.internal.example/mcp"
+        headers: []
+
+hooks:
+  - id: pre-commit
+    artifact:
+      kind: script
+      path: hooks/pre-commit.sh
+      digest: "sha256:..."
+    workspace_access: read_only
+```
+
+**Unspecified detail:** Whether Corbusier persists bundles/prompts in its DB
+versus loading from a workspace filesystem is not currently defined in
+Corbusier. Given Podbot’s host-mount safety model, a practical first iteration
+is “bundle lives in repo, Corbusier parses it from the mounted workspace”, then
+move to a curated registry later.
+
+### Podbot `validate_prompt` endpoint
+
+Podbot should expose validation as:
+
+- a library function for embedders (Corbusier),
+- optionally, a CLI `podbot validate-prompt` that emits JSON for operators/CI.
+
+Validation must at minimum enforce the ACP masking reality: if the prompt
+requires terminal or fs ACP capabilities, validation should report them as
+**ignored** or **rejected** depending on whether the prompt marked them as
+required.
+
+Sample request:
+
+```json
+{
+  "agent": {
+    "kind": "custom",
+    "mode": "acp",
+    "command": "opencode",
+    "args": ["acp"],
+    "env_allowlist": ["OPENAI_API_KEY"],
+    "working_dir": "/workspace"
+  },
+  "prompt": {
+    "name": "review-and-fix",
+    "frontmatter": { "capabilities": { "require": ["hook:pre-commit"], "forbid": ["acp.terminal"] } },
+    "body": "..."
+  },
+  "bundle_refs": ["repo-quality-gates@0.1.0"],
+  "assumed_mcp_wires": ["weaver", "search"],
+  "assumed_hooks": ["pre-commit"]
+}
+```
+
+Sample response (host-enforced capability degradation that remains valid):
+
+```json
+{
+  "ok": true,
+  "effective_prompt": {
+    "body": "...",
+    "applied_drops": ["acp.terminal", "acp.fs"]
+  },
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "ACP_CAPABILITY_MASKED",
+      "message": "Agent runs in ACP mode; terminal/* and fs/* are masked by Podbot and will be ignored.",
+      "location": { "frontmatterPath": "capabilities" }
+    }
+  ],
+  "capability_report": [
+    {
+      "capability": "acp.terminal",
+      "disposition": "HostEnforced",
+      "execution_effect": "NonBlocking",
+      "details": "Masked by Podbot ACP policy."
+    },
+    {
+      "capability": "acp.fs",
+      "disposition": "HostEnforced",
+      "execution_effect": "NonBlocking",
+      "details": "Masked by Podbot ACP policy."
+    },
+    {
+      "capability": "hook:pre-commit",
+      "disposition": "Native",
+      "execution_effect": "NonBlocking"
+    }
+  ]
+}
+```
+
+## Security, migration, tests, and documentation
+
+### Security and trust boundary changes
+
+1. **Workspace access and host mounts**  
+   If Corbusier uses `host_mount`, it must implement Podbot’s required path
+   policy (canonicalize, allowlist roots, reject symlink escapes). Enforcement
+   cannot be left solely to operators.
+
+2. **Environment secret passthrough**  
+   Corbusier must treat `env_allowlist` as a hard gate for both agent runtime
+   and hooks. Podbot’s design explicitly separates “credential injection” from
+   “env allowlist” and requires secret redaction.
+
+3. **MCP transport framing and stdout purity**  
+   For stdio MCP sources, MCP requires newline-delimited JSON-RPC messages with
+   no embedded newlines, and no non-protocol bytes on stdout. Podbot’s hosting
+   design mirrors this “protocol purity” goal for its own hosting mode. This
+   implies:
+   - do not log structured diagnostics onto MCP stdio streams,
+   - isolate tool/hook logs into stderr or structured side channels.
+
+4. **Repo access for helper containers**  
+   Podbot’s MCP hosting design requires explicit `RepoAccess` for helper
+   containers, defaulting to `None`, and distinguishes helper-container sharing
+   from the agent container’s own workspace mount. Corbusier must surface this
+   in policy/UI and persist it in the server definition schema.
+
+5. **ACP delegation**  
+   Corbusier must not rely on ACP’s “IDE-host tools” for file system or
+   terminal operations when using Podbot-hosted agents; Podbot masks them by
+   default. Any override to allow ACP delegation is a trust-boundary change
+   that Corbusier should treat as policy-controlled and auditable.
+
+### Migration plan
+
+A staged rollout should preserve functioning parts of Corbusier’s current tool
+registry while introducing Podbot-wired operation safely.
+
+- **Backwards compatibility adapters**  
+  Corbusier currently models transport in `tool_registry/domain/transport.rs`
+  with historical variants; add a compatibility layer:
+  - map legacy `http_sse` records to `streamable_http` where possible
+    (Streamable HTTP may optionally employ SSE for streaming, but the defining
+    contract is Streamable HTTP).  
+  - keep legacy parsing to avoid migration failures, but re-serialize to the
+    new source model on update.
+
+- **Legacy SSE adapter**  
+  If Corbusier currently expects SSE as a first-class transport, treat it as
+  deprecated and only supported via bridging layers (Podbot can optionally use
+  SSE within Streamable HTTP; Corbusier should not model SSE as its own stable
+  transport). Any dedicated “SSE-only” support should be explicitly labelled
+  legacy and isolated behind an adapter boundary.
+
+- **Staged rollout**  
+  - [ ] 1.0 Ship schema and domain-type changes. Dependencies: None. Finish
+    criteria: existing lifecycle tests remain green for 5 consecutive runs
+    using the in-memory host path and the new schema types appear in the
+    migration preview without compatibility regressions.
+  - [ ] 2.0 Add Podbot-wire provisioning for one golden-path MCP server and
+    one workspace strategy. Dependencies: 1.0. Finish criteria: provisioning is
+    validated for 1 MCP server and 1 workspace strategy (`host_mount` or
+    `github_clone`) in 3 consecutive integration runs.
+  - [ ] 3.0 Enable prompt and bundle parsing with warn-only validation.
+    Dependencies: 2.0. Finish criteria: diagnostics are logged and audited for
+    at least 10 representative prompt samples, and 0 of those samples are
+    blocked solely by warn-only validation.
+  - [ ] 4.0 Enforce policy gates and hook acknowledgements in block mode.
+    Dependencies: 3.0. Finish criteria: deny-path tests fail closed in 3
+    consecutive runs and ack state is recorded for 100% of Podbot-hosted hook
+    requests in the acceptance suite.
+
+### Tests and QA requirements
+
+Corbusier already emphasizes deterministic testing via in-memory adapters and
+structured audit trails. Extend this with:
+
+- **Unit tests**
+  - transport conversion: legacy → new `McpEndpointSource`
+  - prompt parsing + frontmatter validation
+  - capability disposition mapping (ACP masked capabilities must produce
+    deterministic diagnostics)
+
+- **Integration tests**
+  - `WorkspaceMcpWires` fake that simulates Podbot returning Streamable HTTP
+    endpoints and headers (URL + auth).
+  - hook coordinator idempotency: duplicate hook requests after restart must
+    not double-ack.
+
+- **E2E tests (requires real Podbot + container engine)**
+  - create workspace (host mount), create 2 MCP wires, launch ACP agent, ensure:
+    - terminal/fs capabilities are masked (validate_prompt warns appropriately),
+    - hooks suspend and resume correctly across ack,
+    - failure/restart scenario: Corbusier restarts mid-hook; it resumes and
+      acks exactly once.
+
+### Documentation and roadmap updates
+
+Corbusier documentation must reflect the doctrinal shift where Podbot owns
+runtime mechanics:
+
+- Update Corbusier design doc sections describing tool hosting and workspace
+  encapsulation, replacing “HTTP+SSE manager” framing with “Podbot MCP wires
+  presenting Streamable HTTP to agent containers”.
+- Update Corbusier roadmap to include:
+  - Podbot wire provisioning milestone (under encapsulation/workspace
+    management),
+  - hook coordinator + ack loop milestone (hook engine),
+  - prompt validation milestone (external interface + governance).
+
+### Implementation timeline
+
+Accessible description: Gantt chart showing the Corbusier–Podbot conformance
+timeline, major workstreams, and their dependencies across foundations,
+integration, hooks, prompts, and quality work.
+
+Figure 2. Corbusier–Podbot conformance implementation timeline.
+
+```mermaid
+gantt
+title Corbusier–Podbot conformance staged plan
+dateFormat  YYYY-MM-DD
+axisFormat  %d %b
+
+section Foundations
+Domain model + DB migrations [M]          :a1, 2026-03-17, 14d
+Legacy transport adapters [M]             :a2, after a1, 10d
+
+section Podbot integration
+Podbot adapter: AgentLauncher [H]         :b1, after a1, 20d
+Workspace MCP wire service [H]            :b2, after b1, 20d
+
+section Hooks
+HookCoordinator + state machine [H]       :c1, after b1, 20d
+Hook protocol + ack integration [H]       :c2, after c1, 15d
+
+section Prompts and bundles
+Prompt/Bundle parsing + frontmatter [M]   :d1, after a1, 15d
+Podbot validate_prompt surface [M]        :d2, after d1, 15d
+Corbusier policy gating + diagnostics [M] :d3, after d2, 10d
+
+section Quality
+Integration + e2e scenarios [H]           :e1, after b2, 25d
+Docs + roadmap updates [L]                :e2, after d3, 7d
+```
+
+### Hook protocol message flow
+
+This sequence diagram implements the required “Podbot sends hook messages;
+execution suspends until Corbusier acknowledges” assumption, without violating
+Podbot stdout purity (hook events travel over a dedicated library event
+channel, not stdout).
+
+Figure 3. Sequence diagram for hook authorization and resume flow. It shows the
+control-channel exchange from agent-triggered hook request through Podbot,
+Corbusier, and policy evaluation, including the allow and deny paths and the
+point where hosted execution resumes.
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent_runtime_container
+    participant P as Podbot
+    participant C as Corbusier
+    participant H as HookPolicyService
+
+    Agent->>P: Trigger runtime action that requires hook
+    P->>C: HookRequested(hook_id, trigger, workspace_id, access_mode, artifact_ref, correlation_id)
+    C->>H: authorize_hook(request_context)
+    H-->>C: HookDecision(Allow_or_Deny, reason)
+    C-->>P: HookAck(hook_id, correlation_id, decision)
+    alt decision == Allow
+        P->>P: ExecuteHook(hook_id, workspace_access_mode)
+        P-->>C: HookCompleted(hook_id, correlation_id, status, exit_code, logs_ref)
+    else decision == Deny
+        P-->>C: HookSkipped(hook_id, correlation_id, reason)
+    end
+    P-->>Agent: Resume hosted execution after hook outcome
+```
+
+**Unspecified but necessary additions:** the “HookCompleted/HookSkipped”
+messages and their payload fields are not part of current Podbot docs; include
+them only if post-hook auditing and failure propagation beyond the single ack
+gate are required.
+
+______________________________________________________________________
+
+This design deliberately confines new “runtime privilege” (container wiring,
+tool bridging, hook execution) to Podbot, while evolving Corbusier into a
+policy-driven orchestrator that provisions workspaces and wires, validates
+prompts/bundles against agent runtimes, and controls governance hooks via
+explicit acknowledgements—matching the primary Podbot design intent and MCP
+transport requirements.
