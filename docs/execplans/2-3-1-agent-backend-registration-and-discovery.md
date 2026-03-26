@@ -19,9 +19,9 @@ After this change, a caller can:
 
 1. Register two distinct backends (e.g. "claude_code_sdk" and "codex_cli")
    with capability metadata.
-1. List all registered backends and confirm both appear.
-1. Look up a backend by name or ID.
-1. Deregister a backend and confirm it no longer appears in active listings
+2. List all registered backends and confirm both appear.
+3. Look up a backend by name or ID.
+4. Deregister a backend and confirm it no longer appears in active listings
    (inactive backends still appear in `list_all`).
 
 Observable success: `make all` passes, including new unit tests, in-memory
@@ -674,7 +674,7 @@ All commands run from `/home/user/project`.
    mkdir -p migrations/2026-02-25-000000_add_backend_registrations_table
    ```
 
-1. Write domain layer files (Stage A), then run:
+2. Write domain layer files (Stage A), then run:
 
    ```bash
    cargo check 2>&1 | head -20
@@ -682,13 +682,13 @@ All commands run from `/home/user/project`.
 
    Expected: compiles with no errors.
 
-1. Write port layer (Stage B), then `cargo check`.
+3. Write port layer (Stage B), then `cargo check`.
 
-1. Write in-memory adapter (Stage C), then `cargo check`.
+4. Write in-memory adapter (Stage C), then `cargo check`.
 
-1. Write service layer (Stage D), then `cargo check`.
+5. Write service layer (Stage D), then `cargo check`.
 
-1. Write unit tests (Stage E), then:
+6. Write unit tests (Stage E), then:
 
    ```bash
    set -o pipefail; cargo nextest run --lib 2>&1 | tee /tmp/unit-tests.log
@@ -696,7 +696,7 @@ All commands run from `/home/user/project`.
 
    Expected: all new tests pass.
 
-1. Write in-memory integration tests (Stage F), then:
+7. Write in-memory integration tests (Stage F), then:
 
    ```bash
    set -o pipefail; cargo nextest run --test in_memory 2>&1 | tee /tmp/inmem-tests.log
@@ -704,7 +704,7 @@ All commands run from `/home/user/project`.
 
    Expected: all tests pass, including new backend registry tests.
 
-1. Write BDD tests (Stage G), then:
+8. Write BDD tests (Stage G), then:
 
    ```bash
    set -o pipefail; cargo nextest run --test backend_registration_scenarios 2>&1 | tee /tmp/bdd-tests.log
@@ -712,7 +712,7 @@ All commands run from `/home/user/project`.
 
    Expected: all scenarios pass.
 
-1. Write migration (Stage H), then create Postgres adapter
+9. Write migration (Stage H), then create Postgres adapter
    (Stage I), then:
 
    ```bash
@@ -721,18 +721,18 @@ All commands run from `/home/user/project`.
 
    Expected: all Postgres tests pass, including new backend registry tests.
 
-1. Update documentation (Stage K).
+10. Update documentation (Stage K).
 
-1. Final validation:
+11. Final validation:
 
-   ```bash
-   set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
-   set -o pipefail; make markdownlint 2>&1 | tee /tmp/markdownlint.log
-   set -o pipefail; make nixie 2>&1 | tee /tmp/nixie.log
-   set -o pipefail; make fmt 2>&1 | tee /tmp/fmt.log
-   ```
+```bash
+set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
+set -o pipefail; make markdownlint 2>&1 | tee /tmp/markdownlint.log
+set -o pipefail; make nixie 2>&1 | tee /tmp/nixie.log
+set -o pipefail; make fmt 2>&1 | tee /tmp/fmt.log
+```
 
-   Expected: exit code 0 for each command, no warnings, no failures.
+Expected: exit code 0 for each command, no warnings, no failures.
 
 ## Validation and acceptance
 

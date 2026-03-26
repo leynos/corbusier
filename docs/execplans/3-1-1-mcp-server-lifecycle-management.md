@@ -19,9 +19,9 @@ servers in a tool registry, and query tools exposed by running servers.
 After this change, a developer or operator can:
 
 1. Register MCP server configurations in the tool registry.
-1. Start and stop registered MCP servers through a service API.
-1. List registered servers with lifecycle state and last health status.
-1. Query tools from a running server (`tools/list`) through the registry.
+2. Start and stop registered MCP servers through a service API.
+3. List registered servers with lifecycle state and last health status.
+4. Query tools from a running server (`tools/list`) through the registry.
 
 Observable success: `make all`, `make markdownlint`, and `make nixie` pass, and
 new unit (`rstest`), behavioural (`rstest-bdd`), in-memory integration, and
@@ -203,16 +203,16 @@ PostgreSQL harness expectations:
 Reference documents for this feature cover scope, architecture, testing, and
 tooling guidance.[^1][^2][^3][^4][^5][^6][^7][^8][^9]
 
-\[^1\]: `docs/roadmap.md` (3.1.1 scope and success criteria).
-\[^2\]: `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
+[^1]: `docs/roadmap.md` (3.1.1 scope and success criteria).
+[^2]: `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
 registry architecture).
-\[^3\]: `docs/rust-testing-with-rstest-fixtures.md`.
-\[^4\]: `docs/reliable-testing-in-rust-via-dependency-injection.md`.
-\[^5\]: `docs/rust-doctest-dry-guide.md`.
-\[^6\]: `docs/complexity-antipatterns-and-refactoring-strategies.md`.
-\[^7\]: `docs/pg-embed-setup-unpriv-users-guide.md`.
-\[^8\]: `docs/ortho-config-users-guide.md`.
-\[^9\]: `docs/rstest-bdd-users-guide.md`.
+[^3]: `docs/rust-testing-with-rstest-fixtures.md`.
+[^4]: `docs/reliable-testing-in-rust-via-dependency-injection.md`.
+[^5]: `docs/rust-doctest-dry-guide.md`.
+[^6]: `docs/complexity-antipatterns-and-refactoring-strategies.md`.
+[^7]: `docs/pg-embed-setup-unpriv-users-guide.md`.
+[^8]: `docs/ortho-config-users-guide.md`.
+[^9]: `docs/rstest-bdd-users-guide.md`.
 
 ## Plan of work
 
@@ -334,27 +334,27 @@ Run all commands from repository root: `/home/user/project`.
 1. Baseline and scaffolding checks during development:
 
    ```bash
-   set -o pipefail && make check-fmt 2>&1 | tee /tmp/2-1-1-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/2-1-1-lint.log
+   set -o pipefail && make check-fmt 2>&1 | tee /tmp/3-1-1-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/3-1-1-lint.log
    ```
 
    Expected signal: no formatting/lint regressions while scaffolding evolves.
 
-1. Fast iteration on targeted tests while implementing:
+2. Fast iteration on targeted tests while implementing:
 
    ```bash
-   set -o pipefail && cargo nextest run --all-targets --all-features mcp_server 2>&1 | tee /tmp/2-1-1-targeted-tests.log
+   set -o pipefail && cargo nextest run --all-targets --all-features mcp_server 2>&1 | tee /tmp/3-1-1-targeted-tests.log
    ```
 
    Expected signal: new MCP lifecycle suites fail first (red), then pass
    (green) as implementation lands.
 
-1. Full repository gates before completion:
+3. Full repository gates before completion:
 
    ```bash
-   set -o pipefail && make all 2>&1 | tee /tmp/2-1-1-make-all.log
-   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-1-1-markdownlint.log
-   set -o pipefail && make nixie 2>&1 | tee /tmp/2-1-1-nixie.log
+   set -o pipefail && make all 2>&1 | tee /tmp/3-1-1-make-all.log
+   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/3-1-1-markdownlint.log
+   set -o pipefail && make nixie 2>&1 | tee /tmp/3-1-1-nixie.log
    ```
 
    Expected signal: all commands exit 0, with no lint, test, markdown, or
@@ -365,11 +365,11 @@ Run all commands from repository root: `/home/user/project`.
 Acceptance is behavioural:
 
 1. A registered MCP server can be started and transitions to a running state.
-1. Listing servers returns registered entries with lifecycle and health data.
-1. Querying available tools from a running server returns tool definitions.
-1. Stopping a running server updates lifecycle/health state and removes runtime
+2. Listing servers returns registered entries with lifecycle and health data.
+3. Querying available tools from a running server returns tool definitions.
+4. Stopping a running server updates lifecycle/health state and removes runtime
    availability.
-1. Duplicate registrations, unknown server IDs, and host start/query failures
+5. Duplicate registrations, unknown server IDs, and host start/query failures
    return typed errors and are covered by tests.
 
 Quality criteria:
@@ -426,14 +426,14 @@ so a future maintainer can verify completion without rerunning every step.
 
 Validation evidence:
 
-- `/tmp/2-1-1-check-fmt.log`: `make check-fmt` passed.
-- `/tmp/2-1-1-lint.log`: `make lint` passed.
-- `/tmp/2-1-1-test.log`: `make test` passed
+- `/tmp/3-1-1-check-fmt.log`: `make check-fmt` passed.
+- `/tmp/3-1-1-lint.log`: `make lint` passed.
+- `/tmp/3-1-1-test.log`: `make test` passed
   (`577 tests run: 577 passed, 1 skipped`).
-- `/tmp/2-1-1-doc-fmt.log`: `make fmt` passed after resolving a duplicate
+- `/tmp/3-1-1-doc-fmt.log`: `make fmt` passed after resolving a duplicate
   heading (`MD024`) in `docs/corbusier-design.md`.
-- `/tmp/2-1-1-markdownlint.log`: `make markdownlint` passed.
-- `/tmp/2-1-1-nixie.log`: `make nixie` passed.
+- `/tmp/3-1-1-markdownlint.log`: `make markdownlint` passed.
+- `/tmp/3-1-1-nixie.log`: `make nixie` passed.
 
 ## Revision note
 
@@ -444,4 +444,5 @@ Validation evidence:
   migration, tests, and service delivery. Documentation and roadmap updates
   applied.
 
-- 2026-02-28: Full gates completed successfully (`make check-fmt`, `make lint`, `make test`, `make fmt`, `make markdownlint`, `make nixie`).
+- 2026-02-28: Full gates completed successfully (`make check-fmt`,
+  `make lint`, `make test`, `make fmt`, `make markdownlint`, `make nixie`).

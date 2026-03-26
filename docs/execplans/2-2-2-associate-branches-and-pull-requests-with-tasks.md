@@ -218,7 +218,7 @@ Lessons learned:
 The `task` bounded context lives in `src/task/` and follows hexagonal
 architecture:
 
-```
+```plaintext
 src/task/
 ├── domain/
 │   ├── mod.rs          Re-exports all domain types
@@ -249,7 +249,7 @@ src/task/
 
 ### Database schema (from migration `2026-02-09-000000_add_tasks_table`)
 
-```
+```plaintext
 CREATE TABLE tasks (
     id UUID PRIMARY KEY,
     origin JSONB NOT NULL,
@@ -358,7 +358,7 @@ Go/no-go: `make check-fmt && make lint` pass. New types compile cleanly.
 
 Add optional fields to `Task`:
 
-```
+```plaintext
 branch_ref: Option<BranchRef>,
 pull_request_ref: Option<PullRequestRef>,
 ```
@@ -390,8 +390,11 @@ Add three new methods to the `TaskRepository` trait:
 
 - `async fn update(&self, task: &Task) -> TaskRepositoryResult<()>` — persists
   changes to an existing task.
-- `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>> ` — returns all tasks linked to the branch (may be multiple due to many-to-many).
-- `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) -> TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the PR.
+- `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) ->
+  TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the branch
+  (may be multiple due to many-to-many).
+- `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) ->
+  TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the PR.
 
 Note: these return `Vec<Task>` not `Option<Task>` because multiple tasks may
 share a branch or PR.
@@ -427,7 +430,7 @@ Implement `find_by_pull_request_ref`: analogous to `find_by_branch_ref`.
 
 up.sql:
 
-```
+```plaintext
 -- Non-unique index for branch reference lookups (many-to-many: multiple
 -- tasks may share a branch).
 CREATE INDEX idx_tasks_branch_ref ON tasks (branch_ref)
@@ -440,7 +443,7 @@ CREATE INDEX idx_tasks_pull_request_ref ON tasks (pull_request_ref)
 
 down.sql:
 
-```
+```plaintext
 DROP INDEX IF EXISTS idx_tasks_pull_request_ref;
 DROP INDEX IF EXISTS idx_tasks_branch_ref;
 ```
@@ -449,7 +452,7 @@ DROP INDEX IF EXISTS idx_tasks_branch_ref;
 
 Add reverse indexes to `InMemoryTaskState`:
 
-```
+```plaintext
 branch_index: HashMap<String, Vec<TaskId>>,
 pull_request_index: HashMap<String, Vec<TaskId>>,
 ```
@@ -551,7 +554,7 @@ Go/no-go: `make check-fmt && make lint` pass.
 
 **BDD tests — new file `tests/features/task_branch_pr_association.feature`:**
 
-```
+```plaintext
 Feature: Branch and pull request association with tasks
 
   Scenario: Associate a branch with a task and retrieve by reference
@@ -624,7 +627,7 @@ Go/no-go: `make test` passes across workspace.
 Add implementation decision notes under §2.2.2, after the existing 2.2.1
 decision block:
 
-```
+```plaintext
 ###### Implementation Decisions (2026-02-11)
 
 - Branch and pull request references are stored as canonical string
@@ -667,77 +670,77 @@ All commands run from repository root: `/home/user/project`.
 
 1. Run baseline quality gates to confirm starting state.
 
-   ```
-   set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-2-baseline-fmt.log
-   set -o pipefail; make lint 2>&1 | tee /tmp/1-2-2-baseline-lint.log
-   set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-baseline-test.log
+   ```plaintext
+   set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-2-baseline-fmt.log
+   set -o pipefail; make lint 2>&1 | tee /tmp/2-2-2-baseline-lint.log
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-baseline-test.log
    ```
 
    Expected: all exit 0.
 
-1. Create domain value objects (Stage A).
+2. Create domain value objects (Stage A).
 
    Create `src/task/domain/branch.rs` and `src/task/domain/pull_request.rs`.
    Extend `error.rs` and `mod.rs`.
 
-   ```
+   ```plaintext
    make check-fmt && make lint
    ```
 
    Expected: no errors.
 
-1. Extend task aggregate and repository port (Stage B).
+3. Extend task aggregate and repository port (Stage B).
 
    Modify `task.rs`, `PersistedTaskData`, repository trait.
 
-   ```
+   ```plaintext
    make check-fmt && make lint
    ```
 
    Expected: compile errors from unimplemented trait methods (expected;
    adapters need stubs).
 
-1. Implement adapters (Stage C).
+4. Implement adapters (Stage C).
 
    Modify Postgres and in-memory adapters. Create migration. Update helpers.
 
-   ```
+   ```plaintext
    make check-fmt && make lint && make test
    ```
 
    Expected: all existing 2.2.1 tests still pass.
 
-1. Implement service layer (Stage D).
+5. Implement service layer (Stage D).
 
-   ```
+   ```plaintext
    make check-fmt && make lint
    ```
 
    Expected: no errors.
 
-1. Add all tests (Stage E).
+6. Add all tests (Stage E).
 
-   ```
-   set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-test.log
+   ```plaintext
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-test.log
    ```
 
    Expected: all new and existing tests pass.
 
-1. Update documentation (Stage F).
+7. Update documentation (Stage F).
 
-   ```
-   set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-2-2-md.log
-   set -o pipefail; make nixie 2>&1 | tee /tmp/1-2-2-nixie.log
+   ```plaintext
+   set -o pipefail; make markdownlint 2>&1 | tee /tmp/2-2-2-md.log
+   set -o pipefail; make nixie 2>&1 | tee /tmp/2-2-2-nixie.log
    ```
 
    Expected: all exit 0.
 
-1. Final quality gate.
+8. Final quality gate.
 
-   ```
-   set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-2-final-fmt.log
-   set -o pipefail; make lint 2>&1 | tee /tmp/1-2-2-final-lint.log
-   set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-final-test.log
+   ```plaintext
+   set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-2-final-fmt.log
+   set -o pipefail; make lint 2>&1 | tee /tmp/2-2-2-final-lint.log
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-final-test.log
    ```
 
    Expected: all exit 0.
@@ -835,9 +838,16 @@ Prescriptive interfaces for this milestone:
 Domain types (all in `src/task/domain/`):
 
 - `BranchName` — string newtype, validated (non-empty, no colons, ≤200 chars).
-- `BranchRef` — `{ provider: IssueProvider, repository: RepositoryFullName, branch_name: BranchName }`. Canonical format: `"provider:owner/repo:branch-name"`.
+- `BranchRef` —
+  `{ provider: IssueProvider, repository: RepositoryFullName,
+  branch_name: BranchName }`.
+  Canonical format:
+  `"provider:owner/repo:branch-name"`.
 - `PullRequestNumber` — `u64` newtype, validated (positive, ≤ `i64::MAX`).
-- `PullRequestRef` — `{ provider: IssueProvider, repository: RepositoryFullName, pull_request_number: PullRequestNumber }`. Canonical format: `"provider:owner/repo:42"`.
+- `PullRequestRef` —
+  `{ provider: IssueProvider, repository: RepositoryFullName,
+  pull_request_number: PullRequestNumber }`. Canonical
+  format: `"provider:owner/repo:42"`.
 - `VcsProvider` — type alias for `IssueProvider`.
 
 Port contract extensions (in `src/task/ports/repository.rs`):

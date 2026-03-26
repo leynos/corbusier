@@ -21,15 +21,15 @@ After this change, a developer or operator can:
 
 1. Start an MCP server and have its tools automatically persisted in a
    durable catalogue that survives process restarts.
-1. Query the tool catalogue to see all available tools across all registered
+2. Query the tool catalogue to see all available tools across all registered
    MCP servers, with their schemas and availability status.
-1. Execute a tool call by name and have the system resolve which MCP server
+3. Execute a tool call by name and have the system resolve which MCP server
    hosts that tool, validate call parameters against the tool's input schema,
    enforce a pluggable policy check, route the call to the correct server, and
    record a complete audit trail of the invocation.
-1. Stop an MCP server and have all its tools automatically marked as
+4. Stop an MCP server and have all its tools automatically marked as
    unavailable in the catalogue.
-1. Have MCP server startup stderr and tool call stderr automatically captured
+5. Have MCP server startup stderr and tool call stderr automatically captured
    and stored via the Rust `object_store` crate, with log references recorded
    in the tool call audit trail. Logs are subject to a configurable rotation
    and retention policy (default: 7-day retention for tool execution logs,
@@ -270,29 +270,29 @@ All 11 acceptance criteria verified:
    `catalog_survives_service_reconstruction` -- tools discovered from a running
    server are persisted and survive service reconstruction from the same
    connection pool.
-1. Cross-server routing: verified by in-memory integration test
+2. Cross-server routing: verified by in-memory integration test
    `two_servers_route_correctly` and BDD scenario "Route a tool call to the
    correct server".
-1. Schema validation: verified by unit test
+3. Schema validation: verified by unit test
    `call_tool_schema_validation_failure`.
-1. Policy enforcement: verified by unit test `call_tool_policy_denied`
+4. Policy enforcement: verified by unit test `call_tool_policy_denied`
    using `DenyAllPolicy`.
-1. Audit trail: verified by PostgreSQL integration test
+5. Audit trail: verified by PostgreSQL integration test
    `audit_log_persisted` and BDD scenario audit assertions.
-1. Tool unavailability after stop: verified by BDD scenario "Tool becomes
+6. Tool unavailability after stop: verified by BDD scenario "Tool becomes
    unavailable when server stops" and integration test
    `tool_unavailable_after_stop`.
-1. Unknown tool error: verified by BDD scenario "Unknown tool call is
+7. Unknown tool error: verified by BDD scenario "Unknown tool call is
    rejected".
-1. Stderr capture for tool calls: verified by BDD scenario "Tool call
+8. Stderr capture for tool calls: verified by BDD scenario "Tool call
    stderr is captured in the log store" and unit test
    `call_tool_captures_stderr_in_log_store`.
-1. Startup stderr capture: verified by unit test
+9. Startup stderr capture: verified by unit test
    `store_startup_stderr_captures_and_sweeps`.
-1. Log rotation (`max_logs_per_server`): verified by unit test
+10. Log rotation (`max_logs_per_server`): verified by unit test
    `store_startup_stderr_captures_and_sweeps` (overflow sweep) and
    integration test `log_rotation_enforces_max_count`.
-1. Stderr truncation: verified by unit test
+11. Stderr truncation: verified by unit test
    `stderr_truncation_at_max_bytes`.
 
 ### Quality gates
@@ -379,7 +379,8 @@ Tests follow established patterns:
 Build gates (from `AGENTS.md` and `Makefile`):
 
 - `make check-fmt` -- `cargo fmt --all -- --check`
-- `make lint` -- `cargo doc --no-deps` + `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `make lint` -- `cargo doc --no-deps` +
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - `make test` -- `RUSTFLAGS="-D warnings" cargo nextest run --all-targets --all-features`
 - `make fmt` -- formatting (code + markdown)
 - `make markdownlint` -- markdown linting
@@ -761,31 +762,37 @@ the core routing method. Flow:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
-1. Availability: check `entry.available()`. Fail with `ToolUnavailable` if
+2. Availability: check `entry.available()`. Fail with `ToolUnavailable` if
    false.
-1. Schema validation: call `validate_parameters(entry.tool().input_schema(), request.parameters())`. Fail with `SchemaValidationFailed` on error.
-1. Policy enforcement: call `policy.evaluate(request.tool_name(), request.parameters())`. Fail with `PolicyDenied` if denied.
-1. Runtime check: load server from registry, verify lifecycle is `Running`.
+3. Schema validation: call
+   `validate_parameters(entry.tool().input_schema(), request.parameters())`.
+   Fail with `SchemaValidationFailed` on error.
+4. Policy enforcement: call
+   `policy.evaluate(request.tool_name(), request.parameters())`. Fail with
+   `PolicyDenied` if denied.
+5. Runtime check: load server from registry, verify lifecycle is `Running`.
    Fail with `ToolUnavailable` if not.
-1. Execute: call `host.call_tool(server, tool_name, parameters)`. Wrap in
+6. Execute: call `host.call_tool(server, tool_name, parameters)`. Wrap in
    `tokio::time::timeout` with 30-second default. The host returns a
    `ToolCallHostResult` containing the content `Value` and an optional
    `stderr_output: Option<bytes::Bytes>`.
-1. Stderr capture: if `host_result.stderr_output` is `Some(bytes)` and
+7. Stderr capture: if `host_result.stderr_output` is `Some(bytes)` and
    non-empty, store the log:
    - Build a `LogCaptureContext` carrying the clock reference, the retention
      policy reference, and the `tenant_id` from `RequestContext`.
-   - Call `LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &capture_ctx)` to compute the object path and metadata.
+   - Call
+     `LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &capture_ctx)`
+     to compute the object path and metadata.
    - Call `log_store.store_log(ctx, &metadata, bytes, &retention_policy)`.
    - Record the `object_path` for inclusion in the audit record.
    - Stderr storage is best-effort: a failed write logs a warning but does
      not fail the tool call.
-1. Audit: build `ToolCallAuditRecord::from_result(...)` including the
+8. Audit: build `ToolCallAuditRecord::from_result(...)` including the
    `stderr_log_path` (the object store path, or `None` if no stderr was
    captured or storage failed). Call `catalog.record_audit()`. Audit is
    best-effort -- a failed audit write logs a warning but does not fail the
    call.
-1. Return `ToolCallResult`.
+9. Return `ToolCallResult`.
 
 `store_startup_stderr(&self, ctx, server_id, stderr)`
 `-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`: stores startup stderr
@@ -1024,39 +1031,39 @@ Run all commands from repository root: `/home/user/project`.
    set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-stage-a-lint.log
    ```
 
-1. Stage B compilation checks:
+2. Stage B compilation checks:
 
    ```bash
    set -o pipefail && make check-fmt 2>&1 \
-     | tee /tmp/2-1-2-stage-b-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-stage-b-lint.log
-   set -o pipefail && make test 2>&1 | tee /tmp/2-1-2-stage-b-test.log
+     | tee /tmp/3-1-2-stage-b-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-stage-b-lint.log
+   set -o pipefail && make test 2>&1 | tee /tmp/3-1-2-stage-b-test.log
    ```
 
-1. Fast iteration on targeted tests during Stage C:
+3. Fast iteration on targeted tests during Stage C:
 
    ```bash
    set -o pipefail && cargo nextest run --all-targets --all-features \
-     tool_discovery 2>&1 | tee /tmp/2-1-2-targeted-tests.log
+     tool_discovery 2>&1 | tee /tmp/3-1-2-targeted-tests.log
    set -o pipefail && cargo nextest run --all-targets --all-features \
-     validation 2>&1 | tee /tmp/2-1-2-validation-tests.log
+     validation 2>&1 | tee /tmp/3-1-2-validation-tests.log
    ```
 
-1. Full test suite after Stage C:
+4. Full test suite after Stage C:
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-stage-c-make-all.log
+     | tee /tmp/3-1-2-stage-c-make-all.log
    ```
 
-1. Full test suite after Stage D:
+5. Full test suite after Stage D:
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-stage-d-make-all.log
+     | tee /tmp/3-1-2-stage-d-make-all.log
    ```
 
-1. Final gates after Stage E:
+6. Final gates after Stage E:
 
    ```bash
    set -o pipefail && make all 2>&1 \
@@ -1075,30 +1082,30 @@ Acceptance is behavioural:
 1. Tools discovered from a running MCP server are persisted in the catalogue
    and survive service reconstruction (verified by PostgreSQL integration test
    `catalog_survives_service_reconstruction`).
-1. Calling a tool by name routes the request to the correct MCP server and
+2. Calling a tool by name routes the request to the correct MCP server and
    returns the result (verified by BDD scenario "Route a tool call to the
    correct server" and integration test `two_servers_route_correctly`).
-1. Tool call parameters are validated against the tool's input schema before
+3. Tool call parameters are validated against the tool's input schema before
    execution (verified by unit test `call_tool_schema_validation_failure`).
-1. A pluggable policy enforcement point checks each tool call before
+4. A pluggable policy enforcement point checks each tool call before
    execution (verified by unit test `call_tool_policy_denied`).
-1. Every tool call (success or failure) produces an audit trail record
+5. Every tool call (success or failure) produces an audit trail record
    (verified by integration tests and BDD scenario).
-1. Stopping a server marks its tools as unavailable in the catalogue, and
+6. Stopping a server marks its tools as unavailable in the catalogue, and
    subsequent tool calls for those tools are rejected (verified by BDD scenario
    "Tool becomes unavailable when server stops").
-1. Calling a tool that does not exist returns a typed error (verified by
+7. Calling a tool that does not exist returns a typed error (verified by
    BDD scenario "Unknown tool call is rejected").
-1. Stderr output from tool calls is captured and stored in the object store,
+8. Stderr output from tool calls is captured and stored in the object store,
    with a reference path recorded in the audit trail (verified by BDD scenario
    "Tool call stderr is captured in the log store" and unit test
    `call_tool_captures_stderr_in_log_store`).
-1. Startup stderr from MCP server start is captured and stored (verified by
+9. Startup stderr from MCP server start is captured and stored (verified by
    unit test `store_startup_stderr_captures_and_sweeps`).
-1. Log rotation enforces `max_logs_per_server` and `retention_period`
+10. Log rotation enforces `max_logs_per_server` and `retention_period`
    (verified by unit tests `sweep_expired_logs_deletes_old_entries` and
    integration test `log_rotation_enforces_max_count`).
-1. Stderr exceeding `max_bytes_per_log` is truncated with a marker
+11. Stderr exceeding `max_bytes_per_log` is truncated with a marker
    (verified by unit test `stderr_truncation_at_max_bytes`).
 
 Quality criteria:
@@ -1293,7 +1300,7 @@ where
 New files (estimated 23-26):
 
 | Path | Purpose |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| --- | --- |
 | `src/tool_registry/domain/catalog.rs` | `CatalogEntry`, `CatalogEntryId` |
 | `src/tool_registry/domain/routing.rs` | `ToolCallRequest`, `ToolCallResult`, `ToolCallOutcome`, `ToolCallId` |
 | `src/tool_registry/domain/audit.rs` | `ToolCallAuditRecord` (with `stderr_log_path`) |
@@ -1322,7 +1329,7 @@ New files (estimated 23-26):
 Modified files (estimated 14-16):
 
 | Path | Changes |
-| --------------------------------------------- | -------------------------------------------------------------------------------- |
+| --- | --- |
 | `Cargo.toml` | Add `object_store` and `bytes` dependencies |
 | `src/tool_registry/domain/error.rs` | Add 6 new error variants |
 | `src/tool_registry/domain/mod.rs` | Add module declarations and re-exports |
@@ -1364,6 +1371,7 @@ Modified files (estimated 14-16):
   scenario. Updated all affected stages (A-E), file manifest, and validation
   criteria.
 
+[^1]: %60docs/rust-testing-with-rstest-fixtures.md%60
 [^2]: %60docs/reliable-testing-in-rust-via-dependency-injection.md%60
 [^3]: %60docs/rstest-bdd-users-guide.md%60
 [^4]: %60docs/pg-embed-setup-unpriv-users-guide.md%60

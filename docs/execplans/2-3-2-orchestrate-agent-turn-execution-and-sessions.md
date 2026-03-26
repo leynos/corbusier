@@ -26,9 +26,9 @@ Observable outcomes:
 
 1. A turn request can be executed against a registered backend and yields a
    canonical result with tool call auditability.
-1. Repeated turns in the same conversation reuse the active session until
+2. Repeated turns in the same conversation reuse the active session until
    expiry, then rotate to a new session deterministically.
-1. Tool calls emitted by backends are routed through one consistent router path
+3. Tool calls emitted by backends are routed through one consistent router path
    and have deterministic ordering in audit records.
 
 ## Constraints
@@ -283,12 +283,12 @@ Planned edits:
   `AgentTurnOrchestratorService`.
 - Service flow follows design section 4.2.1.1:
   1. Build turn context and validate backend registration/status.
-  1. Resolve or create active session.
-  1. Apply expiry policy and rotate session if required.
-  1. Execute backend turn request.
-  1. Route tool calls via `ToolRouterPort` in deterministic order.
-  1. Aggregate response + tool audits.
-  1. Persist session updates and turn execution record.
+  2. Resolve or create active session.
+  3. Apply expiry policy and rotate session if required.
+  4. Execute backend turn request.
+  5. Route tool calls via `ToolRouterPort` in deterministic order.
+  6. Aggregate response + tool audits.
+  7. Persist session updates and turn execution record.
 - Add in-memory runtime and session adapters under
   `src/agent_backend/adapters/memory/` for deterministic tests.
 - Keep orchestration logic in service/domain; adapters should only map storage
@@ -363,12 +363,12 @@ Run all required gates and capture logs for auditability.
 Commands from repository root:
 
 ```bash
-set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-3-2-check-fmt.log
-set -o pipefail; make lint 2>&1 | tee /tmp/1-3-2-lint.log
-set -o pipefail; make test 2>&1 | tee /tmp/1-3-2-test.log
-set -o pipefail; make fmt 2>&1 | tee /tmp/1-3-2-fmt.log
-set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/1-3-2-markdownlint.log
-set -o pipefail; make nixie 2>&1 | tee /tmp/1-3-2-nixie.log
+set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-3-2-check-fmt.log
+set -o pipefail; make lint 2>&1 | tee /tmp/2-3-2-lint.log
+set -o pipefail; make test 2>&1 | tee /tmp/2-3-2-test.log
+set -o pipefail; make fmt 2>&1 | tee /tmp/2-3-2-fmt.log
+set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-3-2-markdownlint.log
+set -o pipefail; make nixie 2>&1 | tee /tmp/2-3-2-nixie.log
 ```
 
 Acceptance for Stage G:
@@ -381,12 +381,12 @@ Acceptance for Stage G:
 
 1. Create domain and port files for orchestration in `src/agent_backend/` and
    update module exports.
-1. Add red-phase tests across unit/in-memory/BDD/Postgres skeletons.
-1. Implement service orchestration and memory adapters to satisfy red tests.
-1. Implement or extend Postgres persistence for session expiry continuity.
-1. Complete Postgres integration and BDD behavioural assertions.
-1. Update docs (`corbusier-design`, `users-guide`, roadmap).
-1. Run full quality gates with `tee` logs and capture outcomes in this plan.
+2. Add red-phase tests across unit/in-memory/BDD/Postgres skeletons.
+3. Implement service orchestration and memory adapters to satisfy red tests.
+4. Implement or extend Postgres persistence for session expiry continuity.
+5. Complete Postgres integration and BDD behavioural assertions.
+6. Update docs (`corbusier-design`, `users-guide`, roadmap).
+7. Run full quality gates with `tee` logs and capture outcomes in this plan.
 
 Expected short validation transcripts during implementation:
 
@@ -437,12 +437,12 @@ Quality criteria:
 
 Store verification logs at:
 
-- `/tmp/1-3-2-check-fmt.log`
-- `/tmp/1-3-2-lint.log`
-- `/tmp/1-3-2-test.log`
-- `/tmp/1-3-2-fmt.log`
-- `/tmp/1-3-2-markdownlint.log`
-- `/tmp/1-3-2-nixie.log`
+- `/tmp/2-3-2-check-fmt.log`
+- `/tmp/2-3-2-lint.log`
+- `/tmp/2-3-2-test.log`
+- `/tmp/2-3-2-fmt.log`
+- `/tmp/2-3-2-markdownlint.log`
+- `/tmp/2-3-2-nixie.log`
 
 Add concise excerpts proving success/failure states as implementation proceeds.
 

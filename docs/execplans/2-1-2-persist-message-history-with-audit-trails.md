@@ -232,16 +232,16 @@ All commands run from repository root `/home/user/project`.
    - `docs/rust-testing-with-rstest-fixtures.md`
    - `docs/rstest-bdd-users-guide.md`
 
-1. Document the audit metadata schema decision in
+2. Document the audit metadata schema decision in
    `docs/corbusier-design.md`.
 
 ### Stage B
 
 1. Add domain types and helpers in `src/message/domain/metadata.rs` (or new
    module if the file approaches 400 lines).
-1. Update validation rules in `src/message/validation/` to enforce metadata
+2. Update validation rules in `src/message/validation/` to enforce metadata
    invariants.
-1. Add (if needed) a history service module under `src/message/history/` with
+3. Add (if needed) a history service module under `src/message/history/` with
    a port trait for appending/retrieving conversation history.
 
 ### Stage C
@@ -249,7 +249,7 @@ All commands run from repository root `/home/user/project`.
 1. Update adapters to round-trip new metadata fields and add any new
    repository implementations (in-memory and Postgres) required for
    conversation history.
-1. Add or extend migration usage in tests only if required (avoid new
+2. Add or extend migration usage in tests only if required (avoid new
    migrations unless strictly necessary).
 
 ### Stage D
@@ -257,9 +257,9 @@ All commands run from repository root `/home/user/project`.
 1. Unit tests (`rstest`) in `src/message/tests/` for new metadata types and
    validation.
 
-1. Integration tests in `tests/postgres/` using the embedded cluster helper.
+2. Integration tests in `tests/postgres/` using the embedded cluster helper.
 
-1. Behavioural tests:
+3. Behavioural tests:
 
    - Add `tests/features/conversation_history.feature`.
    - Implement step definitions using `rstest_bdd_macros` with
@@ -269,11 +269,11 @@ All commands run from repository root `/home/user/project`.
 
 1. Update `docs/users-guide.md` and wrap paragraphs at 80 columns.
 
-1. Update `docs/corbusier-design.md` with the metadata schema decision.
+2. Update `docs/corbusier-design.md` with the metadata schema decision.
 
-1. Mark roadmap item 2.1.2 and its sub-items as done in `docs/roadmap.md`.
+3. Mark roadmap item 2.1.2 and its sub-items as done in `docs/roadmap.md`.
 
-1. Run quality gates via Makefile targets, using `tee` for long output:
+4. Run quality gates via Makefile targets, using `tee` for long output:
 
    - `set -o pipefail && make check-fmt 2>&1 | tee /tmp/check-fmt.log`
    - `set -o pipefail && make lint 2>&1 | tee /tmp/lint.log`
@@ -299,7 +299,7 @@ Quality criteria (done means all of the following are true):
 All steps are re-runnable. If a step fails:
 
 1. Fix the reported issue in the referenced file.
-1. Re-run the failed command from the Concrete Steps section.
+2. Re-run the failed command from the Concrete Steps section.
 
 No destructive actions are required. Use git to restore files if necessary.
 
@@ -344,7 +344,8 @@ Expected additions (adjust if design review dictates otherwise):
 - Dev-dependencies:
 
   - `rstest-bdd = "0.4.0"`
-  - `rstest-bdd-macros = { version = "0.4.0", features = ["strict-compile-time-validation"] }`
+  - `rstest-bdd-macros = { version = "0.4.0", features = [`
+    `"strict-compile-time-validation"] }`
 
 If dependency versions or feature flags differ from what is available, stop and
 escalate before proceeding.

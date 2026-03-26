@@ -21,10 +21,10 @@ This plan introduces three things:
 
 1. A new `tenant` bounded context (`src/tenant/`) containing domain primitives
    `TenantId`, `TenantSlug`, and `Tenant`.
-1. A new cross-cutting `context` module (`src/context/`) containing
+2. A new cross-cutting `context` module (`src/context/`) containing
    `RequestContext` and newtype identifiers `CorrelationId`, `CausationId`,
    `UserId`, and `SessionId`.
-1. Updated port trait signatures across every repository and handoff port so
+3. Updated port trait signatures across every repository and handoff port so
    that tenant-owned operations require a `&RequestContext` parameter.
 
 After this change:
@@ -374,12 +374,12 @@ Add `use crate::context::RequestContext;` to each port module and add
 traits:
 
 1. `MessageRepository` in `src/message/ports/repository.rs` (5 methods)
-1. `AgentSessionRepository` in `src/message/ports/agent_session.rs` (5 methods)
-1. `ContextSnapshotPort` in `src/message/ports/context_snapshot.rs` (4 methods)
-1. `AgentHandoffPort` in `src/message/ports/handoff.rs` (5 methods)
-1. `BackendRegistryRepository` in `src/agent_backend/ports/repository.rs`
+2. `AgentSessionRepository` in `src/message/ports/agent_session.rs` (5 methods)
+3. `ContextSnapshotPort` in `src/message/ports/context_snapshot.rs` (4 methods)
+4. `AgentHandoffPort` in `src/message/ports/handoff.rs` (5 methods)
+5. `BackendRegistryRepository` in `src/agent_backend/ports/repository.rs`
    (6 methods)
-1. `TaskRepository` in `src/task/ports/repository.rs` (6 methods)
+6. `TaskRepository` in `src/task/ports/repository.rs` (6 methods)
 
 Example signature change for `MessageRepository::store`:
 

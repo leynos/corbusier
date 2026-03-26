@@ -31,9 +31,9 @@ Observable operator outcome:
 
 1. A configured trigger event causes matching hooks to run in deterministic
    order.
-1. Every configured hook run emits a structured result with status, action
+2. Every configured hook run emits a structured result with status, action
    outcomes, and execution log entries.
-1. Hook execution results are queryable from storage for each configured
+3. Hook execution results are queryable from storage for each configured
    trigger type.
 
 ## Constraints
@@ -368,7 +368,7 @@ Run all commands from `/home/user/project`.
    Expected: failures due to missing hook engine module/tests before
    implementation.
 
-1. Implement stages A-D, then run formatting and lint/test gates:
+2. Implement stages A-D, then run formatting and lint/test gates:
 
    ```bash
    set -o pipefail
@@ -381,7 +381,7 @@ Run all commands from `/home/user/project`.
 
    Expected: all commands exit 0.
 
-1. Validate documentation updates:
+3. Validate documentation updates:
 
    ```bash
    set -o pipefail

@@ -275,7 +275,7 @@ Edit `src/task/domain/error.rs`:
 
 A5. Add `InvalidStateTransition` variant to `TaskDomainError`:
 
-```
+```plaintext
 InvalidStateTransition {
     task_id: super::TaskId,
     from: super::TaskState,
@@ -301,7 +301,7 @@ other request DTOs). Constructor:
 
 B2. Add `InvalidState` variant to `TaskLifecycleError`:
 
-```
+```plaintext
 #[error(transparent)]
 InvalidState(#[from] ParseTaskStateError),
 ```
@@ -310,7 +310,7 @@ Add `ParseTaskStateError` to the imports from `crate::task::domain`.
 
 B3. Add `transition_task` method on `TaskLifecycleService`:
 
-```
+```plaintext
 pub async fn transition_task(
     &self,
     request: TransitionTaskRequest,
@@ -422,31 +422,31 @@ All commands run from `/home/user/project`.
 
 1. Write the execplan file to
    `docs/execplans/2-2-3-enforce-task-state-transitions.md`.
-1. Edit `src/task/domain/error.rs` -- add `InvalidStateTransition` variant
+2. Edit `src/task/domain/error.rs` -- add `InvalidStateTransition` variant
    (Stage A5).
-1. Edit `src/task/domain/task.rs` -- add `Display` impl (A1),
+3. Edit `src/task/domain/task.rs` -- add `Display` impl (A1),
    `can_transition_to` and `is_terminal` (A2), `transition_to` (A3), update
    `associate_pull_request` (A4).
-1. Run `cargo check --workspace` to verify compilation.
-1. Edit `src/task/services/lifecycle.rs` -- add `TransitionTaskRequest` (B1),
+4. Run `cargo check --workspace` to verify compilation.
+5. Edit `src/task/services/lifecycle.rs` -- add `TransitionTaskRequest` (B1),
    `InvalidState` variant (B2), `transition_task` method (B3).
-1. Edit `src/task/services/mod.rs` -- add `TransitionTaskRequest` to
+6. Edit `src/task/services/mod.rs` -- add `TransitionTaskRequest` to
    re-exports (B4).
-1. Run `cargo check --workspace` to verify compilation.
-1. Create `src/task/tests/state_transition_tests.rs` (Stage C).
-1. Edit `src/task/tests/mod.rs` -- add `mod state_transition_tests;`.
-1. Run
+7. Run `cargo check --workspace` to verify compilation.
+8. Create `src/task/tests/state_transition_tests.rs` (Stage C).
+9. Edit `src/task/tests/mod.rs` -- add `mod state_transition_tests;`.
+10. Run
    `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-1.log`.
-1. Create `tests/features/task_state_transitions.feature` (D1).
-1. Create `tests/task_state_transition_steps/` with `mod.rs`, `world.rs`,
+11. Create `tests/features/task_state_transitions.feature` (D1).
+12. Create `tests/task_state_transition_steps/` with `mod.rs`, `world.rs`,
    `given.rs`, `when.rs`, `then.rs` (D2).
-1. Create `tests/task_state_transition_steps.rs` scenario runner (D3).
-1. Add integration tests to `tests/in_memory/task_lifecycle_tests.rs` (E1-E3).
-1. Run
+13. Create `tests/task_state_transition_steps.rs` scenario runner (D3).
+14. Add integration tests to `tests/in_memory/task_lifecycle_tests.rs` (E1-E3).
+15. Run
    `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-2.log`.
-1. Update documentation files (F1-F4).
-1. Run `set -o pipefail && make all 2>&1 | tee /tmp/make-all.log`.
-1. Review output and address any failures.
+16. Update documentation files (F1-F4).
+17. Run `set -o pipefail && make all 2>&1 | tee /tmp/make-all.log`.
+18. Review output and address any failures.
 
 ## Validation and acceptance
 
@@ -464,7 +464,7 @@ Quality criteria (what "done" means):
 
 Quality method (verification approach):
 
-```
+```plaintext
 make all
 ```
 
@@ -473,12 +473,12 @@ Expected output includes a test summary line with zero failures.
 Behavioural acceptance:
 
 1. A `Draft` task transitions to `InProgress` via `transition_task`.
-1. A `Draft` task cannot transition to `Done` -- the error contains the task
+2. A `Draft` task cannot transition to `Done` -- the error contains the task
    ID, `from: draft`, `to: done`.
-1. A `Done` task cannot transition to any state.
-1. `associate_pull_request` on a `Draft` task still succeeds and transitions
+3. A `Done` task cannot transition to any state.
+4. `associate_pull_request` on a `Draft` task still succeeds and transitions
    to `InReview`.
-1. `associate_pull_request` on a `Done` task fails with
+5. `associate_pull_request` on a `Done` task fails with
    `InvalidStateTransition`.
 
 ## Idempotence and recovery
@@ -512,8 +512,8 @@ Table 3. Existing files modified for this implementation.
 | File | Change |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `src/task/domain/error.rs` | Add `InvalidStateTransition` variant |
-| `src/task/domain/task.rs` | Add `Display`, `can_transition_to`, `is_terminal`, `transition_to`; update `associate_pull_request` |
-| `src/task/services/lifecycle.rs` | Add `TransitionTaskRequest`, `transition_task`, `InvalidState` variant |
+| `src/task/domain/task.rs` | Add transition helpers and update `associate_pull_request` |
+| `src/task/services/lifecycle.rs` | Add request type, `transition_task`, and `InvalidState` |
 | `src/task/services/mod.rs` | Add `TransitionTaskRequest` to re-exports |
 | `src/task/tests/mod.rs` | Add `mod state_transition_tests;` |
 | `src/task/mod.rs` | Update module doc comment |
@@ -534,7 +534,7 @@ No new external dependencies. All functionality uses existing crates:
 
 In `src/task/domain/task.rs`:
 
-```
+```plaintext
 impl std::fmt::Display for TaskState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
 }
@@ -555,7 +555,7 @@ impl Task {
 
 In `src/task/domain/error.rs`:
 
-```
+```plaintext
 pub enum TaskDomainError {
     // … existing variants …
     InvalidStateTransition {
@@ -568,7 +568,7 @@ pub enum TaskDomainError {
 
 In `src/task/services/lifecycle.rs`:
 
-```
+```plaintext
 pub struct TransitionTaskRequest { .. }
 
 impl TransitionTaskRequest {

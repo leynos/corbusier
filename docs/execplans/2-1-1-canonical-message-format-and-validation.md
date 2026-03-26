@@ -176,11 +176,11 @@ Implement domain types in order of dependency:
 
 1. NewType identifiers (`MessageId`, `ConversationId`, `TurnId`,
    `SequenceNumber`) in `src/message/domain/ids.rs`
-1. Role enum in `src/message/domain/role.rs`
-1. ContentPart types (`TextPart`, `ToolCallPart`, `ToolResultPart`,
+2. Role enum in `src/message/domain/role.rs`
+3. ContentPart types (`TextPart`, `ToolCallPart`, `ToolResultPart`,
    `AttachmentPart`) in `src/message/domain/content.rs`
-1. MessageMetadata in `src/message/domain/metadata.rs`
-1. Message aggregate with builder in `src/message/domain/message.rs`
+4. MessageMetadata in `src/message/domain/metadata.rs`
+5. Message aggregate with builder in `src/message/domain/message.rs`
 
 Each file includes module documentation and rustdoc for public items.
 
@@ -191,8 +191,8 @@ documentation.
 
 1. Define `ValidationError`, `RepositoryError`, `SchemaUpgradeError` in
    `src/message/error.rs` using thiserror
-1. Define `MessageRepository` port trait in `src/message/ports/repository.rs`
-1. Define `MessageValidator` port trait with `ValidationConfig` in
+2. Define `MessageRepository` port trait in `src/message/ports/repository.rs`
+3. Define `MessageValidator` port trait with `ValidationConfig` in
    `src/message/ports/validator.rs`
 
 **Validation**: `cargo check` succeeds.
@@ -201,7 +201,7 @@ documentation.
 
 1. Implement validation rules as pure functions in
    `src/message/validation/rules.rs`
-1. Implement `DefaultMessageValidator` in `src/message/validation/service.rs`
+2. Implement `DefaultMessageValidator` in `src/message/validation/service.rs`
 
 Validation rules to implement:
 
@@ -216,9 +216,9 @@ Validation rules to implement:
 
 1. Define `VersionedEvent` and `EventMetadata` in
    `src/message/versioning/event.rs`
-1. Define `EventUpgrader` trait and `MessageCreatedUpgrader` implementation in
+2. Define `EventUpgrader` trait and `MessageCreatedUpgrader` implementation in
    `src/message/versioning/upgrader.rs`
-1. Implement `UpgraderRegistry` for event type dispatch
+3. Implement `UpgraderRegistry` for event type dispatch
 
 **Validation**: `cargo check` succeeds.
 
@@ -227,9 +227,9 @@ Validation rules to implement:
 Create `src/message/tests/` module with:
 
 1. `domain_tests.rs`: Tests for MessageId, Role, ContentPart, Message builder
-1. `validation_tests.rs`: Tests for DefaultMessageValidator covering happy
+2. `validation_tests.rs`: Tests for DefaultMessageValidator covering happy
    paths, empty content, invalid tool calls, size limits
-1. `versioning_tests.rs`: Tests for EventUpgrader v1 to v2 migration
+3. `versioning_tests.rs`: Tests for EventUpgrader v1 to v2 migration
 
 Use rstest fixtures for shared setup (MockClock, valid messages).
 
@@ -251,9 +251,9 @@ Implement step definitions in `tests/message_validation_steps.rs`.
 ### Stage H: Documentation and Cleanup
 
 1. Update `docs/users-guide.md` with message format documentation
-1. Add design decisions to `docs/corbusier-design.md` if any were made
-1. Run `make fmt`, `make lint`, `make check-fmt`
-1. Verify all tests pass
+2. Add design decisions to `docs/corbusier-design.md` if any were made
+3. Run `make fmt`, `make lint`, `make check-fmt`
+4. Verify all tests pass
 
 **Validation**: All quality gates pass.
 
@@ -261,7 +261,7 @@ Implement step definitions in `tests/message_validation_steps.rs`.
 
 Update `docs/roadmap.md` to mark item 2.1.1 as done:
 
-```
+```plaintext
 - [x] 2.1.1 Implement the canonical message format and validation.
 ```
 
@@ -275,7 +275,7 @@ All commands run from repository root `/root/repo`.
 
 1. Edit `Cargo.toml` to add dependencies:
 
-   ```
+   ```toml
    [dependencies]
    serde = { version = "1.0", features = ["derive"] }
    serde_json = "1.0"
@@ -290,9 +290,9 @@ All commands run from repository root `/root/repo`.
    mockall = "0.13"
    ```
 
-1. Create directory structure:
+2. Create directory structure:
 
-   ```
+   ```bash
    mkdir -p src/message/domain
    mkdir -p src/message/ports
    mkdir -p src/message/validation
@@ -300,9 +300,9 @@ All commands run from repository root `/root/repo`.
    mkdir -p src/message/tests
    ```
 
-1. Create module files (touch to establish):
+3. Create module files (touch to establish):
 
-   ```
+   ```bash
    touch src/message/mod.rs
    touch src/message/domain/mod.rs
    touch src/message/domain/ids.rs
@@ -323,9 +323,9 @@ All commands run from repository root `/root/repo`.
    touch src/message/tests/mod.rs
    ```
 
-1. Verify:
+4. Verify:
 
-   ```
+   ```bash
    cargo check
    ```
 
@@ -336,14 +336,14 @@ All commands run from repository root `/root/repo`.
 Each stage follows the pattern:
 
 1. Implement code per Plan of Work section
-1. Run `cargo check` after each file
-1. Run `make fmt` to format
-1. Run `make lint` to verify Clippy
-1. Run `make test` after tests are added
+2. Run `cargo check` after each file
+3. Run `make fmt` to format
+4. Run `make lint` to verify Clippy
+5. Run `make test` after tests are added
 
 Final validation:
 
-```
+```bash
 set -o pipefail && make test 2>&1 | tee /tmp/test-output.log
 ```
 
@@ -361,7 +361,7 @@ Expected: All tests pass, exit code 0.
 
 **Quality method (verification):**
 
-```
+```bash
 make check-fmt && make lint && make test
 ```
 
@@ -388,8 +388,8 @@ All steps are idempotent:
 If a step fails:
 
 1. Check the error message
-1. Fix the issue in the relevant file
-1. Re-run from the failed command
+2. Fix the issue in the relevant file
+3. Re-run from the failed command
 
 No destructive operations are performed; git can restore any file.
 
@@ -397,7 +397,7 @@ No destructive operations are performed; git can restore any file.
 
 ### File Structure After Implementation
 
-```
+```plaintext
 src/
   lib.rs                          # Re-export message module
   main.rs                         # Application entry (unchanged)
@@ -440,7 +440,7 @@ Estimated total: ~1700 lines across ~20 files.
 
 ### Crate Dependencies
 
-```
+```toml
 serde = "1.0"          # Serialization framework
 serde_json = "1.0"     # JSON support
 chrono = "0.4"         # Date/time handling
@@ -458,7 +458,7 @@ mockall = "0.13"       # Mock generation
 
 In `src/message/domain/ids.rs`:
 
-```
+```rust
 pub struct MessageId(Uuid);
 pub struct ConversationId(Uuid);
 pub struct TurnId(Uuid);
@@ -467,13 +467,13 @@ pub struct SequenceNumber(u64);
 
 In `src/message/domain/role.rs`:
 
-```
+```rust
 pub enum Role { User, Assistant, Tool, System }
 ```
 
 In `src/message/domain/content.rs`:
 
-```
+```rust
 pub enum ContentPart {
     Text(TextPart),
     ToolCall(ToolCallPart),
@@ -484,7 +484,7 @@ pub enum ContentPart {
 
 In `src/message/domain/message.rs`:
 
-```
+```rust
 pub struct Message { … }
 impl Message {
     pub fn new(…, clock: &impl Clock) -> Result<Self, MessageBuilderError>;
@@ -494,7 +494,7 @@ impl Message {
 
 In `src/message/ports/repository.rs`:
 
-```
+```rust
 #[async_trait]
 pub trait MessageRepository: Send + Sync {
     async fn store(&self, message: &Message) -> RepositoryResult<()>;
@@ -505,7 +505,7 @@ pub trait MessageRepository: Send + Sync {
 
 In `src/message/ports/validator.rs`:
 
-```
+```rust
 pub trait MessageValidator: Send + Sync {
     fn validate(&self, message: &Message) -> ValidationResult<()>;
 }
@@ -513,7 +513,7 @@ pub trait MessageValidator: Send + Sync {
 
 In `src/message/versioning/upgrader.rs`:
 
-```
+```rust
 pub trait EventUpgrader: Send + Sync {
     fn upgrade(&self, event: VersionedEvent) -> UpgradeResult<VersionedEvent>;
     fn current_version(&self) -> u32;

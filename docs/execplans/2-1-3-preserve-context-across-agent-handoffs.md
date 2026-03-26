@@ -320,6 +320,8 @@ ______________________________________________________________________
 
 ### 8.1 Unit tests (`src/message/tests/`)
 
+Table 2.1.3: Test coverage summary for handoff and session components.
+
 | File | Coverage |
 | ----------------------------- | ---------------------------------------------- |
 | `handoff_tests.rs` | `HandoffMetadata` construction, builder, serde |
@@ -328,6 +330,8 @@ ______________________________________________________________________
 | `handoff_validation_tests.rs` | Validation rules happy/unhappy paths |
 
 ### 8.2 Integration tests (`tests/`)
+
+Table 2.1.4: Integration test coverage for handoff persistence flows.
 
 | File | Coverage |
 | ---------------------------- | ----------------------------------------- |
@@ -388,6 +392,8 @@ Mark item 2.1.3 and sub-items as `[x]` complete.
 ______________________________________________________________________
 
 ## Implementation Order
+
+Table 2.1.5: Implementation order and estimated file impact.
 
 | Step | Task | Files | Est. Lines |
 | ---- | ---------------------------- | ---------------------------------------------- | ---------- |
@@ -480,6 +486,8 @@ ______________________________________________________________________
 
 ## Risks and Mitigations
 
+Table 2.1.6: Delivery risks and planned mitigations.
+
 | Risk | Mitigation |
 | ------------------------------ | ------------------------------------------------------- |
 | Schema complexity | Use JSONB for nested structures to minimize table count |
@@ -493,9 +501,9 @@ ______________________________________________________________________
 
 1. **Handoff metadata stored in MessageMetadata**: Enables full audit trail via
    existing message persistence.
-1. **JSONB for tool call references and snapshots**: Flexible schema, avoids
+2. **JSONB for tool call references and snapshots**: Flexible schema, avoids
    join-heavy queries.
-1. **AgentSession as first-class entity**: Enables session-level queries and
+3. **AgentSession as first-class entity**: Enables session-level queries and
    lifecycle tracking.
-1. **Snapshot types enum**: Distinguishes capture contexts for debugging and
+4. **Snapshot types enum**: Distinguishes capture contexts for debugging and
    analysis.

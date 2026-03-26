@@ -27,9 +27,9 @@ Observable outcome for operators and developers:
 
 1. The same command input and parameter set always produce the same ordered
    tool call sequence.
-1. Invalid commands are rejected with typed errors that identify why parsing or
+2. Invalid commands are rejected with typed errors that identify why parsing or
    validation failed.
-1. Expanded command content and planned tool calls are persisted in the
+3. Expanded command content and planned tool calls are persisted in the
    canonical message/audit structures, and are queryable through existing
    history retrieval paths.
 
@@ -198,10 +198,10 @@ Current relevant code and docs:
 Implementation orientation:
 
 1. Extend message-domain capability with slash command types and errors.
-1. Add a command registry port and a default in-memory adapter.
-1. Add an application service that performs parse -> lookup -> validate ->
+2. Add a command registry port and a default in-memory adapter.
+3. Add an application service that performs parse -> lookup -> validate ->
    render -> deterministic tool-call planning -> audit record assembly.
-1. Validate this behaviour in unit tests (`rstest`), integration tests, and
+4. Validate this behaviour in unit tests (`rstest`), integration tests, and
    feature scenarios (`rstest-bdd`).
 
 ## Plan of work
@@ -299,32 +299,32 @@ All commands run from repository root (`/home/user/project`).
 1. Create feature branches of code changes in this order:
    domain -> ports -> adapters/services -> tests -> docs.
 
-1. Run targeted tests after each stage and keep logs:
+2. Run targeted tests after each stage and keep logs:
 
    ```bash
-   set -o pipefail && make test 2>&1 | tee /tmp/1-4-1-stage-test.log
+   set -o pipefail && make test 2>&1 | tee /tmp/2-4-1-stage-test.log
    ```
 
-1. Ensure Postgres test harness tooling is available:
+3. Ensure Postgres test harness tooling is available:
 
    ```bash
    command -v pg_embedded_setup_unpriv >/dev/null || cargo install pg-embed-setup-unpriv
    ```
 
-1. Run full code quality gates once implementation is complete:
+4. Run full code quality gates once implementation is complete:
 
    ```bash
-   set -o pipefail && make check-fmt 2>&1 | tee /tmp/1-4-1-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/1-4-1-lint.log
-   set -o pipefail && make test 2>&1 | tee /tmp/1-4-1-test.log
+   set -o pipefail && make check-fmt 2>&1 | tee /tmp/2-4-1-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/2-4-1-lint.log
+   set -o pipefail && make test 2>&1 | tee /tmp/2-4-1-test.log
    ```
 
-1. Run documentation gates after docs updates:
+5. Run documentation gates after docs updates:
 
    ```bash
-   set -o pipefail && make fmt 2>&1 | tee /tmp/1-4-1-fmt.log
-   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/1-4-1-markdownlint.log
-   set -o pipefail && make nixie 2>&1 | tee /tmp/1-4-1-nixie.log
+   set -o pipefail && make fmt 2>&1 | tee /tmp/2-4-1-fmt.log
+   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-4-1-markdownlint.log
+   set -o pipefail && make nixie 2>&1 | tee /tmp/2-4-1-nixie.log
    ```
 
 Expected success transcript shape:
@@ -343,12 +343,12 @@ Behavioural acceptance:
 
 1. Given a registered command and valid parameters, execution returns expanded
    content and a non-empty planned tool-call sequence.
-1. Given the same input repeated, planned tool calls (order and IDs) are
+2. Given the same input repeated, planned tool calls (order and IDs) are
    identical across executions.
-1. Given an unknown command, execution returns a typed unknown-command error.
-1. Given missing or invalid parameters, execution returns typed validation
+3. Given an unknown command, execution returns a typed unknown-command error.
+4. Given missing or invalid parameters, execution returns typed validation
    errors and no planned tool-call sequence.
-1. Persisted message history contains slash expansion and tool-call audit data
+5. Persisted message history contains slash expansion and tool-call audit data
    for successful executions.
 
 Quality acceptance:
@@ -381,7 +381,7 @@ Expected new/updated artifact groups:
 - Documentation updates in `docs/users-guide.md`,
   `docs/corbusier-design.md`, and `docs/roadmap.md`.
 
-Store command logs under `/tmp/1-4-1-*.log` for auditable implementation
+Store command logs under `/tmp/2-4-1-*.log` for auditable implementation
 evidence.
 
 ## Interfaces and dependencies

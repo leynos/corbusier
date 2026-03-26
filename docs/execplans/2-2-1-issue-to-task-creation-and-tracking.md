@@ -245,42 +245,42 @@ All commands run from repository root: `/home/user/project`.
    Expected signal: lockfile updates cleanly and subsequent build resolves
    v0.5.0 dependencies.
 
-1. Add task module scaffolding and migration/schema updates.
+2. Add task module scaffolding and migration/schema updates.
 
    `make check-fmt`
 
    Expected signal: formatter check passes after scaffolding edits.
 
-1. Run targeted tests while developing.
+3. Run targeted tests while developing.
 
    `cargo nextest run --all-targets --all-features task`
 
    Expected signal: new task-focused suites fail first, then pass after
    implementation.
 
-1. Run behaviour tests explicitly for new feature coverage.
+4. Run behaviour tests explicitly for new feature coverage.
 
    `cargo test --test task_issue_creation_steps`
 
    Expected signal: `Given/When/Then` scenarios pass with observable outcomes.
 
-1. Run PostgreSQL task integration tests.
+5. Run PostgreSQL task integration tests.
 
    `cargo test --test postgres -- task_lifecycle`
 
    Expected signal: embedded PostgreSQL tests pass for create and lookup flows.
 
-1. Run commit gates with durable logs.
+6. Run commit gates with durable logs.
 
-   `set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-1-check-fmt.log`
+   `set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-1-check-fmt.log`
 
-   `set -o pipefail; make lint 2>&1 | tee /tmp/1-2-1-lint.log`
+   `set -o pipefail; make lint 2>&1 | tee /tmp/2-2-1-lint.log`
 
-   `set -o pipefail; make test 2>&1 | tee /tmp/1-2-1-test.log`
+   `set -o pipefail; make test 2>&1 | tee /tmp/2-2-1-test.log`
 
-   `set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-2-1-markdownlint.log`
+   `set -o pipefail; make markdownlint 2>&1 | tee /tmp/2-2-1-markdownlint.log`
 
-   `set -o pipefail; make nixie 2>&1 | tee /tmp/1-2-1-nixie.log`
+   `set -o pipefail; make nixie 2>&1 | tee /tmp/2-2-1-nixie.log`
 
    Expected signal: all commands exit 0 and logs contain no denied warnings.
 
@@ -359,7 +359,7 @@ Expected implementation touchpoints:
   - `docs/users-guide.md`
   - `docs/roadmap.md`
 
-Keep command logs captured under `/tmp/1-2-1-*.log` for review during execution.
+Keep command logs captured under `/tmp/2-2-1-*.log` for review during execution.
 
 ## Interfaces and dependencies
 
