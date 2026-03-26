@@ -80,7 +80,7 @@ def list_clusters() -> list[dict[str, Any]]:
 
     Returns
     -------
-    list[dict[str, typing.Any]]
+    list[dict[str, Any]]
         Parsed cluster records emitted by `k3d cluster list -o json`. A
         genuine empty cluster list returns `[]`.
 
