@@ -94,7 +94,7 @@ Validation returns only pass or fail plus human-readable warning text.
 No preflight validation exists beyond parsing. The hosted runtime exposes
 problems only when the session starts or fails.
 
-_Table 1: Trade-offs for prompt validation semantics._
+Table 1: Trade-offs for prompt validation semantics.
 
 | Topic                   | Option A | Option B | Option C |
 | ----------------------- | -------- | -------- | -------- |

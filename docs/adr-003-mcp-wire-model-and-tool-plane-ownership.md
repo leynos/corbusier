@@ -95,7 +95,7 @@ runtime call path and dispatches work to MCP servers indirectly.
 Some tools are exposed as direct MCP wires while others remain proxied through
 Corbusier for the same hosted-agent session.
 
-_Table 1: Trade-offs for tool-plane ownership in Podbot-hosted sessions._
+Table 1: Trade-offs for tool-plane ownership in Podbot-hosted sessions.
 
 | Topic                      | Option A | Option B | Option C |
 | -------------------------- | -------- | -------- | -------- |

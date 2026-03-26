@@ -173,7 +173,7 @@ Security tightening and retirement
 
 - Compatibility layers can linger unless removal criteria are explicit and
   enforced.
-- Warn-only phases can normalise degraded behaviour if they last too long.
+- Warn-only phases can normalize degraded behaviour if they last too long.
 - Rollback paths can become fragile if schema changes are coupled too tightly
   to runtime changes.
 

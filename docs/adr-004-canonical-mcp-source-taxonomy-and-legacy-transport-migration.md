@@ -92,7 +92,7 @@ Corbusier preserves the current transport model and asks readers and
 maintainers to infer the difference between source definitions and wire
 instances from surrounding prose.
 
-_Table 1: Trade-offs for the canonical MCP source model._
+Table 1: Trade-offs for the canonical MCP source model.
 
 | Topic                     | Option A | Option B | Option C |
 | ------------------------- | -------- | -------- | -------- |

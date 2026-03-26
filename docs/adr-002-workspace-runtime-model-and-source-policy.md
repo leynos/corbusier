@@ -83,7 +83,7 @@ This ADR depends on the following upstream Podbot roadmap steps:
 
 Corbusier persists a workspace runtime record with identity, source metadata,
 requested access mode, and lifecycle state. Podbot prepares and tears down the
-concrete runtime realisation for that record.
+concrete runtime realization for that record.
 
 ### Option B: Corbusier owns both logical and concrete workspace state
 
@@ -95,7 +95,7 @@ only receives enough information to start the container.
 Corbusier stores only opaque workspace identifiers returned by Podbot and
 relies on Podbot to remain the sole source of truth for all workspace detail.
 
-_Table 1: Trade-offs for the workspace runtime model._
+Table 1: Trade-offs for the workspace runtime model.
 
 | Topic                    | Option A | Option B | Option C |
 | ------------------------ | -------- | -------- | -------- |

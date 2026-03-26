@@ -101,7 +101,7 @@ Corbusier keeps selected execution responsibilities, such as direct hook
 execution or some workspace mechanics, while Podbot handles only the remaining
 runtime tasks.
 
-_Table 1: Trade-offs for the runtime ownership boundary._
+Table 1: Trade-offs for the runtime ownership boundary.
 
 | Topic                     | Option A                | Option B                 | Option C            |
 | ------------------------- | ----------------------- | ------------------------ | ------------------- |

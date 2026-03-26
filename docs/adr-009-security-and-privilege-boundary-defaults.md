@@ -97,7 +97,7 @@ most dangerous combinations.
 Development uses permissive defaults while production uses stricter ones, with
 the effective privilege stance changing by deployment environment.
 
-_Table 1: Trade-offs for privilege defaults and overrides._
+Table 1: Trade-offs for privilege defaults and overrides.
 
 | Topic                      | Option A | Option B | Option C |
 | -------------------------- | -------- | -------- | -------- |

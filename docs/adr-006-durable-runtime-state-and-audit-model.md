@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -103,7 +103,7 @@ operator views and reconciliation workflows.
 | Incremental migration fit | Strong   | Medium   | Weak     |
 | Query simplicity          | Strong   | Medium   | Weak     |
 
-_Table 1: Trade-offs for durable runtime state._
+Table 1: Trade-offs for durable runtime state.
 
 ## Decision Outcome / Proposed Direction
 

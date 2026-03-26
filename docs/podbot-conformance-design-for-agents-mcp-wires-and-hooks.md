@@ -31,7 +31,7 @@ and rejected capabilities for a target agent runtime.
 
 ## Current state and required alignment
 
-Corbusier is organised as hexagonal modules (domain/ports/adapters) with key
+Corbusier is organized as hexagonal modules (domain/ports/adapters) with key
 subsystems including `agent_backend` and `tool_registry`, and an explicit
 `worker` module. The roadmap shows that *workspace encapsulation* and a *hook
 engine* remain planned (not delivered), while the MCP server lifecycle and tool
@@ -490,7 +490,7 @@ split “server definition lifecycle” from “workspace wiring lifecycle”:
   that calls Podbot to create wires and persists the returned Streamable HTTP
   endpoints by workspace.
 - **Change:** `ToolDiscoveryRoutingService` should no longer assume Corbusier
-  is the runtime invoker for containerised agents (Option A). Instead it
+  is the runtime invoker for containerized agents (Option A). Instead it
   becomes:
   - a “catalogue service” used to materialize tool lists for UI/audit, and/or
   - a “bootstrap tool manifest builder” for agents (by creating wires and
@@ -614,7 +614,7 @@ Corbusier must store hook execution and acknowledgement for auditability
 (consistent with its broader audit goals in tool calls and agent handoffs). A
 concrete minimal state machine for hook gating:
 
-- `Pending` (hook requested by Podbot, not yet authorised)
+- `Pending` (hook requested by Podbot, not yet authorized)
 - `Authorised` or `Denied` (after HookPolicyService decision)
 - `Acked` (ack delivered to Podbot)
 - `Completed` / `Failed` (if Podbot also emits completion events;
@@ -962,7 +962,7 @@ registry while introducing Podbot-wired operation safely.
 
 ### Tests and QA requirements
 
-Corbusier already emphasises deterministic testing via in-memory adapters and
+Corbusier already emphasizes deterministic testing via in-memory adapters and
 structured audit trails. Extend this with:
 
 - **Unit tests**

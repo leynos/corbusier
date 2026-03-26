@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-21.
+2026-03-21
 
 ## Context and Problem Statement
 
@@ -101,7 +101,7 @@ same document type and relies on conventions to distinguish roles.
 | Ecosystem fit             | Strong   | Weak     | Weak     |
 | Implementation simplicity | Medium   | Medium   | High     |
 
-_Table 1: Trade-offs for the prompt and bundle document model._
+Table 1: Trade-offs for the prompt and bundle document model.
 
 ## Decision Outcome / Proposed Direction
 
