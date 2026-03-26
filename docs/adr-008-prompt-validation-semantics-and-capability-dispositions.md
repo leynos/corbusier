@@ -170,12 +170,12 @@ warn-only to blocking behaviour where the migration plan allows.
 
 ## Architectural Rationale
 
-The companion design[^cd] treats validation as a product surface rather than an
+The companion design[^1] treats validation as a product surface rather than an
 internal convenience. Structured dispositions match that requirement, support
 CI and design review, and make capability degradation explicit instead of
 turning it into hidden runtime surprise.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

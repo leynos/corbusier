@@ -163,11 +163,11 @@ bundle and prompt surfaces.
 ## Architectural Rationale
 
 This direction keeps Corbusier aligned with the external skill ecosystem while
-adding the higher-level grouping that the companion design[^cd] requires. It
+adding the higher-level grouping that the companion design[^1] requires. It
 also gives later validation and security work a stable, typed document surface
 rather than a loose collection of Markdown conventions.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

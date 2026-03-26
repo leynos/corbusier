@@ -168,10 +168,10 @@ replacement path is stable and covered by tests.
 This boundary preserves a clean hexagonal split. Corbusier remains the system
 of record for intent, policy, and audit, while Podbot becomes the execution
 engine for hosted sessions. That improves conformance with the companion
-design[^cd] and prevents later ADRs from re-opening the question of runtime
+design[^1] and prevents later ADRs from re-opening the question of runtime
 ownership.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

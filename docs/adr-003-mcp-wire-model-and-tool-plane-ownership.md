@@ -161,11 +161,11 @@ telemetry and audit ingestion are in place.
 ## Architectural Rationale
 
 This direction preserves the control-plane and data-plane split proposed in the
-companion design[^cd]. Corbusier decides what is allowed. Podbot makes those
+companion design[^1]. Corbusier decides what is allowed. Podbot makes those
 decisions concrete inside a specific workspace runtime. That keeps the runtime
 path narrow and avoids building a second routing layer on top of Podbot.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

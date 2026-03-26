@@ -22,7 +22,7 @@ rollback expectations, and coexistence rules for the transition.
 ## Decision Drivers
 
 - Continuous repository health during migration
-- Minimised operational risk
+- Minimized operational risk
 - Predictable deprecation of legacy terms and code paths
 - Controlled introduction of new schemas and services
 - Clear reviewer checkpoints
@@ -91,7 +91,7 @@ transition.
 Corbusier keeps the old and new architectural paths side by side with no hard
 deprecation point.
 
-_Table 1: Trade-offs for the migration strategy._
+Table 1: Trade-offs for the migration strategy.
 
 | Topic                  | Option A | Option B | Option C |
 | ---------------------- | -------- | -------- | -------- |

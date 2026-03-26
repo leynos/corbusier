@@ -166,12 +166,12 @@ surfaces are in place.
 
 ## Architectural Rationale
 
-The companion design[^cd] increases the number of host-adjacent capabilities
+The companion design[^1] increases the number of host-adjacent capabilities
 that Corbusier and Podbot can expose. Least-privilege defaults keep that
 surface coherent, and explicit overrides preserve the review and audit
 authority that Corbusier is meant to retain.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

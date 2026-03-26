@@ -96,6 +96,8 @@ execution directly inside its own runtime boundary.
 Hook requests are emitted for observation, but hosted execution continues
 without waiting for Corbusier to decide.
 
+Table 1: Trade-offs for the hook execution contract.
+
 | Topic                       | Option A | Option B | Option C |
 | --------------------------- | -------- | -------- | -------- |
 | Runtime ownership alignment | Strong   | Weak     | Weak     |
@@ -103,8 +105,6 @@ without waiting for Corbusier to decide.
 | Protocol purity             | Strong   | Medium   | Medium   |
 | Restart safety              | Strong   | Medium   | Weak     |
 | Operational clarity         | Strong   | Medium   | Weak     |
-
-_Table 1: Trade-offs for the hook execution contract._
 
 ## Decision Outcome / Proposed Direction
 

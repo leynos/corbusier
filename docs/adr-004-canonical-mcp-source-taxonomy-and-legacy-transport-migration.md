@@ -160,12 +160,12 @@ code paths before eventual removal.
 
 ## Architectural Rationale
 
-The companion design[^cd] assumes that source definitions, wires, and
+The companion design[^1] assumes that source definitions, wires, and
 agent-visible endpoints are distinct concepts. A canonical source taxonomy
 makes that distinction explicit in Corbusier's types, persistence model, and
 review language, which reduces confusion in both implementation and future ADRs.
 
-[^cd]: The companion design is
+[^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The
     Podbot roadmap steps referenced in this ADR are defined in the upstream
     [Podbot roadmap](https://github.com/leynos/podbot/blob/main/docs/podbot-roadmap.md).

@@ -615,7 +615,7 @@ Corbusier must store hook execution and acknowledgement for auditability
 concrete minimal state machine for hook gating:
 
 - `Pending` (hook requested by Podbot, not yet authorized)
-- `Authorised` or `Denied` (after HookPolicyService decision)
+- `Authorized` or `Denied` (after HookPolicyService decision)
 - `Acked` (ack delivered to Podbot)
 - `Completed` / `Failed` (if Podbot also emits completion events;
   **unspecified**)
