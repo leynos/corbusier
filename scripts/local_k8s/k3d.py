@@ -57,10 +57,10 @@ def _parse_k3d_cluster_list(output: str) -> list[dict[str, Any]]:
         raise LocalK8sError(
             f"Failed to parse k3d cluster list JSON: {error}; output was: {output}"
         ) from error
-    return _validate_cluster_list_shape(parsed)
+    return _validate_k3d_cluster_list_shape(parsed)
 
 
-def _validate_cluster_list_shape(parsed: Any) -> list[dict[str, Any]]:
+def _validate_k3d_cluster_list_shape(parsed: Any) -> list[dict[str, Any]]:
     """Validate the parsed `k3d cluster list` JSON shape."""
     if not isinstance(parsed, list):
         raise LocalK8sError(
