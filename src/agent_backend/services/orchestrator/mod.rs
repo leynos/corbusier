@@ -270,26 +270,28 @@ where
         Ok(())
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "let-chain pattern contributes to complexity but improves readability"
-    )]
     async fn cleanup_after_upsert_failure(
         &self,
         params: &SessionPersistenceParams<'_>,
         session: &mut TurnSession,
     ) {
-        if !params.reused_session
-            && let Err(cleanup_err) = self
-                .expire_persist_and_teardown(params.ctx, params.backend, session)
-                .await
-        {
-            tracing::warn!(
-                error = ?cleanup_err,
-                backend_id = %session.backend_id(),
-                "cleanup failed after session upsert failure; session may leak"
-            );
+        if params.reused_session {
+            return;
         }
+        if let Err(cleanup_err) = self
+            .expire_persist_and_teardown(params.ctx, params.backend, session)
+            .await
+        {
+            Self::warn_cleanup_failure(&cleanup_err, session);
+        }
+    }
+
+    fn warn_cleanup_failure(error: &AgentTurnOrchestrationError, session: &TurnSession) {
+        tracing::warn!(
+            error = ?error,
+            backend_id = %session.backend_id(),
+            "cleanup failed after session upsert failure; session may leak"
+        );
     }
 
     async fn expire_session(
