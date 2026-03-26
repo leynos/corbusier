@@ -13,7 +13,7 @@ use crate::agent_backend::{
 };
 use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::tenant_tx::{
-    FromTxError, TxError, with_tenant_read_tx, with_tenant_tx,
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
@@ -74,6 +74,8 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         let new_row = to_new_row(registration, tenant_id)?;
 
         self.run_blocking(move |connection| {
+            ensure_tenant_exists(connection, tenant_id.into_inner())
+                .map_err(BackendRegistryError::persistence)?;
             with_tenant_tx(connection, tenant_id.into_inner(), |tx| {
                 diesel::insert_into(backend_registrations::table)
                     .values(&new_row)
@@ -106,26 +108,30 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         let serialized = serialize_registration_fields(registration)?;
 
         self.run_blocking(move |connection| {
-            let updated_count = diesel::update(
-                backend_registrations::table
-                    .filter(backend_registrations::id.eq(backend_id))
-                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner())),
-            )
-            .set((
-                backend_registrations::status.eq(&serialized.status),
-                backend_registrations::capabilities.eq(&serialized.capabilities),
-                backend_registrations::backend_info.eq(&serialized.backend_info),
-                backend_registrations::updated_at.eq(serialized.updated_at),
-            ))
-            .execute(connection)
-            .map_err(BackendRegistryError::persistence)?;
+            ensure_tenant_exists(connection, tenant_id.into_inner())
+                .map_err(BackendRegistryError::persistence)?;
+            with_tenant_tx(connection, tenant_id.into_inner(), |tx| {
+                let updated_count = diesel::update(
+                    backend_registrations::table
+                        .filter(backend_registrations::id.eq(backend_id))
+                        .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner())),
+                )
+                .set((
+                    backend_registrations::status.eq(&serialized.status),
+                    backend_registrations::capabilities.eq(&serialized.capabilities),
+                    backend_registrations::backend_info.eq(&serialized.backend_info),
+                    backend_registrations::updated_at.eq(serialized.updated_at),
+                ))
+                .execute(tx)
+                .map_err(BackendRegistryError::persistence)?;
 
-            if updated_count == 0 {
-                return Err(BackendRegistryError::NotFound(BackendId::from_uuid(
-                    backend_id,
-                )));
-            }
-            Ok(())
+                if updated_count == 0 {
+                    return Err(BackendRegistryError::NotFound(BackendId::from_uuid(
+                        backend_id,
+                    )));
+                }
+                Ok(())
+            })
         })
         .await
     }

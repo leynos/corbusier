@@ -38,8 +38,14 @@ pub(crate) trait FromTxError<E> {
 
 /// Runs `body` inside a transaction that first sets `app.tenant_id`.
 ///
-/// Ensures the tenant exists before proceeding, making this suitable for write
-/// operations that require a valid foreign key target.
+/// **IMPORTANT**: This function does NOT ensure the tenant exists. Callers
+/// performing write operations MUST call `ensure_tenant_exists` explicitly
+/// before calling this function to guarantee a valid foreign key target exists.
+///
+/// This separation allows:
+/// - Write operations to explicitly bootstrap tenants when needed
+/// - Read operations to use this without side effects
+/// - Better visibility of which code paths create tenant rows
 ///
 /// The caller's domain error `E` must implement [`FromTxError`] so that both
 /// Diesel errors and domain errors can be propagated.
@@ -53,7 +59,6 @@ where
     F: FnOnce(&mut PgConnection) -> Result<T, E>,
 {
     conn.transaction::<T, TxError<E>, _>(|tx| {
-        ensure_tenant_exists(tx, tenant_id).map_err(TxError::Diesel)?;
         set_tenant_context(tx, tenant_id)?;
         body(tx).map_err(TxError::Domain)
     })
