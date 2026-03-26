@@ -51,6 +51,10 @@ tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
 
 # Structured diagnostics
 tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+# HTTP server (health endpoint adapter)
+actix-web = "4.9.0"
 
 # Embedded PostgreSQL support (tests and tooling)
 pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "async-api"] }

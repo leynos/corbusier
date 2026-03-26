@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs
 
 
 TARGET ?= corbusier
@@ -45,6 +45,18 @@ markdownlint: ## Lint Markdown files
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+local-k8s-up: ## Create local k3d preview environment
+	uv run scripts/local_k8s.py up
+
+local-k8s-down: ## Delete local k3d preview environment
+	uv run scripts/local_k8s.py down
+
+local-k8s-status: ## Show local preview environment status
+	uv run scripts/local_k8s.py status
+
+local-k8s-logs: ## Tail application logs from preview environment
+	uv run scripts/local_k8s.py logs
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

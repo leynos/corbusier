@@ -1,0 +1,20 @@
+image:
+  repository: corbusier
+  tag: local
+
+ingress:
+  enabled: true
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+existingSecretName: corbusier
+secretEnvFromKeys:
+  DATABASE_URL: DATABASE_URL
+  VALKEY_URL: VALKEY_URL
+
+externalSecret:
+  enabled: false

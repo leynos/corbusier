@@ -15,6 +15,7 @@
 //! # Modules
 //!
 //! - [`context`]: Cross-cutting request context and identity types
+//! - [`health`]: Health-check ports and the HTTP adapter used by the runtime
 //! - [`tenant`]: Tenant identity and lifecycle
 //! - [`agent_backend`]: Agent backend registration and discovery
 //! - [`hook_engine`]: Governance hook definition and execution
@@ -24,6 +25,7 @@
 //! - `test_support` (feature-gated): Shared fixtures and fakes for tests
 
 pub mod context;
+pub mod health;
 pub mod tenant;
 
 pub mod agent_backend;

@@ -503,3 +503,33 @@ staying within the in-scope capabilities defined in corbusier-design.md.
   and
   [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
    for `Last-Event-ID` replay semantics.
+
+## 6. Deployment and preview environments
+
+### 6.1. Nile Valley-aligned deployment path
+
+- [x] 6.1.1 Add a runtime health endpoint and Kubernetes-ready container.
+  - [x] Introduce the health port and Actix Web adapter. See
+    `src/health/mod.rs` and `src/health/actix_adapter.rs`.
+  - [x] Replace the stub entry point with an HTTP server exposing
+    `/health/live` and `/health/ready`. See `src/main.rs`.
+  - [x] Add a multi-stage `Dockerfile` and `.dockerignore` for local and CI
+    image builds.
+  - [x] Success criteria: the release image runs as non-root and exposes
+    stable health endpoints on port 8080.
+- [x] 6.1.2 Add a Helm chart compatible with local preview and GitOps
+  (Git-based operations).
+  - [x] Create `charts/corbusier` with deployment, service, ingress,
+    ConfigMap, ServiceAccount, PDB, and `ExternalSecret` templates.
+  - [x] Add a values schema and local preview values file.
+  - [x] Success criteria: the chart can render a hostless local ingress and a
+    GitOps-friendly explicit-host ingress from the same values contract.
+- [x] 6.1.3 Add a local k3d (Kubernetes in Docker) lifecycle workflow.
+  - [x] Create `scripts/local_k8s.py` and the supporting `scripts/local_k8s/`
+    package using Cyclopts and `plumbum`.
+  - [x] Add `make local-k8s-up`, `local-k8s-status`, `local-k8s-logs`, and
+    `local-k8s-down`.
+  - [x] Document the design and Nile Valley alignment in
+    `docs/local-k8s-preview-design.md`.
+  - [x] Success criteria: local preview orchestration is versioned in-repo and
+    targets the same chart/image contract intended for Nile Valley overlays.

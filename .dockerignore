@@ -1,0 +1,8 @@
+target/
+.git/
+docs/
+scripts/
+charts/
+tests/
+*.md
+*.log
