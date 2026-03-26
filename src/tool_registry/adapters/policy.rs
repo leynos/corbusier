@@ -13,87 +13,73 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
 
-/// Governance adapter that unconditionally allows all tool calls.
-///
-/// This is the default governance adapter, providing an extensibility point
-/// for hook-backed enforcement without blocking current functionality.
-#[derive(Debug, Clone, Default)]
-pub struct AllowAllPolicy;
-
-#[async_trait]
-impl ToolExecutionGovernance for AllowAllPolicy {
-    async fn enforce_before_call(
-        &self,
-        _ctx: &RequestContext,
-        _request: &ToolCallRequest,
-        _entry: &CatalogEntry,
-    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
-        Ok(ToolGovernanceDecision::Allow)
-    }
-}
-
-/// Governance adapter that unconditionally denies all tool calls.
-///
-/// Intended for testing pre-execution denial paths.
+/// The fixed outcome returned by a [`StubGovernance`] adapter.
 #[derive(Debug, Clone)]
-pub struct DenyAllPolicy {
-    reason: String,
+pub enum StubOutcome {
+    Allow,
+    Deny { reason: String },
+    Fail { message: String },
 }
 
-impl DenyAllPolicy {
-    /// Creates a deny-all policy with the given reason.
+/// Stub governance adapter that returns a fixed outcome regardless of request inputs.
+#[derive(Debug, Clone)]
+pub struct StubGovernance {
+    outcome: StubOutcome,
+}
+
+impl StubGovernance {
+    /// Creates a stub that always allows tool execution.
     #[must_use]
-    pub fn new(reason: impl Into<String>) -> Self {
+    pub const fn allowing() -> Self {
         Self {
-            reason: reason.into(),
+            outcome: StubOutcome::Allow,
+        }
+    }
+
+    /// Creates a stub that always denies tool execution with the given reason.
+    #[must_use]
+    pub fn denying(reason: impl Into<String>) -> Self {
+        Self {
+            outcome: StubOutcome::Deny {
+                reason: reason.into(),
+            },
+        }
+    }
+
+    /// Creates a stub that always fails governance evaluation with the given message.
+    #[must_use]
+    pub fn failing(message: impl Into<String>) -> Self {
+        Self {
+            outcome: StubOutcome::Fail {
+                message: message.into(),
+            },
         }
     }
 }
 
+impl Default for StubGovernance {
+    fn default() -> Self {
+        Self::allowing()
+    }
+}
+
 #[async_trait]
-impl ToolExecutionGovernance for DenyAllPolicy {
+impl ToolExecutionGovernance for StubGovernance {
     async fn enforce_before_call(
         &self,
         _ctx: &RequestContext,
         _request: &ToolCallRequest,
         _entry: &CatalogEntry,
     ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
-        Ok(ToolGovernanceDecision::Deny {
-            reason: self.reason.clone(),
-        })
-    }
-}
-
-/// Governance adapter that simulates a governance evaluation failure.
-///
-/// Intended for testing error propagation when the policy engine
-/// itself fails (distinct from a governance denial decision).
-#[derive(Debug, Clone)]
-pub struct FailingPolicy {
-    message: String,
-}
-
-impl FailingPolicy {
-    /// Creates a failing policy with the given error message.
-    #[must_use]
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
+        match &self.outcome {
+            StubOutcome::Allow => Ok(ToolGovernanceDecision::Allow),
+            StubOutcome::Deny { reason } => Ok(ToolGovernanceDecision::Deny {
+                reason: reason.clone(),
+            }),
+            StubOutcome::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
         }
-    }
-}
-
-#[async_trait]
-impl ToolExecutionGovernance for FailingPolicy {
-    async fn enforce_before_call(
-        &self,
-        _ctx: &RequestContext,
-        _request: &ToolCallRequest,
-        _entry: &CatalogEntry,
-    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
-        Err(ToolGovernanceError::EvaluationFailed {
-            message: self.message.clone(),
-        })
     }
 
     async fn observe_after_call(
@@ -101,11 +87,21 @@ impl ToolExecutionGovernance for FailingPolicy {
         _ctx: &RequestContext,
         _call: &CompletedToolCall<'_>,
     ) -> Result<(), ToolGovernanceError> {
-        Err(ToolGovernanceError::EvaluationFailed {
-            message: self.message.clone(),
-        })
+        match &self.outcome {
+            StubOutcome::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
+            _ => Ok(()),
+        }
     }
 }
+
+/// Backwards-compatible alias for the always-allowing stub adapter.
+pub type AllowAllPolicy = StubGovernance;
+/// Backwards-compatible alias for the always-denying stub adapter.
+pub type DenyAllPolicy = StubGovernance;
+/// Backwards-compatible alias for the always-failing stub adapter.
+pub type FailingPolicy = StubGovernance;
 
 /// Governance adapter that delegates enforcement and observation to the hook
 /// engine and policy audit repository.

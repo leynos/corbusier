@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         postgres::{McpServerPgPool, PostgresMcpServerRegistry, PostgresToolCatalog},
     },
     domain::{LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport},
@@ -72,7 +72,7 @@ async fn setup_context(cluster: PostgresCluster) -> Result<PgTestContext, BoxErr
             catalog,
             registry,
             host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
+            policy: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

@@ -5,7 +5,7 @@ use crate::{
     context::RequestContext,
     tool_registry::{
         adapters::{
-            AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+            AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
             memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
         },
         domain::{
@@ -58,7 +58,8 @@ pub fn bundle() -> TestBundle {
     let host = Arc::new(InMemoryMcpServerHost::new());
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let (discovery, catalog) = discovery_with_policy(&registry, &host, AllowAllPolicy, &clock);
+    let (discovery, catalog) =
+        discovery_with_policy(&registry, &host, StubGovernance::allowing(), &clock);
     TestBundle {
         host,
         lifecycle,

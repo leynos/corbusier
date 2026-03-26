@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{LogRetentionPolicy, McpTransport},
@@ -56,7 +56,7 @@ pub fn discovery_service(
             catalog: catalog.clone(),
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
+            policy: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

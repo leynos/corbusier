@@ -14,7 +14,7 @@ pub use super::helpers::request_ctx;
 use corbusier::context::RequestContext;
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{
@@ -63,7 +63,7 @@ pub fn integration_ctx() -> IntegrationContext {
             catalog: catalog.clone(),
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
+            policy: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

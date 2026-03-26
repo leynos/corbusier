@@ -9,5 +9,7 @@ pub mod memory;
 pub mod postgres;
 
 pub use log_store::ObjectStoreLogAdapter;
-pub use policy::{AllowAllPolicy, DenyAllPolicy, FailingPolicy, HookBackedToolExecutionGovernance};
+pub use policy::{
+    AllowAllPolicy, DenyAllPolicy, FailingPolicy, HookBackedToolExecutionGovernance, StubGovernance,
+};
 pub use runtime::InMemoryMcpServerHost;

@@ -5,10 +5,7 @@ mod test_helpers;
 
 use super::ToolDiscoveryRoutingServiceError;
 use crate::tool_registry::{
-    adapters::{
-        AllowAllPolicy, DenyAllPolicy, FailingPolicy, InMemoryMcpServerHost,
-        memory::InMemoryMcpServerRegistry,
-    },
+    adapters::{InMemoryMcpServerHost, StubGovernance, memory::InMemoryMcpServerRegistry},
     domain::{McpServerName, ToolCallRequest, ToolRegistryDomainError},
     services::McpServerLifecycleService,
 };
@@ -203,7 +200,7 @@ async fn call_tool_schema_validation_failure(bundle: TestBundle) -> Result<()> {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_denied() -> Result<()> {
-    let err = exercise_policy_failure(DenyAllPolicy::new("forbidden")).await?;
+    let err = exercise_policy_failure(StubGovernance::denying("forbidden")).await?;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Domain(ToolRegistryDomainError::PolicyDenied { .. })
@@ -214,7 +211,7 @@ async fn call_tool_policy_denied() -> Result<()> {
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn call_tool_policy_evaluation_failed() -> Result<()> {
-    let err = exercise_policy_failure(FailingPolicy::new("engine down")).await?;
+    let err = exercise_policy_failure(StubGovernance::failing("engine down")).await?;
     assert!(matches!(
         err,
         ToolDiscoveryRoutingServiceError::Governance(_)
@@ -325,7 +322,8 @@ async fn call_tool_ambiguous_returns_error() -> Result<()> {
     let ctx = test_request_ctx();
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let (discovery, _catalog) = discovery_with_policy(&registry, &host, AllowAllPolicy, &clock);
+    let (discovery, _catalog) =
+        discovery_with_policy(&registry, &host, StubGovernance::allowing(), &clock);
 
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     host.set_tool_catalog(McpServerName::new("code_tools")?, vec![read_file_tool()?])?;
