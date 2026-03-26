@@ -26,7 +26,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from plumbum import local
 from plumbum.commands.processes import ProcessExecutionError
 
 from local_k8s.cnpg import create_cnpg_cluster, install_cnpg_operator, read_pg_app_uri, wait_for_cnpg_ready
