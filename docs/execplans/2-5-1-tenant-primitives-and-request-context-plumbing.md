@@ -1,4 +1,4 @@
-# Establish tenant primitives and request context plumbing (Roadmap 1.5.1)
+# Establish tenant primitives and request context plumbing (Roadmap 2.5.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -21,10 +21,10 @@ This plan introduces three things:
 
 1. A new `tenant` bounded context (`src/tenant/`) containing domain primitives
    `TenantId`, `TenantSlug`, and `Tenant`.
-2. A new cross-cutting `context` module (`src/context/`) containing
+1. A new cross-cutting `context` module (`src/context/`) containing
    `RequestContext` and newtype identifiers `CorrelationId`, `CausationId`,
    `UserId`, and `SessionId`.
-3. Updated port trait signatures across every repository and handoff port so
+1. Updated port trait signatures across every repository and handoff port so
    that tenant-owned operations require a `&RequestContext` parameter.
 
 After this change:
@@ -36,11 +36,11 @@ After this change:
   conversion that the Postgres adapters use internally.
 - A `Tenant` domain aggregate with `TenantId`, `TenantSlug`, display name,
   status, and timestamps is available for future persistence (the database
-  migration is deferred to 1.5.2).
+  migration is deferred to 2.5.2).
 - `make all` passes with all existing and new tests green.
 
 This is step 1 of 6 in the multi-tenancy delivery sequence. Later steps
-(1.5.2-1.5.4) will deliver schema migrations, adapter-level tenant filtering,
+(2.5.2-2.5.4) will deliver schema migrations, adapter-level tenant filtering,
 Row-Level Security (RLS) policies, and two-tenant isolation tests. This step
 focuses exclusively on domain primitives and plumbing signatures.
 
@@ -57,7 +57,7 @@ focuses exclusively on domain primitives and plumbing signatures.
 - Commit gating: `make check-fmt && make lint && make test` must pass before
   each commit.
 - No database schema migration in this plan; the `tenants` table and
-  `tenant_id` columns are deferred to roadmap 1.5.2.
+  `tenant_id` columns are deferred to roadmap 2.5.2.
 - The `SlashCommandRegistry` port is not tenant-scoped (it loads static
   definitions, not tenant-owned data) and must not be changed.
 - The `worker` module is a shell-escape utility, not a bounded context, and
@@ -72,7 +72,7 @@ focuses exclusively on domain primitives and plumbing signatures.
 - Iterations: if tests still fail after 5 fix-and-rerun cycles in any single
   milestone, stop and escalate.
 - Ambiguity: if multiple valid interpretations exist and the choice materially
-  affects downstream roadmap items (1.5.2-1.5.4), stop and present options.
+  affects downstream roadmap items (2.5.2-2.5.4), stop and present options.
 
 ## Risks
 
@@ -161,7 +161,7 @@ focuses exclusively on domain primitives and plumbing signatures.
 
 - Decision: Add `&RequestContext` to all port methods (reads and writes), not
   just writes. Rationale: The design doc states "every state mutation and
-  lookup executes within a tenant context." Future steps (1.5.3) will add
+  lookup executes within a tenant context." Future steps (2.5.3) will add
   tenant filtering to reads. Adding the parameter now avoids a second
   cross-cutting signature change later. The read path can initially ignore the
   tenant_id, but having it in the signature is the contract that callers must
@@ -374,12 +374,12 @@ Add `use crate::context::RequestContext;` to each port module and add
 traits:
 
 1. `MessageRepository` in `src/message/ports/repository.rs` (5 methods)
-2. `AgentSessionRepository` in `src/message/ports/agent_session.rs` (5 methods)
-3. `ContextSnapshotPort` in `src/message/ports/context_snapshot.rs` (4 methods)
-4. `AgentHandoffPort` in `src/message/ports/handoff.rs` (5 methods)
-5. `BackendRegistryRepository` in `src/agent_backend/ports/repository.rs`
+1. `AgentSessionRepository` in `src/message/ports/agent_session.rs` (5 methods)
+1. `ContextSnapshotPort` in `src/message/ports/context_snapshot.rs` (4 methods)
+1. `AgentHandoffPort` in `src/message/ports/handoff.rs` (5 methods)
+1. `BackendRegistryRepository` in `src/agent_backend/ports/repository.rs`
    (6 methods)
-6. `TaskRepository` in `src/task/ports/repository.rs` (6 methods)
+1. `TaskRepository` in `src/task/ports/repository.rs` (6 methods)
 
 Example signature change for `MessageRepository::store`:
 
@@ -415,7 +415,7 @@ Update every adapter that implements a changed port trait to accept the new
 - `src/task/adapters/memory/mod.rs` — in-memory task repo
 
 For in-memory adapters, add the `ctx` parameter and prefix it with `_ctx`
-(unused for now — tenant filtering comes in 1.5.3).
+(unused for now — tenant filtering comes in 2.5.3).
 
 **Postgres adapters** (3+ files):
 
@@ -581,7 +581,7 @@ differs from directory per established convention).
 
 - `docs/users-guide.md` — add a section on tenant context explaining that all
   operations now require a `RequestContext` and what its fields mean.
-- `docs/roadmap.md` — mark task 1.5.1 as done (change `- [ ]` to `- [x]`).
+- `docs/roadmap.md` — mark task 2.5.1 as done (change `- [ ]` to `- [x]`).
 - `docs/corbusier-design.md` — add implementation decisions under §2.2.5 for
   the choices made (slug validation rules, `RequestContext` module location,
   `AuditContext` migration approach).
@@ -676,7 +676,7 @@ make all   # runs check-fmt, lint, test
 ## Idempotence and recovery
 
 All stages create or modify source files only. No database state is changed
-(migrations are deferred to 1.5.2). Re-running any stage overwrites files
+(migrations are deferred to 2.5.2). Re-running any stage overwrites files
 idempotently. If a stage fails partway, fix the issue and re-run `make all`
 from the repository root.
 

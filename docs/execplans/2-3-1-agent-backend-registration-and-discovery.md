@@ -1,4 +1,4 @@
-# Implement agent backend registration and discovery (Roadmap 1.3.1)
+# Implement agent backend registration and discovery (Roadmap 2.3.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -19,9 +19,9 @@ After this change, a caller can:
 
 1. Register two distinct backends (e.g. "claude_code_sdk" and "codex_cli")
    with capability metadata.
-2. List all registered backends and confirm both appear.
-3. Look up a backend by name or ID.
-4. Deregister a backend and confirm it no longer appears in active listings
+1. List all registered backends and confirm both appear.
+1. Look up a backend by name or ID.
+1. Deregister a backend and confirm it no longer appears in active listings
    (inactive backends still appear in `list_all`).
 
 Observable success: `make all` passes, including new unit tests, in-memory
@@ -57,7 +57,7 @@ lifecycle.
 - Iterations: if tests still fail after 5 fix-and-rerun cycles in any single
   milestone, stop and escalate.
 - Ambiguity: if multiple valid interpretations exist and the choice materially
-  affects downstream roadmap items (1.3.2, 1.3.3), stop and present options.
+  affects downstream roadmap items (2.3.2, 2.3.3), stop and present options.
 
 ## Risks
 
@@ -93,7 +93,7 @@ lifecycle.
 - [x] Stage I: Postgres adapter (schema, models, repository)
 - [x] Stage J: Postgres integration tests — 5 tests passed
 - [x] Stage K: Documentation updates (users-guide, roadmap, design doc
-      decisions)
+  decisions)
 - [x] Stage L: Final validation (make all, review)
 
 ## Surprises & discoveries
@@ -109,12 +109,12 @@ lifecycle.
 
 ## Decision log
 
-- Decision: Scope 1.3.1 to registration metadata only, not the full
+- Decision: Scope 2.3.1 to registration metadata only, not the full
   `AgentBackend` trait from the design doc. Rationale: The design doc's
   `AgentBackend` trait includes `execute_turn` and `translate_tool_schema`,
-  which are roadmap items 1.3.2 and 1.3.3. Item 1.3.1 focuses on "registration
+  which are roadmap items 2.3.2 and 2.3.3. Item 2.3.1 focuses on "registration
   and discovery" — the registry of backend metadata, not the runtime dispatch
-  interface. The `AgentBackend` trait will be introduced in 1.3.2. Date/Author:
+  interface. The `AgentBackend` trait will be introduced in 2.3.2. Date/Author:
   2026-02-25
 
 - Decision: Use `BackendStatus` enum with `Active` / `Inactive` states rather
@@ -151,9 +151,9 @@ The Corbusier project lives at `/home/user/project`. It is a single Rust crate
 The project follows hexagonal architecture with two existing subsystems:
 
 - `src/message/` — conversation message format, persistence, handoff context
-  (roadmap 1.1.x, complete).
+  (roadmap 2.1.x, complete).
 - `src/task/` — issue-to-task creation, branch/PR association, state
-  transitions (roadmap 1.2.x, complete).
+  transitions (roadmap 2.2.x, complete).
 
 Each subsystem follows an identical layout:
 
@@ -346,10 +346,10 @@ pub struct ParseBackendStatusError(pub String);
 
 **`src/agent_backend/ports/repository.rs`** — Define the repository trait:
 
-> **Superseded by 1.5.1** — The signatures below are historical. All
+> **Superseded by 2.5.1** — The signatures below are historical. All
 > repository trait methods now require `&RequestContext` as the first
 > parameter after `&self`. See the current `RequestContext` pattern in
-> `src/context/` and the 1.5.1 exec plan for migration details.
+> `src/context/` and the 2.5.1 exec plan for migration details.
 
 ```rust
 // src/agent_backend/ports/repository.rs
@@ -401,10 +401,10 @@ submodules.
 
 ### Stage D: Service layer
 
-> **Superseded by 1.5.1** — The service method signatures below are
+> **Superseded by 2.5.1** — The service method signatures below are
 > historical. All service methods now require `&RequestContext` as the
 > first parameter after `&self`. See the current `RequestContext` pattern
-> in `src/context/` and the 1.5.1 exec plan for migration details.
+> in `src/context/` and the 2.5.1 exec plan for migration details.
 
 **`src/agent_backend/services/registry.rs`** — Define `BackendRegistryService`:
 
@@ -536,7 +536,7 @@ differently from the step directory to avoid Rust module resolution conflicts).
 **`migrations/2026-02-25-000000_add_backend_registrations_table/up.sql`**:
 
 ```sql
--- Add agent backend registration table for roadmap item 1.3.1
+-- Add agent backend registration table for roadmap item 2.3.1
 -- Follows corbusier-design.md §2.2.3 and §6.2.3.
 
 CREATE TABLE backend_registrations (
@@ -624,15 +624,15 @@ Update **`tests/postgres.rs`** to declare the new module.
 after "Task state transitions", with a `rust,no_run` code example showing
 registration of two backends and listing them. Follow the existing style.
 
-**`docs/roadmap.md`** — Mark 1.3.1 and its sub-items as done (`[x]`).
+**`docs/roadmap.md`** — Mark 2.3.1 and its sub-items as done (`[x]`).
 
 **`docs/corbusier-design.md`** — Insert an implementation decisions block after
 §2.2.3 F-003-RQ-001 (after line 929, before F-003-RQ-002 at line 931),
-following the established pattern used by roadmap items 1.2.1–1.2.3. The block
+following the established pattern used by roadmap items 2.2.1–2.2.3. The block
 will be:
 
 ```markdown
-###### Implementation decisions (2026-02-25) — roadmap 1.3.1
+###### Implementation decisions (2026-02-25) — roadmap 2.3.1
 
 - Backend registrations are persisted in a dedicated `backend_registrations`
   table with `capabilities` and `backend_info` stored as JSONB columns,
@@ -644,8 +644,8 @@ will be:
   `Inactive`) rather than hard delete, preserving audit history and
   allowing re-activation.
 - The `AgentBackend` runtime trait (with `execute_turn` and
-  `translate_tool_schema`) is deferred to roadmap items 1.3.2 and 1.3.3;
-  item 1.3.1 introduces only the registration metadata aggregate and
+  `translate_tool_schema`) is deferred to roadmap items 2.3.2 and 2.3.3;
+  item 2.3.1 introduces only the registration metadata aggregate and
   registry repository.
 ```
 
@@ -674,7 +674,7 @@ All commands run from `/home/user/project`.
    mkdir -p migrations/2026-02-25-000000_add_backend_registrations_table
    ```
 
-2. Write domain layer files (Stage A), then run:
+1. Write domain layer files (Stage A), then run:
 
    ```bash
    cargo check 2>&1 | head -20
@@ -682,13 +682,13 @@ All commands run from `/home/user/project`.
 
    Expected: compiles with no errors.
 
-3. Write port layer (Stage B), then `cargo check`.
+1. Write port layer (Stage B), then `cargo check`.
 
-4. Write in-memory adapter (Stage C), then `cargo check`.
+1. Write in-memory adapter (Stage C), then `cargo check`.
 
-5. Write service layer (Stage D), then `cargo check`.
+1. Write service layer (Stage D), then `cargo check`.
 
-6. Write unit tests (Stage E), then:
+1. Write unit tests (Stage E), then:
 
    ```bash
    set -o pipefail; cargo nextest run --lib 2>&1 | tee /tmp/unit-tests.log
@@ -696,7 +696,7 @@ All commands run from `/home/user/project`.
 
    Expected: all new tests pass.
 
-7. Write in-memory integration tests (Stage F), then:
+1. Write in-memory integration tests (Stage F), then:
 
    ```bash
    set -o pipefail; cargo nextest run --test in_memory 2>&1 | tee /tmp/inmem-tests.log
@@ -704,7 +704,7 @@ All commands run from `/home/user/project`.
 
    Expected: all tests pass, including new backend registry tests.
 
-8. Write BDD tests (Stage G), then:
+1. Write BDD tests (Stage G), then:
 
    ```bash
    set -o pipefail; cargo nextest run --test backend_registration_scenarios 2>&1 | tee /tmp/bdd-tests.log
@@ -712,7 +712,7 @@ All commands run from `/home/user/project`.
 
    Expected: all scenarios pass.
 
-9. Write migration (Stage H), then create Postgres adapter
+1. Write migration (Stage H), then create Postgres adapter
    (Stage I), then:
 
    ```bash
@@ -721,18 +721,18 @@ All commands run from `/home/user/project`.
 
    Expected: all Postgres tests pass, including new backend registry tests.
 
-10. Update documentation (Stage K).
+1. Update documentation (Stage K).
 
-11. Final validation:
+1. Final validation:
 
-    ```bash
-    set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
-    set -o pipefail; make markdownlint 2>&1 | tee /tmp/markdownlint.log
-    set -o pipefail; make nixie 2>&1 | tee /tmp/nixie.log
-    set -o pipefail; make fmt 2>&1 | tee /tmp/fmt.log
-    ```
+   ```bash
+   set -o pipefail; make all 2>&1 | tee /tmp/make-all.log
+   set -o pipefail; make markdownlint 2>&1 | tee /tmp/markdownlint.log
+   set -o pipefail; make nixie 2>&1 | tee /tmp/nixie.log
+   set -o pipefail; make fmt 2>&1 | tee /tmp/fmt.log
+   ```
 
-    Expected: exit code 0 for each command, no warnings, no failures.
+   Expected: exit code 0 for each command, no warnings, no failures.
 
 ## Validation and acceptance
 

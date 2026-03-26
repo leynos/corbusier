@@ -1,4 +1,4 @@
-# Implement hook engine execution (Roadmap 2.3.1)
+# Implement hook engine execution (Roadmap 3.3.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -7,7 +7,7 @@ proceeds.
 
 Status: COMPLETE
 
-This document plans roadmap item 2.3.1 in `docs/roadmap.md`:
+This document plans roadmap item 3.3.1 in `docs/roadmap.md`:
 
 - Define hook triggers for turn start and turn end, pre-tool-use and
   post-tool-use, and pre-commit and post-commit, pre-merge and post-merge,
@@ -24,16 +24,16 @@ After this change, Corbusier will run governance hooks whenever turn start and
 turn end, pre-tool-use and post-tool-use, or pre-commit and post-commit,
 pre-merge and post-merge, pre-pull and post-pull, pre-push and post-push, and
 pre-deploy and post-deploy events occur, and will persist structured execution
-results for audit and policy follow-up. This delivers roadmap 2.3.1 and creates
-the execution substrate required for roadmap 2.3.2 policy enforcement.
+results for audit and policy follow-up. This delivers roadmap 3.3.1 and creates
+the execution substrate required for roadmap 3.3.2 policy enforcement.
 
 Observable operator outcome:
 
 1. A configured trigger event causes matching hooks to run in deterministic
    order.
-2. Every configured hook run emits a structured result with status, action
+1. Every configured hook run emits a structured result with status, action
    outcomes, and execution log entries.
-3. Hook execution results are queryable from storage for each configured
+1. Hook execution results are queryable from storage for each configured
    trigger type.
 
 ## Constraints
@@ -44,7 +44,7 @@ Observable operator outcome:
   - Adapters implement ports (memory and postgres), with no adapter-to-adapter
     calls.
 - Respect roadmap dependency ordering:
-  - 1.2.3 (task transition enforcement) and 2.1.2 (tool discovery and routing)
+  - 2.2.3 (task transition enforcement) and 3.1.2 (tool discovery and routing)
     must be complete before wiring trigger producers.
 - Implement trigger coverage for these roadmap-required event families in this
   milestone: turn start and turn end, pre-tool-use and post-tool-use, and
@@ -61,7 +61,7 @@ Observable operator outcome:
 - Documentation deliverables are mandatory before roadmap completion:
   - update `docs/corbusier-design.md` with any design decisions taken;
   - update `docs/users-guide.md` with new user-visible behaviour;
-  - update `docs/roadmap.md` and mark 2.3.1 done only after all gates pass.
+  - update `docs/roadmap.md` and mark 3.3.1 done only after all gates pass.
 
 ## Tolerances (exception triggers)
 
@@ -103,23 +103,23 @@ Observable operator outcome:
 ## Progress
 
 - [x] (2026-02-28 13:05Z) Gathered roadmap/design/testing constraints and
-      drafted this ExecPlan.
+  drafted this ExecPlan.
 - [x] (2026-03-03) Stage A: Finalize hook execution domain model and port
-      contracts.
+  contracts.
 - [x] (2026-03-03) Stage B: Implement hook engine service orchestration and
-      trigger mapping.
+  trigger mapping.
 - [x] (2026-03-03) Stage C: Implement in-memory and postgres adapters
-      (including migration).
+  (including migration).
 - [x] (2026-03-03) Stage D: Add unit, integration, and behavioural tests.
-- [x] (2026-03-03) Stage E: Update design and user docs; mark roadmap 2.3.1
-      done.
+- [x] (2026-03-03) Stage E: Update design and user docs; mark roadmap 3.3.1
+  done.
 - [x] (2026-03-03) Stage F: Run full quality gates and capture validation
-      evidence.
+  evidence.
 
 ## Surprises & discoveries
 
 - The design schema in section 6.3.3 lists `PreCommit`, `PostCommit`, and pull
-  request triggers, while roadmap 2.3.1 now requires turn start and turn end,
+  request triggers, while roadmap 3.3.1 now requires turn start and turn end,
   pre-tool-use and post-tool-use, and pre-commit and post-commit, pre-merge and
   post-merge, pre-pull and post-pull, pre-push and post-push, and pre-deploy
   and post-deploy trigger families. This plan resolves the mismatch by
@@ -169,7 +169,7 @@ Acceptance criteria met:
 - Structured outcomes and logs recorded with each execution.
 - Execution results persisted for every configured trigger in tests.
 
-Residual gaps: none identified. Follow-up work continues in roadmap 2.3.2.
+Residual gaps: none identified. Follow-up work continues in roadmap 3.3.2.
 
 ## Context and orientation
 
@@ -177,7 +177,7 @@ Repository baseline relevant to this milestone:
 
 - Existing completed domains are in `src/message/`, `src/task/`, and
   `src/agent_backend/` with consistent hexagonal layout.
-- Tool plane and workflow governance modules for roadmap 2.x do not yet exist.
+- Tool plane and workflow governance modules for roadmap 3.x do not yet exist.
 - Postgres test migration wiring is centralized in
   `tests/postgres/helpers.rs` through constants and `apply_migrations()`.
 - Integration test entry points are `tests/in_memory.rs` and
@@ -297,7 +297,7 @@ postgres.
 
 ### Stage D: Trigger producer wiring (turn/tool and VCS pre and post)
 
-Integrate with the post-2.1.2 execution path:
+Integrate with the post-3.1.2 execution path:
 
 - Add adapter mapping from upstream workflow events to domain triggers:
   - turn start and turn end events -> `HookTriggerType::TurnStart`/`TurnEnd`;
@@ -351,7 +351,7 @@ Update docs after implementation behaviour is stable:
   status model, and persistence schema refinements.
 - `docs/users-guide.md`: add a user-facing section explaining configured
   triggers, result records, and failure semantics.
-- `docs/roadmap.md`: mark 2.3.1 and sub-items as done only after all quality
+- `docs/roadmap.md`: mark 3.3.1 and sub-items as done only after all quality
   gates pass.
 
 ## Concrete steps
@@ -368,7 +368,7 @@ Run all commands from `/home/user/project`.
    Expected: failures due to missing hook engine module/tests before
    implementation.
 
-2. Implement stages A-D, then run formatting and lint/test gates:
+1. Implement stages A-D, then run formatting and lint/test gates:
 
    ```bash
    set -o pipefail
@@ -381,7 +381,7 @@ Run all commands from `/home/user/project`.
 
    Expected: all commands exit 0.
 
-3. Validate documentation updates:
+1. Validate documentation updates:
 
    ```bash
    set -o pipefail
@@ -396,7 +396,7 @@ Run all commands from `/home/user/project`.
 
 ## Validation and acceptance
 
-Acceptance criteria for roadmap 2.3.1 are met when all of the following are
+Acceptance criteria for roadmap 3.3.1 are met when all of the following are
 true:
 
 - Trigger coverage:
@@ -436,7 +436,7 @@ Evidence to capture during implementation:
 - names of new tests proving each trigger family;
 - SQL migration identifier and schema diff summary;
 - final `git status --short` showing only intended files;
-- roadmap diff confirming 2.3.1 marked done.
+- roadmap diff confirming 3.3.1 marked done.
 
 ## Interfaces and dependencies
 
@@ -500,6 +500,6 @@ Dependencies:
 
 ## Revision note
 
-- 2026-02-28: Initial draft created for roadmap 2.3.1 planning.
+- 2026-02-28: Initial draft created for roadmap 3.3.1 planning.
 - 2026-03-03: Execution completed; implementation, tests, and documentation
   updates landed.

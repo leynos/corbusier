@@ -1,4 +1,4 @@
-# Implement MCP server lifecycle management (roadmap 2.1.1)
+# Implement MCP server lifecycle management (roadmap 3.1.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -8,20 +8,20 @@ proceeds.
 Status: COMPLETE
 
 `PLANS.md` is not present in this repository as of 2026-02-27, so this plan is
-the controlling execution document for roadmap item 2.1.1.
+the controlling execution document for roadmap item 3.1.1.
 
 ## Purpose / big picture
 
-Implement roadmap item 2.1.1 so Corbusier can host MCP servers with explicit
+Implement roadmap item 3.1.1 so Corbusier can host MCP servers with explicit
 lifecycle operations (`start`, `stop`, health reporting), register those
 servers in a tool registry, and query tools exposed by running servers.
 
 After this change, a developer or operator can:
 
 1. Register MCP server configurations in the tool registry.
-2. Start and stop registered MCP servers through a service API.
-3. List registered servers with lifecycle state and last health status.
-4. Query tools from a running server (`tools/list`) through the registry.
+1. Start and stop registered MCP servers through a service API.
+1. List registered servers with lifecycle state and last health status.
+1. Query tools from a running server (`tools/list`) through the registry.
 
 Observable success: `make all`, `make markdownlint`, and `make nixie` pass, and
 new unit (`rstest`), behavioural (`rstest-bdd`), in-memory integration, and
@@ -35,9 +35,9 @@ cases.
     implementation details in domain types).
   - Port traits are defined in the `tool_registry` core module.
   - Adapters implement ports; adapters do not depend on one another directly.
-- Scope strictly to roadmap 2.1.1:
+- Scope strictly to roadmap 3.1.1:
   - Include lifecycle management, registration, and tool listing/query support.
-  - Do not implement tool-call execution routing/policy logic from 2.1.2.
+  - Do not implement tool-call execution routing/policy logic from 3.1.2.
 - Preserve existing public behaviour in `message`, `task`, and `agent_backend`.
 - Add module-level `//!` docs and public Rustdoc comments for all new modules
   and public APIs.
@@ -49,14 +49,14 @@ cases.
 - Update docs as part of the feature:
   - Record implementation decisions in `docs/corbusier-design.md`.
   - Update `docs/users-guide.md` for user-visible lifecycle/registry behaviour.
-  - Mark roadmap 2.1.1 and its sub-items done in `docs/roadmap.md` only after
+  - Mark roadmap 3.1.1 and its sub-items done in `docs/roadmap.md` only after
     all quality gates pass.
 
 ## Tolerances (exception triggers)
 
 - Scope: if the implementation needs more than 35 files changed or 2,400 net
   lines, stop and escalate with a reduced-scope option.
-- API surface: if implementing 2.1.1 requires incompatible changes to existing
+- API surface: if implementing 3.1.1 requires incompatible changes to existing
   public APIs outside the new module, stop and escalate.
 - Dependencies: if a new external crate is required, stop and escalate with
   rationale and alternatives.
@@ -69,7 +69,7 @@ cases.
 
 ## Risks
 
-- Risk: MCP protocol integration can expand into 2.1.2 routing concerns.
+- Risk: MCP protocol integration can expand into 3.1.2 routing concerns.
   Severity: high Likelihood: medium Mitigation: confine this feature to
   lifecycle + registry + `tools/list`; keep tool-call execution routing
   deferred.
@@ -91,30 +91,30 @@ cases.
 
 ## Progress
 
-- [x] (2026-02-27 00:00Z) Gathered roadmap/design requirements for 2.1.1.
+- [x] (2026-02-27 00:00Z) Gathered roadmap/design requirements for 3.1.1.
 - [x] (2026-02-27 00:00Z) Mapped existing hexagonal module and test patterns.
 - [x] (2026-02-27 00:00Z) Authored initial ExecPlan draft.
 - [x] (2026-02-28 00:00Z) Received approval and implemented Stage A scaffolding
-      under `src/tool_registry/` with domain, ports, adapters, and services.
+  under `src/tool_registry/` with domain, ports, adapters, and services.
 - [x] (2026-02-28 00:00Z) Added additive migration
-      `migrations/2026-02-28-000000_add_mcp_servers_table/` and wired it into
-      `tests/postgres/helpers.rs`.
+  `migrations/2026-02-28-000000_add_mcp_servers_table/` and wired it into
+  `tests/postgres/helpers.rs`.
 - [x] (2026-02-28 00:00Z) Added unit tests (`rstest`), in-memory integration
-      tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests
-      for lifecycle and tool-query behaviour.
+  tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests
+  for lifecycle and tool-query behaviour.
 - [x] (2026-02-28 00:00Z) Implemented lifecycle service operations:
-      `register`, `start`, `stop`, `refresh_health`, `list_all`,
-      `find_by_name`, and `list_tools`.
+  `register`, `start`, `stop`, `refresh_health`, `list_all`,
+  `find_by_name`, and `list_tools`.
 - [x] (2026-02-28 00:00Z) Ran core code gates successfully:
-      `make check-fmt`, `make lint`, and `make test`.
+  `make check-fmt`, `make lint`, and `make test`.
 - [x] (2026-02-28 00:00Z) Ran documentation gates after final doc updates:
-      `make fmt`, `make markdownlint`, and `make nixie`.
+  `make fmt`, `make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
 
 - Observation: No `tool_registry` or MCP lifecycle module exists yet; this is a
   new bounded context. Evidence: source tree inspection under `src/`. Impact:
-  2.1.1 must establish domain, ports, adapters, services, tests, and
+  3.1.1 must establish domain, ports, adapters, services, tests, and
   persistence from scratch.
 
 - Observation: PostgreSQL integration tests use explicit migration inclusion in
@@ -142,8 +142,8 @@ cases.
   and keeps runtime concerns out of domain and persistence adapters.
   Date/Author: 2026-02-27 / plan author.
 
-- Decision: scope 2.1.1 to `tools/list` querying only, with `tools/call`
-  execution routing deferred to 2.1.2. Rationale: matches roadmap sequencing
+- Decision: scope 3.1.1 to `tools/list` querying only, with `tools/call`
+  execution routing deferred to 3.1.2. Rationale: matches roadmap sequencing
   and prevents accidental scope creep into policy/routing concerns.
   Date/Author: 2026-02-27 / plan author.
 
@@ -203,16 +203,16 @@ PostgreSQL harness expectations:
 Reference documents for this feature cover scope, architecture, testing, and
 tooling guidance.[^1][^2][^3][^4][^5][^6][^7][^8][^9]
 
-[^1]: `docs/roadmap.md` (2.1.1 scope and success criteria).
-[^2]: `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
-  registry architecture).
-[^3]: `docs/rust-testing-with-rstest-fixtures.md`.
-[^4]: `docs/reliable-testing-in-rust-via-dependency-injection.md`.
-[^5]: `docs/rust-doctest-dry-guide.md`.
-[^6]: `docs/complexity-antipatterns-and-refactoring-strategies.md`.
-[^7]: `docs/pg-embed-setup-unpriv-users-guide.md`.
-[^8]: `docs/ortho-config-users-guide.md`.
-[^9]: `docs/rstest-bdd-users-guide.md`.
+\[^1\]: `docs/roadmap.md` (3.1.1 scope and success criteria).
+\[^2\]: `docs/corbusier-design.md` §2.2.4 and §6.1.4 (MCP lifecycle and tool
+registry architecture).
+\[^3\]: `docs/rust-testing-with-rstest-fixtures.md`.
+\[^4\]: `docs/reliable-testing-in-rust-via-dependency-injection.md`.
+\[^5\]: `docs/rust-doctest-dry-guide.md`.
+\[^6\]: `docs/complexity-antipatterns-and-refactoring-strategies.md`.
+\[^7\]: `docs/pg-embed-setup-unpriv-users-guide.md`.
+\[^8\]: `docs/ortho-config-users-guide.md`.
+\[^9\]: `docs/rstest-bdd-users-guide.md`.
 
 ## Plan of work
 
@@ -246,7 +246,7 @@ boundaries are clean.
 
 ### Stage B: Tests first (red phase)
 
-Add failing tests that define required 2.1.1 behaviour.
+Add failing tests that define required 3.1.1 behaviour.
 
 Unit tests with `rstest`:
 
@@ -321,7 +321,7 @@ and PostgreSQL tests pass.
   "Implementation decisions" subsection under the F-005 / 2.2.4 context.
 - Update `docs/users-guide.md` with lifecycle and registry usage examples
   (register/start/list/health/tools/stop).
-- Mark `docs/roadmap.md` item 2.1.1 and its sub-bullets as done.
+- Mark `docs/roadmap.md` item 3.1.1 and its sub-bullets as done.
 - Run full quality gates and documentation validators.
 
 Go/no-go checkpoint: feature is complete only when code and documentation gates
@@ -340,7 +340,7 @@ Run all commands from repository root: `/home/user/project`.
 
    Expected signal: no formatting/lint regressions while scaffolding evolves.
 
-2. Fast iteration on targeted tests while implementing:
+1. Fast iteration on targeted tests while implementing:
 
    ```bash
    set -o pipefail && cargo nextest run --all-targets --all-features mcp_server 2>&1 | tee /tmp/2-1-1-targeted-tests.log
@@ -349,7 +349,7 @@ Run all commands from repository root: `/home/user/project`.
    Expected signal: new MCP lifecycle suites fail first (red), then pass
    (green) as implementation lands.
 
-3. Full repository gates before completion:
+1. Full repository gates before completion:
 
    ```bash
    set -o pipefail && make all 2>&1 | tee /tmp/2-1-1-make-all.log
@@ -365,16 +365,16 @@ Run all commands from repository root: `/home/user/project`.
 Acceptance is behavioural:
 
 1. A registered MCP server can be started and transitions to a running state.
-2. Listing servers returns registered entries with lifecycle and health data.
-3. Querying available tools from a running server returns tool definitions.
-4. Stopping a running server updates lifecycle/health state and removes runtime
+1. Listing servers returns registered entries with lifecycle and health data.
+1. Querying available tools from a running server returns tool definitions.
+1. Stopping a running server updates lifecycle/health state and removes runtime
    availability.
-5. Duplicate registrations, unknown server IDs, and host start/query failures
+1. Duplicate registrations, unknown server IDs, and host start/query failures
    return typed errors and are covered by tests.
 
 Quality criteria:
 
-- Tests: all existing tests and new 2.1.1 tests pass.
+- Tests: all existing tests and new 3.1.1 tests pass.
 - Lint/format: `make check-fmt`, `make lint`, and `make all` pass.
 - Docs validation: `make markdownlint` and `make nixie` pass after doc updates.
 
@@ -437,12 +437,11 @@ Validation evidence:
 
 ## Revision note
 
-- 2026-02-27: Initial draft created from roadmap 2.1.1, design sections 2.2.4
+- 2026-02-27: Initial draft created from roadmap 3.1.1, design sections 2.2.4
   and 6.1.4, and current repository testing/architecture conventions.
 
-- 2026-02-28: Implementation completed for roadmap 2.1.1 with module,
+- 2026-02-28: Implementation completed for roadmap 3.1.1 with module,
   migration, tests, and service delivery. Documentation and roadmap updates
   applied.
 
-- 2026-02-28: Full gates completed successfully (`make check-fmt`, `make
-  lint`, `make test`, `make fmt`, `make markdownlint`, `make nixie`).
+- 2026-02-28: Full gates completed successfully (`make check-fmt`, `make lint`, `make test`, `make fmt`, `make markdownlint`, `make nixie`).
