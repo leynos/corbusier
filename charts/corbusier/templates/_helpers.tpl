@@ -50,10 +50,10 @@ Validate that secretEnvFromKeys references an existing Secret when set.
 {{- $name := .Values.existingSecretName | default (ternary (default (include "corbusier.fullname" .) $esTarget) "" $esEnabled) -}}
 {{- $allowMissing := .Values.allowMissingSecret | default true -}}
 {{- $validateExistingSecret := .Values.validateExistingSecret | default false -}}
-{{- if and (gt (len $sec) 0) (not $name) -}}
+{{- if and (gt (len $sec) 0) (not $allowMissing) (not $name) -}}
 {{- fail "existingSecretName (or externalSecret.targetName / externalSecret.enabled) is required when secretEnvFromKeys is set" -}}
 {{- end -}}
-{{- if and (gt (len $sec) 0) $name -}}
+{{- if gt (len $sec) 0 -}}
 {{- range $k, $secretKey := $sec -}}
 {{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $k) -}}
 {{- fail (printf "secretEnvFromKeys has invalid env var name %q (must match ^[A-Za-z_][A-Za-z0-9_]*$)" $k) -}}
@@ -62,7 +62,7 @@ Validate that secretEnvFromKeys references an existing Secret when set.
 {{- fail (printf "secretEnvFromKeys maps %q to an empty secret key" $k) -}}
 {{- end -}}
 {{- end -}}
-{{- if $validateExistingSecret -}}
+{{- if and $validateExistingSecret $name -}}
 {{- if not (semverCompare ">=3.2.0" .Capabilities.HelmVersion.Version) -}}
 {{- fail "corbusier.validateSecrets requires Helm >= 3.2.0" -}}
 {{- end -}}

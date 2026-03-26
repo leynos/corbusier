@@ -184,7 +184,7 @@
           }
         }
       },
-      "required": ["enabled", "hosts"],
+      "required": ["enabled"],
       "additionalProperties": false
     },
     "externalSecret": {
@@ -291,6 +291,25 @@
   "allOf": [
     {
       "if": {
+        "properties": {
+          "ingress": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["ingress"],
+        "properties": {
+          "ingress": {
+            "required": ["hosts"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "required": ["externalSecret"],
         "properties": {
           "externalSecret": {
@@ -304,8 +323,12 @@
       "then": {
         "properties": {
           "externalSecret": {
-            "required": ["secretStoreRef", "data"],
+            "required": ["refreshInterval", "secretStoreRef", "data"],
             "properties": {
+              "refreshInterval": {
+                "type": "string",
+                "pattern": "^[0-9]+[smhd]$"
+              },
               "secretStoreRef": {
                 "properties": {
                   "name": { "type": "string", "minLength": 1 }
@@ -319,10 +342,20 @@
     },
     {
       "if": {
-        "required": ["secretEnvFromKeys"],
-        "properties": {
-          "secretEnvFromKeys": { "minProperties": 1 }
-        }
+        "allOf": [
+          {
+            "required": ["secretEnvFromKeys"],
+            "properties": {
+              "secretEnvFromKeys": { "minProperties": 1 }
+            }
+          },
+          {
+            "required": ["allowMissingSecret"],
+            "properties": {
+              "allowMissingSecret": { "const": false }
+            }
+          }
+        ]
       },
       "then": {
         "anyOf": [

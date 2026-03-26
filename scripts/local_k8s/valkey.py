@@ -23,6 +23,7 @@ Read the Redis-compatible URI after the instance is ready:
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 
 from plumbum import FG, local
 
@@ -173,6 +174,6 @@ def read_valkey_uri(cfg: Config, env: dict[str, str]) -> str:
     plumbum.commands.processes.ProcessExecutionError
         Raised when the Kubernetes `Secret` cannot be read.
     """
-    password = read_secret_field(cfg.valkey_name, "password", cfg.namespace, env)
+    password = quote(read_secret_field(cfg.valkey_name, "password", cfg.namespace, env), safe="")
     host = f"{cfg.valkey_name}.{cfg.namespace}.svc.cluster.local"
     return f"redis://:{password}@{host}:6379"

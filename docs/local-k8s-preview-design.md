@@ -224,7 +224,7 @@ This sequence shows the full local preview flow. A developer runs
 provision the Postgres and cache instances, import the locally built Corbusier
 image, deploy the chart, and finally print the preview and health URLs.
 <!-- markdownlint-disable MD031 -->
-_Figure 1: Sequence diagram for the local k3d preview workflow._
+Table 1.1.1: Sequence diagram for the local k3d preview workflow.
 ```mermaid
 sequenceDiagram
     actor Developer
