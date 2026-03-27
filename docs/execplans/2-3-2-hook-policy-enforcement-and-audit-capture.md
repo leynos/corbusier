@@ -27,11 +27,12 @@ queryable audit trail of what was evaluated, what was denied or permitted, and
 which task, conversation, and hook event the decision belonged to.
 
 The first concrete enforcement point in the current codebase is tool execution.
-A pre-tool-use policy hook can deny a tool call before the MCP host runs it,
-and both the denial and the underlying hook action results are persisted. A
-post-tool-use hook can record the resulting audit event after the call
-completes. The hook audit query surface then allows callers to retrieve policy
-outcomes by `TaskId`, by `ConversationId`, or by `TriggerContextId`.
+A pre-tool-use policy hook can deny a tool call before the Model Context
+Protocol (MCP) host runs it, and both the denial and the underlying hook action
+results are persisted. A post-tool-use hook can record the resulting audit
+event after the call completes. The hook audit query surface then allows
+callers to retrieve policy outcomes by `TaskId`, by `ConversationId`, or by
+`TriggerContextId`.
 
 Observable operator outcome:
 

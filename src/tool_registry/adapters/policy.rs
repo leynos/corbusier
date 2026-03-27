@@ -4,7 +4,7 @@ use crate::context::RequestContext;
 use crate::hook_engine::domain::{HookExecutionScope, HookTriggerContext, HookTriggerType};
 use crate::hook_engine::ports::{HookEngine, HookPolicyAuditRepository};
 use crate::tool_registry::domain::{
-    CatalogEntry, ToolCallRequest, ToolCallResult, ToolGovernanceDecision,
+    CatalogEntry, ToolCallRequest, ToolCallResult, ToolExecutionScope, ToolGovernanceDecision,
 };
 use crate::tool_registry::ports::{
     CompletedToolCall, ToolExecutionGovernance, ToolGovernanceError,
@@ -19,6 +19,29 @@ pub enum StubOutcome {
     Allow,
     Deny { reason: String },
     Fail { message: String },
+}
+
+impl StubOutcome {
+    fn before_call(&self) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        match self {
+            Self::Allow => Ok(ToolGovernanceDecision::Allow),
+            Self::Deny { reason } => Ok(ToolGovernanceDecision::Deny {
+                reason: reason.clone(),
+            }),
+            Self::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
+        }
+    }
+
+    fn after_call(&self) -> Result<(), ToolGovernanceError> {
+        match self {
+            Self::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
+            Self::Allow | Self::Deny { .. } => Ok(()),
+        }
+    }
 }
 
 /// Stub governance adapter that returns a fixed outcome regardless of request inputs.
@@ -71,15 +94,7 @@ impl ToolExecutionGovernance for StubGovernance {
         _request: &ToolCallRequest,
         _entry: &CatalogEntry,
     ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
-        match &self.outcome {
-            StubOutcome::Allow => Ok(ToolGovernanceDecision::Allow),
-            StubOutcome::Deny { reason } => Ok(ToolGovernanceDecision::Deny {
-                reason: reason.clone(),
-            }),
-            StubOutcome::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
-                message: message.clone(),
-            }),
-        }
+        self.outcome.before_call()
     }
 
     async fn observe_after_call(
@@ -87,12 +102,7 @@ impl ToolExecutionGovernance for StubGovernance {
         _ctx: &RequestContext,
         _call: &CompletedToolCall<'_>,
     ) -> Result<(), ToolGovernanceError> {
-        match &self.outcome {
-            StubOutcome::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
-                message: message.clone(),
-            }),
-            _ => Ok(()),
-        }
+        self.outcome.after_call()
     }
 }
 
@@ -144,25 +154,30 @@ where
         })
     }
 
+    fn project_execution_scope(
+        scope: &ToolExecutionScope,
+        metadata: serde_json::Value,
+    ) -> HookExecutionScope {
+        let mut hook_scope = HookExecutionScope::default().with_metadata(metadata);
+        if let Some(task_id) = scope.task_id() {
+            hook_scope = hook_scope.with_task_id(task_id);
+        }
+        if let Some(conversation_id) = scope.conversation_id() {
+            hook_scope = hook_scope.with_conversation_id(conversation_id);
+        }
+        hook_scope
+    }
+
     fn build_trigger_context(
         trigger_type: HookTriggerType,
         request: &ToolCallRequest,
         entry: &CatalogEntry,
         result: Option<&ToolCallResult>,
     ) -> HookTriggerContext {
-        let base_scope = HookExecutionScope::default()
-            .with_metadata(Self::build_scope_metadata(request, entry, result));
-        let task_scope = if let Some(task_id) = request.execution_scope().task_id() {
-            base_scope.with_task_id(task_id)
-        } else {
-            base_scope
-        };
-        let execution_scope =
-            if let Some(conversation_id) = request.execution_scope().conversation_id() {
-                task_scope.with_conversation_id(conversation_id)
-            } else {
-                task_scope
-            };
+        let execution_scope = Self::project_execution_scope(
+            request.execution_scope(),
+            Self::build_scope_metadata(request, entry, result),
+        );
         let occurred_at =
             result.map_or_else(|| request.initiated_at(), ToolCallResult::completed_at);
         HookTriggerContext::new_with_timestamp(trigger_type, execution_scope, occurred_at)
@@ -227,17 +242,16 @@ where
 }
 
 fn denial_reason(events: Vec<crate::hook_engine::domain::PolicyAuditEvent>) -> Option<String> {
-    events.into_iter().find_map(|event| {
-        if matches!(
-            event.decision(),
-            crate::hook_engine::domain::PolicyAuditDecision::Deny
-        ) {
-            Some(event.violation().map_or_else(
+    use crate::hook_engine::domain::PolicyAuditDecision::Deny;
+
+    for event in events {
+        if matches!(event.decision(), Deny) {
+            let message = event.violation().map_or_else(
                 || "policy denied tool call".to_owned(),
                 |violation| violation.reason().to_owned(),
-            ))
-        } else {
-            None
+            );
+            return Some(message);
         }
-    })
+    }
+    None
 }

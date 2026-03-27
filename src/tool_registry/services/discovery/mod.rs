@@ -1,15 +1,10 @@
 //! Service layer for tool discovery, catalog management, and call routing.
-//!
-//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema
-//! validation, policy enforcement, call routing, stderr capture, and
-//! audit recording.
 
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        CatalogEntry, LogRetentionPolicy, McpServerId, ToolCallOutcome, ToolCallRequest,
-        ToolCallResult, ToolCallTiming, ToolGovernanceDecision, ToolRegistryDomainError,
-        validation::validate_parameters,
+        CatalogEntry, LogRetentionPolicy, McpServerId, ToolCallRequest, ToolCallResult,
+        ToolGovernanceDecision, ToolRegistryDomainError, validation::validate_parameters,
     },
     ports::{
         CompletedToolCall, McpServerHost, McpServerHostError, McpServerRegistryError,
@@ -67,10 +62,6 @@ pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
 }
 
 /// Tool discovery, catalog management, and call routing service.
-///
-/// This service is a sibling to [`super::McpServerLifecycleService`],
-/// managing tool catalog persistence and call routing as distinct
-/// responsibilities from server lifecycle state transitions.
 pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
@@ -116,13 +107,12 @@ where
         }
     }
 
-    /// Discovers tools from a running server and persists them in the
-    /// catalog.
+    /// Discovers tools from a running server and persists them in the catalog.
     ///
     /// # Errors
     ///
-    /// Returns errors when the server is not found, not running, or
-    /// catalog persistence fails.
+    /// Returns an error when the server is missing, not running, or the
+    /// catalog cannot be updated.
     pub async fn discover_and_persist_tools(
         &self,
         ctx: &RequestContext,
@@ -162,7 +152,8 @@ where
     /// Marks all tools for a server as unavailable in the catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog persistence fails.
     pub async fn mark_tools_unavailable(
         &self,
         ctx: &RequestContext,
@@ -174,7 +165,8 @@ where
     /// Marks all tools for a server as available in the catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog persistence fails.
     pub async fn mark_tools_available(
         &self,
         ctx: &RequestContext,
@@ -186,7 +178,8 @@ where
     /// Returns the complete tool catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog lookup fails.
     pub async fn list_catalog(
         &self,
         ctx: &RequestContext,
@@ -197,14 +190,10 @@ where
     /// Routes a tool call through validation, policy, execution, stderr
     /// capture, and audit recording.
     ///
-    /// Pre-execution rejections (unavailable tool, schema validation
-    /// failure, policy denial) are audited as failures before the error
-    /// propagates. Only `ToolNotFound` skips auditing because no
-    /// `server_id` is available.
-    ///
     /// # Errors
-    /// Returns errors for tool resolution, schema validation, policy
-    /// denial, host execution failures, or timeout.
+    ///
+    /// Returns an error when resolution, validation, governance, host
+    /// execution, or audit persistence fails.
     pub async fn call_tool(
         &self,
         ctx: &RequestContext,
@@ -227,9 +216,6 @@ where
         self.execute_and_audit(ctx, request, &entry).await
     }
 
-    /// Resolves a tool from the catalog, checks availability, validates
-    /// parameters, and enforces policy. On failure returns the catalog
-    /// entry (if resolved) alongside the error for audit purposes.
     async fn resolve_and_validate(
         &self,
         ctx: &RequestContext,
@@ -250,9 +236,6 @@ where
                 return Err((None, err.into()));
             }
             1 => {
-                // SAFETY: into_iter().next() always yields Some when
-                // len() == 1; the else branch is structurally
-                // unreachable.
                 let Some(entry) = entries.into_iter().next() else {
                     let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
                     return Err((None, err.into()));
@@ -292,7 +275,6 @@ where
         res.map_err(ToolDiscoveryRoutingServiceError::Catalog)
     }
 
-    /// Validates availability, schema, and policy for a resolved entry.
     async fn validate_entry(
         &self,
         ctx: &RequestContext,
@@ -328,56 +310,31 @@ where
         Ok(())
     }
 
-    /// Executes a validated tool call and records the audit trail.
     async fn execute_and_audit(
         &self,
         ctx: &RequestContext,
         request: &ToolCallRequest,
         entry: &CatalogEntry,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let server = match self.find_running_server(ctx, entry.server_id()).await {
-            Ok(s) => s,
-            Err(err) => {
-                let rejected = log_and_audit::RejectedCallContext {
-                    request,
-                    server_id: entry.server_id(),
-                };
-                self.audit_rejection(ctx, &rejected, &err).await;
-                return Err(err);
-            }
-        };
+        let server =
+            log_and_audit::find_running_server_or_audit_rejection(self, ctx, request, entry)
+                .await?;
         let execute_result = self.host.call_tool(ctx, &server, request).await;
 
         let completed_at = self.clock.utc();
-        let duration = (completed_at - request.initiated_at())
-            .to_std()
-            .unwrap_or_default();
-        let (outcome, stderr_output, host_error) = match execute_result {
-            Ok(r) => (
-                ToolCallOutcome::Success { content: r.content },
-                r.stderr_output,
-                None,
-            ),
-            Err(e) => (
-                ToolCallOutcome::Failure {
-                    error: e.to_string(),
-                },
-                None,
-                Some(e),
-            ),
-        };
-
-        let timing = ToolCallTiming {
-            duration,
+        let (result, stderr_output, host_error) = log_and_audit::build_tool_call_result(
+            request,
+            execute_result,
+            entry.server_id(),
             completed_at,
-        };
-        let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
+        );
         let completed = log_and_audit::CompletedCallContext {
             request,
             result: &result,
         };
         self.capture_and_audit(ctx, &completed, stderr_output).await;
-        self.policy
+        if let Err(err) = self
+            .policy
             .observe_after_call(
                 ctx,
                 &CompletedToolCall {
@@ -386,15 +343,14 @@ where
                     result: &result,
                 },
             )
-            .await?;
-
-        if let Some(host_err) = host_error {
-            return Err(host_err.into());
+            .await
+        {
+            log_and_audit::warn_post_call_observation_failure(request, entry, &err);
         }
-        Ok(result)
+
+        log_and_audit::return_result_or_host_error(result, host_error)
     }
 
-    /// Loads a server from the registry and verifies it is running.
     async fn find_running_server(
         &self,
         ctx: &RequestContext,

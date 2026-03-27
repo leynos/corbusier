@@ -31,3 +31,12 @@ async fn pre_tool_use_policy_denies(world: HookPolicyWorld) {
 async fn post_tool_use_policy_audit(world: HookPolicyWorld) {
     let _ = world;
 }
+
+#[scenario(
+    path = "tests/features/hook_policy_enforcement.feature",
+    name = "A policy hook emits an invalid payload and the tool call fails with a governance error"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn policy_hook_invalid_payload_governance_error(world: HookPolicyWorld) {
+    let _ = world;
+}

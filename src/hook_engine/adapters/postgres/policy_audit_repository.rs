@@ -5,7 +5,7 @@ use super::schema::hook_policy_audit_events;
 use crate::context::{RequestContext, TenantId};
 use crate::hook_engine::domain::{
     HookActionId, HookExecutionId, HookId, HookTriggerType, PolicyAuditDecision, PolicyAuditEvent,
-    PolicyAuditEventId, PolicyAuditEventInput, PolicyViolation, TriggerContextId,
+    PolicyAuditEventId, PolicyViolation, TriggerContextId,
 };
 use crate::hook_engine::ports::{
     HookPolicyAuditError, HookPolicyAuditRepository, HookPolicyAuditResult,
@@ -193,7 +193,7 @@ fn row_to_event(row: PolicyAuditEventRow) -> HookPolicyAuditResult<PolicyAuditEv
         .transpose()
         .map_err(|err| HookPolicyAuditError::invalid_persisted_data(err.to_string()))?;
 
-    Ok(PolicyAuditEvent::new(PolicyAuditEventInput {
+    Ok(PolicyAuditEvent {
         id: PolicyAuditEventId::from_uuid(row.id),
         hook_execution_id: HookExecutionId::from_uuid(row.hook_execution_id),
         trigger_context_id: TriggerContextId::from_uuid(row.trigger_context_id),
@@ -206,5 +206,5 @@ fn row_to_event(row: PolicyAuditEventRow) -> HookPolicyAuditResult<PolicyAuditEv
         violation,
         payload: row.payload,
         recorded_at: row.recorded_at,
-    }))
+    })
 }

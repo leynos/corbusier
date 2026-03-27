@@ -136,69 +136,21 @@ impl PolicyViolation {
 /// Stored audit projection for a policy-check action.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyAuditEvent {
-    id: PolicyAuditEventId,
-    hook_execution_id: HookExecutionId,
-    trigger_context_id: TriggerContextId,
-    trigger_type: HookTriggerType,
-    hook_id: HookId,
-    action_id: super::HookActionId,
-    task_id: Option<TaskId>,
-    conversation_id: Option<ConversationId>,
-    decision: PolicyAuditDecision,
-    violation: Option<PolicyViolation>,
-    payload: serde_json::Value,
-    recorded_at: DateTime<Utc>,
-}
-
-/// Input bundle for constructing a [`PolicyAuditEvent`].
-#[derive(Debug, Clone)]
-pub struct PolicyAuditEventInput {
-    /// Unique identifier for the audit event.
-    pub id: PolicyAuditEventId,
-    /// Hook execution that produced the projection.
-    pub hook_execution_id: HookExecutionId,
-    /// Trigger context linked to the execution.
-    pub trigger_context_id: TriggerContextId,
-    /// Trigger type linked to the execution.
-    pub trigger_type: HookTriggerType,
-    /// Hook definition that produced the audit event.
-    pub hook_id: HookId,
-    /// Action identifier for the policy check.
-    pub action_id: super::HookActionId,
-    /// Workflow task correlation, if available.
-    pub task_id: Option<TaskId>,
-    /// Workflow conversation correlation, if available.
-    pub conversation_id: Option<ConversationId>,
-    /// Resulting policy decision.
-    pub decision: PolicyAuditDecision,
-    /// Optional structured violation details.
-    pub violation: Option<PolicyViolation>,
-    /// Raw policy payload for additional auditing context.
-    pub payload: serde_json::Value,
-    /// Projection timestamp.
-    pub recorded_at: DateTime<Utc>,
+    pub(crate) id: PolicyAuditEventId,
+    pub(crate) hook_execution_id: HookExecutionId,
+    pub(crate) trigger_context_id: TriggerContextId,
+    pub(crate) trigger_type: HookTriggerType,
+    pub(crate) hook_id: HookId,
+    pub(crate) action_id: super::HookActionId,
+    pub(crate) task_id: Option<TaskId>,
+    pub(crate) conversation_id: Option<ConversationId>,
+    pub(crate) decision: PolicyAuditDecision,
+    pub(crate) violation: Option<PolicyViolation>,
+    pub(crate) payload: serde_json::Value,
+    pub(crate) recorded_at: DateTime<Utc>,
 }
 
 impl PolicyAuditEvent {
-    /// Creates a new policy audit event from validated input.
-    #[must_use]
-    pub fn new(input: PolicyAuditEventInput) -> Self {
-        Self {
-            id: input.id,
-            hook_execution_id: input.hook_execution_id,
-            trigger_context_id: input.trigger_context_id,
-            trigger_type: input.trigger_type,
-            hook_id: input.hook_id,
-            action_id: input.action_id,
-            task_id: input.task_id,
-            conversation_id: input.conversation_id,
-            decision: input.decision,
-            violation: input.violation,
-            payload: input.payload,
-            recorded_at: input.recorded_at,
-        }
-    }
-
     /// Returns the event identifier.
     #[must_use]
     pub const fn id(&self) -> PolicyAuditEventId {
@@ -345,7 +297,7 @@ fn project_policy_audit_event(
         })?;
     let decision = PolicyAuditDecision::try_from(decision_raw)?;
     let violation = parse_violation(object, decision, action.action_id())?;
-    Ok(PolicyAuditEvent::new(PolicyAuditEventInput {
+    Ok(PolicyAuditEvent {
         id: PolicyAuditEventId::new(),
         hook_execution_id: result.execution_id(),
         trigger_context_id: result.trigger_context_id(),
@@ -358,7 +310,7 @@ fn project_policy_audit_event(
         violation,
         payload: action.output().clone(),
         recorded_at: result.executed_at(),
-    }))
+    })
 }
 
 fn parse_violation(

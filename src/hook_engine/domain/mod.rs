@@ -17,8 +17,8 @@ pub use execution::{
 };
 pub use ids::{HookActionId, HookExecutionId, HookId, TriggerContextId};
 pub use policy_audit::{
-    PolicyAuditDecision, PolicyAuditEvent, PolicyAuditEventId, PolicyAuditEventInput,
-    PolicyAuditProjectionError, PolicyViolation, project_policy_audit_events,
+    PolicyAuditDecision, PolicyAuditEvent, PolicyAuditEventId, PolicyAuditProjectionError,
+    PolicyViolation, project_policy_audit_events,
 };
 pub use trigger::{
     HookExecutionScope, HookTriggerContext, HookTriggerType, ParseHookTriggerTypeError,

@@ -14,3 +14,9 @@ Feature: Hook-backed tool policy enforcement
     Given a post-tool-use policy hook records an allow decision
     When a successful tool call completes
     Then the policy audit is retrievable by hook event
+
+  Scenario: A policy hook emits an invalid payload and the tool call fails with a governance error
+    Given a pre-tool-use policy hook emits an invalid payload
+    When a tool call executes with task tracking
+    Then the tool call fails with a governance error
+    And no policy audit is persisted for the task

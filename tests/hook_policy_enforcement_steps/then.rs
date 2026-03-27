@@ -94,3 +94,31 @@ fn policy_audit_is_retrievable_by_hook_event(
     }
     Ok(())
 }
+
+#[then("the tool call fails with a governance error")]
+fn tool_call_fails_with_governance_error(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
+    let Some(err) = &world.last_error else {
+        return Err(eyre!("expected governance error"));
+    };
+    if !matches!(err, ToolDiscoveryRoutingServiceError::Governance(_)) {
+        return Err(eyre!("expected governance error, got {err}"));
+    }
+    Ok(())
+}
+
+#[then("no policy audit is persisted for the task")]
+fn no_policy_audit_is_persisted_for_task(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
+    let task_id = world
+        .last_task_id
+        .ok_or_else(|| eyre!("task id should be recorded"))?;
+    let events = run_async(world.policy_audit.find_by_task(&world.request_ctx, task_id))
+        .wrap_err("query policy audit by task")?;
+    world.last_events.clone_from(&events);
+    if !events.is_empty() {
+        return Err(eyre!(
+            "expected no policy audit events for task, got {}",
+            events.len()
+        ));
+    }
+    Ok(())
+}

@@ -3,12 +3,13 @@
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        LogCaptureContext, LogEntryMetadata, McpServerId, ToolCallAuditRecord, ToolCallRequest,
-        ToolCallResult,
+        CatalogEntry, LogCaptureContext, LogEntryMetadata, McpServerId, ToolCallAuditRecord,
+        ToolCallOutcome, ToolCallRequest, ToolCallResult, ToolCallTiming,
     },
     ports::{
-        McpServerHost, McpServerRegistryRepository, StoreLogRequest, SweepContext,
-        ToolCatalogRepository, ToolExecutionGovernance, ToolLogStore,
+        McpServerHost, McpServerHostError, McpServerRegistryRepository, StoreLogRequest,
+        SweepContext, ToolCallHostResult, ToolCatalogRepository, ToolExecutionGovernance,
+        ToolLogStore,
     },
 };
 use mockable::Clock;
@@ -34,6 +35,97 @@ pub(super) struct RejectedCallContext<'a> {
 pub(super) struct CompletedCallContext<'a> {
     pub request: &'a ToolCallRequest,
     pub result: &'a ToolCallResult,
+}
+
+pub(super) fn build_tool_call_result(
+    request: &ToolCallRequest,
+    result: Result<ToolCallHostResult, McpServerHostError>,
+    server_id: McpServerId,
+    completed_at: chrono::DateTime<chrono::Utc>,
+) -> (
+    ToolCallResult,
+    Option<bytes::Bytes>,
+    Option<McpServerHostError>,
+) {
+    let duration = (completed_at - request.initiated_at())
+        .to_std()
+        .unwrap_or_default();
+    let (outcome, stderr_output, host_error) = match result {
+        Ok(response) => (
+            ToolCallOutcome::Success {
+                content: response.content,
+            },
+            response.stderr_output,
+            None,
+        ),
+        Err(error) => (
+            ToolCallOutcome::Failure {
+                error: error.to_string(),
+            },
+            None,
+            Some(error),
+        ),
+    };
+    let timing = ToolCallTiming {
+        duration,
+        completed_at,
+    };
+    (
+        ToolCallResult::from_request(request, server_id, outcome, timing),
+        stderr_output,
+        host_error,
+    )
+}
+
+pub(super) async fn find_running_server_or_audit_rejection<Cat, Reg, H, Gov, Log, C>(
+    service: &ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>,
+    ctx: &RequestContext,
+    request: &ToolCallRequest,
+    entry: &CatalogEntry,
+) -> ToolDiscoveryRoutingServiceResult<crate::tool_registry::domain::McpServerRegistration>
+where
+    Cat: ToolCatalogRepository,
+    Reg: McpServerRegistryRepository,
+    H: McpServerHost,
+    Gov: ToolExecutionGovernance,
+    Log: ToolLogStore,
+    C: Clock + Send + Sync,
+{
+    match service.find_running_server(ctx, entry.server_id()).await {
+        Ok(server) => Ok(server),
+        Err(err) => {
+            let rejected = RejectedCallContext {
+                request,
+                server_id: entry.server_id(),
+            };
+            service.audit_rejection(ctx, &rejected, &err).await;
+            Err(err)
+        }
+    }
+}
+
+pub(super) fn warn_post_call_observation_failure(
+    request: &ToolCallRequest,
+    entry: &CatalogEntry,
+    err: &crate::tool_registry::ports::ToolGovernanceError,
+) {
+    tracing::warn!(
+        call_id = %request.call_id(),
+        tool_name = request.tool_name(),
+        server_id = %entry.server_id(),
+        error = %err,
+        "post-tool-use governance observation failed after tool execution"
+    );
+}
+
+pub(super) fn return_result_or_host_error(
+    result: ToolCallResult,
+    host_error: Option<McpServerHostError>,
+) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
+    if let Some(error) = host_error {
+        return Err(error.into());
+    }
+    Ok(result)
 }
 
 impl<Cat, Reg, H, Gov, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>

@@ -261,6 +261,52 @@ async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
+async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Result<()> {
+    let GovernanceTestFixture {
+        ctx,
+        host,
+        lifecycle,
+        definition_repo,
+        action_executor,
+        policy_audit,
+        discovery,
+    } = GovernanceTestFixture::new();
+    let conversation_id = ConversationId::new();
+
+    let action_id = HookActionId::new("invalid-post-tool-action").expect("valid action id");
+    definition_repo
+        .insert(
+            &ctx,
+            tool_policy_definition(HookTriggerType::PostToolUse, &action_id),
+        )
+        .await
+        .expect("insert post-tool policy definition should succeed");
+    action_executor
+        .set_output(action_id.as_str(), json!({"status": "invalid"}))
+        .expect("configure invalid post-tool output should succeed");
+
+    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
+    setup_success_result(&host)?;
+
+    let request =
+        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock)
+            .with_conversation_id(conversation_id);
+    let result = discovery.call_tool(&ctx, &request).await?;
+
+    assert!(result.outcome().is_success());
+    let events = policy_audit
+        .find_by_conversation(&ctx, conversation_id)
+        .await
+        .expect("query by conversation should succeed");
+    assert!(
+        events.is_empty(),
+        "invalid post-tool payload should not persist audit events"
+    );
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
 async fn post_tool_use_observation_records_audit_event() -> Result<()> {
     let GovernanceTestFixture {
         ctx,

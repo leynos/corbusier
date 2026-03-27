@@ -126,3 +126,19 @@ fn post_tool_use_policy_records_allow(world: &mut HookPolicyWorld) -> Result<(),
     )?;
     prepare_runtime(world)
 }
+
+#[given("a pre-tool-use policy hook emits an invalid payload")]
+fn pre_tool_use_policy_emits_invalid_payload(
+    world: &mut HookPolicyWorld,
+) -> Result<(), eyre::Report> {
+    configure_hook(
+        world,
+        HookSetup {
+            hook_id: "pre-tool-invalid",
+            trigger: HookTriggerType::PreToolUse,
+            action_id: "pre-tool-invalid-action",
+            output: json!({"status": "invalid"}),
+        },
+    )?;
+    prepare_runtime(world)
+}
