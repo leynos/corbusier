@@ -229,7 +229,7 @@ metadata.
 
 ### State machine definition
 
-Table 2.2.3: Allowed task state transitions for roadmap item 2.2.3.
+Table 2.2.3.1: Allowed task state transitions for roadmap item 2.2.3.
 
 | From state | Allowed target states |
 | ------------ | ----------------------------------------- |
@@ -491,7 +491,7 @@ re-running `make all` from the repository root will identify remaining issues.
 
 ### New files (9)
 
-Table 2.2.3: New files added for this implementation.
+Table 2.2.3.2: New files added for this implementation.
 
 | File | Purpose |
 | -------------------------------------------------------- | ---------------------------- |
@@ -507,7 +507,7 @@ Table 2.2.3: New files added for this implementation.
 
 ### Modified files (10)
 
-Table 2.2.3: Existing files modified for this implementation.
+Table 2.2.3.3: Existing files modified for this implementation.
 
 | File | Change |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |

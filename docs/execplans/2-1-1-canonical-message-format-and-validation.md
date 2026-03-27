@@ -1,4 +1,4 @@
-# Implement Canonical Message Format and Validation (Roadmap 2.1.1)
+# Implement canonical message format and validation (Roadmap 2.1.1)
 
 This Execution Plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,

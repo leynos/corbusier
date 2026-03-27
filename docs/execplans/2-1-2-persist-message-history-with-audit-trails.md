@@ -344,7 +344,7 @@ Expected additions (adjust if design review dictates otherwise):
 - Dev-dependencies:
 
   - `rstest-bdd = "0.4.0"`
-  -
+  - `rstest-bdd-macros` with strict compile-time validation:
 
     ```toml
     rstest-bdd-macros = { version = "0.4.0", features = ["strict-compile-time-validation"] }

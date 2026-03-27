@@ -317,7 +317,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     history, while new writes and CI gates move onto blocking behaviour in the
     documented order.
 - [ ] 1.6.2 Declare end-of-migration retirement criteria. Requires 1.6.1 and
-  4.3.2. See adr-010-migration-and-coexistence-strategy.md §Migration Plan and
+  TBD (non-linear dependency on the final hosted cutover evidence bundle). See
+  adr-010-migration-and-coexistence-strategy.md §Migration Plan and
   §Outstanding Decisions.
   - [ ] Define the evidence bundle required to remove inline hosted runtime
     ownership, legacy routing, and legacy transport write paths.
@@ -523,7 +524,8 @@ The tasks below establish the current Corbusier-owned hook baseline. Phase 2.3
 extends hosted-session execution onto Podbot control-channel acknowledgement
 flows without regressing existing policy enforcement.
 
-- [x] 3.3.1 Implement hook engine execution. Requires 3.2.3 and 3.1.2. See
+- [x] 3.3.1 Implement hook engine execution. Requires 3.1.2 and TBD
+  (non-linear dependency on future Weaver workflow milestones). See
   corbusier-design.md §2.1.3 and §6.3.3.
   - [x] Define hook triggers for turn start/end, tool use before/after, and
     pre- and post-commit, pre- and post-merge, pre- and post-pull, pre- and
@@ -663,7 +665,8 @@ enforcement.
 ### 5.3. Testing and quality gates
 
 - [ ] 5.3.1 Implement automated unit, integration, and end-to-end test suites.
-  Requires 3.2.3 and 3.3.1. See corbusier-design.md §6.6.1.
+  Requires 3.3.1 and TBD (non-linear dependency on future Weaver workflow test
+  harness milestones). See corbusier-design.md §6.6.1.
   - [ ] Add unit tests for domain services and ports. See
     corbusier-design.md §6.6.1.1.
   - [ ] Add integration tests for VCS, tool, and agent adapters. See
@@ -844,11 +847,11 @@ enforcement.
   - [ ] Success criteria: contract tests validate error schema stability and
     pagination envelope shape; tenant isolation tests pass.
 
-## 6. Deployment and preview environments
+## 7. Deployment and preview environments
 
-### 6.1. Nile Valley-aligned deployment path
+### 7.1. Nile Valley-aligned deployment path
 
-- [x] 6.1.1 Add a runtime health endpoint and Kubernetes-ready container.
+- [x] 7.1.1 Add a runtime health endpoint and Kubernetes-ready container.
   - [x] Introduce the health port and Actix Web adapter. See
     `src/health/mod.rs` and `src/health/actix_adapter.rs`.
   - [x] Replace the stub entry point with an HTTP server exposing
@@ -857,14 +860,14 @@ enforcement.
     image builds.
   - [x] Success criteria: the release image runs as non-root and exposes
     stable health endpoints on port 8080.
-- [x] 6.1.2 Add a Helm chart compatible with local preview and GitOps
+- [x] 7.1.2 Add a Helm chart compatible with local preview and GitOps
   (Git-based operations).
   - [x] Create `charts/corbusier` with deployment, service, ingress,
     ConfigMap, ServiceAccount, PDB, and `ExternalSecret` templates.
   - [x] Add a values schema and local preview values file.
   - [x] Success criteria: the chart can render a hostless local ingress and a
     GitOps-friendly explicit-host ingress from the same values contract.
-- [x] 6.1.3 Add a local k3d (Kubernetes in Docker) lifecycle workflow.
+- [x] 7.1.3 Add a local k3d (Kubernetes in Docker) lifecycle workflow.
   - [x] Create `scripts/local_k8s.py` and the supporting `scripts/local_k8s/`
     package using Cyclopts and `plumbum`.
   - [x] Add `make local-k8s-up`, `local-k8s-status`, `local-k8s-logs`, and
