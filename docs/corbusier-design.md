@@ -1193,7 +1193,7 @@ sequenceDiagram
             opt session was newly reserved
                 Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
                 alt expire_persist_and_teardown fails
-                    Orchestrator->>Orchestrator: warn_cleanup_failure(cleanup_err, session)
+                    Orchestrator->>Orchestrator: warn_cleanup_failure(cleanup_err, backend_id, session)
                 end
             end
             Orchestrator-->>Caller: error SessionRepository(upsert_error)
