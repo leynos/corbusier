@@ -12,6 +12,11 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+enum ToolConfiguration {
+    Response(Value),
+    Failure(String),
+}
+
 #[derive(Debug, Default)]
 struct InMemoryToolRouterState {
     responses: HashMap<String, Value>,
@@ -46,6 +51,26 @@ impl InMemoryToolRouter {
         Ok(self.state.write().map_err(Self::map_lock_err)?)
     }
 
+    fn configure_tool(
+        &self,
+        tool_name: impl Into<String>,
+        config: ToolConfiguration,
+    ) -> ToolRoutingResult<()> {
+        let key = tool_name.into().trim().to_owned();
+        let mut state = self.write_state()?;
+        match config {
+            ToolConfiguration::Response(output) => {
+                state.failures.remove(&key);
+                state.responses.insert(key, output);
+            }
+            ToolConfiguration::Failure(message) => {
+                state.responses.remove(&key);
+                state.failures.insert(key, message);
+            }
+        }
+        Ok(())
+    }
+
     /// Creates a new router with empty configuration.
     #[must_use]
     pub fn new() -> Self {
@@ -63,11 +88,7 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         output: Value,
     ) -> ToolRoutingResult<()> {
-        let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.write_state()?;
-        state.failures.remove(&tool_name_key);
-        state.responses.insert(tool_name_key, output);
-        Ok(())
+        self.configure_tool(tool_name, ToolConfiguration::Response(output))
     }
 
     /// Configures a failure for a tool name.
@@ -81,11 +102,7 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         message: impl Into<String>,
     ) -> ToolRoutingResult<()> {
-        let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.write_state()?;
-        state.responses.remove(&tool_name_key);
-        state.failures.insert(tool_name_key, message.into());
-        Ok(())
+        self.configure_tool(tool_name, ToolConfiguration::Failure(message.into()))
     }
 
     /// Returns call IDs in the order they were routed.
