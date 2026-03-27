@@ -1114,6 +1114,7 @@ erDiagram
 
     AGENT_TURN_SESSIONS {
         uuid id PK
+        uuid tenant_id
         uuid backend_id FK
         uuid conversation_id FK
         text runtime_session_id
@@ -1147,7 +1148,7 @@ sequenceDiagram
     participant ToolRouter as ToolRouterPort
     participant Runtime as AgentRuntimePort
 
-    Caller->>Orchestrator: execute_turn(ctx, ExecuteTurnRequest)
+    Caller->>Orchestrator: execute_turn(ctx, ExecuteAgentTurnRequest)
     activate Orchestrator
 
     Orchestrator->>BackendRegistry: find_by_id(ctx, backend_id)
@@ -1156,11 +1157,14 @@ sequenceDiagram
 
     Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotQuery)
     SessionRepo-->>Orchestrator: SessionSlotArbitration
-    note over Orchestrator,SessionRepo: Reused or Vacant or Expired
+    note over Orchestrator,SessionRepo: Reused or Reserved
 
-    alt Expired session
-        Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_session_id)
-        Runtime-->>Orchestrator: Result
+    alt SessionSlotArbitration::Reserved
+        opt prior_expired present
+            Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_session_id)
+            Runtime-->>Orchestrator: Result
+        end
+    else SessionSlotArbitration::Reused
     end
 
     Orchestrator->>MsgRepo: find_by_conversation(ctx, conversation_id)
@@ -1187,7 +1191,7 @@ sequenceDiagram
         end
         Orchestrator->>SessionRepo: upsert_session(ctx, TurnSession)
         SessionRepo-->>Orchestrator: Result
-        Orchestrator-->>Caller: ExecuteTurnResult
+        Orchestrator-->>Caller: ExecuteAgentTurnResponse
     else Runtime failure
         Orchestrator->>SessionRepo: upsert_session(ctx, failed TurnSession)
         SessionRepo-->>Orchestrator: Result
