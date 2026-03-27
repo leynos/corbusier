@@ -1161,7 +1161,7 @@ sequenceDiagram
 
     alt SessionSlotArbitration::Reserved
         opt prior_expired present
-            Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_session_id)
+            Orchestrator->>Runtime: teardown_session(backend, runtime_session_id)
             Runtime-->>Orchestrator: Result
         end
     else SessionSlotArbitration::Reused
@@ -1176,30 +1176,34 @@ sequenceDiagram
     Orchestrator->>Runtime: execute_turn(ctx, RuntimeTurnRequest, ToolRouter)
     activate Runtime
     loop per scripted tool call
-        Runtime->>ToolRouter: call_tool(ctx, tool_name, parameters)
-        ToolRouter-->>Runtime: ToolCallResult
+        Runtime->>ToolRouter: route_tool_call(call_id, ToolCallRequest)
+        ToolRouter-->>Runtime: ToolRoutingResult
     end
     Runtime-->>Orchestrator: RuntimeTurnResult
     deactivate Runtime
 
     alt Runtime success
-        loop for each GeneratedTurnMessage
-            Orchestrator->>MsgRepo: next_sequence_number(ctx, conversation_id)
-            MsgRepo-->>Orchestrator: SequenceNumber
-            Orchestrator->>MsgRepo: store(ctx, Message)
-            MsgRepo-->>Orchestrator: Result
-        end
         Orchestrator->>SessionRepo: upsert_session(ctx, TurnSession)
-        SessionRepo-->>Orchestrator: Result
-        Orchestrator-->>Caller: ExecuteAgentTurnResponse
+        alt upsert_session succeeds
+            SessionRepo-->>Orchestrator: Result
+            Orchestrator-->>Caller: ExecuteAgentTurnResponse
+        else upsert_session fails
+            SessionRepo-->>Orchestrator: error SessionRepository
+            opt session was newly reserved
+                Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
+                alt expire_persist_and_teardown fails
+                    Orchestrator->>Orchestrator: warn_cleanup_failure(cleanup_err, session)
+                end
+            end
+            Orchestrator-->>Caller: error SessionRepository(upsert_error)
+        end
     else Runtime failure
-        Orchestrator->>SessionRepo: upsert_session(ctx, failed TurnSession)
-        SessionRepo-->>Orchestrator: Result
-        Orchestrator->>MsgRepo: next_sequence_number(ctx, conversation_id)
-        MsgRepo-->>Orchestrator: SequenceNumber
-        Orchestrator->>MsgRepo: store(ctx, failure Message)
-        MsgRepo-->>Orchestrator: Result
-        Orchestrator-->>Caller: error Runtime
+        Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
+        alt expire_persist_and_teardown succeeds
+            Orchestrator-->>Caller: error Runtime
+        else expire_persist_and_teardown fails
+            Orchestrator-->>Caller: error cleanup
+        end
     end
 
     deactivate Orchestrator
