@@ -1,10 +1,17 @@
-//! Metadata summarisation helpers for hook-backed tool governance.
+//! Metadata summarization helpers for hook-backed tool governance.
 
 use crate::tool_registry::domain::{
     CatalogEntry, ToolCallOutcome, ToolCallRequest, ToolCallResult,
 };
 use serde_json::json;
 
+/// Builds the hook execution scope metadata for a tool-governance evaluation.
+///
+/// `request` supplies the call identity, tool name, parameters, and workflow
+/// metadata. `entry` supplies the resolved server identifier. `result`
+/// contributes a summarized outcome when available, or `null` when the tool has
+/// not executed yet. The returned JSON object always contains `call_id`,
+/// `tool_name`, `server_id`, `parameters`, `workflow_metadata`, and `result`.
 pub(super) fn build_scope_metadata(
     request: &ToolCallRequest,
     entry: &CatalogEntry,

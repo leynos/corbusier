@@ -14,9 +14,28 @@ model owned by the hook engine.
 
 ```rust
 pub struct HookExecutionScope {
-    pub task_id: Option<TaskId>,
-    pub conversation_id: Option<ConversationId>,
-    pub metadata: serde_json::Value,
+    task_id: Option<TaskId>,
+    conversation_id: Option<ConversationId>,
+    metadata: serde_json::Value,
+}
+
+impl HookExecutionScope {
+    pub const fn task_id(&self) -> Option<TaskId> { self.task_id }
+
+    pub const fn conversation_id(&self) -> Option<ConversationId> {
+        self.conversation_id
+    }
+
+    pub const fn metadata(&self) -> &serde_json::Value { &self.metadata }
+
+    pub const fn with_task_id(self, task_id: TaskId) -> Self { /* ... */ }
+
+    pub const fn with_conversation_id(
+        self,
+        conversation_id: ConversationId,
+    ) -> Self { /* ... */ }
+
+    pub fn with_metadata(self, metadata: serde_json::Value) -> Self { /* ... */ }
 }
 ```
 
@@ -68,9 +87,7 @@ pub trait ToolExecutionGovernance: Send + Sync {
     async fn observe_after_call(
         &self,
         ctx: &RequestContext,
-        request: &ToolCallRequest,
-        entry: &CatalogEntry,
-        result: &ToolCallResult,
+        completed: &CompletedToolCall<'_>,
     ) -> ToolGovernanceResult<()>;
 }
 ```
@@ -80,9 +97,19 @@ introduce a workflow-correlation scope rather than mutating `RequestContext`.
 
 ```rust
 pub struct ToolExecutionScope {
-    pub task_id: Option<TaskId>,
-    pub conversation_id: Option<ConversationId>,
-    pub metadata: serde_json::Value,
+    task_id: Option<TaskId>,
+    conversation_id: Option<ConversationId>,
+    metadata: serde_json::Value,
+}
+
+impl ToolExecutionScope {
+    pub const fn task_id(&self) -> Option<TaskId> { self.task_id }
+
+    pub const fn conversation_id(&self) -> Option<ConversationId> {
+        self.conversation_id
+    }
+
+    pub const fn metadata(&self) -> &serde_json::Value { &self.metadata }
 }
 ```
 

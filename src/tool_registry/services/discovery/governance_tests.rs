@@ -285,18 +285,15 @@ async fn execute_post_tool_use_observation(
         discovery,
     } = fixture;
     let conversation_id = ConversationId::new();
-    let action_id = HookActionId::new(action_id_str).expect("valid action id");
+    let action_id = HookActionId::new(action_id_str)?;
 
     definition_repo
         .insert(
             &ctx,
             tool_policy_definition(HookTriggerType::PostToolUse, &action_id)?,
         )
-        .await
-        .expect("insert post-tool policy definition should succeed");
-    action_executor
-        .set_output(action_id.as_str(), output)
-        .expect("configure post-tool output should succeed");
+        .await?;
+    action_executor.set_output(action_id.as_str(), output)?;
 
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
