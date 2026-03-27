@@ -100,11 +100,11 @@ cases.
   `migrations/2026-02-28-000000_add_mcp_servers_table/` and wired it into
   `tests/postgres/helpers.rs`.
 - [x] (2026-02-28 00:00Z) Added unit tests (`rstest`), in-memory integration
-  tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests
-  for lifecycle and tool-query behaviour.
+  tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests for
+  lifecycle and tool-query behaviour.
 - [x] (2026-02-28 00:00Z) Implemented lifecycle service operations:
-  `register`, `start`, `stop`, `refresh_health`, `list_all`,
-  `find_by_name`, and `list_tools`.
+  `register`, `start`, `stop`, `refresh_health`, `list_all`, `find_by_name`,
+  and `list_tools`.
 - [x] (2026-02-28 00:00Z) Ran core code gates successfully:
   `make check-fmt`, `make lint`, and `make test`.
 - [x] (2026-02-28 00:00Z) Ran documentation gates after final doc updates:

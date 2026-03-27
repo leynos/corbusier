@@ -231,14 +231,14 @@ metadata.
 
 Table 2.2.3.1: Allowed task state transitions for roadmap item 2.2.3.
 
-| From state | Allowed target states |
+| From state   | Allowed target states                     |
 | ------------ | ----------------------------------------- |
-| `Draft` | `InProgress`, `InReview`, `Abandoned` |
+| `Draft`      | `InProgress`, `InReview`, `Abandoned`     |
 | `InProgress` | `InReview`, `Paused`, `Done`, `Abandoned` |
-| `InReview` | `InProgress`, `Done`, `Abandoned` |
-| `Paused` | `InProgress`, `Abandoned` |
-| `Done` | *(terminal -- no outgoing transitions)* |
-| `Abandoned` | *(terminal -- no outgoing transitions)* |
+| `InReview`   | `InProgress`, `Done`, `Abandoned`         |
+| `Paused`     | `InProgress`, `Abandoned`                 |
+| `Done`       | *(terminal -- no outgoing transitions)*   |
+| `Abandoned`  | *(terminal -- no outgoing transitions)*   |
 
 Self-transitions (e.g., `Draft` -> `Draft`) are not permitted.
 
@@ -403,9 +403,8 @@ F2. Add "Task state transitions" section to `docs/users-guide.md` after "Branch
 and pull request association". Include a code example showing valid transition,
 invalid transition (error), and the state machine table.
 
-F3. Update the `docs/roadmap.md` 2.2.3 checkbox block: change `- [ ] 2.2.3`
-to `- [x] 2.2.3`
-and all three sub-checkboxes to `[x]`.
+F3. Update the `docs/roadmap.md` 2.2.3 checkbox block: change `- [ ] 2.2.3` to
+`- [x] 2.2.3` and all three sub-checkboxes to `[x]`.
 
 F4. Record design decisions in `docs/corbusier-design.md` noting that 2.2.3
 uses `can_transition_to` predicate on `TaskState` and `InvalidStateTransition`
@@ -493,34 +492,34 @@ re-running `make all` from the repository root will identify remaining issues.
 
 Table 2.2.3.2: New files added for this implementation.
 
-| File | Purpose |
+| File                                                     | Purpose                      |
 | -------------------------------------------------------- | ---------------------------- |
-| `docs/execplans/2-2-3-enforce-task-state-transitions.md` | This ExecPlan |
-| `src/task/tests/state_transition_tests.rs` | Unit tests for state machine |
-| `tests/features/task_state_transitions.feature` | BDD feature file |
-| `tests/task_state_transition_steps.rs` | BDD scenario runner |
-| `tests/task_state_transition_steps/mod.rs` | Step definitions module |
-| `tests/task_state_transition_steps/world.rs` | BDD world struct |
-| `tests/task_state_transition_steps/given.rs` | Given step definitions |
-| `tests/task_state_transition_steps/when.rs` | When step definitions |
-| `tests/task_state_transition_steps/then.rs` | Then step definitions |
+| `docs/execplans/2-2-3-enforce-task-state-transitions.md` | This ExecPlan                |
+| `src/task/tests/state_transition_tests.rs`               | Unit tests for state machine |
+| `tests/features/task_state_transitions.feature`          | BDD feature file             |
+| `tests/task_state_transition_steps.rs`                   | BDD scenario runner          |
+| `tests/task_state_transition_steps/mod.rs`               | Step definitions module      |
+| `tests/task_state_transition_steps/world.rs`             | BDD world struct             |
+| `tests/task_state_transition_steps/given.rs`             | Given step definitions       |
+| `tests/task_state_transition_steps/when.rs`              | When step definitions        |
+| `tests/task_state_transition_steps/then.rs`              | Then step definitions        |
 
 ### Modified files (10)
 
 Table 2.2.3.3: Existing files modified for this implementation.
 
-| File | Change |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `src/task/domain/error.rs` | Add `InvalidStateTransition` variant |
-| `src/task/domain/task.rs` | Add transition helpers and update `associate_pull_request` |
-| `src/task/services/lifecycle.rs` | Add request type, `transition_task`, and `InvalidState` |
-| `src/task/services/mod.rs` | Add `TransitionTaskRequest` to re-exports |
-| `src/task/tests/mod.rs` | Add `mod state_transition_tests;` |
-| `src/task/mod.rs` | Update module doc comment |
-| `tests/in_memory/task_lifecycle_tests.rs` | Add state transition integration tests |
-| `docs/users-guide.md` | Add "Task state transitions" section |
-| `docs/roadmap.md` | Mark 2.2.3 as complete |
-| `docs/corbusier-design.md` | Record 2.2.3 implementation decisions |
+| File                                      | Change                                                     |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| `src/task/domain/error.rs`                | Add `InvalidStateTransition` variant                       |
+| `src/task/domain/task.rs`                 | Add transition helpers and update `associate_pull_request` |
+| `src/task/services/lifecycle.rs`          | Add request type, `transition_task`, and `InvalidState`    |
+| `src/task/services/mod.rs`                | Add `TransitionTaskRequest` to re-exports                  |
+| `src/task/tests/mod.rs`                   | Add `mod state_transition_tests;`                          |
+| `src/task/mod.rs`                         | Update module doc comment                                  |
+| `tests/in_memory/task_lifecycle_tests.rs` | Add state transition integration tests                     |
+| `docs/users-guide.md`                     | Add "Task state transitions" section                       |
+| `docs/roadmap.md`                         | Mark 2.2.3 as complete                                     |
+| `docs/corbusier-design.md`                | Record 2.2.3 implementation decisions                      |
 
 Total: 19 files (9 new + 10 modified).
 

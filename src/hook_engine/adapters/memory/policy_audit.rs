@@ -16,6 +16,13 @@ pub struct InMemoryHookPolicyAuditRepository {
     events: Arc<RwLock<HashMap<TenantId, Vec<PolicyAuditEvent>>>>,
 }
 
+#[derive(Clone)]
+enum QueryKey {
+    Task(TaskId),
+    Conversation(ConversationId),
+    Trigger(TriggerContextId),
+}
+
 impl InMemoryHookPolicyAuditRepository {
     /// Creates an empty in-memory policy audit repository.
     #[must_use]
@@ -49,6 +56,26 @@ impl InMemoryHookPolicyAuditRepository {
         Self::sort_events(&mut filtered);
         Ok(filtered)
     }
+
+    async fn query_by_key(
+        &self,
+        ctx: &RequestContext,
+        key: QueryKey,
+    ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
+        self.filter_tenant_events(ctx, {
+            let query_key = key.clone();
+            move |event| match &query_key {
+                QueryKey::Task(task_id) => event.task_id() == Some(*task_id),
+                QueryKey::Conversation(conversation_id) => {
+                    event.conversation_id() == Some(*conversation_id)
+                }
+                QueryKey::Trigger(trigger_context_id) => {
+                    event.trigger_context_id() == *trigger_context_id
+                }
+            }
+        })
+        .await
+    }
 }
 
 #[async_trait]
@@ -75,8 +102,7 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         task_id: TaskId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        self.filter_tenant_events(ctx, |event| event.task_id() == Some(task_id))
-            .await
+        self.query_by_key(ctx, QueryKey::Task(task_id)).await
     }
 
     async fn find_by_conversation(
@@ -84,10 +110,8 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        self.filter_tenant_events(ctx, |event| {
-            event.conversation_id() == Some(conversation_id)
-        })
-        .await
+        self.query_by_key(ctx, QueryKey::Conversation(conversation_id))
+            .await
     }
 
     async fn find_by_trigger_context(
@@ -95,9 +119,7 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         trigger_context_id: TriggerContextId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        self.filter_tenant_events(ctx, |event| {
-            event.trigger_context_id() == trigger_context_id
-        })
-        .await
+        self.query_by_key(ctx, QueryKey::Trigger(trigger_context_id))
+            .await
     }
 }

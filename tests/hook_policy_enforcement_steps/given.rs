@@ -79,18 +79,22 @@ fn prepare_runtime(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     Ok(())
 }
 
+fn run_policy_setup(world: &mut HookPolicyWorld, setup: HookSetup) -> Result<(), eyre::Report> {
+    configure_hook(world, setup)?;
+    prepare_runtime(world)
+}
+
 #[given("a pre-tool-use policy hook permits tool calls")]
 fn pre_tool_use_policy_permits(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
-    configure_hook(
+    run_policy_setup(
         world,
         HookSetup {
-            hook_id: "pre-tool-allow",
+            hook_id: "pre-tool-permit",
             trigger: HookTriggerType::PreToolUse,
             action_id: "pre-tool-allow-action",
             output: json!({"decision": "allow"}),
         },
-    )?;
-    prepare_runtime(world)
+    )
 }
 
 #[given("a pre-tool-use policy hook denies tool calls")]
@@ -115,7 +119,7 @@ fn pre_tool_use_policy_denies(world: &mut HookPolicyWorld) -> Result<(), eyre::R
 
 #[given("a post-tool-use policy hook records an allow decision")]
 fn post_tool_use_policy_records_allow(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
-    configure_hook(
+    run_policy_setup(
         world,
         HookSetup {
             hook_id: "post-tool-allow",
@@ -123,15 +127,14 @@ fn post_tool_use_policy_records_allow(world: &mut HookPolicyWorld) -> Result<(),
             action_id: "post-tool-allow-action",
             output: json!({"decision": "allow"}),
         },
-    )?;
-    prepare_runtime(world)
+    )
 }
 
 #[given("a pre-tool-use policy hook emits an invalid payload")]
 fn pre_tool_use_policy_emits_invalid_payload(
     world: &mut HookPolicyWorld,
 ) -> Result<(), eyre::Report> {
-    configure_hook(
+    run_policy_setup(
         world,
         HookSetup {
             hook_id: "pre-tool-invalid",
@@ -139,6 +142,5 @@ fn pre_tool_use_policy_emits_invalid_payload(
             action_id: "pre-tool-invalid-action",
             output: json!({"status": "invalid"}),
         },
-    )?;
-    prepare_runtime(world)
+    )
 }
