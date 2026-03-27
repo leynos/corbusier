@@ -2,7 +2,6 @@
 
 use diesel::Connection;
 use diesel::PgConnection;
-use diesel::RunQueryDsl;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use rstest::{fixture, rstest};
 use uuid::Uuid;
@@ -318,4 +317,3 @@ fn insert_context_snapshot_conversation_case(
         },
     )
 }
-

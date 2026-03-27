@@ -26,7 +26,9 @@ use crate::message::{
 };
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::{FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx};
+use super::tenant_tx::{
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
+};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper

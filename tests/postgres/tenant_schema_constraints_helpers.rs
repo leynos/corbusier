@@ -4,8 +4,8 @@
 //! database-level foreign key constraints.
 
 use corbusier::test_support::bootstrap_tenant_row as ensure_tenant_exists;
-use diesel::pg::PgConnection;
 use diesel::RunQueryDsl;
+use diesel::pg::PgConnection;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -108,7 +108,10 @@ pub(crate) fn insert_agent_session(
     .execute(conn)
 }
 
-pub(crate) fn insert_handoff(conn: &mut PgConnection, params: HandoffInsert) -> diesel::QueryResult<usize> {
+pub(crate) fn insert_handoff(
+    conn: &mut PgConnection,
+    params: HandoffInsert,
+) -> diesel::QueryResult<usize> {
     ensure_tenant_exists(conn, params.tenant)?;
     diesel::sql_query(concat!(
         "INSERT INTO handoffs (",

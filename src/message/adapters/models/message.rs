@@ -77,8 +77,12 @@ impl NewMessage {
         let metadata = serde_json::to_value(message.metadata())
             .map_err(|e| RepositoryError::serialization(e.to_string()))?;
 
-        let sequence_number = i64::try_from(message.sequence_number().value())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+        let raw_sequence = message.sequence_number().value();
+        let sequence_number = i64::try_from(raw_sequence).map_err(|_| {
+            RepositoryError::serialization(format!(
+                "sequence_number out of range for i64: {raw_sequence}"
+            ))
+        })?;
 
         Ok(Self {
             id: message.id().into_inner(),
