@@ -31,24 +31,20 @@ pub struct InMemoryToolRouter {
 }
 
 impl InMemoryToolRouter {
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "RwLock poison errors are produced by value and converted immediately"
-    )]
-    fn map_lock_err<T>(err: std::sync::PoisonError<T>) -> ToolRoutingInfrastructureError {
+    fn map_lock_err<T>(err: &std::sync::PoisonError<T>) -> ToolRoutingInfrastructureError {
         ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string())
     }
 
     fn read_state(
         &self,
     ) -> ToolRoutingResult<std::sync::RwLockReadGuard<'_, InMemoryToolRouterState>> {
-        Ok(self.state.read().map_err(Self::map_lock_err)?)
+        Ok(self.state.read().map_err(|err| Self::map_lock_err(&err))?)
     }
 
     fn write_state(
         &self,
     ) -> ToolRoutingResult<std::sync::RwLockWriteGuard<'_, InMemoryToolRouterState>> {
-        Ok(self.state.write().map_err(Self::map_lock_err)?)
+        Ok(self.state.write().map_err(|err| Self::map_lock_err(&err))?)
     }
 
     fn configure_tool(
