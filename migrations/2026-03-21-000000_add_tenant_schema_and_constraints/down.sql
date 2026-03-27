@@ -1,5 +1,54 @@
 BEGIN;
 
+-- Preflight: abort rollback if multi-tenant data would violate global UNIQUE indexes.
+-- The up migration scopes uniqueness by tenant, so rolling back to global uniqueness
+-- will fail if multiple tenants share the same issue reference or backend name.
+DO $$
+DECLARE
+    _task_duplicates INTEGER;
+    _backend_duplicates INTEGER;
+BEGIN
+    -- Check for duplicate issue references across tenants
+    SELECT COUNT(*)
+      INTO _task_duplicates
+      FROM (
+        SELECT
+            origin->'issue_ref'->>'provider' AS provider,
+            origin->'issue_ref'->>'repository' AS repository,
+            (origin->'issue_ref'->>'issue_number')::BIGINT AS issue_number,
+            COUNT(DISTINCT tenant_id) AS tenant_count
+        FROM tasks
+        WHERE origin->>'type' = 'issue'
+        GROUP BY provider, repository, issue_number
+        HAVING COUNT(DISTINCT tenant_id) > 1
+      ) duplicates;
+
+    IF _task_duplicates > 0 THEN
+        RAISE EXCEPTION 'Cannot rollback: % issue reference(s) exist in multiple tenants. '
+            'Global UNIQUE constraint idx_tasks_issue_origin_unique would fail. '
+            'Remediate cross-tenant duplicates or accept irreversibility.',
+            _task_duplicates;
+    END IF;
+
+    -- Check for duplicate backend names across tenants
+    SELECT COUNT(*)
+      INTO _backend_duplicates
+      FROM (
+        SELECT name, COUNT(DISTINCT tenant_id) AS tenant_count
+        FROM backend_registrations
+        GROUP BY name
+        HAVING COUNT(DISTINCT tenant_id) > 1
+      ) duplicates;
+
+    IF _backend_duplicates > 0 THEN
+        RAISE EXCEPTION 'Cannot rollback: % backend name(s) exist in multiple tenants. '
+            'Global UNIQUE constraint idx_backend_registrations_name would fail. '
+            'Remediate cross-tenant duplicates or accept irreversibility.',
+            _backend_duplicates;
+    END IF;
+END
+$$;
+
 ALTER TABLE agent_sessions
     DROP CONSTRAINT IF EXISTS agent_sessions_terminated_by_handoff_fk;
 ALTER TABLE agent_sessions
