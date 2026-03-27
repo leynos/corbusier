@@ -1092,6 +1092,10 @@ For screen readers: The following entity-relationship diagram shows how backend
 registrations and conversations each own zero or more agent turn sessions used
 for orchestrated backend execution state.
 
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.3.2: Entity-relationship diagram showing backend registrations,
+conversations, and agent turn sessions.
+
 ```mermaid
 erDiagram
     BACKEND_REGISTRATIONS {
@@ -1112,27 +1116,26 @@ erDiagram
         uuid id PK
         uuid backend_id FK
         uuid conversation_id FK
-        text runtime_handle
+        text runtime_session_id
         varchar status
         int turn_count
         timestamptz started_at
         timestamptz last_used_at
         timestamptz expires_at
         timestamptz ended_at
-        text failure_reason
     }
 
     BACKEND_REGISTRATIONS ||--o{ AGENT_TURN_SESSIONS : has
     CONVERSATIONS ||--o{ AGENT_TURN_SESSIONS : has
 ```
 
-_Figure 2.2.3.2: Entity-relationship diagram showing backend registrations,
-conversations, and agent turn sessions._
-
 For screen readers: The following sequence diagram shows the high-level flow
 for `execute_turn`, from backend lookup and session arbitration through message
 loading, tool routing, runtime execution, and persistence of either success or
 failure outcomes.
+
+<!-- markdownlint-disable MD031 -->
+Figure 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration flow.
 
 ```mermaid
 sequenceDiagram
@@ -1156,7 +1159,7 @@ sequenceDiagram
     note over Orchestrator,SessionRepo: Reused or Vacant or Expired
 
     alt Expired session
-        Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_handle)
+        Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_session_id)
         Runtime-->>Orchestrator: Result
     end
 
@@ -1197,9 +1200,6 @@ sequenceDiagram
 
     deactivate Orchestrator
 ```
-
-_Figure 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration
-flow._
 
 #### 2.2.4 Tool Orchestration Requirements
 
