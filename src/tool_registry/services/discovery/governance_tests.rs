@@ -18,7 +18,7 @@ use crate::tool_registry::adapters::{
 };
 use crate::tool_registry::domain::{
     LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport, ToolCallRequest,
-    ToolRegistryDomainError,
+    ToolCallResult, ToolRegistryDomainError,
 };
 use crate::tool_registry::ports::ToolExecutionGovernance;
 use crate::tool_registry::services::{
@@ -27,7 +27,7 @@ use crate::tool_registry::services::{
 };
 use eyre::Result;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -165,6 +165,11 @@ impl GovernanceTestFixture {
     }
 }
 
+#[fixture]
+fn governance_test_fixture() -> GovernanceTestFixture {
+    GovernanceTestFixture::new()
+}
+
 fn tool_policy_definition(
     trigger_type: HookTriggerType,
     action_id: &HookActionId,
@@ -187,7 +192,9 @@ fn tool_policy_definition(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<()> {
+async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit(
+    governance_test_fixture: GovernanceTestFixture,
+) -> Result<()> {
     let GovernanceTestFixture {
         ctx,
         host,
@@ -196,7 +203,7 @@ async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<(
         action_executor,
         policy_audit,
         discovery,
-    } = GovernanceTestFixture::new();
+    } = governance_test_fixture;
     let task_id = TaskId::new();
     let conversation_id = ConversationId::new();
 
@@ -258,9 +265,16 @@ async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<(
     Ok(())
 }
 
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Result<()> {
+async fn execute_post_tool_use_observation(
+    fixture: GovernanceTestFixture,
+    action_id_str: &str,
+    output: serde_json::Value,
+) -> Result<(
+    crate::context::RequestContext,
+    InMemoryHookPolicyAuditRepository,
+    ConversationId,
+    ToolCallResult,
+)> {
     let GovernanceTestFixture {
         ctx,
         host,
@@ -269,10 +283,10 @@ async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Resul
         action_executor,
         policy_audit,
         discovery,
-    } = GovernanceTestFixture::new();
+    } = fixture;
     let conversation_id = ConversationId::new();
+    let action_id = HookActionId::new(action_id_str).expect("valid action id");
 
-    let action_id = HookActionId::new("invalid-post-tool-action").expect("valid action id");
     definition_repo
         .insert(
             &ctx,
@@ -281,8 +295,8 @@ async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Resul
         .await
         .expect("insert post-tool policy definition should succeed");
     action_executor
-        .set_output(action_id.as_str(), json!({"status": "invalid"}))
-        .expect("configure invalid post-tool output should succeed");
+        .set_output(action_id.as_str(), output)
+        .expect("configure post-tool output should succeed");
 
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     setup_success_result(&host)?;
@@ -291,6 +305,20 @@ async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Resul
         ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock)
             .with_conversation_id(conversation_id);
     let result = discovery.call_tool(&ctx, &request).await?;
+    Ok((ctx, policy_audit, conversation_id, result))
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn invalid_post_tool_payload_does_not_fail_successful_tool_call(
+    governance_test_fixture: GovernanceTestFixture,
+) -> Result<()> {
+    let (ctx, policy_audit, conversation_id, result) = execute_post_tool_use_observation(
+        governance_test_fixture,
+        "invalid-post-tool-action",
+        json!({"status": "invalid"}),
+    )
+    .await?;
 
     assert!(result.outcome().is_success());
     let events = policy_audit
@@ -306,40 +334,15 @@ async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Resul
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn post_tool_use_observation_records_audit_event() -> Result<()> {
-    let GovernanceTestFixture {
-        ctx,
-        host,
-        lifecycle,
-        definition_repo,
-        action_executor,
-        policy_audit,
-        discovery,
-    } = GovernanceTestFixture::new();
-    let conversation_id = ConversationId::new();
-
-    let action_id = HookActionId::new("allow-action").expect("valid action id");
-    definition_repo
-        .insert(
-            &ctx,
-            tool_policy_definition(HookTriggerType::PostToolUse, &action_id)?,
-        )
-        .await
-        .expect("insert post-tool definition should succeed");
-    action_executor
-        .set_output(action_id.as_str(), json!({"decision": "allow"}))
-        .expect("configure post-tool output should succeed");
-
-    register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
-    setup_success_result(&host)?;
-
-    let request =
-        ToolCallRequest::new("read_file", json!({"path": "/tmp/test.txt"}), &DefaultClock)
-            .with_conversation_id(conversation_id);
-    let result = discovery
-        .call_tool(&ctx, &request)
-        .await
-        .expect("allowed tool call should succeed");
+async fn post_tool_use_observation_records_audit_event(
+    governance_test_fixture: GovernanceTestFixture,
+) -> Result<()> {
+    let (ctx, policy_audit, conversation_id, result) = execute_post_tool_use_observation(
+        governance_test_fixture,
+        "allow-action",
+        json!({"decision": "allow"}),
+    )
+    .await?;
     assert!(result.outcome().is_success());
 
     let by_conversation = policy_audit

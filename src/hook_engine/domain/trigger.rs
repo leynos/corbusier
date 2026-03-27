@@ -240,8 +240,8 @@ impl HookTriggerContext {
 
     /// Creates a trigger context with an explicit timestamp.
     ///
-    /// Example: `new_with_timestamp(trigger, Value::Null, timestamp)` uses the
-    /// supplied time.
+    /// Example: `new_with_timestamp(trigger, HookExecutionScope::default(),
+    /// timestamp)` uses the supplied time.
     #[must_use]
     pub fn new_with_timestamp(
         trigger_type: HookTriggerType,

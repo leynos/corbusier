@@ -336,5 +336,19 @@ async fn postgres_policy_audit_is_queryable_and_tenant_scoped(
             .expect("cross-tenant query succeeds")
             .is_empty()
     );
+    assert!(
+        ctx.policy_audit
+            .find_by_conversation(&tenant_b, conversation_id)
+            .await
+            .expect("cross-tenant conversation query succeeds")
+            .is_empty()
+    );
+    assert!(
+        ctx.policy_audit
+            .find_by_trigger_context(&tenant_b, trigger_context_id)
+            .await
+            .expect("cross-tenant trigger query succeeds")
+            .is_empty()
+    );
     Ok(())
 }

@@ -107,7 +107,7 @@ Observable operator outcome:
 
 - [x] (2026-03-21 00:00Z) Gathered roadmap, design, testing, and
       architecture context; drafted this ExecPlan.
-- [x] Stage A: finalised the domain model for enforcement scope and policy
+- [x] Stage A: finalized the domain model for enforcement scope and policy
       audit projection.
 - [x] Stage B: implemented hook-engine policy audit persistence and query
       service, including the PostgreSQL migration.
@@ -153,7 +153,7 @@ Observable operator outcome:
 - Add typed execution-scope models for hook-trigger and tool-call workflow
   correlation.
 - Add the hook-owned policy-audit domain model and projection logic.
-- Prove execution-scope construction, policy-audit normalisation, and
+- Prove execution-scope construction, policy-audit normalization, and
   invalid policy output handling with focused unit tests.
 
 ### Stage B: add hook-engine policy-audit persistence and query services
@@ -210,7 +210,7 @@ Quality criteria:
   database version must be bumped whenever the migration list changes.
 - Re-running focused tests is the first retry path after any failure.
 - If `make fmt` rewrites unrelated Markdown files, restore unrelated churn
-  before finalising.
+  before finalizing.
 - If PostgreSQL tests appear to use an old schema, verify that
   `tests/postgres/helpers.rs:TEMPLATE_DB` was bumped and the migration list was
   updated in order.

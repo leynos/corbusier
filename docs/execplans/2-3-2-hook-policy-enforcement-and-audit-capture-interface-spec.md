@@ -1,8 +1,8 @@
 # 2.3.2 hook policy enforcement and audit capture: interface specification
 
 This companion document holds the detailed interface sketches that were removed
-from the primary ExecPlan to keep the roadmap-level file under the repository
-400-line limit.
+from the primary execution plan (ExecPlan) to keep the roadmap-level file under
+the repository 400-line limit.
 
 ## Interfaces and dependencies
 
