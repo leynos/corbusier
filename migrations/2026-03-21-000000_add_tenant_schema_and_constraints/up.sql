@@ -140,6 +140,12 @@ CREATE UNIQUE INDEX idx_agent_sessions_one_active_per_conversation
     ON agent_sessions (tenant_id, conversation_id)
     WHERE state = 'active';
 
+CREATE INDEX idx_context_snapshots_tenant_session_captured_at
+    ON context_snapshots (tenant_id, session_id, captured_at);
+
+CREATE INDEX idx_context_snapshots_tenant_conversation_captured_at
+    ON context_snapshots (tenant_id, conversation_id, captured_at);
+
 -- Create composite foreign key constraints
 ALTER TABLE conversations
     ADD CONSTRAINT conversations_task_fk

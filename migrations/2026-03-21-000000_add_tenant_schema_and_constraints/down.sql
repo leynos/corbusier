@@ -21,6 +21,8 @@ ALTER TABLE messages
 ALTER TABLE conversations
     DROP CONSTRAINT IF EXISTS conversations_task_fk;
 
+DROP INDEX IF EXISTS idx_context_snapshots_tenant_conversation_captured_at;
+DROP INDEX IF EXISTS idx_context_snapshots_tenant_session_captured_at;
 DROP INDEX IF EXISTS idx_agent_sessions_one_active_per_conversation;
 DROP INDEX IF EXISTS idx_agent_sessions_conversation_id;
 DROP INDEX IF EXISTS idx_messages_tenant_conversation_sequence;
