@@ -1,4 +1,4 @@
-# Orchestrate agent turn execution and sessions (roadmap 1.3.2)
+# Orchestrate agent turn execution and sessions (roadmap 2.3.2)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -7,7 +7,7 @@ proceeds.
 
 Status: COMPLETE
 
-This plan covers roadmap item 1.3.2 in [docs/roadmap.md](../roadmap.md):
+This plan covers roadmap item 2.3.2 in [docs/roadmap.md](../roadmap.md):
 
 - Coordinate turn execution with tool calls and responses.
 - Maintain session state and expiry rules.
@@ -39,8 +39,8 @@ Observable outcomes:
   - Ports in `src/agent_backend/ports/` define contracts only.
   - Adapters in `src/agent_backend/adapters/` implement ports and contain
     infrastructure concerns.
-- Do not regress roadmap 1.3.1 behaviour in backend registration and discovery.
-- Keep canonical message semantics compatible with roadmap 1.1.1 types and
+- Do not regress roadmap 2.3.1 behaviour in backend registration and discovery.
+- Keep canonical message semantics compatible with roadmap 2.1.1 types and
   validation guarantees.
 - Use `rstest` for unit and integration tests, and `rstest-bdd` for behavioural
   scenarios where end-user behaviour is expressed.
@@ -48,10 +48,10 @@ Observable outcomes:
 - Keep every Rust source file under 400 lines by extracting helper modules.
 - Maintain strict lints (`-D warnings` via `make lint`) and avoid suppression
   unless unavoidable and narrowly scoped with reason.
-- Update `docs/corbusier-design.md` with roadmap 1.3.2 implementation
+- Update `docs/corbusier-design.md` with roadmap 2.3.2 implementation
   decisions.
 - Update `docs/users-guide.md` with user-visible turn/session behaviour.
-- Mark roadmap entry 1.3.2 complete in `docs/roadmap.md` only after all
+- Mark roadmap entry 2.3.2 complete in `docs/roadmap.md` only after all
   validation gates pass.
 
 ## Tolerances (exception triggers)
@@ -74,14 +74,14 @@ Observable outcomes:
 - Risk: Session orchestration semantics overlap existing
   `message::domain::AgentSession` handoff sessions, creating duplication or
   conflicting state transitions. Severity: high Likelihood: medium Mitigation:
-  define one session authority for 1.3.2 and enforce it through a dedicated
+  define one session authority for 2.3.2 and enforce it through a dedicated
   port; add regression tests for handoff scenarios to ensure no behavioural
   drift.
 
-- Risk: Tool routing contracts are underspecified before roadmap 2.1.1 (MCP
+- Risk: Tool routing contracts are underspecified before roadmap 3.1.1 (MCP
   lifecycle) lands. Severity: medium Likelihood: high Mitigation: define a
   narrow `ToolRouterPort` for deterministic routing and stubbed execution now,
-  with schema translation deferred to roadmap 1.3.3.
+  with schema translation deferred to roadmap 2.3.3.
 
 - Risk: Expiry logic can become time-flaky if wall-clock access is not
   injected. Severity: medium Likelihood: medium Mitigation: use
@@ -95,27 +95,27 @@ Observable outcomes:
 ## Progress
 
 - [x] (2026-02-28 13:09Z) Reviewed roadmap/design/testing docs and existing
-      1.3.1 implementation to draft this ExecPlan.
+  2.3.1 implementation to draft this ExecPlan.
 - [x] (2026-03-03 09:44Z) Execution phase approved and implementation started.
-- [x] (2026-03-03 11:58Z) Stage A: Finalize 1.3.2 domain model and port
-      contracts.
+- [x] (2026-03-03 11:58Z) Stage A: Finalize 2.3.2 domain model and port
+  contracts.
 - [x] (2026-03-03 12:06Z) Stage B: Add failing unit and behavioural tests (red
-      phase).
+  phase).
 - [x] (2026-03-03 12:20Z) Stage C: Implement orchestration service and
-      in-memory adapters.
+  in-memory adapters.
 - [x] (2026-03-03 12:31Z) Stage D: Implement Postgres adapter updates and
-      migration updates if needed.
+  migration updates if needed.
 - [x] (2026-03-03 12:38Z) Stage E: Add Postgres integration coverage with
-      `pg-embedded-setup-unpriv` fixtures.
+  `pg-embedded-setup-unpriv` fixtures.
 - [x] (2026-03-03 12:47Z) Stage F: Update user/design docs and mark roadmap
-      item done.
+  item done.
 - [x] (2026-03-03 12:58Z) Stage G: Run full quality gates and capture evidence
-      logs.
+  logs.
 
 ## Surprises & Discoveries
 
 - Existing code already contains `message` session persistence and handoff
-  workflows (`agent_sessions`, `handoffs`, `context_snapshots`). 1.3.2 must
+  workflows (`agent_sessions`, `handoffs`, `context_snapshots`). 2.3.2 must
   avoid creating a second competing session lifecycle.
 - `docs/corbusier-design.md` defines the `AgentBackend` runtime trait and turn
   flow at conceptual level, but concrete Rust module/file mapping is not yet
@@ -126,10 +126,10 @@ Observable outcomes:
 
 ## Decision log
 
-- Decision: Implement 1.3.2 in the `agent_backend` module as the orchestration
+- Decision: Implement 2.3.2 in the `agent_backend` module as the orchestration
   home, while integrating with canonical message/session types through explicit
   ports rather than direct adapter coupling. Rationale: keeps roadmap ownership
-  aligned with section 1.3 while preserving hexagonal boundaries and avoiding
+  aligned with section 2.3 while preserving hexagonal boundaries and avoiding
   service-level imports of adapter internals. Date/Author: 2026-02-28 / plan
   author.
 
@@ -138,7 +138,7 @@ Observable outcomes:
   and explicit behaviour for rotation, continuation, and cleanup paths.
   Date/Author: 2026-02-28 / plan author.
 
-- Decision: Persist 1.3.2 session continuity in a dedicated
+- Decision: Persist 2.3.2 session continuity in a dedicated
   `agent_turn_sessions` table rather than reusing `message::agent_sessions`.
   Rationale: avoids crossing bounded-context concerns and keeps orchestration
   ownership in `agent_backend`. Date/Author: 2026-03-03 / implementation author.
@@ -155,7 +155,7 @@ Observable outcomes:
 
 ## Outcomes & Retrospective
 
-Delivered behaviour against 1.3.2 success criteria:
+Delivered behaviour against 2.3.2 success criteria:
 
 - Turn execution is coordinated end-to-end through
   `AgentTurnOrchestratorService`, including runtime turn calls, deterministic
@@ -183,7 +183,7 @@ Validation evidence:
 
 Deferred work:
 
-- Tool schema translation remains in roadmap 1.3.3 by design.
+- Tool schema translation remains in roadmap 2.3.3 by design.
 - The partial unique index created in
   `migrations/2026-03-13-000000_tenant_scope_agent_backend/up.sql` now covers
   `status IN ('active', 'reserved')`, so concurrent reservation claims are
@@ -191,10 +191,10 @@ Deferred work:
 
 ## Context and orientation
 
-Relevant repository state before 1.3.2 implementation:
+Relevant repository state before 2.3.2 implementation:
 
 - `src/agent_backend/` currently provides registration/discovery only
-  (roadmap 1.3.1), with domain/ports/adapters/service built around
+  (roadmap 2.3.1), with domain/ports/adapters/service built around
   `BackendRegistryService`.
 - `src/message/domain/agent_session.rs` and corresponding ports/adapters already
   model persisted session lifecycle for handoff workflows.
@@ -271,7 +271,7 @@ Planned tests:
 Go/no-go validation for Stage B:
 
 - New tests fail for expected missing-orchestration reasons.
-- Existing 1.3.1 tests remain passing.
+- Existing 2.3.1 tests remain passing.
 
 ### Stage C: Implement orchestration service and memory adapters (green phase)
 
@@ -345,11 +345,11 @@ Update user-facing and design documentation once behaviour is proven.
 Planned edits:
 
 - `docs/corbusier-design.md`: append
-  `Implementation decisions (YYYY-MM-DD) — roadmap 1.3.2` beneath F-003-RQ-002
+  `Implementation decisions (YYYY-MM-DD) — roadmap 2.3.2` beneath F-003-RQ-002
   and F-003-RQ-004, documenting chosen session and routing approach.
 - `docs/users-guide.md`: add section describing turn orchestration behaviour,
   tool routing consistency, and session expiry/rotation semantics with example.
-- `docs/roadmap.md`: mark 1.3.2 and child bullets as done only after full gate
+- `docs/roadmap.md`: mark 2.3.2 and child bullets as done only after full gate
   pass.
 
 Go/no-go validation for Stage F:
@@ -363,19 +363,19 @@ Run all required gates and capture logs for auditability.
 Commands from repository root:
 
 ```bash
-set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-3-2-check-fmt.log
-set -o pipefail; make lint 2>&1 | tee /tmp/1-3-2-lint.log
-set -o pipefail; make test 2>&1 | tee /tmp/1-3-2-test.log
-set -o pipefail; make fmt 2>&1 | tee /tmp/1-3-2-fmt.log
-set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/1-3-2-markdownlint.log
-set -o pipefail; make nixie 2>&1 | tee /tmp/1-3-2-nixie.log
+set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-3-2-check-fmt.log
+set -o pipefail; make lint 2>&1 | tee /tmp/2-3-2-lint.log
+set -o pipefail; make test 2>&1 | tee /tmp/2-3-2-test.log
+set -o pipefail; make fmt 2>&1 | tee /tmp/2-3-2-fmt.log
+set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-3-2-markdownlint.log
+set -o pipefail; make nixie 2>&1 | tee /tmp/2-3-2-nixie.log
 ```
 
 Acceptance for Stage G:
 
 - All commands exit successfully.
 - `git status --short` contains only intended files.
-- Roadmap item 1.3.2 is checked off.
+- Roadmap item 2.3.2 is checked off.
 
 ## Concrete steps
 
@@ -437,12 +437,12 @@ Quality criteria:
 
 Store verification logs at:
 
-- `/tmp/1-3-2-check-fmt.log`
-- `/tmp/1-3-2-lint.log`
-- `/tmp/1-3-2-test.log`
-- `/tmp/1-3-2-fmt.log`
-- `/tmp/1-3-2-markdownlint.log`
-- `/tmp/1-3-2-nixie.log`
+- `/tmp/2-3-2-check-fmt.log`
+- `/tmp/2-3-2-lint.log`
+- `/tmp/2-3-2-test.log`
+- `/tmp/2-3-2-fmt.log`
+- `/tmp/2-3-2-markdownlint.log`
+- `/tmp/2-3-2-nixie.log`
 
 Add concise excerpts proving success/failure states as implementation proceeds.
 
@@ -500,6 +500,6 @@ Dependencies remain within existing crate set (`mockable`, `rstest`,
 
 ## Revision note
 
-- 2026-02-28: Initial draft created from roadmap 1.3.2 requirements and design
+- 2026-02-28: Initial draft created from roadmap 2.3.2 requirements and design
   references (`docs/corbusier-design.md` §2.2.3 and §4.2.1.1), with explicit
   stage gates, testing matrix, documentation obligations, and closure criteria.

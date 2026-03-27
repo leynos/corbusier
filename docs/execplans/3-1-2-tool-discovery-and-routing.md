@@ -1,4 +1,4 @@
-# Deliver tool discovery and routing (roadmap 2.1.2)
+# Deliver tool discovery and routing (roadmap 3.1.2)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -9,7 +9,7 @@ Status: DONE
 
 ## Purpose / big picture
 
-Roadmap item 2.1.1 gave Corbusier the ability to register Model Context
+Roadmap item 3.1.1 gave Corbusier the ability to register Model Context
 Protocol (MCP) servers, manage their lifecycle (start/stop/health), and list
 tools exposed by running servers. However, tools discovered from MCP servers
 are not persisted -- they exist only as transient query results from the live
@@ -38,7 +38,7 @@ After this change, a developer or operator can:
 Observable success: `make all`, `make markdownlint`, and `make nixie` pass, and
 new unit (`rstest`), behavioural (`rstest-bdd`), in-memory integration, and
 PostgreSQL integration tests prove happy paths, unhappy paths, and key edge
-cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
+cases. The roadmap item 3.1.2 and its sub-bullets are marked done.
 
 ## Constraints
 
@@ -46,10 +46,10 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   context: domain code must remain infrastructure-agnostic (no Diesel, no
   process management, no transport details); port traits live in the core
   module; adapters implement ports and do not depend on one another.
-- Scope strictly to roadmap 2.1.2: tool discovery, metadata persistence,
+- Scope strictly to roadmap 3.1.2: tool discovery, metadata persistence,
   cross-server tool resolution, call routing with schema validation and policy
-  enforcement, and audit trail. Do not implement workspace management (2.4.1),
-  hook engine execution (2.3.1), or Weaver integration (2.2.1).
+  enforcement, and audit trail. Do not implement workspace management (3.4.1),
+  hook engine execution (3.3.1), or Weaver integration (3.2.1).
 - Preserve all existing public behaviour in `message`, `task`,
   `agent_backend`, and the existing `tool_registry` lifecycle service. All
   existing tests must continue to pass without modification.
@@ -70,17 +70,11 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   behaviour, and mark roadmap items done in `docs/roadmap.md` only after all
   quality gates pass.
 
-[^1]: `docs/rust-testing-with-rstest-fixtures.md`
-[^2]: `docs/reliable-testing-in-rust-via-dependency-injection.md`
-[^3]: `docs/rstest-bdd-users-guide.md`
-[^4]: `docs/pg-embed-setup-unpriv-users-guide.md`
-[^5]: `docs/complexity-antipatterns-and-refactoring-strategies.md`
-
 ## Tolerances (exception triggers)
 
 - Scope: if implementation requires changes to more than 40 files or 3,000 net
   lines, stop and escalate with a reduced-scope option.
-- API surface: if implementing 2.1.2 requires incompatible changes to existing
+- API surface: if implementing 3.1.2 requires incompatible changes to existing
   public APIs outside the `tool_registry` module, stop and escalate.
 - Dependencies: the `object_store` crate is pre-authorized for this feature.
   If any additional new external crate is required (e.g., `jsonschema` for full
@@ -142,7 +136,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
 
 ## Progress
 
-- [x] Gathered roadmap and design requirements for 2.1.2.
+- [x] Gathered roadmap and design requirements for 3.1.2.
 - [x] Mapped existing hexagonal module, test, and adapter patterns.
 - [x] Authored initial ExecPlan draft.
 - [x] Stage A: domain types, port traits, and compilation checkpoint.
@@ -223,7 +217,7 @@ cases. The roadmap item 2.1.2 and its sub-bullets are marked done.
   and full `ToolExecutionContext` (workspace, task, conversation IDs). These
   depend on infrastructure and bounded contexts that do not exist yet.
   Rationale: the routing backbone and audit trail provide the essential
-  observability for 2.1.2. Events can be wired in when the event infrastructure
+  observability for 3.1.2. Events can be wired in when the event infrastructure
   is built. Date/Author: 2026-03-04 / plan author.
 
 - Decision: use the Rust `object_store` crate with its `LocalFileSystem`
@@ -296,10 +290,10 @@ All 11 acceptance criteria verified:
 9. Startup stderr capture: verified by unit test
    `store_startup_stderr_captures_and_sweeps`.
 10. Log rotation (`max_logs_per_server`): verified by unit test
-    `store_startup_stderr_captures_and_sweeps` (overflow sweep) and
-    integration test `log_rotation_enforces_max_count`.
+   `store_startup_stderr_captures_and_sweeps` (overflow sweep) and
+   integration test `log_rotation_enforces_max_count`.
 11. Stderr truncation: verified by unit test
-    `stderr_truncation_at_max_bytes`.
+   `stderr_truncation_at_max_bytes`.
 
 ### Quality gates
 
@@ -345,7 +339,7 @@ objects, aggregates, error types), `ports/` (async trait contracts),
 (orchestration).
 
 The `tool_registry` bounded context (`src/tool_registry/`) was established by
-roadmap 2.1.1 and provides:
+roadmap 3.1.1 and provides:
 
 - **Domain types** in `src/tool_registry/domain/`: `McpServerId` and
   `McpServerName` (identity), `McpServerRegistration` (aggregate root with
@@ -385,10 +379,9 @@ Tests follow established patterns:
 Build gates (from `AGENTS.md` and `Makefile`):
 
 - `make check-fmt` -- `cargo fmt --all -- --check`
-- `make lint` -- `cargo doc --no-deps` + `cargo clippy --workspace
-  --all-targets --all-features -- -D warnings`
-- `make test` -- `RUSTFLAGS="-D warnings" cargo nextest run --all-targets
-  --all-features`
+- `make lint` -- `cargo doc --no-deps` +
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `make test` -- `RUSTFLAGS="-D warnings" cargo nextest run --all-targets --all-features`
 - `make fmt` -- formatting (code + markdown)
 - `make markdownlint` -- markdown linting
 - `make nixie` -- Mermaid diagram validation
@@ -410,7 +403,7 @@ Design references:
 
 ### Stage A: Domain types, port traits, and compilation checkpoint
 
-Create the new domain types and port traits that define the 2.1.2 contracts. No
+Create the new domain types and port traits that define the 3.1.2 contracts. No
 service logic, no adapters, no tests that exercise behaviour yet -- only types
 and traits that compile.
 
@@ -458,7 +451,7 @@ builder method `with_stderr_log_path(path)` to attach the log reference.
 
 `validation.rs` defines
 `validate_parameters(input_schema: &Value, parameters: &Value) -> Result<(), ToolRegistryDomainError>`.
- This function checks: (a) if `input_schema` has `"type": "object"`,
+This function checks: (a) if `input_schema` has `"type": "object"`,
 `parameters` must be a JSON object; (b) if `input_schema` has a `"required"`
 array, every listed key must be present in `parameters`. Returns
 `ToolRegistryDomainError::SchemaValidationFailed` on failure.
@@ -519,7 +512,7 @@ to its catalogue entry (returning available entries preferentially);
 
 `policy.rs` defines the `ToolPolicyEnforcer` async trait with one method:
 `evaluate(ctx, tool_name, parameters) -> Result<PolicyDecision, ToolPolicyError>`.
- Define `ToolPolicyError` with a single variant
+Define `ToolPolicyError` with a single variant
 `EvaluationFailed { message: String }` and `ToolPolicyResult<T>` type alias.
 
 `log_store.rs` defines the `ToolLogStore` async trait -- the hexagonal port
@@ -534,13 +527,13 @@ truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
 `retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
- -- reads a log blob by path.
+-- reads a log blob by path.
 
 `delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
 -- deletes a single log blob.
 
 `list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
- -- lists all log blob paths for a server by prefix scan on
+-- lists all log blob paths for a server by prefix scan on
 `tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
 
 `sweep_expired(&self, ctx: &RequestContext,`
@@ -582,7 +575,7 @@ Go/no-go checkpoint: run `make check-fmt` and `make lint`. Both must pass
 before proceeding. The `InMemoryMcpServerHost` in
 `src/tool_registry/adapters/runtime.rs` will fail compilation because it does
 not yet implement `call_tool` -- add a `todo!()` stub to unblock the lint gate,
-clearly marked with a `// TODO(2.1.2): implement in Stage B` comment.
+clearly marked with a `// TODO(3.1.2): implement in Stage B` comment.
 
 ### Stage B: Adapter implementations and migration
 
@@ -744,37 +737,39 @@ dependencies as `Arc` references (`catalog`, `registry`, `host`, `policy`,
 `ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over the
 same port types plus `Clock`. The constructor
 `new(ports: ServicePorts<...>, retention_policy: LogRetentionPolicy, clock: Arc<C>)`
- destructures the grouped ports into individual fields. Internally the service
+destructures the grouped ports into individual fields. Internally the service
 stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
 `discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
- load server from registry (fail with `NotFound` if absent), verify lifecycle
+load server from registry (fail with `NotFound` if absent), verify lifecycle
 state allows tool queries, call `host.list_tools()` to get tool definitions,
 map each to a `CatalogEntry`, call `catalog.sync_server_tools()` to persist,
 return the entries.
 
 `mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
- delegate to `catalog.mark_server_tools_unavailable(server_id)`.
+delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
 `mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
- delegate to `catalog.mark_server_tools_available(server_id)`.
+delegate to `catalog.mark_server_tools_available(server_id)`.
 
 `list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
- delegate to `catalog.list_all()`.
+delegate to `catalog.list_all()`.
 
 `call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
- the core routing method. Flow:
+the core routing method. Flow:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
 2. Availability: check `entry.available()`. Fail with `ToolUnavailable` if
    false.
-3. Schema validation: call `validate_parameters(entry.tool().input_schema(),
-   request.parameters())`. Fail with `SchemaValidationFailed` on error.
-4. Policy enforcement: call `policy.evaluate(request.tool_name(),
-   request.parameters())`. Fail with `PolicyDenied` if denied.
+3. Schema validation: call
+   `validate_parameters(entry.tool().input_schema(), request.parameters())`.
+   Fail with `SchemaValidationFailed` on error.
+4. Policy enforcement: call
+   `policy.evaluate(request.tool_name(), request.parameters())`. Fail with
+   `PolicyDenied` if denied.
 5. Runtime check: load server from registry, verify lifecycle is `Running`.
    Fail with `ToolUnavailable` if not.
 6. Execute: call `host.call_tool(server, tool_name, parameters)`. Wrap in
@@ -785,8 +780,9 @@ return the entries.
    non-empty, store the log:
    - Build a `LogCaptureContext` carrying the clock reference, the retention
      policy reference, and the `tenant_id` from `RequestContext`.
-   - Call `LogEntryMetadata::for_tool_call(server_id, call_id, byte_count,
-     &capture_ctx)` to compute the object path and metadata.
+   - Call
+     `LogEntryMetadata::for_tool_call(server_id, call_id, byte_count, &capture_ctx)`
+     to compute the object path and metadata.
    - Call `log_store.store_log(ctx, &metadata, bytes, &retention_policy)`.
    - Record the `object_path` for inclusion in the audit record.
    - Stderr storage is best-effort: a failed write logs a warning but does
@@ -809,7 +805,7 @@ returns the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
 `sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
- triggers a retention sweep for a specific server. Delegates to
+triggers a retention sweep for a specific server. Delegates to
 `log_store.sweep_expired(server_id, &SweepContext { … })`. Returns the count of
 deleted log entries.
 
@@ -1007,18 +1003,18 @@ Update `docs/users-guide.md` with a new section covering:
 Include Rust code examples following the existing style (using in-memory
 adapters).
 
-Mark `docs/roadmap.md` item 2.1.2 and its three sub-bullets as done (`[x]`).
+Mark `docs/roadmap.md` item 3.1.2 and its three sub-bullets as done (`[x]`).
 
 Run full quality gates:
 
 ```bash
-set -o pipefail && make check-fmt 2>&1 | tee /tmp/2-1-2-check-fmt.log
-set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-lint.log
-set -o pipefail && make test 2>&1 | tee /tmp/2-1-2-test.log
-set -o pipefail && make fmt 2>&1 | tee /tmp/2-1-2-fmt.log
+set -o pipefail && make check-fmt 2>&1 | tee /tmp/3-1-2-check-fmt.log
+set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-lint.log
+set -o pipefail && make test 2>&1 | tee /tmp/3-1-2-test.log
+set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-2-fmt.log
 set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 \
-  | tee /tmp/2-1-2-markdownlint.log
-set -o pipefail && make nixie 2>&1 | tee /tmp/2-1-2-nixie.log
+  | tee /tmp/3-1-2-markdownlint.log
+set -o pipefail && make nixie 2>&1 | tee /tmp/3-1-2-nixie.log
 ```
 
 Go/no-go: all six commands must exit 0. If any fail, fix and re-run.
@@ -1031,52 +1027,52 @@ Run all commands from repository root: `/home/user/project`.
 
    ```bash
    set -o pipefail && make check-fmt 2>&1 \
-     | tee /tmp/2-1-2-stage-a-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-stage-a-lint.log
+     | tee /tmp/3-1-2-stage-a-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-stage-a-lint.log
    ```
 
 2. Stage B compilation checks:
 
    ```bash
    set -o pipefail && make check-fmt 2>&1 \
-     | tee /tmp/2-1-2-stage-b-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-stage-b-lint.log
-   set -o pipefail && make test 2>&1 | tee /tmp/2-1-2-stage-b-test.log
+     | tee /tmp/3-1-2-stage-b-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-stage-b-lint.log
+   set -o pipefail && make test 2>&1 | tee /tmp/3-1-2-stage-b-test.log
    ```
 
 3. Fast iteration on targeted tests during Stage C:
 
    ```bash
    set -o pipefail && cargo nextest run --all-targets --all-features \
-     tool_discovery 2>&1 | tee /tmp/2-1-2-targeted-tests.log
+     tool_discovery 2>&1 | tee /tmp/3-1-2-targeted-tests.log
    set -o pipefail && cargo nextest run --all-targets --all-features \
-     validation 2>&1 | tee /tmp/2-1-2-validation-tests.log
+     validation 2>&1 | tee /tmp/3-1-2-validation-tests.log
    ```
 
 4. Full test suite after Stage C:
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-stage-c-make-all.log
+     | tee /tmp/3-1-2-stage-c-make-all.log
    ```
 
 5. Full test suite after Stage D:
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-stage-d-make-all.log
+     | tee /tmp/3-1-2-stage-d-make-all.log
    ```
 
 6. Final gates after Stage E:
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-final-make-all.log
-   set -o pipefail && make fmt 2>&1 | tee /tmp/2-1-2-final-fmt.log
+     | tee /tmp/3-1-2-final-make-all.log
+   set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-2-final-fmt.log
    set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 \
-     | tee /tmp/2-1-2-final-markdownlint.log
+     | tee /tmp/3-1-2-final-markdownlint.log
    set -o pipefail && make nixie 2>&1 \
-     | tee /tmp/2-1-2-final-nixie.log
+     | tee /tmp/3-1-2-final-nixie.log
    ```
 
 ## Validation and acceptance
@@ -1114,10 +1110,10 @@ Acceptance is behavioural:
 
 Quality criteria:
 
-- Tests: all existing tests and new 2.1.2 tests pass (`make test`).
+- Tests: all existing tests and new 3.1.2 tests pass (`make test`).
 - Lint/format: `make check-fmt` and `make lint` pass.
 - Docs validation: `make markdownlint` and `make nixie` pass.
-- Roadmap: 2.1.2 and sub-items marked `[x]` in `docs/roadmap.md`.
+- Roadmap: 3.1.2 and sub-items marked `[x]` in `docs/roadmap.md`.
 
 ## Idempotence and recovery
 
@@ -1303,55 +1299,59 @@ where
 
 New files (estimated 23-26):
 
-| Path                                                             | Purpose                                                                |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `src/tool_registry/domain/catalog.rs`                            | `CatalogEntry`, `CatalogEntryId`                                       |
-| `src/tool_registry/domain/routing.rs`                            | `ToolCallRequest`, `ToolCallResult`, `ToolCallOutcome`, `ToolCallId`   |
-| `src/tool_registry/domain/audit.rs`                              | `ToolCallAuditRecord` (with `stderr_log_path`)                         |
-| `src/tool_registry/domain/policy.rs`                             | `PolicyDecision`                                                       |
-| `src/tool_registry/domain/validation.rs`                         | `validate_parameters()`                                                |
-| `src/tool_registry/domain/log_capture.rs`                        | `LogEntryId`, `LogEntryKind`, `LogEntryMetadata`, `LogRetentionPolicy` |
-| `src/tool_registry/ports/catalog.rs`                             | `ToolCatalogRepository` port                                           |
-| `src/tool_registry/ports/policy.rs`                              | `ToolPolicyEnforcer` port                                              |
-| `src/tool_registry/ports/log_store.rs`                           | `ToolLogStore` port                                                    |
-| `src/tool_registry/services/discovery/mod.rs`                    | `ToolDiscoveryRoutingService`                                          |
-| `src/tool_registry/services/discovery/tests.rs`                  | Service unit tests                                                     |
-| `src/tool_registry/adapters/memory/catalog.rs`                   | `InMemoryToolCatalog`                                                  |
-| `src/tool_registry/adapters/policy.rs`                           | `AllowAllPolicy`, `DenyAllPolicy`                                      |
-| `src/tool_registry/adapters/log_store.rs`                        | `ObjectStoreLogAdapter` (wraps `object_store`)                         |
-| `src/tool_registry/adapters/postgres/catalog_schema.rs`          | Diesel table macros (3 tables)                                         |
-| `src/tool_registry/adapters/postgres/catalog_models.rs`          | Row models (incl. `LogMetadataRow`)                                    |
-| `src/tool_registry/adapters/postgres/catalog_repository.rs`      | `PostgresToolCatalog`                                                  |
-| `src/tool_registry/adapters/postgres/log_metadata_repository.rs` | `PostgresLogMetadataRepository`                                        |
-| `migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql`    | Migration (3 tables)                                                   |
-| `migrations/2026-03-04-000000_add_tool_catalog_tables/down.sql`  | Migration down                                                         |
-| `tests/in_memory/tool_discovery_routing_tests/`                  | In-memory integration (directory module)                               |
-| `tests/postgres/tool_discovery_routing_tests.rs`                 | Postgres integration                                                   |
-| `tests/features/tool_discovery_routing.feature`                  | BDD scenarios                                                          |
-| `tests/tool_discovery_routing_steps/`                            | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.)    |
+Table 3.1.2: File manifest -- new files for roadmap 3.1.2
+
+| Path | Purpose |
+| --- | --- |
+| `src/tool_registry/domain/catalog.rs` | `CatalogEntry`, `CatalogEntryId` |
+| `src/tool_registry/domain/routing.rs` | `ToolCallRequest`, `ToolCallResult`, `ToolCallOutcome`, `ToolCallId` |
+| `src/tool_registry/domain/audit.rs` | `ToolCallAuditRecord` (with `stderr_log_path`) |
+| `src/tool_registry/domain/policy.rs` | `PolicyDecision` |
+| `src/tool_registry/domain/validation.rs` | `validate_parameters()` |
+| `src/tool_registry/domain/log_capture.rs` | `LogEntryId`, `LogEntryKind`, `LogEntryMetadata`, `LogRetentionPolicy` |
+| `src/tool_registry/ports/catalog.rs` | `ToolCatalogRepository` port |
+| `src/tool_registry/ports/policy.rs` | `ToolPolicyEnforcer` port |
+| `src/tool_registry/ports/log_store.rs` | `ToolLogStore` port |
+| `src/tool_registry/services/discovery/mod.rs` | `ToolDiscoveryRoutingService` |
+| `src/tool_registry/services/discovery/tests.rs` | Service unit tests |
+| `src/tool_registry/adapters/memory/catalog.rs` | `InMemoryToolCatalog` |
+| `src/tool_registry/adapters/policy.rs` | `AllowAllPolicy`, `DenyAllPolicy` |
+| `src/tool_registry/adapters/log_store.rs` | `ObjectStoreLogAdapter` (wraps `object_store`) |
+| `src/tool_registry/adapters/postgres/catalog_schema.rs` | Diesel table macros (3 tables) |
+| `src/tool_registry/adapters/postgres/catalog_models.rs` | Row models (incl. `LogMetadataRow`) |
+| `src/tool_registry/adapters/postgres/catalog_repository.rs` | `PostgresToolCatalog` |
+| `src/tool_registry/adapters/postgres/log_metadata_repository.rs` | `PostgresLogMetadataRepository` |
+| `migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql` | Migration (3 tables) |
+| `migrations/2026-03-04-000000_add_tool_catalog_tables/down.sql` | Migration down |
+| `tests/in_memory/tool_discovery_routing_tests/` | In-memory integration (directory module) |
+| `tests/postgres/tool_discovery_routing_tests.rs` | Postgres integration |
+| `tests/features/tool_discovery_routing.feature` | BDD scenarios |
+| `tests/tool_discovery_routing_steps/` | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.) |
 
 Modified files (estimated 14-16):
 
-| Path                                          | Changes                                                                          |
-| --------------------------------------------- | -------------------------------------------------------------------------------- |
-| `Cargo.toml`                                  | Add `object_store` and `bytes` dependencies                                      |
-| `src/tool_registry/domain/error.rs`           | Add 6 new error variants                                                         |
-| `src/tool_registry/domain/mod.rs`             | Add module declarations and re-exports                                           |
-| `src/tool_registry/ports/host.rs`             | Add `call_tool`, change `start` return type, add result structs + error variants |
-| `src/tool_registry/ports/mod.rs`              | Add catalog, policy, and log_store re-exports                                    |
-| `src/tool_registry/adapters/runtime.rs`       | Add `call_tool` + startup/call stderr to `InMemoryMcpServerHost`                 |
-| `src/tool_registry/adapters/memory/mod.rs`    | Export `InMemoryToolCatalog`                                                     |
-| `src/tool_registry/adapters/postgres/mod.rs`  | Export `PostgresToolCatalog`, `PostgresLogMetadataRepository`                    |
-| `src/tool_registry/adapters/mod.rs`           | Export policy + log_store adapters                                               |
-| `src/tool_registry/services/mod.rs`           | Export discovery service                                                         |
-| `src/tool_registry/services/lifecycle/mod.rs` | Update `start` call site for new `StartHostResult` return type                   |
-| `src/tool_registry/mod.rs`                    | Update module-level doc comment                                                  |
-| `tests/in_memory.rs`                          | Add `mod tool_discovery_routing_tests;`                                          |
-| `tests/postgres.rs`                           | Add `mod tool_discovery_routing_tests;`                                          |
-| `tests/postgres/helpers.rs`                   | Add migration constant and apply call                                            |
-| `docs/corbusier-design.md`                    | Add implementation decisions                                                     |
-| `docs/users-guide.md`                         | Add tool discovery/routing + log capture section                                 |
-| `docs/roadmap.md`                             | Mark 2.1.2 items as done                                                         |
+Table 3.1.2: File manifest -- modified files for roadmap 3.1.2
+
+| Path | Changes |
+| --- | --- |
+| `Cargo.toml` | Add `object_store` and `bytes` dependencies |
+| `src/tool_registry/domain/error.rs` | Add 6 new error variants |
+| `src/tool_registry/domain/mod.rs` | Add module declarations and re-exports |
+| `src/tool_registry/ports/host.rs` | Add `call_tool`, change `start` return type, add result structs + error variants |
+| `src/tool_registry/ports/mod.rs` | Add catalog, policy, and log_store re-exports |
+| `src/tool_registry/adapters/runtime.rs` | Add `call_tool` + startup/call stderr to `InMemoryMcpServerHost` |
+| `src/tool_registry/adapters/memory/mod.rs` | Export `InMemoryToolCatalog` |
+| `src/tool_registry/adapters/postgres/mod.rs` | Export `PostgresToolCatalog`, `PostgresLogMetadataRepository` |
+| `src/tool_registry/adapters/mod.rs` | Export policy + log_store adapters |
+| `src/tool_registry/services/mod.rs` | Export discovery service |
+| `src/tool_registry/services/lifecycle/mod.rs` | Update `start` call site for new `StartHostResult` return type |
+| `src/tool_registry/mod.rs` | Update module-level doc comment |
+| `tests/in_memory.rs` | Add `mod tool_discovery_routing_tests;` |
+| `tests/postgres.rs` | Add `mod tool_discovery_routing_tests;` |
+| `tests/postgres/helpers.rs` | Add migration constant and apply call |
+| `docs/corbusier-design.md` | Add implementation decisions |
+| `docs/users-guide.md` | Add tool discovery/routing + log capture section |
+| `docs/roadmap.md` | Mark 3.1.2 items as done |
 
 ## Artifacts and notes
 
@@ -1359,9 +1359,9 @@ Modified files (estimated 14-16):
 
 ## Revision note
 
-- 2026-03-04: Initial draft created from roadmap 2.1.2, design sections
+- 2026-03-04: Initial draft created from roadmap 3.1.2, design sections
   2.2.4, 6.1.4, 4.4.2.2, and 6.4.2.4, and current repository
-  testing/architecture conventions. Based on completed 2.1.1 foundation.
+  testing/architecture conventions. Based on completed 3.1.1 foundation.
 
 - 2026-03-04: Added stderr log capture requirements per user request.
   Integrated `object_store` crate (authorized new dependency) for log blob
@@ -1374,3 +1374,9 @@ Modified files (estimated 14-16):
   Added 6 new unit tests and 3 new integration tests for log capture, 1 new BDD
   scenario. Updated all affected stages (A-E), file manifest, and validation
   criteria.
+
+[^1]: `docs/rust-testing-with-rstest-fixtures.md`
+[^2]: `docs/reliable-testing-in-rust-via-dependency-injection.md`
+[^3]: `docs/rstest-bdd-users-guide.md`
+[^4]: `docs/pg-embed-setup-unpriv-users-guide.md`
+[^5]: `docs/complexity-antipatterns-and-refactoring-strategies.md`

@@ -1,4 +1,4 @@
-# Persist message history with audit trails (Roadmap 1.1.2)
+# Persist message history with audit trails (Roadmap 2.1.2)
 
 This Execution Plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
@@ -125,7 +125,7 @@ Stop and escalate if any threshold is exceeded:
 Implementation delivered typed audit metadata for tool calls and agent
 responses, validation for required fields, and round-trip coverage through
 Postgres and in-memory repositories. Documentation now captures the schema
-decision and roadmap item 1.1.2 is complete.
+decision and roadmap item 2.1.2 is complete.
 
 ## Context and orientation
 
@@ -146,7 +146,7 @@ Key files and modules:
 - `tests/postgres/` and `tests/in_memory/` for repository integration tests.
 - `migrations/` for database schema and audit trigger definitions.
 
-The gap for roadmap 1.1.2 is explicit audit metadata for tool calls and agent
+The gap for roadmap 2.1.2 is explicit audit metadata for tool calls and agent
 responses within stored messages, plus a cohesive workflow for appending and
 retrieving ordered message history by conversation id, backed by Postgres with
 embedded test coverage.
@@ -209,14 +209,14 @@ Add comprehensive tests covering happy and unhappy paths.
   - Scenario: persist tool call + agent response messages and retrieve history
     with audit metadata.
   - Scenario: missing audit metadata yields validation error.
-  Use `#[tokio::test]` on scenario functions to allow async repository calls.
+    Use `#[tokio::test]` on scenario functions to allow async repository calls.
 
 ### Stage E: documentation, roadmap, and quality gates
 
 - Update `docs/users-guide.md` with user-visible behaviour (audit metadata now
   included in conversation history results).
 - Record the audit metadata schema decision in `docs/corbusier-design.md`.
-- Mark roadmap item 1.1.2 as done in `docs/roadmap.md`.
+- Mark roadmap item 2.1.2 as done in `docs/roadmap.md`.
 - Run formatting, linting, tests, markdown lint, and Mermaid validation.
 
 ## Concrete steps
@@ -256,7 +256,9 @@ All commands run from repository root `/home/user/project`.
 
 1. Unit tests (`rstest`) in `src/message/tests/` for new metadata types and
    validation.
+
 2. Integration tests in `tests/postgres/` using the embedded cluster helper.
+
 3. Behavioural tests:
 
    - Add `tests/features/conversation_history.feature`.
@@ -266,8 +268,11 @@ All commands run from repository root `/home/user/project`.
 ### Stage E
 
 1. Update `docs/users-guide.md` and wrap paragraphs at 80 columns.
+
 2. Update `docs/corbusier-design.md` with the metadata schema decision.
-3. Mark roadmap item 1.1.2 and its sub-items as done in `docs/roadmap.md`.
+
+3. Mark roadmap item 2.1.2 and its sub-items as done in `docs/roadmap.md`.
+
 4. Run quality gates via Makefile targets, using `tee` for long output:
 
    - `set -o pipefail && make check-fmt 2>&1 | tee /tmp/check-fmt.log`
@@ -321,6 +326,7 @@ Expected additions (adjust if design review dictates otherwise):
 
 - `ToolCallAudit` and `AgentResponseAudit` structs in
   `crate::message::domain::metadata`.
+
 - Optional `ConversationRepository` or `ConversationHistoryPort` trait in
   `src/message/ports/` with methods such as:
 
@@ -336,9 +342,13 @@ Expected additions (adjust if design review dictates otherwise):
   ```
 
 - Dev-dependencies:
+
   - `rstest-bdd = "0.4.0"`
-  - `rstest-bdd-macros = { version = "0.4.0", features =
-    ["strict-compile-time-validation"] }`
+  - `rstest-bdd-macros` with strict compile-time validation:
+
+    ```toml
+    rstest-bdd-macros = { version = "0.4.0", features = ["strict-compile-time-validation"] }
+    ```
 
 If dependency versions or feature flags differ from what is available, stop and
 escalate before proceeding.

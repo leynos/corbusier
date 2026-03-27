@@ -1,4 +1,4 @@
-# Enforce task state transitions with validation (roadmap 1.2.3)
+# Enforce task state transitions with validation (roadmap 2.2.3)
 
 This Execution Plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
@@ -10,11 +10,11 @@ Status: COMPLETE
 `PLANS.md` is not present in this repository as of 2026-02-16, so this plan is
 the controlling execution document for this feature.
 
-This plan resides at `docs/execplans/1-2-3-enforce-task-state-transitions.md`.
+This plan resides at `docs/execplans/2-2-3-enforce-task-state-transitions.md`.
 
 ## Purpose / big picture
 
-Implement roadmap item 1.2.3 so that Corbusier enforces a task state machine:
+Implement roadmap item 2.2.3 so that Corbusier enforces a task state machine:
 only valid state transitions are permitted, and invalid transitions are
 rejected with a typed domain error carrying the task identifier, the current
 state, and the requested target state. This error serves as the "auditable
@@ -44,7 +44,7 @@ tests pass.
   - The service layer orchestrates domain calls and repository persistence
     only.
   - Adapters are not modified for state machine logic.
-- Preserve all existing 1.2.1 and 1.2.2 behaviour and public interfaces.
+- Preserve all existing 2.2.1 and 2.2.2 behaviour and public interfaces.
   Existing tests must continue to pass without modification (unless a test was
   asserting incorrect behaviour that the state machine now correctly rejects).
 - Use typed domain errors (`thiserror`) for the new `InvalidStateTransition`
@@ -58,7 +58,7 @@ tests pass.
 - Each Rust module touched or added must include module-level `//!` docs.
 - Keep file sizes below 400 lines; split modules before crossing.
 - Update `docs/users-guide.md` with new behaviour and code examples.
-- Update `docs/roadmap.md` to mark 1.2.3 as complete.
+- Update `docs/roadmap.md` to mark 2.2.3 as complete.
 - Use en-GB-oxendict spelling in comments and documentation.
 - The `TaskState` enum's `serde(rename_all = "snake_case")` serialization
   format must not change.
@@ -138,10 +138,10 @@ tests pass.
   plan author.
 
 - Decision: implement `transition_to` without `TransitionContext` or domain
-  events. Rationale: roadmap 1.2.3 requires "define allowed transitions and
+  events. Rationale: roadmap 2.2.3 requires "define allowed transitions and
   terminal states" and "reject invalid transitions with typed errors". Domain
   events, workspace validation, and richer context belong to future roadmap
-  items (2.3.1 hook engine requires 1.2.3 as a prerequisite). The simpler
+  items (3.3.1 hook engine requires 2.2.3 as a prerequisite). The simpler
   interface is sufficient and avoids speculative abstraction. Date/Author:
   2026-02-16 / plan author.
 
@@ -173,7 +173,7 @@ tests pass.
 
 ## Outcomes & retrospective
 
-Implemented roadmap item 1.2.3 with domain-enforced task state transitions,
+Implemented roadmap item 2.2.3 with domain-enforced task state transitions,
 typed invalid-transition errors, service orchestration support, and new unit,
 behavioural, and integration coverage.
 
@@ -203,7 +203,7 @@ metadata.
   `TaskState` enum. Currently has six states (`Draft`, `InProgress`,
   `InReview`, `Paused`, `Done`, `Abandoned`). The only explicit state
   transition is in `associate_pull_request` (line 232) which unconditionally
-  sets state to `InReview` with a comment deferring validation to 1.2.3.
+  sets state to `InReview` with a comment deferring validation to 2.2.3.
 - `src/task/domain/error.rs` (57 lines) -- `TaskDomainError` enum using
   `thiserror::Error`. Also contains `ParseTaskStateError`.
 - `src/task/domain/mod.rs` (23 lines) -- re-exports from the domain module.
@@ -211,7 +211,7 @@ metadata.
   request DTOs for task creation, branch association, and PR association.
 - `src/task/services/mod.rs` (8 lines) -- re-exports `lifecycle` types.
 - `src/task/mod.rs` (20 lines) -- module-level doc comment referencing
-  roadmap items 1.2.1 and 1.2.2.
+  roadmap items 2.2.1 and 2.2.2.
 - `src/task/tests/mod.rs` (7 lines) -- declares test submodules.
 - `src/task/tests/branch_pr_tests.rs` (266 lines) -- domain tests for branch
   and PR value objects and task association. Contains tests that associate a PR
@@ -225,20 +225,20 @@ metadata.
 - `tests/in_memory/task_lifecycle_tests.rs` (309 lines) -- in-memory
   integration tests. Test at line 153 associates a PR on a `Draft` task.
 - `docs/users-guide.md` (174 lines) -- user-facing documentation.
-- `docs/roadmap.md` -- roadmap with 1.2.3 checkbox items at lines 53-60.
+- `docs/roadmap.md` -- roadmap with the 2.2.3 checkbox items.
 
 ### State machine definition
 
-Table 1. Allowed task state transitions for roadmap item 1.2.3.
+Table 2.2.3.1: Allowed task state transitions for roadmap item 2.2.3.
 
-| From state   | Allowed target states                     |
+| From state | Allowed target states |
 | ------------ | ----------------------------------------- |
-| `Draft`      | `InProgress`, `InReview`, `Abandoned`     |
+| `Draft` | `InProgress`, `InReview`, `Abandoned` |
 | `InProgress` | `InReview`, `Paused`, `Done`, `Abandoned` |
-| `InReview`   | `InProgress`, `Done`, `Abandoned`         |
-| `Paused`     | `InProgress`, `Abandoned`                 |
-| `Done`       | *(terminal -- no outgoing transitions)*   |
-| `Abandoned`  | *(terminal -- no outgoing transitions)*   |
+| `InReview` | `InProgress`, `Done`, `Abandoned` |
+| `Paused` | `InProgress`, `Abandoned` |
+| `Done` | *(terminal -- no outgoing transitions)* |
+| `Abandoned` | *(terminal -- no outgoing transitions)* |
 
 Self-transitions (e.g., `Draft` -> `Draft`) are not permitted.
 
@@ -268,18 +268,20 @@ applying the state change and calling `self.touch(clock)` if valid.
 A4. Update `associate_pull_request` to validate the transition before mutating
 any fields. Replace the direct `self.state = TaskState::InReview` assignment
 with a pre-check using `can_transition_to`, followed by `associate_ref`, then
-the state assignment and `touch`. Remove the comment about deferring to 1.2.3.
+the state assignment and `touch`. Remove the comment about deferring to 2.2.3.
 Update the doc comment's `# Errors` section to mention `InvalidStateTransition`.
 
 Edit `src/task/domain/error.rs`:
 
 A5. Add `InvalidStateTransition` variant to `TaskDomainError`:
 
-    InvalidStateTransition {
-        task_id: super::TaskId,
-        from: super::TaskState,
-        to: super::TaskState,
-    }
+```plaintext
+InvalidStateTransition {
+    task_id: super::TaskId,
+    from: super::TaskState,
+    to: super::TaskState,
+}
+```
 
 with error message:
 `invalid state transition for task {task_id}: cannot move from {from} to {to}`.
@@ -299,17 +301,21 @@ other request DTOs). Constructor:
 
 B2. Add `InvalidState` variant to `TaskLifecycleError`:
 
-    #[error(transparent)]
-    InvalidState(#[from] ParseTaskStateError),
+```plaintext
+#[error(transparent)]
+InvalidState(#[from] ParseTaskStateError),
+```
 
 Add `ParseTaskStateError` to the imports from `crate::task::domain`.
 
 B3. Add `transition_task` method on `TaskLifecycleService`:
 
-    pub async fn transition_task(
-        &self,
-        request: TransitionTaskRequest,
-    ) -> TaskLifecycleResult<Task>
+```plaintext
+pub async fn transition_task(
+    &self,
+    request: TransitionTaskRequest,
+) -> TaskLifecycleResult<Task>
+```
 
 Parses `target_state` via `TaskState::try_from`, looks up the task, calls
 `task.transition_to(target, &*self.clock)`, persists with
@@ -391,16 +397,17 @@ Estimated post-edit line count: ~365 lines. Within limits.
 
 ### Stage F: documentation updates
 
-F1. Update `src/task/mod.rs` module doc comment to reference roadmap 1.2.3.
+F1. Update `src/task/mod.rs` module doc comment to reference roadmap 2.2.3.
 
 F2. Add "Task state transitions" section to `docs/users-guide.md` after "Branch
 and pull request association". Include a code example showing valid transition,
 invalid transition (error), and the state machine table.
 
-F3. Update `docs/roadmap.md` lines 53-60: change `- [ ] 1.2.3` to `- [x] 1.2.3`
+F3. Update the `docs/roadmap.md` 2.2.3 checkbox block: change `- [ ] 2.2.3`
+to `- [x] 2.2.3`
 and all three sub-checkboxes to `[x]`.
 
-F4. Record design decisions in `docs/corbusier-design.md` noting that 1.2.3
+F4. Record design decisions in `docs/corbusier-design.md` noting that 2.2.3
 uses `can_transition_to` predicate on `TaskState` and `InvalidStateTransition`
 error variant, without `TransitionContext` or domain events at this stage.
 
@@ -414,7 +421,7 @@ failures. Fix any issues discovered.
 All commands run from `/home/user/project`.
 
 1. Write the execplan file to
-   `docs/execplans/1-2-3-enforce-task-state-transitions.md`.
+   `docs/execplans/2-2-3-enforce-task-state-transitions.md`.
 2. Edit `src/task/domain/error.rs` -- add `InvalidStateTransition` variant
    (Stage A5).
 3. Edit `src/task/domain/task.rs` -- add `Display` impl (A1),
@@ -429,14 +436,14 @@ All commands run from `/home/user/project`.
 8. Create `src/task/tests/state_transition_tests.rs` (Stage C).
 9. Edit `src/task/tests/mod.rs` -- add `mod state_transition_tests;`.
 10. Run
-    `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-1.log`.
+   `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-1.log`.
 11. Create `tests/features/task_state_transitions.feature` (D1).
 12. Create `tests/task_state_transition_steps/` with `mod.rs`, `world.rs`,
-    `given.rs`, `when.rs`, `then.rs` (D2).
+   `given.rs`, `when.rs`, `then.rs` (D2).
 13. Create `tests/task_state_transition_steps.rs` scenario runner (D3).
 14. Add integration tests to `tests/in_memory/task_lifecycle_tests.rs` (E1-E3).
 15. Run
-    `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-2.log`.
+   `set -o pipefail && cargo nextest run --workspace 2>&1 | tee /tmp/test-run-2.log`.
 16. Update documentation files (F1-F4).
 17. Run `set -o pipefail && make all 2>&1 | tee /tmp/make-all.log`.
 18. Review output and address any failures.
@@ -457,7 +464,9 @@ Quality criteria (what "done" means):
 
 Quality method (verification approach):
 
-    make all
+```plaintext
+make all
+```
 
 Expected output includes a test summary line with zero failures.
 
@@ -482,36 +491,36 @@ re-running `make all` from the repository root will identify remaining issues.
 
 ### New files (9)
 
-Table 2. New files added for this implementation.
+Table 2.2.3.2: New files added for this implementation.
 
-| File                                                     | Purpose                      |
+| File | Purpose |
 | -------------------------------------------------------- | ---------------------------- |
-| `docs/execplans/1-2-3-enforce-task-state-transitions.md` | This ExecPlan                |
-| `src/task/tests/state_transition_tests.rs`               | Unit tests for state machine |
-| `tests/features/task_state_transitions.feature`          | BDD feature file             |
-| `tests/task_state_transition_steps.rs`                   | BDD scenario runner          |
-| `tests/task_state_transition_steps/mod.rs`               | Step definitions module      |
-| `tests/task_state_transition_steps/world.rs`             | BDD world struct             |
-| `tests/task_state_transition_steps/given.rs`             | Given step definitions       |
-| `tests/task_state_transition_steps/when.rs`              | When step definitions        |
-| `tests/task_state_transition_steps/then.rs`              | Then step definitions        |
+| `docs/execplans/2-2-3-enforce-task-state-transitions.md` | This ExecPlan |
+| `src/task/tests/state_transition_tests.rs` | Unit tests for state machine |
+| `tests/features/task_state_transitions.feature` | BDD feature file |
+| `tests/task_state_transition_steps.rs` | BDD scenario runner |
+| `tests/task_state_transition_steps/mod.rs` | Step definitions module |
+| `tests/task_state_transition_steps/world.rs` | BDD world struct |
+| `tests/task_state_transition_steps/given.rs` | Given step definitions |
+| `tests/task_state_transition_steps/when.rs` | When step definitions |
+| `tests/task_state_transition_steps/then.rs` | Then step definitions |
 
 ### Modified files (10)
 
-Table 3. Existing files modified for this implementation.
+Table 2.2.3.3: Existing files modified for this implementation.
 
-| File                                      | Change                                                                                              |
+| File | Change |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `src/task/domain/error.rs`                | Add `InvalidStateTransition` variant                                                                |
-| `src/task/domain/task.rs`                 | Add `Display`, `can_transition_to`, `is_terminal`, `transition_to`; update `associate_pull_request` |
-| `src/task/services/lifecycle.rs`          | Add `TransitionTaskRequest`, `transition_task`, `InvalidState` variant                              |
-| `src/task/services/mod.rs`                | Add `TransitionTaskRequest` to re-exports                                                           |
-| `src/task/tests/mod.rs`                   | Add `mod state_transition_tests;`                                                                   |
-| `src/task/mod.rs`                         | Update module doc comment                                                                           |
-| `tests/in_memory/task_lifecycle_tests.rs` | Add state transition integration tests                                                              |
-| `docs/users-guide.md`                     | Add "Task state transitions" section                                                                |
-| `docs/roadmap.md`                         | Mark 1.2.3 as complete                                                                              |
-| `docs/corbusier-design.md`                | Record 1.2.3 implementation decisions                                                               |
+| `src/task/domain/error.rs` | Add `InvalidStateTransition` variant |
+| `src/task/domain/task.rs` | Add transition helpers and update `associate_pull_request` |
+| `src/task/services/lifecycle.rs` | Add request type, `transition_task`, and `InvalidState` |
+| `src/task/services/mod.rs` | Add `TransitionTaskRequest` to re-exports |
+| `src/task/tests/mod.rs` | Add `mod state_transition_tests;` |
+| `src/task/mod.rs` | Update module doc comment |
+| `tests/in_memory/task_lifecycle_tests.rs` | Add state transition integration tests |
+| `docs/users-guide.md` | Add "Task state transitions" section |
+| `docs/roadmap.md` | Mark 2.2.3 as complete |
+| `docs/corbusier-design.md` | Record 2.2.3 implementation decisions |
 
 Total: 19 files (9 new + 10 modified).
 
@@ -525,50 +534,56 @@ No new external dependencies. All functionality uses existing crates:
 
 In `src/task/domain/task.rs`:
 
-    impl std::fmt::Display for TaskState {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    }
+```plaintext
+impl std::fmt::Display for TaskState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+}
 
-    impl TaskState {
-        pub const fn can_transition_to(self, target: Self) -> bool;
-        pub const fn is_terminal(self) -> bool;
-    }
+impl TaskState {
+    pub const fn can_transition_to(self, target: Self) -> bool;
+    pub const fn is_terminal(self) -> bool;
+}
 
-    impl Task {
-        pub fn transition_to(
-            &mut self,
-            target: TaskState,
-            clock: &impl Clock,
-        ) -> Result<(), TaskDomainError>;
-    }
+impl Task {
+    pub fn transition_to(
+        &mut self,
+        target: TaskState,
+        clock: &impl Clock,
+    ) -> Result<(), TaskDomainError>;
+}
+```
 
 In `src/task/domain/error.rs`:
 
-    pub enum TaskDomainError {
-        // … existing variants …
-        InvalidStateTransition {
-            task_id: super::TaskId,
-            from: super::TaskState,
-            to: super::TaskState,
-        },
-    }
+```plaintext
+pub enum TaskDomainError {
+    // … existing variants …
+    InvalidStateTransition {
+        task_id: super::TaskId,
+        from: super::TaskState,
+        to: super::TaskState,
+    },
+}
+```
 
 In `src/task/services/lifecycle.rs`:
 
-    pub struct TransitionTaskRequest { .. }
+```plaintext
+pub struct TransitionTaskRequest { .. }
 
-    impl TransitionTaskRequest {
-        pub fn new(task_id: TaskId, target_state: impl Into<String>) -> Self;
-    }
+impl TransitionTaskRequest {
+    pub fn new(task_id: TaskId, target_state: impl Into<String>) -> Self;
+}
 
-    pub enum TaskLifecycleError {
-        // … existing variants …
-        InvalidState(#[from] ParseTaskStateError),
-    }
+pub enum TaskLifecycleError {
+    // … existing variants …
+    InvalidState(#[from] ParseTaskStateError),
+}
 
-    impl<R, C> TaskLifecycleService<R, C> {
-        pub async fn transition_task(
-            &self,
-            request: TransitionTaskRequest,
-        ) -> TaskLifecycleResult<Task>;
-    }
+impl<R, C> TaskLifecycleService<R, C> {
+    pub async fn transition_task(
+        &self,
+        request: TransitionTaskRequest,
+    ) -> TaskLifecycleResult<Task>;
+}
+```

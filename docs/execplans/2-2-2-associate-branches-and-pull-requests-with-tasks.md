@@ -1,4 +1,4 @@
-# Associate branches and pull requests with tasks (roadmap 1.2.2)
+# Associate branches and pull requests with tasks (roadmap 2.2.2)
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
@@ -10,19 +10,19 @@ Status: COMPLETE
 the controlling execution document for this feature.
 
 This plan resides at
-`docs/execplans/1-2-2-associate-branches-and-pull-requests-with-tasks.md`.
+`docs/execplans/2-2-2-associate-branches-and-pull-requests-with-tasks.md`.
 
 ## Purpose / big picture
 
-Implement roadmap item 1.2.2 so that Corbusier can record which Git branch and
+Implement roadmap item 2.2.2 so that Corbusier can record which Git branch and
 which pull request (PR) are associated with a task, retrieve tasks by those
 references, and transition task state when a pull request is linked. This
-extends the task lifecycle (built in 1.2.1) from issue-origin tracking to full
+extends the task lifecycle (built in 2.2.1) from issue-origin tracking to full
 branch-and-PR tracking.
 
 After this change, an implementer can:
 
-- Create a task from an issue (1.2.1, already works).
+- Create a task from an issue (2.2.1, already works).
 - Associate a branch reference with that task and retrieve the task by branch.
 - Associate a pull request reference with that task, automatically
   transitioning the task to `InReview`, and retrieve the task by PR reference.
@@ -38,7 +38,7 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
   - Domain logic must not depend on Diesel, PostgreSQL, or transport details.
   - Ports are defined in the core module and implemented only by adapters.
   - Adapters do not call each other directly.
-- Preserve all existing 1.2.1 behaviour and public interfaces.
+- Preserve all existing 2.2.1 behaviour and public interfaces.
 - Use typed domain errors (`thiserror`) for inspectable failures.
 - Use `rstest` for unit/integration fixtures and `rstest-bdd` v0.5.0 for
   behavioural tests.
@@ -67,7 +67,7 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
 
 - Scope: if implementation exceeds 30 files or 2,500 net lines, stop and
   escalate with a reduced-scope option.
-- Interfaces: if implementing 1.2.2 requires changing unrelated public APIs
+- Interfaces: if implementing 2.2.2 requires changing unrelated public APIs
   outside the task lifecycle boundary, stop and escalate.
 - Dependencies: if any new crate beyond those already in Cargo.toml is needed,
   stop and escalate with rationale.
@@ -93,13 +93,13 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
   `debug_assert!` that branch/PR fields are `None`. Removing this may mask data
   integrity issues during transition. Severity: low. Likelihood: low.
   Mitigation: replace the blanket assert with a workspace-id-only assert
-  (workspace_id is still deferred to 1.2.3). Add parsing validation for the
+  (workspace_id is still deferred to 2.2.3). Add parsing validation for the
   branch/PR fields instead.
 
 - Risk: State transition on PR association (task → InReview) may conflict with
-  1.2.3's scope ("Enforce task state transitions with validation"). Severity:
+  2.2.3's scope ("Enforce task state transitions with validation"). Severity:
   medium. Likelihood: medium. Mitigation: implement the state update as a
-  simple field write in 1.2.2 without enforcing transition guards. 1.2.3 will
+  simple field write in 2.2.2 without enforcing transition guards. 2.2.3 will
   add guard logic. Document this decision clearly.
 
 - Risk: Behaviour tests may become brittle if they assert internal
@@ -112,8 +112,8 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
 - [x] (2026-02-11 00:00Z) Gathered roadmap and design requirements from
   `docs/roadmap.md` and `docs/corbusier-design.md` (§2.2.2, §4.1.1.2).
 - [x] (2026-02-11 00:00Z) Mapped existing architecture, domain model, and test
-  patterns from the 1.2.1 implementation.
-- [x] (2026-02-11 00:00Z) Authored initial ExecPlan draft for roadmap 1.2.2.
+  patterns from the 2.2.1 implementation.
+- [x] (2026-02-11 00:00Z) Authored initial ExecPlan draft for roadmap 2.2.2.
 - [x] (2026-02-11) Await user approval of this ExecPlan before implementation.
 - [x] (2026-02-11) Stage A: domain value objects and error extensions.
 - [x] (2026-02-11) Stage B+C: task aggregate, repository port, and adapter
@@ -142,9 +142,9 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
 - Decision: Use the existing `branch_ref VARCHAR(255)` and
   `pull_request_ref VARCHAR(255)` columns on the `tasks` table rather than
   introducing join tables. Rationale: the columns were explicitly reserved for
-  this purpose in the 1.2.1 implementation decision ("Keep branch, pull
-  request, and workspace references nullable in 1.2.1 so roadmap items 1.2.2
-  and 1.2.3 can extend the lifecycle without re-shaping issue-origin records").
+  this purpose in the 2.2.1 implementation decision ("Keep branch, pull
+  request, and workspace references nullable in 2.2.1 so roadmap items 2.2.2
+  and 2.2.3 can extend the lifecycle without re-shaping issue-origin records").
   Each task has at most one branch and one PR. The many-to-many relationship
   (multiple tasks sharing a branch) is naturally modelled by allowing the same
   string value across multiple rows without a unique constraint on these
@@ -170,8 +170,8 @@ Success is observable in unit tests, behaviour-driven development (BDD) tests
   state to `InReview` as a simple field write without transition guards.
   Rationale: the roadmap sub-item says "Map pull request identifiers to task
   state updates". The natural mapping is PR → InReview. Transition validation
-  (e.g., rejecting InReview → InReview) is deferred to 1.2.3 which explicitly
-  covers "Enforce task state transitions with validation". In 1.2.2 the state
+  (e.g., rejecting InReview → InReview) is deferred to 2.2.3 which explicitly
+  covers "Enforce task state transitions with validation". In 2.2.2 the state
   update is unconditional. Date/Author: 2026-02-11 / DevBoxer.
 
 - Decision: Introduce a `VcsProvider` type alias for `IssueProvider` rather
@@ -213,50 +213,54 @@ Lessons learned:
 
 ## Context and orientation
 
-### Repository state after 1.2.1
+### Repository state after 2.2.1
 
 The `task` bounded context lives in `src/task/` and follows hexagonal
 architecture:
 
-    src/task/
-    ├── domain/
-    │   ├── mod.rs          Re-exports all domain types
-    │   ├── task.rs         Task aggregate root: TaskState, TaskOrigin, Task,
-    │   │                   PersistedTaskData
-    │   ├── issue.rs        IssueRef, IssueProvider, ExternalIssue,
-    │   │                   ExternalIssueMetadata, IssueSnapshot
-    │   ├── ids.rs          TaskId (UUID), IssueNumber, RepositoryFullName
-    │   └── error.rs        TaskDomainError, ParseTaskStateError
-    ├── ports/
-    │   └── repository.rs   TaskRepository trait: store, find_by_id,
-    │                       find_by_issue_ref
-    ├── adapters/
-    │   ├── postgres/
-    │   │   ├── repository.rs  PostgresTaskRepository (run_blocking pattern)
-    │   │   ├── models.rs      TaskRow, NewTaskRow (already has branch_ref,
-    │   │   │                  pull_request_ref as Option<String>)
-    │   │   └── schema.rs      Diesel table definition
-    │   └── memory/
-    │       └── task.rs     InMemoryTaskRepository (HashMap + RwLock)
-    ├── services/
-    │   └── lifecycle.rs    TaskLifecycleService: create_from_issue,
-    │                       find_by_issue_ref; CreateTaskFromIssueRequest
-    └── tests/
-        ├── domain_tests.rs    rstest unit tests for domain types
-        └── service_tests.rs   rstest service-level tests
+```plaintext
+src/task/
+├── domain/
+│   ├── mod.rs          Re-exports all domain types
+│   ├── task.rs         Task aggregate root: TaskState, TaskOrigin, Task,
+│   │                   PersistedTaskData
+│   ├── issue.rs        IssueRef, IssueProvider, ExternalIssue,
+│   │                   ExternalIssueMetadata, IssueSnapshot
+│   ├── ids.rs          TaskId (UUID), IssueNumber, RepositoryFullName
+│   └── error.rs        TaskDomainError, ParseTaskStateError
+├── ports/
+│   └── repository.rs   TaskRepository trait: store, find_by_id,
+│                       find_by_issue_ref
+├── adapters/
+│   ├── postgres/
+│   │   ├── repository.rs  PostgresTaskRepository (run_blocking pattern)
+│   │   ├── models.rs      TaskRow, NewTaskRow (already has branch_ref,
+│   │   │                  pull_request_ref as Option<String>)
+│   │   └── schema.rs      Diesel table definition
+│   └── memory/
+│       └── task.rs     InMemoryTaskRepository (HashMap + RwLock)
+├── services/
+│   └── lifecycle.rs    TaskLifecycleService: create_from_issue,
+│                       find_by_issue_ref; CreateTaskFromIssueRequest
+└── tests/
+    ├── domain_tests.rs    rstest unit tests for domain types
+    └── service_tests.rs   rstest service-level tests
+```
 
 ### Database schema (from migration `2026-02-09-000000_add_tasks_table`)
 
-    CREATE TABLE tasks (
-        id UUID PRIMARY KEY,
-        origin JSONB NOT NULL,
-        branch_ref VARCHAR(255),           -- Reserved for 1.2.2 (always NULL)
-        pull_request_ref VARCHAR(255),     -- Reserved for 1.2.2 (always NULL)
-        state VARCHAR(50) NOT NULL DEFAULT 'draft',
-        workspace_id UUID,                 -- Reserved for 1.2.3
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+```plaintext
+CREATE TABLE tasks (
+    id UUID PRIMARY KEY,
+    origin JSONB NOT NULL,
+    branch_ref VARCHAR(255),           -- Reserved for 2.2.2 (always NULL)
+    pull_request_ref VARCHAR(255),     -- Reserved for 2.2.2 (always NULL)
+    state VARCHAR(50) NOT NULL DEFAULT 'draft',
+    workspace_id UUID,                 -- Reserved for 2.2.3
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 ### Current task domain model (key types)
 
@@ -354,8 +358,10 @@ Go/no-go: `make check-fmt && make lint` pass. New types compile cleanly.
 
 Add optional fields to `Task`:
 
-    branch_ref: Option<BranchRef>,
-    pull_request_ref: Option<PullRequestRef>,
+```plaintext
+branch_ref: Option<BranchRef>,
+pull_request_ref: Option<PullRequestRef>,
+```
 
 Add corresponding fields to `PersistedTaskData`.
 
@@ -385,8 +391,8 @@ Add three new methods to the `TaskRepository` trait:
 - `async fn update(&self, task: &Task) -> TaskRepositoryResult<()>` — persists
   changes to an existing task.
 - `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) ->
-  TaskRepositoryResult<Vec<Task>>
-  ` — returns all tasks linked to the branch (may be multiple due to many-to-many).
+  TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the branch
+  (may be multiple due to many-to-many).
 - `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) ->
   TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the PR.
 
@@ -424,26 +430,32 @@ Implement `find_by_pull_request_ref`: analogous to `find_by_branch_ref`.
 
 up.sql:
 
-    -- Non-unique index for branch reference lookups (many-to-many: multiple
-    -- tasks may share a branch).
-    CREATE INDEX idx_tasks_branch_ref ON tasks (branch_ref)
-        WHERE branch_ref IS NOT NULL;
+```plaintext
+-- Non-unique index for branch reference lookups (many-to-many: multiple
+-- tasks may share a branch).
+CREATE INDEX idx_tasks_branch_ref ON tasks (branch_ref)
+    WHERE branch_ref IS NOT NULL;
 
-    -- Non-unique index for pull request reference lookups.
-    CREATE INDEX idx_tasks_pull_request_ref ON tasks (pull_request_ref)
-        WHERE pull_request_ref IS NOT NULL;
+-- Non-unique index for pull request reference lookups.
+CREATE INDEX idx_tasks_pull_request_ref ON tasks (pull_request_ref)
+    WHERE pull_request_ref IS NOT NULL;
+```
 
 down.sql:
 
-    DROP INDEX IF EXISTS idx_tasks_pull_request_ref;
-    DROP INDEX IF EXISTS idx_tasks_branch_ref;
+```plaintext
+DROP INDEX IF EXISTS idx_tasks_pull_request_ref;
+DROP INDEX IF EXISTS idx_tasks_branch_ref;
+```
 
 **Modify `src/task/adapters/memory/task.rs`:**
 
 Add reverse indexes to `InMemoryTaskState`:
 
-    branch_index: HashMap<String, Vec<TaskId>>,
-    pull_request_index: HashMap<String, Vec<TaskId>>,
+```plaintext
+branch_index: HashMap<String, Vec<TaskId>>,
+pull_request_index: HashMap<String, Vec<TaskId>>,
+```
 
 (Using `String` canonical form as key, mapping to a Vec of TaskIds for the
 many-to-many relationship.)
@@ -460,7 +472,7 @@ canonical string, return cloned tasks.
 
 Add the new migration SQL constant and apply it in the template setup function.
 
-Go/no-go: `make check-fmt && make lint` pass. Existing tests still pass (1.2.1
+Go/no-go: `make check-fmt && make lint` pass. Existing tests still pass (2.2.1
 behaviour preserved).
 
 ### Stage D: service layer
@@ -542,41 +554,43 @@ Go/no-go: `make check-fmt && make lint` pass.
 
 **BDD tests — new file `tests/features/task_branch_pr_association.feature`:**
 
-    Feature: Branch and pull request association with tasks
+```plaintext
+Feature: Branch and pull request association with tasks
 
-      Scenario: Associate a branch with a task and retrieve by reference
-        Given an external issue "github" "corbusier/core" #200
-        And the issue has title "Implement branch tracking"
-        And the issue has been converted into a task
-        When a branch "github" "corbusier/core" "feature/branch-tracking"
-          is associated with the task
-        Then the task has an associated branch reference
-        And the task can be retrieved by the branch reference
+  Scenario: Associate a branch with a task and retrieve by reference
+    Given an external issue "github" "corbusier/core" #200
+    And the issue has title "Implement branch tracking"
+    And the issue has been converted into a task
+    When a branch "github" "corbusier/core" "feature/branch-tracking"
+      is associated with the task
+    Then the task has an associated branch reference
+    And the task can be retrieved by the branch reference
 
-      Scenario: Associate a pull request with a task and verify state
-        Given an external issue "github" "corbusier/core" #201
-        And the issue has title "Implement PR tracking"
-        And the issue has been converted into a task
-        When a pull request "github" "corbusier/core" #42
-          is associated with the task
-        Then the task has an associated pull request reference
-        And the task state is in_review
+  Scenario: Associate a pull request with a task and verify state
+    Given an external issue "github" "corbusier/core" #201
+    And the issue has title "Implement PR tracking"
+    And the issue has been converted into a task
+    When a pull request "github" "corbusier/core" #42
+      is associated with the task
+    Then the task has an associated pull request reference
+    And the task state is in_review
 
-      Scenario: Reject second branch association on the same task
-        Given an external issue "github" "corbusier/core" #202
-        And the issue has title "Duplicate branch test"
-        And the issue has been converted into a task
-        And a branch is already associated with the task
-        When a second branch is associated with the task
-        Then branch association fails with a branch already associated error
+  Scenario: Reject second branch association on the same task
+    Given an external issue "github" "corbusier/core" #202
+    And the issue has title "Duplicate branch test"
+    And the issue has been converted into a task
+    And a branch is already associated with the task
+    When a second branch is associated with the task
+    Then branch association fails with a branch already associated error
 
-      Scenario: Reject second pull request association on the same task
-        Given an external issue "github" "corbusier/core" #203
-        And the issue has title "Duplicate PR test"
-        And the issue has been converted into a task
-        And a pull request is already associated with the task
-        When a second pull request is associated with the task
-        Then pull request association fails with a PR already associated error
+  Scenario: Reject second pull request association on the same task
+    Given an external issue "github" "corbusier/core" #203
+    And the issue has title "Duplicate PR test"
+    And the issue has been converted into a task
+    And a pull request is already associated with the task
+    When a second pull request is associated with the task
+    Then pull request association fails with a PR already associated error
+```
 
 **BDD step definitions — new module `tests/task_branch_pr_steps/`:**
 
@@ -610,24 +624,26 @@ Go/no-go: `make test` passes across workspace.
 
 **Modify `docs/corbusier-design.md`:**
 
-Add implementation decision notes under §2.2.2, after the existing 1.2.1
+Add implementation decision notes under §2.2.2, after the existing 2.2.1
 decision block:
 
-    ###### Implementation Decisions (2026-02-11)
+```plaintext
+###### Implementation Decisions (2026-02-11)
 
-    - Branch and pull request references are stored as canonical string
-      representations (`provider:owner/repo:identifier`) in the existing
-      `branch_ref` and `pull_request_ref` VARCHAR(255) columns.
-    - Multiple tasks may share the same branch reference (many-to-many).
-      Each individual task has at most one active branch and at most one
-      open pull request.
-    - Non-unique partial indexes on `branch_ref` and `pull_request_ref`
-      accelerate lookup queries.
-    - Associating a pull request transitions the task state to `InReview`.
-      State transition validation (guard logic) is deferred to 1.2.3.
-    - Domain types `BranchRef` and `PullRequestRef` follow the same
-      pattern as `IssueRef` with provider, repository, and identifier
-      components.
+- Branch and pull request references are stored as canonical string
+  representations (`provider:owner/repo:identifier`) in the existing
+  `branch_ref` and `pull_request_ref` VARCHAR(255) columns.
+- Multiple tasks may share the same branch reference (many-to-many).
+  Each individual task has at most one active branch and at most one
+  open pull request.
+- Non-unique partial indexes on `branch_ref` and `pull_request_ref`
+  accelerate lookup queries.
+- Associating a pull request transitions the task state to `InReview`.
+  State transition validation (guard logic) is deferred to 2.2.3.
+- Domain types `BranchRef` and `PullRequestRef` follow the same
+  pattern as `IssueRef` with provider, repository, and identifier
+  components.
+```
 
 **Modify `docs/users-guide.md`:**
 
@@ -640,11 +656,11 @@ Add a new section after the existing issue-to-task example, showing:
 
 **Modify `docs/roadmap.md`:**
 
-Mark 1.2.2 and its three sub-items as done (`[x]`).
+Mark 2.2.2 and its three sub-items as done (`[x]`).
 
 **Modify `src/task/mod.rs`:**
 
-Update the module doc comment to reflect 1.2.2 scope alongside 1.2.1.
+Update the module doc comment to reflect 2.2.2 scope alongside 2.2.1.
 
 Go/no-go: `make markdownlint`, `make nixie`, and all quality gates pass.
 
@@ -654,9 +670,11 @@ All commands run from repository root: `/home/user/project`.
 
 1. Run baseline quality gates to confirm starting state.
 
-       set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-2-baseline-fmt.log
-       set -o pipefail; make lint 2>&1 | tee /tmp/1-2-2-baseline-lint.log
-       set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-baseline-test.log
+   ```plaintext
+   set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-2-baseline-fmt.log
+   set -o pipefail; make lint 2>&1 | tee /tmp/2-2-2-baseline-lint.log
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-baseline-test.log
+   ```
 
    Expected: all exit 0.
 
@@ -665,7 +683,9 @@ All commands run from repository root: `/home/user/project`.
    Create `src/task/domain/branch.rs` and `src/task/domain/pull_request.rs`.
    Extend `error.rs` and `mod.rs`.
 
-       make check-fmt && make lint
+   ```plaintext
+   make check-fmt && make lint
+   ```
 
    Expected: no errors.
 
@@ -673,7 +693,9 @@ All commands run from repository root: `/home/user/project`.
 
    Modify `task.rs`, `PersistedTaskData`, repository trait.
 
-       make check-fmt && make lint
+   ```plaintext
+   make check-fmt && make lint
+   ```
 
    Expected: compile errors from unimplemented trait methods (expected;
    adapters need stubs).
@@ -682,34 +704,44 @@ All commands run from repository root: `/home/user/project`.
 
    Modify Postgres and in-memory adapters. Create migration. Update helpers.
 
-       make check-fmt && make lint && make test
+   ```plaintext
+   make check-fmt && make lint && make test
+   ```
 
-   Expected: all existing 1.2.1 tests still pass.
+   Expected: all existing 2.2.1 tests still pass.
 
 5. Implement service layer (Stage D).
 
-       make check-fmt && make lint
+   ```plaintext
+   make check-fmt && make lint
+   ```
 
    Expected: no errors.
 
 6. Add all tests (Stage E).
 
-       set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-test.log
+   ```plaintext
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-test.log
+   ```
 
    Expected: all new and existing tests pass.
 
 7. Update documentation (Stage F).
 
-       set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-2-2-md.log
-       set -o pipefail; make nixie 2>&1 | tee /tmp/1-2-2-nixie.log
+   ```plaintext
+   set -o pipefail; make markdownlint 2>&1 | tee /tmp/2-2-2-md.log
+   set -o pipefail; make nixie 2>&1 | tee /tmp/2-2-2-nixie.log
+   ```
 
    Expected: all exit 0.
 
 8. Final quality gate.
 
-       set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-2-final-fmt.log
-       set -o pipefail; make lint 2>&1 | tee /tmp/1-2-2-final-lint.log
-       set -o pipefail; make test 2>&1 | tee /tmp/1-2-2-final-test.log
+   ```plaintext
+   set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-2-final-fmt.log
+   set -o pipefail; make lint 2>&1 | tee /tmp/2-2-2-final-lint.log
+   set -o pipefail; make test 2>&1 | tee /tmp/2-2-2-final-test.log
+   ```
 
    Expected: all exit 0.
 
@@ -725,7 +757,7 @@ Behavioural acceptance criteria:
   one fails with a typed, auditable domain error.
 - Multiple tasks associated with the same branch are all returned when
   querying by that branch reference.
-- All existing 1.2.1 behaviour (issue-to-task creation, retrieval by issue
+- All existing 2.2.1 behaviour (issue-to-task creation, retrieval by issue
   ref, duplicate rejection) continues to work unchanged.
 
 Test acceptance criteria:
@@ -758,8 +790,8 @@ Quality criteria:
   - PostgreSQL tests use temporary databases and cluster guards.
 - If migration work fails midway: revert migration files and re-run. The
   migration only adds indexes to existing columns, so up/down is safe.
-- If adapter work fails midway: existing 1.2.1 tests provide a safety net.
-  All 1.2.1 behaviour must pass before proceeding.
+- If adapter work fails midway: existing 2.2.1 tests provide a safety net.
+  All 2.2.1 behaviour must pass before proceeding.
 
 ## Artefacts and notes
 
@@ -797,7 +829,7 @@ Files to modify:
 - `tests/postgres/helpers.rs` — add migration constant
 - `docs/corbusier-design.md` — add implementation decision
 - `docs/users-guide.md` — add branch/PR association examples
-- `docs/roadmap.md` — mark 1.2.2 as done
+- `docs/roadmap.md` — mark 2.2.2 as done
 
 ## Interfaces and dependencies
 
@@ -806,31 +838,30 @@ Prescriptive interfaces for this milestone:
 Domain types (all in `src/task/domain/`):
 
 - `BranchName` — string newtype, validated (non-empty, no colons, ≤200 chars).
-- `BranchRef` — `{ provider: IssueProvider, repository: RepositoryFullName,
-  branch_name: BranchName
-  }`. Canonical format: `"provider:owner/repo:branch-name"`.
+- `BranchRef` —
+  `{ provider: IssueProvider, repository: RepositoryFullName,
+  branch_name: BranchName }`.
+  Canonical format:
+  `"provider:owner/repo:branch-name"`.
 - `PullRequestNumber` — `u64` newtype, validated (positive, ≤ `i64::MAX`).
-- `PullRequestRef` — `{ provider: IssueProvider, repository:
-  RepositoryFullName, pull_request_number: PullRequestNumber
-  }`. Canonical format: `"provider:owner/repo:42"`.
+- `PullRequestRef` —
+  `{ provider: IssueProvider, repository: RepositoryFullName,
+  pull_request_number: PullRequestNumber }`. Canonical
+  format: `"provider:owner/repo:42"`.
 - `VcsProvider` — type alias for `IssueProvider`.
 
 Port contract extensions (in `src/task/ports/repository.rs`):
 
 - `async fn update(&self, task: &Task) -> TaskRepositoryResult<()>`
-- `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) ->
-  TaskRepositoryResult<Vec<Task>>`
-- `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) ->
-  TaskRepositoryResult<Vec<Task>>`
+- `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) -> TaskRepositoryResult<Vec<Task>>`
+- `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) -> TaskRepositoryResult<Vec<Task>>`
 
 Service methods (in `src/task/services/lifecycle.rs`):
 
 - `associate_branch(AssociateBranchRequest) -> TaskLifecycleResult<Task>`
-- `associate_pull_request(AssociatePullRequestRequest) ->
-  TaskLifecycleResult<Task>`
+- `associate_pull_request(AssociatePullRequestRequest) -> TaskLifecycleResult<Task>`
 - `find_by_branch_ref(&BranchRef) -> TaskLifecycleResult<Vec<Task>>`
-- `find_by_pull_request_ref(&PullRequestRef) ->
-  TaskLifecycleResult<Vec<Task>>`
+- `find_by_pull_request_ref(&PullRequestRef) -> TaskLifecycleResult<Vec<Task>>`
 
 Dependencies: no new crates required. All functionality uses existing
 dependencies (`diesel`, `serde`, `chrono`, `uuid`, `mockable`, `thiserror`,
@@ -838,5 +869,5 @@ dependencies (`diesel`, `serde`, `chrono`, `uuid`, `mockable`, `thiserror`,
 
 ## Revision note
 
-Initial draft created for roadmap item 1.2.2 based on repository state after
-1.2.1 completion and design references dated 2026-02-11.
+Initial draft created for roadmap item 2.2.2 based on repository state after
+2.2.1 completion and design references dated 2026-02-11.

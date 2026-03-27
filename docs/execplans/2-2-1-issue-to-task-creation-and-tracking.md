@@ -1,4 +1,4 @@
-# Implement Issue-to-Task Creation and Tracking (Roadmap 1.2.1)
+# Implement Issue-to-Task Creation and Tracking (Roadmap 2.2.1)
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
@@ -11,7 +11,7 @@ the controlling execution document for this feature.
 
 ## Purpose / big picture
 
-Implement roadmap item 1.2.1, so Corbusier can create an internal task record
+Implement roadmap item 2.2.1, so Corbusier can create an internal task record
 from external issue metadata, assign internal task identity and lifecycle
 timestamps, and retrieve the task by external issue reference.
 
@@ -46,7 +46,7 @@ unhappy paths.
 
 - Scope: if implementation exceeds 30 files or 2,200 net lines, stop and
   escalate with a reduced-scope option.
-- Interfaces: if implementing 1.2.1 requires changing unrelated public APIs
+- Interfaces: if implementing 2.2.1 requires changing unrelated public APIs
   outside the new task lifecycle boundary, stop and escalate.
 - Dependencies: if any new crate beyond requested version bumps is needed, stop
   and escalate with rationale.
@@ -88,7 +88,7 @@ unhappy paths.
   `docs/roadmap.md` and `docs/corbusier-design.md` (§2.2.2, §4.3.1.2, §6.2.1).
 - [x] (2026-02-09 02:49Z) Mapped existing architecture and test harness
   patterns in `src/message/` and `tests/postgres/`.
-- [x] (2026-02-09 02:49Z) Authored initial ExecPlan draft for roadmap 1.2.1.
+- [x] (2026-02-09 02:49Z) Authored initial ExecPlan draft for roadmap 2.2.1.
 - [ ] Await user approval of this ExecPlan before implementation.
 - [ ] Implement stages A-D and keep this section updated per stopping point.
 
@@ -102,7 +102,7 @@ unhappy paths.
 
 - Observation: current schema tracks `conversations.task_id`, but migrations do
   not define a `tasks` table yet. Evidence:
-  `migrations/2026-01-15-000000_create_base_tables/up.sql`. Impact: 1.2.1 must
+  `migrations/2026-01-15-000000_create_base_tables/up.sql`. Impact: 2.2.1 must
   include persistent task table introduction before adapter integration can be
   complete.
 
@@ -145,10 +145,10 @@ Current repository state:
 - Behaviour tests already use `rstest-bdd` macros and feature files:
   - `tests/features/agent_handoff.feature`
   - `tests/agent_handoff_steps/`
-- `docs/roadmap.md` item 1.2.1 is currently unchecked and depends on design
+- `docs/roadmap.md` item 2.2.1 is currently unchecked and depends on design
   guidance in `docs/corbusier-design.md` §2.2.2 and §4.3.1.2.
 
-Target architecture for 1.2.1:
+Target architecture for 2.2.1:
 
 - Add a new `task` module mirroring the established layout:
   - `src/task/domain/` for `Task`, `TaskId`, `TaskOrigin`, `IssueRef`,
@@ -217,7 +217,7 @@ Implement domain, service, and adapter logic in small increments:
 - Ensure retrieval by canonical issue reference is supported in both in-memory
   and PostgreSQL adapters.
 
-Go/no-go: proceed only when unit, behavioural, and integration tests for 1.2.1
+Go/no-go: proceed only when unit, behavioural, and integration tests for 2.2.1
 all pass locally.
 
 ### Stage D: hardening, docs, and roadmap closure
@@ -227,7 +227,7 @@ all pass locally.
   uniqueness strategy, and timestamp lifecycle rationale.
 - Update `docs/users-guide.md` with user-visible task creation/retrieval
   behaviour and examples.
-- Mark roadmap item 1.2.1 and its sub-bullets as done in `docs/roadmap.md`
+- Mark roadmap item 2.2.1 and its sub-bullets as done in `docs/roadmap.md`
   only after all quality gates pass.
 - Run full repository gates and documentation validators.
 
@@ -272,15 +272,15 @@ All commands run from repository root: `/home/user/project`.
 
 6. Run commit gates with durable logs.
 
-   `set -o pipefail; make check-fmt 2>&1 | tee /tmp/1-2-1-check-fmt.log`
+   `set -o pipefail; make check-fmt 2>&1 | tee /tmp/2-2-1-check-fmt.log`
 
-   `set -o pipefail; make lint 2>&1 | tee /tmp/1-2-1-lint.log`
+   `set -o pipefail; make lint 2>&1 | tee /tmp/2-2-1-lint.log`
 
-   `set -o pipefail; make test 2>&1 | tee /tmp/1-2-1-test.log`
+   `set -o pipefail; make test 2>&1 | tee /tmp/2-2-1-test.log`
 
-   `set -o pipefail; make markdownlint 2>&1 | tee /tmp/1-2-1-markdownlint.log`
+   `set -o pipefail; make markdownlint 2>&1 | tee /tmp/2-2-1-markdownlint.log`
 
-   `set -o pipefail; make nixie 2>&1 | tee /tmp/1-2-1-nixie.log`
+   `set -o pipefail; make nixie 2>&1 | tee /tmp/2-2-1-nixie.log`
 
    Expected signal: all commands exit 0 and logs contain no denied warnings.
 
@@ -359,7 +359,7 @@ Expected implementation touchpoints:
   - `docs/users-guide.md`
   - `docs/roadmap.md`
 
-Keep command logs captured under `/tmp/1-2-1-*.log` for review during execution.
+Keep command logs captured under `/tmp/2-2-1-*.log` for review during execution.
 
 ## Interfaces and dependencies
 
@@ -389,5 +389,5 @@ leak Diesel or transport types across port boundaries.
 
 ## Revision note
 
-Initial draft created for roadmap item 1.2.1 based on repository state and
+Initial draft created for roadmap item 2.2.1 based on repository state and
 design references dated 2026-02-09.

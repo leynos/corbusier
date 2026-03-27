@@ -1,4 +1,4 @@
-# Deliver slash command parsing and template execution (roadmap 1.4.1)
+# Deliver slash command parsing and template execution (roadmap 2.4.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -7,7 +7,7 @@ proceeds.
 
 Status: COMPLETE
 
-This document defines implementation for roadmap item 1.4.1 in
+This document defines implementation for roadmap item 2.4.1 in
 `docs/roadmap.md`:
 
 - Implement command parser and registry.
@@ -54,9 +54,9 @@ slash-command execution remains close to canonical message and audit metadata
 - Keep each Rust file under 400 lines.
 - Maintain en-GB-oxendict spelling in docs and comments.
 - Update documentation deliverables as part of feature completion:
-  - `docs/corbusier-design.md` design decisions for 1.4.1.
+  - `docs/corbusier-design.md` design decisions for 2.4.1.
   - `docs/users-guide.md` user-visible slash command behaviour.
-  - `docs/roadmap.md` mark 1.4.1 done only after all validation gates pass.
+  - `docs/roadmap.md` mark 2.4.1 done only after all validation gates pass.
 
 ## Tolerances (exception triggers)
 
@@ -67,7 +67,7 @@ slash-command execution remains close to canonical message and audit metadata
 - Dependency tolerance: stop and escalate if more than one new external crate
   beyond `minijinja` is required.
 - Data tolerance: stop and escalate if the feature requires a new database
-  migration; 1.4.1 should fit the existing message metadata model.
+  migration; 2.4.1 should fit the existing message metadata model.
 - Iteration tolerance: stop and escalate if the same failure persists after
   three focused fix attempts.
 - Ambiguity tolerance: stop and escalate if deterministic ordering semantics
@@ -97,15 +97,15 @@ slash-command execution remains close to canonical message and audit metadata
 ## Progress
 
 - [x] (2026-02-26 17:34Z) Gathered roadmap/design/testing constraints and
-      drafted this ExecPlan.
+  drafted this ExecPlan.
 - [x] (2026-02-26 18:08Z) Stage A: Confirmed command grammar, registry
-      contract, and deterministic planning rules.
+  contract, and deterministic planning rules.
 - [x] (2026-02-26 18:15Z) Stage B: Implemented domain, port, service, and
-      adapter code for parser, registry, expansion, and deterministic planning.
+  adapter code for parser, registry, expansion, and deterministic planning.
 - [x] (2026-02-26 18:18Z) Stage C: Added unit, integration, and BDD coverage
-      for happy/unhappy/edge cases.
+  for happy/unhappy/edge cases.
 - [x] (2026-02-26 18:25Z) Stage D: Updated user/design docs, passed quality
-      gates, and marked roadmap item 1.4.1 complete.
+  gates, and marked roadmap item 2.4.1 complete.
 
 ## Surprises & discoveries
 
@@ -116,7 +116,7 @@ slash-command execution remains close to canonical message and audit metadata
   (`SlashCommand`, `SlashCommandExpansion`, and `execute_slash_command` port
   sketch).
 - The repository already stores slash expansion metadata in
-  `MessageMetadata::slash_command_expansion`, so 1.4.1 can remain
+  `MessageMetadata::slash_command_expansion`, so 2.4.1 can remain
   migration-free unless a hard schema gap is discovered during implementation.
 - `minijinja` in this environment, did not expose a `tojson` filter in template
   rendering defaults; built-in command templates were adjusted to emit valid
@@ -134,11 +134,11 @@ slash-command execution remains close to canonical message and audit metadata
   the conversation component. Date/Author: 2026-02-26 / plan author.
 
 - Decision: Treat deterministic output as an explicit contract of the slash
-  service, verified by repeat-execution tests. Rationale: roadmap 1.4.1 success
+  service, verified by repeat-execution tests. Rationale: roadmap 2.4.1 success
   criteria explicitly require deterministic tool call sequences with auditable
   records. Date/Author: 2026-02-26 / plan author.
 
-- Decision: Keep 1.4.1 storage model within existing message metadata and tool
+- Decision: Keep 2.4.1 storage model within existing message metadata and tool
   audit fields. Rationale: this minimizes blast radius and avoids unnecessary
   persistence migrations while still satisfying auditability requirements.
   Date/Author: 2026-02-26 / plan author.
@@ -150,7 +150,7 @@ slash-command execution remains close to canonical message and audit metadata
 
 ## Outcomes & retrospective
 
-Roadmap 1.4.1 was implemented with the following outcomes:
+Roadmap 2.4.1 was implemented with the following outcomes:
 
 - Added slash-command domain model, parser, typed validation, execution output,
   and error types under `src/message/domain/slash_command/`.
@@ -162,7 +162,7 @@ Roadmap 1.4.1 was implemented with the following outcomes:
   integration tests (using existing `pg-embed-setup-unpriv` fixture pipeline),
   and BDD scenarios (`rstest-bdd`).
 - Updated `docs/users-guide.md`, `docs/corbusier-design.md`, and
-  `docs/roadmap.md` (marked 1.4.1 done).
+  `docs/roadmap.md` (marked 2.4.1 done).
 
 Validation evidence:
 
@@ -181,7 +181,7 @@ Lessons learned:
 
 Current relevant code and docs:
 
-- `docs/roadmap.md` marks 1.4.1 as complete.
+- `docs/roadmap.md` marks 2.4.1 as complete.
 - `docs/corbusier-design.md` section 2.1.1 defines F-004, and section 6.1.1
   models slash command execution within the conversation component.
 - `src/message/domain/metadata.rs` already includes `SlashCommandExpansion`
@@ -286,9 +286,9 @@ implementation.
 
 - Update `docs/users-guide.md` with slash command usage, validation failures,
   and deterministic audit behaviour.
-- Add implementation decisions for roadmap 1.4.1 to
+- Add implementation decisions for roadmap 2.4.1 to
   `docs/corbusier-design.md`.
-- Mark roadmap item 1.4.1 and its sub-items complete in `docs/roadmap.md`
+- Mark roadmap item 2.4.1 and its sub-items complete in `docs/roadmap.md`
   after all quality gates pass.
 - Run all required formatting, linting, tests, and markdown validations.
 
@@ -298,10 +298,11 @@ All commands run from repository root (`/home/user/project`).
 
 1. Create feature branches of code changes in this order:
    domain -> ports -> adapters/services -> tests -> docs.
+
 2. Run targeted tests after each stage and keep logs:
 
    ```bash
-   set -o pipefail && make test 2>&1 | tee /tmp/1-4-1-stage-test.log
+   set -o pipefail && make test 2>&1 | tee /tmp/2-4-1-stage-test.log
    ```
 
 3. Ensure Postgres test harness tooling is available:
@@ -313,17 +314,17 @@ All commands run from repository root (`/home/user/project`).
 4. Run full code quality gates once implementation is complete:
 
    ```bash
-   set -o pipefail && make check-fmt 2>&1 | tee /tmp/1-4-1-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/1-4-1-lint.log
-   set -o pipefail && make test 2>&1 | tee /tmp/1-4-1-test.log
+   set -o pipefail && make check-fmt 2>&1 | tee /tmp/2-4-1-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/2-4-1-lint.log
+   set -o pipefail && make test 2>&1 | tee /tmp/2-4-1-test.log
    ```
 
 5. Run documentation gates after docs updates:
 
    ```bash
-   set -o pipefail && make fmt 2>&1 | tee /tmp/1-4-1-fmt.log
-   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/1-4-1-markdownlint.log
-   set -o pipefail && make nixie 2>&1 | tee /tmp/1-4-1-nixie.log
+   set -o pipefail && make fmt 2>&1 | tee /tmp/2-4-1-fmt.log
+   set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/2-4-1-markdownlint.log
+   set -o pipefail && make nixie 2>&1 | tee /tmp/2-4-1-nixie.log
    ```
 
 Expected success transcript shape:
@@ -380,7 +381,7 @@ Expected new/updated artifact groups:
 - Documentation updates in `docs/users-guide.md`,
   `docs/corbusier-design.md`, and `docs/roadmap.md`.
 
-Store command logs under `/tmp/1-4-1-*.log` for auditable implementation
+Store command logs under `/tmp/2-4-1-*.log` for auditable implementation
 evidence.
 
 ## Interfaces and dependencies
@@ -406,4 +407,4 @@ Planned new interfaces (exact names may be finalized during Stage A):
     planned tool calls and metadata suitable for message/audit persistence.
 
 No external services beyond existing repository dependencies are required for
-1.4.1.
+2.4.1.
