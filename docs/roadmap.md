@@ -11,7 +11,7 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
-It sits ahead of phases 2.0 through 7.0: phase 1.0 establishes the runtime,
+It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
@@ -41,7 +41,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - Phase 1 hook-recovery dependencies: Podbot Step 4.9, "Hook execution and
   orchestrator acknowledgement", and Podbot Step 4.10, "Recovery, replay, and
   restart safety".
-- Phase 1 conformance dependencies: Podbot Step 4.11, "Gated e2e
+- Phase 1 conformance dependencies: Podbot Step 4.11, "Gated end-to-end (E2E)
   orchestration suite", Podbot Step 8.2, "ACP transport conformance harness",
   Podbot Step 8.3, "Host lifecycle and output-purity tests", and Podbot Step
   8.4, "Wire, hook, and validation conformance tests".
@@ -520,7 +520,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 3.3. Hook engine and policy enforcement
 
-The tasks below establish the current Corbusier-owned hook baseline. Phase 2.3
+The tasks below establish the current Corbusier-owned hook baseline. Phase 1.3
 extends hosted-session execution onto Podbot control-channel acknowledgement
 flows without regressing existing policy enforcement.
 
@@ -546,7 +546,7 @@ flows without regressing existing policy enforcement.
 
 ### 3.4. Encapsulation and workspace management
 
-Phase 2.2 expands this work from generic encapsulation into a canonical
+Phase 1.2 expands this work from generic encapsulation into a canonical
 workspace runtime model shared with Podbot-hosted execution and source-policy
 enforcement.
 
@@ -596,7 +596,8 @@ enforcement.
 ### 4.3. Real-time event streaming
 
 - [ ] 4.3.1 Provide real-time event streaming for orchestration updates.
-  Requires 5.2.1 and 1.4.1. See corbusier-design.md §2.1.4 and §6.2.2.
+  Requires 5.2.1 (non-linear) and 1.4.1. See corbusier-design.md §2.1.4 and
+  §6.2.2.
   - [ ] Implement event schema for conversation and task updates. See
     corbusier-design.md §6.2.2.
   - [ ] Publish events through SSE or equivalent transport. See
