@@ -13,6 +13,7 @@ use crate::hook_engine::ports::HookPolicyAuditRepository;
 use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
+use eyre::{Result, WrapErr};
 use mockable::{Clock, DefaultClock};
 use rstest::fixture;
 use serde_json::json;
@@ -90,9 +91,9 @@ pub(crate) async fn setup_failing_post_deploy_hook(
     ctx: &RequestContext,
     definition_repo: &InMemoryHookDefinitionRepository,
     action_executor: &InMemoryHookActionExecutor,
-) {
-    let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");
-    let hook_id = HookId::new("hook-fail").expect("failing hook id should be valid");
+) -> Result<()> {
+    let action_id = HookActionId::new("failing-action").wrap_err("valid failing action id")?;
+    let hook_id = HookId::new("hook-fail").wrap_err("valid failing hook id")?;
     let definition = HookDefinition::new(
         hook_id,
         "Failing hook",
@@ -102,16 +103,16 @@ pub(crate) async fn setup_failing_post_deploy_hook(
             HookActionType::PolicyCheck,
         )],
     )
-    .expect("failing hook definition should be valid for test")
+    .wrap_err("valid failing hook definition")?
     .with_priority(HookPriority::new(1));
 
     definition_repo
         .insert(ctx, definition)
         .await
-        .expect("insert failing definition should succeed");
+        .wrap_err("insert failing definition")?;
     action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
-        .expect("configuring failing action outcome should succeed");
+        .wrap_err("configure failing action outcome")?;
     action_executor
         .set_output(
             action_id.as_str(),
@@ -120,18 +121,18 @@ pub(crate) async fn setup_failing_post_deploy_hook(
                 "reason": "policy blocked deployment",
             }),
         )
-        .expect("configuring failing action output should succeed");
+        .wrap_err("configure failing action output")?;
+    Ok(())
 }
 
 pub(crate) async fn setup_invalid_post_deploy_policy_hook(
     ctx: &RequestContext,
     definition_repo: &InMemoryHookDefinitionRepository,
     action_executor: &InMemoryHookActionExecutor,
-) {
-    let action_id = HookActionId::new("invalid-policy-action")
-        .expect("invalid policy action id should be valid");
-    let hook_id =
-        HookId::new("hook-invalid-policy").expect("invalid policy hook id should be valid");
+) -> Result<()> {
+    let action_id =
+        HookActionId::new("invalid-policy-action").wrap_err("valid invalid-policy action id")?;
+    let hook_id = HookId::new("hook-invalid-policy").wrap_err("valid invalid-policy hook id")?;
     let definition = HookDefinition::new(
         hook_id,
         "Invalid policy hook",
@@ -141,16 +142,17 @@ pub(crate) async fn setup_invalid_post_deploy_policy_hook(
             HookActionType::PolicyCheck,
         )],
     )
-    .expect("invalid policy hook definition should be valid for test")
+    .wrap_err("valid invalid-policy hook definition")?
     .with_priority(HookPriority::new(1));
 
     definition_repo
         .insert(ctx, definition)
         .await
-        .expect("insert invalid policy definition should succeed");
+        .wrap_err("insert invalid policy definition")?;
     action_executor
         .set_output(action_id.as_str(), json!({"status": "succeeded"}))
-        .expect("configuring invalid policy output should succeed");
+        .wrap_err("configure invalid policy output")?;
+    Ok(())
 }
 
 pub(crate) async fn setup_deny_policy_hook(
@@ -158,9 +160,9 @@ pub(crate) async fn setup_deny_policy_hook(
     definition_repo: &InMemoryHookDefinitionRepository,
     action_executor: &InMemoryHookActionExecutor,
     scope: HookExecutionScope,
-) -> HookTriggerContext {
-    let action_id = HookActionId::new("policy-action").expect("policy action id should be valid");
-    let hook_id = HookId::new("hook-policy-scope").expect("hook id should be valid");
+) -> Result<HookTriggerContext> {
+    let action_id = HookActionId::new("policy-action").wrap_err("valid policy action id")?;
+    let hook_id = HookId::new("hook-policy-scope").wrap_err("valid policy hook id")?;
     let definition = HookDefinition::new(
         hook_id,
         "Policy hook",
@@ -170,12 +172,12 @@ pub(crate) async fn setup_deny_policy_hook(
             HookActionType::PolicyCheck,
         )],
     )
-    .expect("policy definition should be valid");
+    .wrap_err("valid policy definition")?;
 
     definition_repo
         .insert(ctx, definition)
         .await
-        .expect("insert policy definition should succeed");
+        .wrap_err("insert policy definition")?;
     action_executor
         .set_output(
             action_id.as_str(),
@@ -187,13 +189,13 @@ pub(crate) async fn setup_deny_policy_hook(
                 }
             }),
         )
-        .expect("configuring policy output should succeed");
+        .wrap_err("configure policy output")?;
 
-    HookTriggerContext::new_with_timestamp(
+    Ok(HookTriggerContext::new_with_timestamp(
         HookTriggerType::PreToolUse,
         scope.with_metadata(json!({"tool_name": "read_file"})),
         DefaultClock.utc(),
-    )
+    ))
 }
 
 #[expect(
@@ -210,11 +212,11 @@ pub(crate) async fn assert_policy_audit_indexed_once(
     policy_audit: &InMemoryHookPolicyAuditRepository,
     ctx: &RequestContext,
     keys: PolicyAuditQueryKeys,
-) {
+) -> Result<()> {
     let by_task = policy_audit
         .find_by_task(ctx, keys.task_id)
         .await
-        .expect("querying policy events by task should succeed");
+        .wrap_err("query policy events by task")?;
     assert_eq!(
         by_task.len(),
         1,
@@ -223,7 +225,7 @@ pub(crate) async fn assert_policy_audit_indexed_once(
     let by_conversation = policy_audit
         .find_by_conversation(ctx, keys.conversation_id)
         .await
-        .expect("querying policy events by conversation should succeed");
+        .wrap_err("query policy events by conversation")?;
     assert_eq!(
         by_conversation.len(),
         1,
@@ -232,10 +234,11 @@ pub(crate) async fn assert_policy_audit_indexed_once(
     let by_trigger = policy_audit
         .find_by_trigger_context(ctx, keys.trigger_context_id)
         .await
-        .expect("querying policy events by trigger should succeed");
+        .wrap_err("query policy events by trigger")?;
     assert_eq!(
         by_trigger.len(),
         1,
         "expected exactly one policy event indexed by trigger context"
     );
+    Ok(())
 }

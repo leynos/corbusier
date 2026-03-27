@@ -179,17 +179,14 @@ impl ToolCallRequest {
     /// Associates a task identifier with the request.
     #[must_use]
     pub fn with_task_id(mut self, task_id: TaskId) -> Self {
-        self.execution_scope = self.execution_scope.clone().with_task_id(task_id);
+        self.execution_scope = self.execution_scope.with_task_id(task_id);
         self
     }
 
     /// Associates a conversation identifier with the request.
     #[must_use]
     pub fn with_conversation_id(mut self, conversation_id: ConversationId) -> Self {
-        self.execution_scope = self
-            .execution_scope
-            .clone()
-            .with_conversation_id(conversation_id);
+        self.execution_scope = self.execution_scope.with_conversation_id(conversation_id);
         self
     }
 }
@@ -297,5 +294,18 @@ impl ToolCallResult {
     #[must_use]
     pub const fn completed_at(&self) -> DateTime<Utc> {
         self.completed_at
+    }
+}
+
+impl From<crate::hook_engine::domain::HookExecutionScope> for ToolExecutionScope {
+    fn from(src: crate::hook_engine::domain::HookExecutionScope) -> Self {
+        let mut scope = Self::new();
+        if let Some(task_id) = src.task_id() {
+            scope = scope.with_task_id(task_id);
+        }
+        if let Some(conversation_id) = src.conversation_id() {
+            scope = scope.with_conversation_id(conversation_id);
+        }
+        scope.with_metadata(src.metadata().clone())
     }
 }

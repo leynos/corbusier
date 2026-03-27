@@ -17,6 +17,7 @@ use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
 use async_trait::async_trait;
+use eyre::Result;
 use mockable::DefaultClock;
 use std::sync::Arc;
 
@@ -24,7 +25,7 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_projects_policy_audit_by_task_and_conversation(
     hook_engine_fixture: HookEngineFixture,
-) {
+) -> Result<()> {
     let HookEngineFixture {
         definition_repo,
         action_executor,
@@ -38,7 +39,7 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
     let scope = HookExecutionScope::default()
         .with_task_id(task_id)
         .with_conversation_id(conversation_id);
-    let context = setup_deny_policy_hook(&ctx, &definition_repo, &action_executor, scope).await;
+    let context = setup_deny_policy_hook(&ctx, &definition_repo, &action_executor, scope).await?;
     let trigger_context_id = context.id();
     service
         .execute(&ctx, context)
@@ -54,14 +55,15 @@ async fn execute_projects_policy_audit_by_task_and_conversation(
             trigger_context_id,
         },
     )
-    .await;
+    .await?;
+    Ok(())
 }
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn policy_audit_projection_error_surfaces_without_persisting_events(
     hook_engine_fixture: HookEngineFixture,
-) {
+) -> Result<()> {
     let HookEngineFixture {
         definition_repo,
         action_executor,
@@ -71,7 +73,7 @@ async fn policy_audit_projection_error_surfaces_without_persisting_events(
     } = hook_engine_fixture;
     let ctx = request_ctx();
 
-    setup_invalid_post_deploy_policy_hook(&ctx, &definition_repo, &action_executor).await;
+    setup_invalid_post_deploy_policy_hook(&ctx, &definition_repo, &action_executor).await?;
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
@@ -103,13 +105,14 @@ async fn policy_audit_projection_error_surfaces_without_persisting_events(
             .status(),
         HookExecutionStatus::Succeeded
     );
+    Ok(())
 }
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn policy_audit_persistence_error_surfaces_without_persisting_events(
     hook_engine_fixture: HookEngineFixture,
-) {
+) -> Result<()> {
     let HookEngineFixture {
         definition_repo,
         action_executor,
@@ -119,7 +122,7 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
     } = hook_engine_fixture;
     let ctx = request_ctx();
 
-    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await;
+    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await?;
 
     let failing_policy_audit = FailingPolicyAuditRepository::new(policy_audit.clone());
     let service = HookEngineService::new(HookEngineServiceDeps {
@@ -153,6 +156,7 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
         .await
         .expect("querying stored execution results should succeed");
     assert_eq!(executions.len(), 1, "expected a single stored execution");
+    Ok(())
 }
 
 #[derive(Clone, Debug)]

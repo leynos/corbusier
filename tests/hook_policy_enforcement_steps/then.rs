@@ -11,6 +11,9 @@ use rstest_bdd_macros::then;
 fn policy_audit_is_retrievable_by_conversation(
     world: &mut HookPolicyWorld,
 ) -> Result<(), eyre::Report> {
+    let Some(result) = &world.last_result else {
+        return Err(eyre!("expected successful tool call result"));
+    };
     let conversation_id = world
         .last_conversation_id
         .ok_or_else(|| eyre!("conversation id should be recorded"))?;
@@ -21,8 +24,11 @@ fn policy_audit_is_retrievable_by_conversation(
     )
     .wrap_err("query policy audit by conversation")?;
     world.last_events.clone_from(&events);
-    if world.last_result.is_none() {
-        return Err(eyre!("expected successful tool call result"));
+    if !result.outcome().is_success() {
+        return Err(eyre!(
+            "expected successful tool call outcome, got {:?}",
+            result.outcome()
+        ));
     }
     if events.len() != 1 {
         return Err(eyre!("expected 1 policy audit event, got {}", events.len()));

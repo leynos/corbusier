@@ -30,6 +30,25 @@ impl InMemoryHookPolicyAuditRepository {
                 .then_with(|| left.action_id().cmp(right.action_id()))
         });
     }
+
+    async fn filter_tenant_events<F>(
+        &self,
+        ctx: &RequestContext,
+        predicate: F,
+    ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>>
+    where
+        F: Fn(&PolicyAuditEvent) -> bool,
+    {
+        let events = self.events.read().await;
+        let tenant_events = events.get(&ctx.tenant_id()).map_or(&[][..], Vec::as_slice);
+        let mut filtered = tenant_events
+            .iter()
+            .filter(|event| predicate(event))
+            .cloned()
+            .collect::<Vec<_>>();
+        Self::sort_events(&mut filtered);
+        Ok(filtered)
+    }
 }
 
 #[async_trait]
@@ -56,15 +75,8 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         task_id: TaskId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        let events = self.events.read().await;
-        let tenant_events = events.get(&ctx.tenant_id()).map_or(&[][..], Vec::as_slice);
-        let mut filtered: Vec<_> = tenant_events
-            .iter()
-            .filter(|event| event.task_id() == Some(task_id))
-            .cloned()
-            .collect();
-        Self::sort_events(&mut filtered);
-        Ok(filtered)
+        self.filter_tenant_events(ctx, |event| event.task_id() == Some(task_id))
+            .await
     }
 
     async fn find_by_conversation(
@@ -72,15 +84,10 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         conversation_id: ConversationId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        let events = self.events.read().await;
-        let tenant_events = events.get(&ctx.tenant_id()).map_or(&[][..], Vec::as_slice);
-        let mut filtered: Vec<_> = tenant_events
-            .iter()
-            .filter(|event| event.conversation_id() == Some(conversation_id))
-            .cloned()
-            .collect();
-        Self::sort_events(&mut filtered);
-        Ok(filtered)
+        self.filter_tenant_events(ctx, |event| {
+            event.conversation_id() == Some(conversation_id)
+        })
+        .await
     }
 
     async fn find_by_trigger_context(
@@ -88,14 +95,9 @@ impl HookPolicyAuditRepository for InMemoryHookPolicyAuditRepository {
         ctx: &RequestContext,
         trigger_context_id: TriggerContextId,
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
-        let events = self.events.read().await;
-        let tenant_events = events.get(&ctx.tenant_id()).map_or(&[][..], Vec::as_slice);
-        let mut filtered: Vec<_> = tenant_events
-            .iter()
-            .filter(|event| event.trigger_context_id() == trigger_context_id)
-            .cloned()
-            .collect();
-        Self::sort_events(&mut filtered);
-        Ok(filtered)
+        self.filter_tenant_events(ctx, |event| {
+            event.trigger_context_id() == trigger_context_id
+        })
+        .await
     }
 }

@@ -11,6 +11,7 @@ use crate::hook_engine::domain::{
 use crate::hook_engine::ports::{
     HookEngine, HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
 };
+use eyre::Result;
 use mockable::DefaultClock;
 use serde_json::json;
 
@@ -61,7 +62,9 @@ async fn execute_orders_hooks_by_priority_then_id(hook_engine_fixture: HookEngin
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEngineFixture) {
+async fn execute_persists_results_and_failure_status(
+    hook_engine_fixture: HookEngineFixture,
+) -> Result<()> {
     let HookEngineFixture {
         definition_repo,
         action_executor,
@@ -71,7 +74,7 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
     } = hook_engine_fixture;
     let ctx = request_ctx();
 
-    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await;
+    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await?;
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
@@ -107,6 +110,7 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
             .reason(),
         "policy blocked deployment"
     );
+    Ok(())
 }
 
 #[rstest::rstest]

@@ -1,5 +1,6 @@
 //! Governance adapters for tool execution authorization and audit observation.
 
+use super::policy_metadata::build_scope_metadata;
 use crate::context::RequestContext;
 use crate::hook_engine::domain::{HookExecutionScope, HookTriggerContext, HookTriggerType};
 use crate::hook_engine::ports::{HookEngine, HookPolicyAuditRepository};
@@ -10,7 +11,6 @@ use crate::tool_registry::ports::{
     CompletedToolCall, ToolExecutionGovernance, ToolGovernanceError,
 };
 use async_trait::async_trait;
-use serde_json::json;
 use std::sync::Arc;
 
 /// The fixed outcome returned by a [`StubGovernance`] adapter.
@@ -106,12 +106,123 @@ impl ToolExecutionGovernance for StubGovernance {
     }
 }
 
-/// Backwards-compatible alias for the always-allowing stub adapter.
-pub type AllowAllPolicy = StubGovernance;
-/// Backwards-compatible alias for the always-denying stub adapter.
-pub type DenyAllPolicy = StubGovernance;
-/// Backwards-compatible alias for the always-failing stub adapter.
-pub type FailingPolicy = StubGovernance;
+macro_rules! legacy_stub_policy {
+    (
+        $(#[$doc:meta])*
+        $name:ident,
+        $ctor_doc:literal,
+        $ctor:expr,
+        $default:expr
+    ) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone)]
+        pub struct $name(StubGovernance);
+
+        impl $name {
+            #[doc = $ctor_doc]
+            #[must_use]
+            pub fn new(message: impl Into<String>) -> Self { Self($ctor(message)) }
+        }
+
+        impl Default for $name {
+            fn default() -> Self { Self::new($default) }
+        }
+
+        impl From<StubGovernance> for $name {
+            fn from(governance: StubGovernance) -> Self { Self(governance) }
+        }
+
+        impl From<$name> for StubGovernance {
+            fn from(policy: $name) -> Self { policy.0 }
+        }
+
+        #[async_trait]
+        impl ToolExecutionGovernance for $name {
+            async fn enforce_before_call(
+                &self,
+                ctx: &RequestContext,
+                request: &ToolCallRequest,
+                entry: &CatalogEntry,
+            ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+                self.0.enforce_before_call(ctx, request, entry).await
+            }
+
+            async fn observe_after_call(
+                &self,
+                ctx: &RequestContext,
+                call: &CompletedToolCall<'_>,
+            ) -> Result<(), ToolGovernanceError> {
+                self.0.observe_after_call(ctx, call).await
+            }
+        }
+    };
+}
+
+/// Backwards-compatible wrapper for the always-allowing stub adapter.
+#[derive(Debug, Clone)]
+pub struct AllowAllPolicy(StubGovernance);
+
+impl AllowAllPolicy {
+    /// Creates a governance adapter that always allows tool execution.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self(StubGovernance::allowing())
+    }
+}
+
+impl Default for AllowAllPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<StubGovernance> for AllowAllPolicy {
+    fn from(governance: StubGovernance) -> Self {
+        Self(governance)
+    }
+}
+
+impl From<AllowAllPolicy> for StubGovernance {
+    fn from(policy: AllowAllPolicy) -> Self {
+        policy.0
+    }
+}
+
+#[async_trait]
+impl ToolExecutionGovernance for AllowAllPolicy {
+    async fn enforce_before_call(
+        &self,
+        ctx: &RequestContext,
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        self.0.enforce_before_call(ctx, request, entry).await
+    }
+
+    async fn observe_after_call(
+        &self,
+        ctx: &RequestContext,
+        call: &CompletedToolCall<'_>,
+    ) -> Result<(), ToolGovernanceError> {
+        self.0.observe_after_call(ctx, call).await
+    }
+}
+
+legacy_stub_policy!(
+    /// Backwards-compatible wrapper for the always-denying stub adapter.
+    DenyAllPolicy,
+    "Creates a governance adapter that always denies tool execution.",
+    StubGovernance::denying,
+    "tool execution denied"
+);
+
+legacy_stub_policy!(
+    /// Backwards-compatible wrapper for the always-failing stub adapter.
+    FailingPolicy,
+    "Creates a governance adapter that always fails evaluation.",
+    StubGovernance::failing,
+    "tool governance failed"
+);
 
 /// Governance adapter that delegates enforcement and observation to the hook
 /// engine and policy audit repository.
@@ -144,14 +255,7 @@ where
         entry: &CatalogEntry,
         result: Option<&ToolCallResult>,
     ) -> serde_json::Value {
-        json!({
-            "call_id": request.call_id().to_string(),
-            "tool_name": request.tool_name(),
-            "server_id": entry.server_id().to_string(),
-            "parameters": request.parameters(),
-            "workflow_metadata": request.execution_scope().metadata(),
-            "result": result.map(ToolCallResult::outcome),
-        })
+        build_scope_metadata(request, entry, result)
     }
 
     fn project_execution_scope(

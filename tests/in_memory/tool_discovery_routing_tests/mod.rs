@@ -14,7 +14,7 @@ pub use super::helpers::request_ctx;
 use corbusier::context::RequestContext;
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
+        InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{
@@ -37,7 +37,7 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
-    AllowAllPolicy,
+    StubGovernance,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;

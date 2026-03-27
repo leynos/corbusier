@@ -297,10 +297,7 @@ async fn postgres_policy_audit_is_queryable_and_tenant_scoped(
             .with_task_id(task_id)
             .with_conversation_id(conversation_id)
             .with_metadata(json!({"tool_name": "read_file"})),
-        {
-            let clock = DefaultClock;
-            clock.utc()
-        },
+        DefaultClock.utc(),
     );
     let trigger_context_id = trigger_context.id();
     service

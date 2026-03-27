@@ -3,6 +3,7 @@
 
 mod log_store;
 mod policy;
+mod policy_metadata;
 mod runtime;
 
 pub mod memory;

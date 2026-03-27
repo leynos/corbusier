@@ -7,8 +7,7 @@ use corbusier::tool_registry::domain::ToolCallRequest;
 use rstest_bdd_macros::when;
 use serde_json::json;
 
-#[when("a tool call executes with conversation tracking")]
-fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) {
+fn run_tool_call_for_world(world: &mut HookPolicyWorld) {
     let conversation_id = ConversationId::new();
     let request = ToolCallRequest::new(
         "read_file",
@@ -22,6 +21,11 @@ fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) {
         Ok(result) => world.last_result = Some(result),
         Err(err) => world.last_error = Some(err),
     }
+}
+
+#[when("a tool call executes with conversation tracking")]
+fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) {
+    run_tool_call_for_world(world);
 }
 
 #[when("a tool call executes with task tracking")]
@@ -43,17 +47,5 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) {
 
 #[when("a successful tool call completes")]
 fn successful_tool_call_completes(world: &mut HookPolicyWorld) {
-    let conversation_id = ConversationId::new();
-    let request = ToolCallRequest::new(
-        "read_file",
-        json!({"path": "/tmp/test.txt"}),
-        &mockable::DefaultClock,
-    )
-    .with_conversation_id(conversation_id);
-    world.last_request = Some(request.clone());
-    world.last_conversation_id = Some(conversation_id);
-    match run_async(world.discovery.call_tool(&world.request_ctx, &request)) {
-        Ok(result) => world.last_result = Some(result),
-        Err(err) => world.last_error = Some(err),
-    }
+    run_tool_call_for_world(world);
 }

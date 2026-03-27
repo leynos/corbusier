@@ -5,7 +5,7 @@ use crate::{
     context::RequestContext,
     tool_registry::{
         adapters::{
-            AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
+            InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
             memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
         },
         domain::{
@@ -34,7 +34,7 @@ pub type TestDiscoveryService = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
-    AllowAllPolicy,
+    StubGovernance,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;

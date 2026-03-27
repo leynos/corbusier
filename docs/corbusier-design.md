@@ -587,8 +587,8 @@ Corbusier implements this through:
   - Consistent workflow behavior across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
-  definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
-  PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
+  definitions supporting multiple triggers (PreTurn, PostTurn, PreToolCall,
+  PostToolCall, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
   PrePush, PostPush, PreDeploy, PostDeploy) and actions (QualityGate,
   PolicyCheck, Notification, BlockAction, and Remediation).
 - **Dependencies:**
@@ -2767,10 +2767,10 @@ event to handler.
 ```mermaid
 flowchart TD
     subgraph "Hook Triggers"
-        TURN_START[TurnStart]
-        TURN_END[TurnEnd]
-        PRE_TOOL_USE[PreToolUse]
-        POST_TOOL_USE[PostToolUse]
+        PRE_TURN[PreTurn]
+        POST_TURN[PostTurn]
+        PRE_TOOL_CALL[PreToolCall]
+        POST_TOOL_CALL[PostToolCall]
         PRE_COMMIT[PreCommit]
         POST_COMMIT[PostCommit]
         PRE_MERGE[PreMerge]
@@ -5713,10 +5713,10 @@ pub struct HookDefinition {
 
 #[derive(Debug, Clone)]
 pub enum HookTriggerType {
-    TurnStart,
-    TurnEnd,
-    PreToolUse,
-    PostToolUse,
+    PreTurn,
+    PostTurn,
+    PreToolCall,
+    PostToolCall,
     PreCommit,
     PostCommit,
     PreMerge,
@@ -9320,8 +9320,8 @@ flowchart TD
 
 For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
 `ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
-that runs a pre-tool-use check before the MCP host executes a tool and a
-post-tool-use observation after the call completes. The default adapter still
+that runs a `PreToolCall` check before the MCP host executes a tool and a
+`PostToolCall` observation after the call completes. The default adapter still
 permits all calls, but a hook-backed adapter translates tool execution requests
 into `HookTriggerContext` values and delegates evaluation to the hook engine.
 
@@ -9394,8 +9394,8 @@ payload, and timestamp. Indexed `(tenant_id, task_id, recorded_at)`,
 required by automated workflow governance without scanning hook execution JSON.
 
 The current milestone records policy audit events for tool execution only:
-pre-tool-use hook denials block the tool call before host execution, and
-post-tool-use hooks persist audit outcomes after the call completes. Future
+`PreToolCall` hook denials block the tool call before host execution, and
+`PostToolCall` hooks persist audit outcomes after the call completes. Future
 API- and VCS-level enforcement points remain owned by their respective roadmap
 items.
 

@@ -168,22 +168,21 @@ impl GovernanceTestFixture {
 fn tool_policy_definition(
     trigger_type: HookTriggerType,
     action_id: &HookActionId,
-) -> HookDefinition {
+) -> Result<HookDefinition> {
     let (hook_id_str, label) = match trigger_type {
         HookTriggerType::PreToolUse => ("pre-tool-policy", "Pre-tool policy"),
         HookTriggerType::PostToolUse => ("post-tool-policy", "Post-tool policy"),
-        _ => panic!("unsupported trigger type for tool policy definition fixture"),
+        _ => eyre::bail!("unsupported trigger type for tool policy definition fixture"),
     };
-    HookDefinition::new(
-        HookId::new(hook_id_str).expect("valid hook id"),
+    Ok(HookDefinition::new(
+        HookId::new(hook_id_str)?,
         label,
         trigger_type,
         vec![HookAction::new(
             action_id.clone(),
             HookActionType::PolicyCheck,
         )],
-    )
-    .expect("tool policy definition should be valid")
+    )?)
 }
 
 #[rstest]
@@ -205,7 +204,7 @@ async fn denied_pre_tool_use_blocks_host_and_persists_policy_audit() -> Result<(
     definition_repo
         .insert(
             &ctx,
-            tool_policy_definition(HookTriggerType::PreToolUse, &action_id),
+            tool_policy_definition(HookTriggerType::PreToolUse, &action_id)?,
         )
         .await
         .expect("insert policy definition should succeed");
@@ -277,7 +276,7 @@ async fn invalid_post_tool_payload_does_not_fail_successful_tool_call() -> Resul
     definition_repo
         .insert(
             &ctx,
-            tool_policy_definition(HookTriggerType::PostToolUse, &action_id),
+            tool_policy_definition(HookTriggerType::PostToolUse, &action_id)?,
         )
         .await
         .expect("insert post-tool policy definition should succeed");
@@ -323,7 +322,7 @@ async fn post_tool_use_observation_records_audit_event() -> Result<()> {
     definition_repo
         .insert(
             &ctx,
-            tool_policy_definition(HookTriggerType::PostToolUse, &action_id),
+            tool_policy_definition(HookTriggerType::PostToolUse, &action_id)?,
         )
         .await
         .expect("insert post-tool definition should succeed");

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
+        InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         postgres::{McpServerPgPool, PostgresMcpServerRegistry, PostgresToolCatalog},
     },
     domain::{LogRetentionPolicy, McpServerName, McpToolDefinition, McpTransport},
@@ -34,7 +34,7 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     PostgresToolCatalog,
     PostgresMcpServerRegistry,
     InMemoryMcpServerHost,
-    AllowAllPolicy,
+    StubGovernance,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
