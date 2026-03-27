@@ -11,7 +11,7 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
-It sits ahead of phases 2 through 6: phase 1 establishes the runtime,
+It sits ahead of phases 2.0 through 7.0: phase 1.0 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
@@ -563,11 +563,11 @@ enforcement.
 
 ### 4.1. VCS integration and review ingestion
 
-- [ ] 4.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 3.2.2, 2.2.3,
-  Podbot Step 3.1, "App authentication", Podbot Step 3.2, "Installation token
-  acquisition", Podbot Step 3.3, "Token daemon", and Podbot Step 3.4,
-  "GIT_ASKPASS mechanism (Git credential helper variable)". See
-  corbusier-design.md §2.1.4 and §6.3.1.
+- [ ] 4.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 2.2.3, TBD
+  (non-linear dependency: 3.2.2), Podbot Step 3.1, "App authentication",
+  Podbot Step 3.2, "Installation token acquisition", Podbot Step 3.3, "Token
+  daemon", and Podbot Step 3.4, "GIT_ASKPASS mechanism (Git credential helper
+  variable)". See corbusier-design.md §2.1.4 and §6.3.1.
   - [ ] Implement branch, pull request, and issue operations. See
     corbusier-design.md §2.1.4.
   - [ ] Map VCS events into task lifecycle updates. See
