@@ -207,40 +207,40 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
   same-reference and same-name reuse would exist only in the raw table
   constraints, not in the repository behaviour. That would fail the roadmap
   success criteria while still leaving the larger RLS and full query-scoping
-  work to 1.5.3. Date/Author: 2026-03-21 / plan author
+  work to 1.5.3. Date/Author: 2026-03-21 / plan author.
 
 - Decision: use a seeded default tenant row in the migration to backfill
   pre-existing rows while keeping the migration deterministic and reversible.
   Rationale: the repository already has historical migrations that created
   tenant-unaware rows. A stable seeded tenant makes the upgrade path safe for
   both existing data and empty test databases. Date/Author: 2026-03-21 / plan
-  author
+  author.
 
 - Decision: reuse the pattern already proven by
   `migrations/2026-03-11-000000_tenant_scope_mcp_servers/`: add `tenant_id`,
   add `UNIQUE (id, tenant_id)` on parent tables, then replace child foreign
   keys with composite foreign keys. Rationale: that migration already solved
   the same class of tenant-consistency problem for the `tool_registry` bounded
-  context. Date/Author: 2026-03-21 / plan author
+  context. Date/Author: 2026-03-21 / plan author.
 
 - Decision: keep BDD focused on user-observable tenant reuse scenarios, and
   keep raw composite foreign key rejection tests in PostgreSQL integration
   tests. Rationale: database constraint failures are storage-level behaviour,
   not a natural Gherkin workflow. The two styles of test should each prove the
-  layer they are best suited to prove. Date/Author: 2026-03-21 / plan author
+  layer they are best suited to prove. Date/Author: 2026-03-21 / plan author.
 
 - Decision: defer `domain_events` and `audit_logs` tenant columns to 1.5.3.
   Rationale: the current audit trigger and session-variable capture would need
   to be redesigned in the same change to keep those tables coherent, which
   would collapse the boundary between this schema/constraint milestone and the
-  later RLS/audit milestone. Date/Author: 2026-03-22 / implementation
+  later RLS/audit milestone. Date/Author: 2026-03-22 / implementation.
 
 - Decision: lazily provision placeholder `tenants` rows from PostgreSQL write
   adapters and raw PostgreSQL test helpers. Rationale: `RequestContext` already
   treats `TenantId` as an opaque caller-supplied identifier, but the new
   foreign keys now require a concrete parent row. This preserves public API
   stability for 1.5.2 and defers explicit tenant lifecycle management to a
-  later milestone. Date/Author: 2026-03-22 / implementation
+  later milestone. Date/Author: 2026-03-22 / implementation.
 
 ## Outcomes & retrospective
 
@@ -313,6 +313,8 @@ Existing test infrastructure and helpers:
 
 The parent/child relationships that 1.5.2 must enforce with composite foreign
 keys are, at minimum:
+
+Table 1.5.2.1: Composite foreign key relationships enforcing tenant consistency.
 
 ```plaintext
 conversations(task_id, tenant_id) -> tasks(id, tenant_id)
