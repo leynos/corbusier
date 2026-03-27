@@ -242,7 +242,7 @@ fn each_tenant_retrieves_own_task(world: &TaskWorld) -> Result<(), eyre::Report>
 }
 
 fn assert_lookup_matches(found: &Task, expected: &Task, label: &str) -> Result<(), eyre::Report> {
-    if found.id() != expected.id() {
+    if found != expected {
         return Err(eyre::eyre!("{label} lookup returned the wrong task"));
     }
 

@@ -3,8 +3,7 @@
 use super::world::{TaskWorld, run_async};
 use rstest_bdd_macros::when;
 
-#[when("the issue is converted into a task")]
-fn convert_issue_to_task(world: &mut TaskWorld) -> Result<(), eyre::Report> {
+fn do_convert_issue_to_task(world: &mut TaskWorld) -> Result<(), eyre::Report> {
     let request = world
         .pending_request
         .clone()
@@ -17,6 +16,11 @@ fn convert_issue_to_task(world: &mut TaskWorld) -> Result<(), eyre::Report> {
     }
     world.last_create_result = Some(result);
     Ok(())
+}
+
+#[when("the issue is converted into a task")]
+fn convert_issue_to_task(world: &mut TaskWorld) -> Result<(), eyre::Report> {
+    do_convert_issue_to_task(world)
 }
 
 #[when("the task is requested by external issue reference")]
@@ -33,18 +37,7 @@ fn lookup_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre::Report> 
 
 #[when("tenant A converts the issue into a task")]
 fn tenant_a_converts_issue(world: &mut TaskWorld) -> Result<(), eyre::Report> {
-    let request = world
-        .pending_request
-        .clone()
-        .ok_or_else(|| eyre::eyre!("missing pending request in scenario world"))?;
-
-    let result = run_async(world.service.create_from_issue(&world.ctx, request));
-    if let Ok(task) = &result {
-        world.last_created_task = Some(task.clone());
-        world.pending_lookup = Some(task.origin().issue_ref().clone());
-    }
-    world.last_create_result = Some(result);
-    Ok(())
+    do_convert_issue_to_task(world)
 }
 
 #[when("tenant B converts the same issue into a task")]

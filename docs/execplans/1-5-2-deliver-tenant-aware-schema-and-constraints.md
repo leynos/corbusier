@@ -200,14 +200,14 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
 
 ## Decision log
 
-- Decision: treat 1.5.2 as a schema-and-observability milestone. It will add
-  `tenant_id`, replace global uniqueness with tenant-aware uniqueness, and add
-  the minimum PostgreSQL lookup changes required so callers can observe that
-  new behaviour safely. Rationale: without those targeted lookup changes,
-  same-reference and same-name reuse would exist only in the raw table
-  constraints, not in the repository behaviour. That would fail the roadmap
-  success criteria while still leaving the larger RLS and full query-scoping
-  work to 1.5.3. Date/Author: 2026-03-21 / plan author.
+- Decision: treat 1.5.2 as a schema-and-observability milestone.
+  It will add `tenant_id`, replace global uniqueness with tenant-aware
+  uniqueness, and add the minimum PostgreSQL lookup changes required so callers
+  can observe that new behaviour safely. Rationale: without those targeted
+  lookup changes, same-reference and same-name reuse would exist only in the
+  raw table constraints, not in the repository behaviour. That would fail the
+  roadmap success criteria while still leaving the larger RLS and full
+  query-scoping work to 1.5.3. Date/Author: 2026-03-21 / plan author.
 
 - Decision: use a seeded default tenant row in the migration to backfill
   pre-existing rows while keeping the migration deterministic and reversible.

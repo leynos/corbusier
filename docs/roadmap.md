@@ -447,8 +447,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     by tenant. See corbusier-design.md §2.2.2 and §2.2.3.
   - [x] Enforce parent/child tenant consistency with composite foreign keys.
     See corbusier-design.md §6.2.1.
-  - [x] Success criteria: same issue reference and backend name can exist in
-    multiple tenants without collisions.
+  - [x] Success criteria: schema changes are in place for tenant-owned
+    orchestration data, including `tenant_id`, tenant-scoped uniqueness, and
+    composite foreign keys; end-to-end two-tenant reuse and isolation proof is
+    tracked under 1.5.4 after 1.5.3 delivers full query scoping and RLS.
 - [ ] 2.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
   2.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 2.5.1 added
   `&RequestContext` to port signatures; this item makes adapters *use* the

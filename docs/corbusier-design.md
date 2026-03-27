@@ -1593,11 +1593,13 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
   placeholder tenant row on first use of a `RequestContext.tenant_id()`. This
   preserves the existing request contract while keeping explicit tenant
   lifecycle management out of scope for this milestone.
-- `domain_events` and `audit_logs` deliberately remain outside the 1.5.2
-  tenant-column migration. Rationale: making those tables tenant-aware without
-  also redesigning the audit trigger/session-variable capture would blur the
-  boundary with 1.5.3. That follow-on milestone still owns broad query scoping,
-  RLS, and tenant-aware audit capture.
+- `domain_events` and `audit_logs` remain outside the implemented 1.5.2
+  migration boundary even though the later target-state schema sections in this
+  document show them with `tenant_id`. Per the `docs/` knowledge-base guidance,
+  milestone timelines should be documented explicitly: 1.5.2 covers the core
+  orchestration tables listed above, while 1.5.3 owns tenant columns on
+  `domain_events` and `audit_logs` together with the related audit-trigger,
+  query-scoping, and RLS work.
 - PostgreSQL adapters received the minimum query changes needed to make the new
   per-tenant uniqueness observable before RLS: task issue lookups and backend
   registry reads/writes now filter by `tenant_id`, while wider adapter
@@ -1610,7 +1612,7 @@ tenant B can store the same issue reference independently because uniqueness is
 enforced per tenant.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.5.1: Sequence diagram showing tenant-scoped task creation and issue
+Table 2.2.5.1: Sequence diagram showing tenant-scoped task creation and issue
 lookup.
 ```mermaid
 sequenceDiagram

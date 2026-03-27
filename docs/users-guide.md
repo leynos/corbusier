@@ -161,17 +161,16 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Tenant-scoped uniqueness
 
-Tenant-owned records are partitioned by
-[`RequestContext::tenant_id`](corbusier::context::RequestContext::tenant_id).
-That affects both task issue references and backend registration names:
+Tenant-owned records are partitioned by `RequestContext::tenant_id`. That
+affects both task issue references and backend registration names:
 
 - the same issue reference may exist once per tenant,
 - the same backend name may exist once per tenant, and
 - lookups return only the caller's tenant-owned records.
 
-When reusing an external identifier or backend name in tests or application
-code, use a distinct `RequestContext` when the records are intended to belong
-to different tenants.
+When tests or application code reuse an external identifier or backend name for
+records that are intended to belong to different tenants, a distinct
+`RequestContext` should be used for each tenant.
 
 ## Branch and pull request association
 
