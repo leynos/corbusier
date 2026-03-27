@@ -1129,6 +1129,7 @@ erDiagram
     BACKEND_REGISTRATIONS ||--o{ AGENT_TURN_SESSIONS : has
     CONVERSATIONS ||--o{ AGENT_TURN_SESSIONS : has
 ```
+<!-- markdownlint-enable MD031 -->
 
 For screen readers: The following sequence diagram shows the high-level flow
 for `execute_turn`, from backend lookup and session arbitration through message
@@ -1208,6 +1209,7 @@ sequenceDiagram
 
     deactivate Orchestrator
 ```
+<!-- markdownlint-enable MD031 -->
 
 #### 2.2.4 Tool Orchestration Requirements
 
