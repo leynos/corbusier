@@ -1088,6 +1088,119 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   persistence and runtime concerns remain adapter responsibilities to preserve
   hexagonal boundaries.
 
+For screen readers: The following entity-relationship diagram shows how backend
+registrations and conversations each own zero or more agent turn sessions used
+for orchestrated backend execution state.
+
+```mermaid
+erDiagram
+    BACKEND_REGISTRATIONS {
+        uuid id PK
+        text name
+        text status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id
+        timestamptz created_at
+    }
+
+    AGENT_TURN_SESSIONS {
+        uuid id PK
+        uuid backend_id FK
+        uuid conversation_id FK
+        text runtime_handle
+        varchar status
+        int turn_count
+        timestamptz started_at
+        timestamptz last_used_at
+        timestamptz expires_at
+        timestamptz ended_at
+        text failure_reason
+    }
+
+    BACKEND_REGISTRATIONS ||--o{ AGENT_TURN_SESSIONS : has
+    CONVERSATIONS ||--o{ AGENT_TURN_SESSIONS : has
+```
+
+_Figure 2.2.3.2: Entity-relationship diagram showing backend registrations,
+conversations, and agent turn sessions._
+
+For screen readers: The following sequence diagram shows the high-level flow
+for `execute_turn`, from backend lookup and session arbitration through message
+loading, tool routing, runtime execution, and persistence of either success or
+failure outcomes.
+
+```mermaid
+sequenceDiagram
+    actor Caller
+    participant Orchestrator as AgentTurnOrchestratorService
+    participant BackendRegistry as BackendRegistryRepository
+    participant SessionRepo as TurnSessionRepository
+    participant MsgRepo as MessageRepository
+    participant ToolRouter as ToolRouterPort
+    participant Runtime as AgentRuntimePort
+
+    Caller->>Orchestrator: execute_turn(ctx, ExecuteTurnRequest)
+    activate Orchestrator
+
+    Orchestrator->>BackendRegistry: find_by_id(ctx, backend_id)
+    BackendRegistry-->>Orchestrator: Option<AgentBackendRegistration>
+    Orchestrator->>Orchestrator: validate BackendStatus Active
+
+    Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotQuery)
+    SessionRepo-->>Orchestrator: SessionSlotArbitration
+    note over Orchestrator,SessionRepo: Reused or Vacant or Expired
+
+    alt Expired session
+        Orchestrator->>Runtime: teardown_session(ctx, backend, runtime_handle)
+        Runtime-->>Orchestrator: Result
+    end
+
+    Orchestrator->>MsgRepo: find_by_conversation(ctx, conversation_id)
+    MsgRepo-->>Orchestrator: Vec<Message>
+
+    Orchestrator->>ToolRouter: list_available_tools(ctx)
+    ToolRouter-->>Orchestrator: Vec<McpToolDefinition>
+
+    Orchestrator->>Runtime: execute_turn(ctx, RuntimeTurnRequest, ToolRouter)
+    activate Runtime
+    loop per scripted tool call
+        Runtime->>ToolRouter: call_tool(ctx, tool_name, parameters)
+        ToolRouter-->>Runtime: ToolCallResult
+    end
+    Runtime-->>Orchestrator: RuntimeTurnResult
+    deactivate Runtime
+
+    alt Runtime success
+        loop for each GeneratedTurnMessage
+            Orchestrator->>MsgRepo: next_sequence_number(ctx, conversation_id)
+            MsgRepo-->>Orchestrator: SequenceNumber
+            Orchestrator->>MsgRepo: store(ctx, Message)
+            MsgRepo-->>Orchestrator: Result
+        end
+        Orchestrator->>SessionRepo: upsert_session(ctx, TurnSession)
+        SessionRepo-->>Orchestrator: Result
+        Orchestrator-->>Caller: ExecuteTurnResult
+    else Runtime failure
+        Orchestrator->>SessionRepo: upsert_session(ctx, failed TurnSession)
+        SessionRepo-->>Orchestrator: Result
+        Orchestrator->>MsgRepo: next_sequence_number(ctx, conversation_id)
+        MsgRepo-->>Orchestrator: SequenceNumber
+        Orchestrator->>MsgRepo: store(ctx, failure Message)
+        MsgRepo-->>Orchestrator: Result
+        Orchestrator-->>Caller: error Runtime
+    end
+
+    deactivate Orchestrator
+```
+
+_Figure 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration
+flow._
+
 #### 2.2.4 Tool Orchestration Requirements
 
 | Requirement ID | Description                     | Acceptance Criteria                                             | Priority  | Complexity |
