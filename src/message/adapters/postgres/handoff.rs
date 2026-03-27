@@ -62,8 +62,12 @@ impl PostgresHandoffAdapter {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a write query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
+    /// Executes a write query that may create the tenant row before use.
+    async fn execute_query_with_bootstrap<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> HandoffResult<T>
     where
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
@@ -75,6 +79,24 @@ impl PostgresHandoffAdapter {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
                 ensure_tenant_exists(&mut conn, tenant_id.into_inner())
                     .map_err(HandoffError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            HandoffError::persistence,
+        )
+        .await
+    }
+
+    /// Executes a write query inside a transaction with tenant context.
+    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             HandoffError::persistence,
@@ -129,7 +151,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 
         let new_handoff = handoff_to_new_row(&handoff, params.conversation_id, tenant_id)?;
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_query_with_bootstrap(tenant_id, move |conn| {
             diesel::insert_into(handoffs::table)
                 .values(&new_handoff)
                 .execute(conn)

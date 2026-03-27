@@ -64,9 +64,7 @@ fn tenant_b_registers_backend(world: &mut BackendWorld) -> Result<(), eyre::Repo
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
     let request = build_request(&pending.name, &pending.provider);
     let result = run_async(world.service.register(&world.other_ctx, request));
-    if let Ok(registration) = &result {
-        world.other_registered = Some(registration.clone());
-    }
+    world.other_registered = result.as_ref().ok().cloned();
     world.other_register_result = Some(result);
     Ok(())
 }

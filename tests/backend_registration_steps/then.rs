@@ -95,6 +95,14 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
         .pending_backends
         .last()
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
+    let expected_a = world
+        .last_registered
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A expected backend is missing"))?;
+    let expected_b = world
+        .other_registered
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B expected backend is missing"))?;
     let found_a = run_async(world.service.find_by_name(&world.ctx, &pending.name))
         .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
         .ok_or_else(|| eyre::eyre!("tenant A backend not found"))?;
@@ -102,6 +110,12 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
         .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
         .ok_or_else(|| eyre::eyre!("tenant B backend not found"))?;
 
+    if found_a.id() != expected_a.id() {
+        return Err(eyre::eyre!("tenant A lookup returned the wrong backend"));
+    }
+    if found_b.id() != expected_b.id() {
+        return Err(eyre::eyre!("tenant B lookup returned the wrong backend"));
+    }
     if found_a.id() == found_b.id() {
         return Err(eyre::eyre!("tenant lookups must return distinct backends"));
     }

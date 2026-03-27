@@ -789,7 +789,7 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
     Lifecycle Management), F-003 (Agent Backend Orchestration)
   - System Dependencies: Diesel repositories, PostgreSQL RLS, audit trigger
     session variables
-  - External Dependencies: PostgreSQL 14+ row-level security support
+  - External Dependencies: PostgreSQL 15+ row-level security support
   - Integration Requirements: Authentication middleware, worker/job payload
     propagation, tracing instrumentation
 
@@ -1612,7 +1612,7 @@ tenant B can store the same issue reference independently because uniqueness is
 enforced per tenant.
 
 <!-- markdownlint-disable MD031 -->
-Table 2.2.5.1: Sequence diagram showing tenant-scoped task creation and issue
+Table 2.2.5.2: Sequence diagram showing tenant-scoped task creation and issue
 lookup.
 ```mermaid
 sequenceDiagram
@@ -1651,7 +1651,7 @@ session, handoff, and context snapshot tables. Each child row carries
 used by downstream message, handoff, and snapshot records.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.5.2: Entity-relationship diagram showing tenant-owned orchestration
+Table 2.2.5.3: Entity-relationship diagram showing tenant-owned orchestration
 tables and their main foreign-key paths.
 ```mermaid
 erDiagram
@@ -2125,7 +2125,7 @@ Foundation[^2].
 
 #### 3.5.1 Primary Database Selection
 
-##### PostgreSQL 14+
+##### PostgreSQL 15+
 
 Selected as the primary database for production deployments due to:
 

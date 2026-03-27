@@ -62,22 +62,20 @@ impl PostgresToolCatalog {
     async fn execute_impl<F, T, W>(
         &self,
         tenant_id: TenantId,
-        tx_wrapper: W,
         query_fn: F,
+        execute: W,
     ) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
-        W: FnOnce(&mut PgConnection, uuid::Uuid, F) -> ToolCatalogResult<T> + Send + 'static,
+        W: FnOnce(&mut PgConnection, TenantId, F) -> ToolCatalogResult<T> + Send + 'static,
     {
         let pool = self.pool.clone();
         run_blocking_with(
             move || {
                 let mut conn =
                     get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
-                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                    .map_err(|e| ToolCatalogError::persistence("ensure_tenant", e))?;
-                tx_wrapper(&mut conn, tenant_id.into_inner(), query_fn)
+                execute(&mut conn, tenant_id, query_fn)
             },
             |e| ToolCatalogError::persistence("spawn_blocking", e),
         )
@@ -90,7 +88,12 @@ impl PostgresToolCatalog {
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, with_tenant_tx, query_fn).await
+        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
+            ensure_tenant_exists(conn, tenant.into_inner())
+                .map_err(|e| ToolCatalogError::persistence("ensure_tenant", e))?;
+            with_tenant_tx(conn, tenant.into_inner(), run_query)
+        })
+        .await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -103,8 +106,10 @@ impl PostgresToolCatalog {
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, with_tenant_read_tx, query_fn)
-            .await
+        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
+            with_tenant_read_tx(conn, tenant.into_inner(), run_query)
+        })
+        .await
     }
 
     /// Sets the `available` flag and refreshes `updated_at` for every

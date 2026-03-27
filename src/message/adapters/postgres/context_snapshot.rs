@@ -47,7 +47,11 @@ impl PostgresContextSnapshotAdapter {
     }
 
     /// Generic helper to execute a read-only query with standard error handling.
-    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SnapshotResult<T>
+    async fn execute_read_query<F, T>(
+        &self,
+        tenant_uuid: uuid::Uuid,
+        query_fn: F,
+    ) -> SnapshotResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SnapshotResult<T> + Send + 'static,
         T: Send + 'static,
@@ -57,7 +61,7 @@ impl PostgresContextSnapshotAdapter {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
+                with_tenant_read_tx(&mut conn, tenant_uuid, query_fn)
             },
             SnapshotError::persistence,
         )
@@ -77,7 +81,7 @@ impl PostgresContextSnapshotAdapter {
             + 'static,
     {
         let tenant_uuid = tenant_id.into_inner();
-        self.execute_read_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_uuid, move |conn| {
             let base = context_snapshots::table
                 .filter(context_snapshots::tenant_id.eq(tenant_uuid))
                 .into_boxed();
@@ -106,7 +110,7 @@ impl PostgresContextSnapshotAdapter {
             + 'static,
     {
         let tenant_uuid = tenant_id.into_inner();
-        self.execute_read_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_uuid, move |conn| {
             let base = context_snapshots::table
                 .filter(context_snapshots::tenant_id.eq(tenant_uuid))
                 .into_boxed();

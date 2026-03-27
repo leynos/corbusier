@@ -77,6 +77,12 @@ to dive into the design and roadmap:
 3. **Explore the codebase**: The project uses hexagonal architecture with
    strict quality gates
 
+### Prerequisites
+
+- PostgreSQL 15+ if you plan to run the `PostgreSQL`-backed adapters or apply
+  the tenant-schema migrations. The current schema uses
+  `ON DELETE SET NULL (column_name)`, which requires `PostgreSQL` 15 or newer.
+
 ### Building and Testing
 
 ```bash

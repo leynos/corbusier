@@ -31,28 +31,23 @@ use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as Diese
 /// `PostgreSQL` connection pool type used by task adapters.
 pub type TaskPgPool = PgPool;
 
-async fn run_tenant_query<F, T>(
+async fn run_tenant_query<F, T, Q>(
     pool: &TaskPgPool,
     tenant_id: TenantId,
-    read_only: bool,
     query_fn: F,
+    run_query: Q,
 ) -> TaskRepositoryResult<T>
 where
     F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
     T: Send + 'static,
+    Q: FnOnce(&mut PgConnection, TenantId, F) -> TaskRepositoryResult<T> + Send + 'static,
 {
     let pool_clone = pool.clone();
 
     run_blocking_with(
         move || {
             let mut conn = get_conn_with(&pool_clone, TaskRepositoryError::persistence)?;
-            if read_only {
-                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            } else {
-                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                    .map_err(TaskRepositoryError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            }
+            run_query(&mut conn, tenant_id, query_fn)
         },
         TaskRepositoryError::persistence,
     )
@@ -94,7 +89,36 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        run_tenant_query(&self.pool, tenant_id, false, query_fn).await
+        run_tenant_query(
+            &self.pool,
+            tenant_id,
+            query_fn,
+            |conn, tenant, run_query| with_tenant_tx(conn, tenant.into_inner(), run_query),
+        )
+        .await
+    }
+
+    /// Executes a write query that may create the tenant row before use.
+    async fn execute_query_with_bootstrap<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> TaskRepositoryResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        run_tenant_query(
+            &self.pool,
+            tenant_id,
+            query_fn,
+            |conn, tenant, run_query| {
+                ensure_tenant_exists(conn, tenant.into_inner())
+                    .map_err(TaskRepositoryError::persistence)?;
+                with_tenant_tx(conn, tenant.into_inner(), run_query)
+            },
+        )
+        .await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -107,7 +131,13 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        run_tenant_query(&self.pool, tenant_id, true, query_fn).await
+        run_tenant_query(
+            &self.pool,
+            tenant_id,
+            query_fn,
+            |conn, tenant, run_query| with_tenant_read_tx(conn, tenant.into_inner(), run_query),
+        )
+        .await
     }
 }
 
@@ -139,7 +169,7 @@ impl TaskRepository for PostgresTaskRepository {
         let issue_ref = task.origin().issue_ref().clone();
         let new_row = to_new_row(task, tenant_id)?;
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_query_with_bootstrap(tenant_id, move |conn| {
             // Pre-check for semantic error reporting; the unique index still
             // enforces integrity in the TOCTOU window between check and insert.
             let duplicate_issue = find_task_by_issue_ref(conn, tenant_id, &issue_ref)?;

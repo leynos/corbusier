@@ -108,8 +108,6 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         let serialized = serialize_registration_fields(registration)?;
 
         self.run_blocking(move |connection| {
-            ensure_tenant_exists(connection, tenant_id.into_inner())
-                .map_err(BackendRegistryError::persistence)?;
             with_tenant_tx(connection, tenant_id.into_inner(), |tx| {
                 let updated_count = diesel::update(
                     backend_registrations::table
