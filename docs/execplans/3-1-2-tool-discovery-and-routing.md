@@ -1008,13 +1008,13 @@ Mark `docs/roadmap.md` item 3.1.2 and its three sub-bullets as done (`[x]`).
 Run full quality gates:
 
 ```bash
-set -o pipefail && make check-fmt 2>&1 | tee /tmp/2-1-2-check-fmt.log
-set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-lint.log
-set -o pipefail && make test 2>&1 | tee /tmp/2-1-2-test.log
-set -o pipefail && make fmt 2>&1 | tee /tmp/2-1-2-fmt.log
+set -o pipefail && make check-fmt 2>&1 | tee /tmp/3-1-2-check-fmt.log
+set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-lint.log
+set -o pipefail && make test 2>&1 | tee /tmp/3-1-2-test.log
+set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-2-fmt.log
 set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 \
-  | tee /tmp/2-1-2-markdownlint.log
-set -o pipefail && make nixie 2>&1 | tee /tmp/2-1-2-nixie.log
+  | tee /tmp/3-1-2-markdownlint.log
+set -o pipefail && make nixie 2>&1 | tee /tmp/3-1-2-nixie.log
 ```
 
 Go/no-go: all six commands must exit 0. If any fail, fix and re-run.
@@ -1027,8 +1027,8 @@ Run all commands from repository root: `/home/user/project`.
 
    ```bash
    set -o pipefail && make check-fmt 2>&1 \
-     | tee /tmp/2-1-2-stage-a-check-fmt.log
-   set -o pipefail && make lint 2>&1 | tee /tmp/2-1-2-stage-a-lint.log
+     | tee /tmp/3-1-2-stage-a-check-fmt.log
+   set -o pipefail && make lint 2>&1 | tee /tmp/3-1-2-stage-a-lint.log
    ```
 
 2. Stage B compilation checks:
@@ -1067,12 +1067,12 @@ Run all commands from repository root: `/home/user/project`.
 
    ```bash
    set -o pipefail && make all 2>&1 \
-     | tee /tmp/2-1-2-final-make-all.log
-   set -o pipefail && make fmt 2>&1 | tee /tmp/2-1-2-final-fmt.log
+     | tee /tmp/3-1-2-final-make-all.log
+   set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-2-final-fmt.log
    set -o pipefail && PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 \
-     | tee /tmp/2-1-2-final-markdownlint.log
+     | tee /tmp/3-1-2-final-markdownlint.log
    set -o pipefail && make nixie 2>&1 \
-     | tee /tmp/2-1-2-final-nixie.log
+     | tee /tmp/3-1-2-final-nixie.log
    ```
 
 ## Validation and acceptance
@@ -1299,6 +1299,8 @@ where
 
 New files (estimated 23-26):
 
+Table 3.1.2: File manifest -- new files for roadmap 3.1.2
+
 | Path | Purpose |
 | --- | --- |
 | `src/tool_registry/domain/catalog.rs` | `CatalogEntry`, `CatalogEntryId` |
@@ -1327,6 +1329,8 @@ New files (estimated 23-26):
 | `tests/tool_discovery_routing_steps/` | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.) |
 
 Modified files (estimated 14-16):
+
+Table 3.1.2: File manifest -- modified files for roadmap 3.1.2
 
 | Path | Changes |
 | --- | --- |
@@ -1371,8 +1375,8 @@ Modified files (estimated 14-16):
   scenario. Updated all affected stages (A-E), file manifest, and validation
   criteria.
 
-[^1]: %60docs/rust-testing-with-rstest-fixtures.md%60
-[^2]: %60docs/reliable-testing-in-rust-via-dependency-injection.md%60
-[^3]: %60docs/rstest-bdd-users-guide.md%60
-[^4]: %60docs/pg-embed-setup-unpriv-users-guide.md%60
-[^5]: %60docs/complexity-antipatterns-and-refactoring-strategies.md%60
+[^1]: `docs/rust-testing-with-rstest-fixtures.md`
+[^2]: `docs/reliable-testing-in-rust-via-dependency-injection.md`
+[^3]: `docs/rstest-bdd-users-guide.md`
+[^4]: `docs/pg-embed-setup-unpriv-users-guide.md`
+[^5]: `docs/complexity-antipatterns-and-refactoring-strategies.md`

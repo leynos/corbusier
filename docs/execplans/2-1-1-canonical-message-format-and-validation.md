@@ -441,13 +441,15 @@ Estimated total: ~1700 lines across ~20 files.
 ### Crate Dependencies
 
 ```toml
+[dependencies]
 serde = "1.0"          # Serialization framework
 serde_json = "1.0"     # JSON support
 chrono = "0.4"         # Date/time handling
 uuid = "1.0"           # UUID generation
 thiserror = "2.0"      # Error derive macro
 async-trait = "0.1"    # Async trait support
-mockable = "0.1"       # Clock abstraction
+mockable = { version = "0.1", default-features = false, features = ["clock"] }
+                        # Clock abstraction
 
 [dev-dependencies]
 rstest = "0.24"        # Test fixtures

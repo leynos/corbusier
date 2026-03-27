@@ -15,7 +15,7 @@ It sits ahead of phases 2 through 6: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
-Table 1: Phase 1 subphases and delivery goals.
+Table 1.0.0: Phase 1 subphases and delivery goals.
 
 | Subphase | Goal |
 | --- | --- |
@@ -385,10 +385,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     pairs, invalid transitions return typed error variants, and terminal states
     reject all outgoing transitions in tested paths.
 
-\[^1\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
-§4.4.1.1.
-\[^2\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
-\[^3\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
+[^1]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
+  §4.4.1.1.
+[^2]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
+[^3]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
 
 ### 2.3. Agent backend orchestration
 
@@ -843,16 +843,6 @@ enforcement.
     all phase 5 endpoints. See corbusier-api-design.md §Test strategy.
   - [ ] Success criteria: contract tests validate error schema stability and
     pagination envelope shape; tenant isolation tests pass.
-[HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
-and
-[MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
-for `Last-Event-ID` replay semantics.
-
-[^4]: See
-      [HTML Standard: Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
-  and
-  [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
-  for `Last-Event-ID` replay semantics.
 
 ## 6. Deployment and preview environments
 
