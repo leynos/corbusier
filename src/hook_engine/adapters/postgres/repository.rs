@@ -38,6 +38,29 @@ impl PostgresHookExecutionLogRepository {
         Self { pool }
     }
 
+    async fn execute_inner<F, T, Wrap>(
+        &self,
+        tenant_id: TenantId,
+        wrap: Wrap,
+        query_fn: F,
+    ) -> HookExecutionLogResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HookExecutionLogResult<T> + Send + 'static,
+        T: Send + 'static,
+        Wrap:
+            FnOnce(&mut PgConnection, uuid::Uuid, F) -> HookExecutionLogResult<T> + Send + 'static,
+    {
+        let pool = self.pool.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut connection = pool
+                .get()
+                .map_err(HookExecutionLogError::persistence_failed)?;
+            wrap(&mut connection, tenant_id.into_inner(), query_fn)
+        })
+        .await
+        .map_err(HookExecutionLogError::persistence_failed)?
+    }
+
     async fn execute_query<F, T>(
         &self,
         tenant_id: TenantId,
@@ -47,17 +70,16 @@ impl PostgresHookExecutionLogRepository {
         F: FnOnce(&mut PgConnection) -> HookExecutionLogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut connection = pool
-                .get()
-                .map_err(HookExecutionLogError::persistence_failed)?;
-            ensure_tenant_exists(&mut connection, tenant_id.into_inner())
-                .map_err(HookExecutionLogError::persistence_failed)?;
-            with_tenant_tx(&mut connection, tenant_id.into_inner(), query_fn)
-        })
+        self.execute_inner(
+            tenant_id,
+            move |connection, tenant_uuid, run_query| {
+                ensure_tenant_exists(connection, tenant_uuid)
+                    .map_err(HookExecutionLogError::persistence_failed)?;
+                with_tenant_tx(connection, tenant_uuid, run_query)
+            },
+            query_fn,
+        )
         .await
-        .map_err(HookExecutionLogError::persistence_failed)?
     }
 
     async fn execute_read_query<F, T>(
@@ -69,15 +91,8 @@ impl PostgresHookExecutionLogRepository {
         F: FnOnce(&mut PgConnection) -> HookExecutionLogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut connection = pool
-                .get()
-                .map_err(HookExecutionLogError::persistence_failed)?;
-            with_tenant_read_tx(&mut connection, tenant_id.into_inner(), query_fn)
-        })
-        .await
-        .map_err(HookExecutionLogError::persistence_failed)?
+        self.execute_inner(tenant_id, with_tenant_read_tx, query_fn)
+            .await
     }
 }
 

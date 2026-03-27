@@ -70,12 +70,18 @@ impl PostgresContextSnapshotAdapter {
         build_query: F,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>>
     where
-        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
+        F: FnOnce(
+                context_snapshots::BoxedQuery<'static, Pg>,
+            ) -> context_snapshots::BoxedQuery<'static, Pg>
             + Send
             + 'static,
     {
+        let tenant_uuid = tenant_id.into_inner();
         self.execute_read_query(tenant_id, move |conn| {
-            let row_opt = build_query(context_snapshots::table)
+            let base = context_snapshots::table
+                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
+                .into_boxed();
+            let row_opt = build_query(base)
                 .select(ContextSnapshotRow::as_select())
                 .limit(1)
                 .first::<ContextSnapshotRow>(conn)
@@ -93,12 +99,18 @@ impl PostgresContextSnapshotAdapter {
         build_query: F,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>>
     where
-        F: FnOnce(context_snapshots::table) -> context_snapshots::BoxedQuery<'static, Pg>
+        F: FnOnce(
+                context_snapshots::BoxedQuery<'static, Pg>,
+            ) -> context_snapshots::BoxedQuery<'static, Pg>
             + Send
             + 'static,
     {
+        let tenant_uuid = tenant_id.into_inner();
         self.execute_read_query(tenant_id, move |conn| {
-            let rows = build_query(context_snapshots::table)
+            let base = context_snapshots::table
+                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
+                .into_boxed();
+            let rows = build_query(base)
                 .select(ContextSnapshotRow::as_select())
                 .load::<ContextSnapshotRow>(conn)
                 .map_err(SnapshotError::persistence)?;
@@ -150,12 +162,8 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         snapshot_id: uuid::Uuid,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         let tenant_id = ctx.tenant_id();
-        let tenant_uuid = tenant_id.into_inner();
-        self.find_one(tenant_id, move |table| {
-            table
-                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
-                .filter(context_snapshots::id.eq(snapshot_id))
-                .into_boxed()
+        self.find_one(tenant_id, move |q| {
+            q.filter(context_snapshots::id.eq(snapshot_id))
         })
         .await
     }
@@ -166,15 +174,11 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         session_id: AgentSessionId,
     ) -> SnapshotResult<Vec<ContextWindowSnapshot>> {
         let tenant_id = ctx.tenant_id();
-        let tenant_uuid = tenant_id.into_inner();
         let uuid = session_id.into_inner();
 
-        self.find_many(tenant_id, move |table| {
-            table
-                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
-                .filter(context_snapshots::session_id.eq(uuid))
+        self.find_many(tenant_id, move |q| {
+            q.filter(context_snapshots::session_id.eq(uuid))
                 .order(context_snapshots::captured_at.asc())
-                .into_boxed()
         })
         .await
     }
@@ -185,15 +189,11 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
         conversation_id: ConversationId,
     ) -> SnapshotResult<Option<ContextWindowSnapshot>> {
         let tenant_id = ctx.tenant_id();
-        let tenant_uuid = tenant_id.into_inner();
         let uuid = conversation_id.into_inner();
 
-        self.find_one(tenant_id, move |table| {
-            table
-                .filter(context_snapshots::tenant_id.eq(tenant_uuid))
-                .filter(context_snapshots::conversation_id.eq(uuid))
+        self.find_one(tenant_id, move |q| {
+            q.filter(context_snapshots::conversation_id.eq(uuid))
                 .order(context_snapshots::captured_at.desc())
-                .into_boxed()
         })
         .await
     }

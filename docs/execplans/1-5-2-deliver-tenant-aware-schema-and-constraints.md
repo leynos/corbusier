@@ -322,8 +322,11 @@ messages(conversation_id, tenant_id) -> conversations(id, tenant_id)
 agent_sessions(conversation_id, tenant_id) -> conversations(id, tenant_id)
 handoffs(source_session_id, tenant_id) -> agent_sessions(id, tenant_id)
 handoffs(conversation_id, tenant_id) -> conversations(id, tenant_id)
+handoffs(target_session_id, tenant_id) -> agent_sessions(id, tenant_id)
 context_snapshots(session_id, tenant_id) -> agent_sessions(id, tenant_id)
 context_snapshots(conversation_id, tenant_id) -> conversations(id, tenant_id)
+agent_sessions(initiated_by_handoff, tenant_id) -> handoffs(id, tenant_id)
+agent_sessions(terminated_by_handoff, tenant_id) -> handoffs(id, tenant_id)
 ```
 
 If implementation shows that additional child relationships need the same

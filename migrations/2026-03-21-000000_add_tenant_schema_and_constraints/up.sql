@@ -151,7 +151,7 @@ ALTER TABLE conversations
     ADD CONSTRAINT conversations_task_fk
         FOREIGN KEY (task_id, tenant_id)
         REFERENCES tasks (id, tenant_id)
-        ON DELETE SET NULL;
+        ON DELETE SET NULL (task_id);
 
 ALTER TABLE messages
     ADD CONSTRAINT messages_conversation_fk
@@ -181,7 +181,7 @@ ALTER TABLE handoffs
     ADD CONSTRAINT handoffs_target_session_fk
         FOREIGN KEY (target_session_id, tenant_id)
         REFERENCES agent_sessions (id, tenant_id)
-        ON DELETE SET NULL;
+        ON DELETE SET NULL (target_session_id);
 
 ALTER TABLE context_snapshots
     ADD CONSTRAINT context_snapshots_conversation_fk
@@ -199,12 +199,12 @@ ALTER TABLE agent_sessions
     ADD CONSTRAINT agent_sessions_initiated_by_handoff_fk
         FOREIGN KEY (initiated_by_handoff, tenant_id)
         REFERENCES handoffs (id, tenant_id)
-        ON DELETE SET NULL;
+        ON DELETE SET NULL (initiated_by_handoff);
 
 ALTER TABLE agent_sessions
     ADD CONSTRAINT agent_sessions_terminated_by_handoff_fk
         FOREIGN KEY (terminated_by_handoff, tenant_id)
         REFERENCES handoffs (id, tenant_id)
-        ON DELETE SET NULL;
+        ON DELETE SET NULL (terminated_by_handoff);
 
 COMMIT;

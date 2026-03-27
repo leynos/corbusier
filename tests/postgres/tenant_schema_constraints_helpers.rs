@@ -15,6 +15,7 @@ pub(crate) struct HandoffInsert {
     pub tenant: Uuid,
     pub source_session: Uuid,
     pub conversation: Uuid,
+    pub target_session: Option<Uuid>,
 }
 
 #[derive(Clone, Copy)]
@@ -117,12 +118,13 @@ pub(crate) fn insert_handoff(
         "INSERT INTO handoffs (",
         "id, tenant_id, source_session_id, conversation_id, target_session_id, prior_turn_id, ",
         "triggering_tool_calls, source_agent, target_agent, reason, initiated_at, completed_at, status",
-        ") VALUES ($1, $2, $3, $4, NULL, $5, '[]'::jsonb, 'source', 'target', NULL, NOW(), NULL, 'initiated')"
+        ") VALUES ($1, $2, $3, $4, $5, $6, '[]'::jsonb, 'source', 'target', NULL, NOW(), NULL, 'initiated')"
     ))
     .bind::<diesel::sql_types::Uuid, _>(params.handoff)
     .bind::<diesel::sql_types::Uuid, _>(params.tenant)
     .bind::<diesel::sql_types::Uuid, _>(params.source_session)
     .bind::<diesel::sql_types::Uuid, _>(params.conversation)
+    .bind::<diesel::sql_types::Nullable<diesel::sql_types::Uuid>, _>(params.target_session)
     .bind::<diesel::sql_types::Uuid, _>(Uuid::new_v4())
     .execute(conn)
 }

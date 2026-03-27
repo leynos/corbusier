@@ -31,6 +31,34 @@ use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as Diese
 /// `PostgreSQL` connection pool type used by task adapters.
 pub type TaskPgPool = PgPool;
 
+async fn run_tenant_query<F, T>(
+    pool: &TaskPgPool,
+    tenant_id: TenantId,
+    read_only: bool,
+    query_fn: F,
+) -> TaskRepositoryResult<T>
+where
+    F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    let pool_clone = pool.clone();
+
+    run_blocking_with(
+        move || {
+            let mut conn = get_conn_with(&pool_clone, TaskRepositoryError::persistence)?;
+            if read_only {
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            } else {
+                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
+                    .map_err(TaskRepositoryError::persistence)?;
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+            }
+        },
+        TaskRepositoryError::persistence,
+    )
+    .await
+}
+
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
 // ---------------------------------------------------------------------------
@@ -66,18 +94,7 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, TaskRepositoryError::persistence)?;
-                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                    .map_err(TaskRepositoryError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            TaskRepositoryError::persistence,
-        )
-        .await
+        run_tenant_query(&self.pool, tenant_id, false, query_fn).await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -90,16 +107,7 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, TaskRepositoryError::persistence)?;
-                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            TaskRepositoryError::persistence,
-        )
-        .await
+        run_tenant_query(&self.pool, tenant_id, true, query_fn).await
     }
 }
 
@@ -107,11 +115,12 @@ impl PostgresTaskRepository {
 /// `VARCHAR` column and maps the resulting rows to domain `Task` values.
 macro_rules! find_tasks_by_ref_column {
     ($self:expr, $tenant_id:expr, $ref_str:expr, $column:expr) => {{
+        let tenant_for_query = $tenant_id;
         let value = $ref_str;
         $self
-            .execute_read_query($tenant_id, move |conn| {
+            .execute_read_query(tenant_for_query, move |conn| {
                 let rows = tasks::table
-                    .filter(tasks::tenant_id.eq($tenant_id.into_inner()))
+                    .filter(tasks::tenant_id.eq(tenant_for_query.into_inner()))
                     .filter($column.eq(&value))
                     .select(TaskRow::as_select())
                     .load::<TaskRow>(conn)

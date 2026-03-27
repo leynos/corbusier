@@ -30,6 +30,7 @@ enum CompositeFkCase {
     AgentSessionConversation,
     HandoffSourceSession,
     HandoffConversation,
+    HandoffTargetSession,
     ContextSnapshotSession,
     ContextSnapshotConversation,
 }
@@ -49,6 +50,9 @@ impl CompositeFkCase {
             }
             Self::HandoffConversation => {
                 "handoffs(conversation_id, tenant_id) -> conversations(id, tenant_id)"
+            }
+            Self::HandoffTargetSession => {
+                "handoffs(target_session_id, tenant_id) -> agent_sessions(id, tenant_id)"
             }
             Self::ContextSnapshotSession => {
                 "context_snapshots(session_id, tenant_id) -> agent_sessions(id, tenant_id)"
@@ -81,6 +85,7 @@ async fn context(
 #[case(CompositeFkCase::AgentSessionConversation)]
 #[case(CompositeFkCase::HandoffSourceSession)]
 #[case(CompositeFkCase::HandoffConversation)]
+#[case(CompositeFkCase::HandoffTargetSession)]
 #[case(CompositeFkCase::ContextSnapshotSession)]
 #[case(CompositeFkCase::ContextSnapshotConversation)]
 #[tokio::test(flavor = "multi_thread")]
@@ -134,6 +139,7 @@ async fn composite_foreign_keys_reject_cross_tenant_links(
 #[case(CompositeFkCase::AgentSessionConversation)]
 #[case(CompositeFkCase::HandoffSourceSession)]
 #[case(CompositeFkCase::HandoffConversation)]
+#[case(CompositeFkCase::HandoffTargetSession)]
 #[case(CompositeFkCase::ContextSnapshotSession)]
 #[case(CompositeFkCase::ContextSnapshotConversation)]
 #[tokio::test(flavor = "multi_thread")]
@@ -206,6 +212,9 @@ fn execute_fk_case(
         CompositeFkCase::HandoffConversation => {
             insert_handoff_conversation_case(tx, tenant_a, tenant_b)
         }
+        CompositeFkCase::HandoffTargetSession => {
+            insert_handoff_target_session_case(tx, tenant_a, tenant_b)
+        }
         CompositeFkCase::ContextSnapshotSession => {
             insert_context_snapshot_session_case(tx, tenant_a, tenant_b)
         }
@@ -229,6 +238,7 @@ fn insert_handoff_source_session_case(
             tenant: tenant_b,
             source_session: session,
             conversation,
+            target_session: None,
         },
     )
 }
@@ -247,6 +257,34 @@ fn insert_handoff_conversation_case(
             tenant: tenant_b,
             source_session: session,
             conversation,
+            target_session: None,
+        },
+    )
+}
+
+fn insert_handoff_target_session_case(
+    tx: &mut PgConnection,
+    tenant_a: Uuid,
+    tenant_b: Uuid,
+) -> diesel::QueryResult<usize> {
+    let conversation_b = Uuid::new_v4();
+    insert_conversation(tx, conversation_b, tenant_b, None)?;
+    let source_session_b = Uuid::new_v4();
+    insert_agent_session(tx, source_session_b, tenant_b, conversation_b)?;
+
+    let conversation_a = Uuid::new_v4();
+    insert_conversation(tx, conversation_a, tenant_a, None)?;
+    let target_session_a = Uuid::new_v4();
+    insert_agent_session(tx, target_session_a, tenant_a, conversation_a)?;
+
+    insert_handoff(
+        tx,
+        HandoffInsert {
+            handoff: Uuid::new_v4(),
+            tenant: tenant_b,
+            source_session: source_session_b,
+            conversation: conversation_b,
+            target_session: Some(target_session_a),
         },
     )
 }
