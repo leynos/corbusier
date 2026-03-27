@@ -26,6 +26,26 @@ pub struct InMemoryToolRouter {
 }
 
 impl InMemoryToolRouter {
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "RwLock poison errors are produced by value and converted immediately"
+    )]
+    fn map_lock_err<T>(err: std::sync::PoisonError<T>) -> ToolRoutingInfrastructureError {
+        ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string())
+    }
+
+    fn read_state(
+        &self,
+    ) -> ToolRoutingResult<std::sync::RwLockReadGuard<'_, InMemoryToolRouterState>> {
+        Ok(self.state.read().map_err(Self::map_lock_err)?)
+    }
+
+    fn write_state(
+        &self,
+    ) -> ToolRoutingResult<std::sync::RwLockWriteGuard<'_, InMemoryToolRouterState>> {
+        Ok(self.state.write().map_err(Self::map_lock_err)?)
+    }
+
     /// Creates a new router with empty configuration.
     #[must_use]
     pub fn new() -> Self {
@@ -44,10 +64,7 @@ impl InMemoryToolRouter {
         output: Value,
     ) -> ToolRoutingResult<()> {
         let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
+        let mut state = self.write_state()?;
         state.failures.remove(&tool_name_key);
         state.responses.insert(tool_name_key, output);
         Ok(())
@@ -65,10 +82,7 @@ impl InMemoryToolRouter {
         message: impl Into<String>,
     ) -> ToolRoutingResult<()> {
         let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
+        let mut state = self.write_state()?;
         state.responses.remove(&tool_name_key);
         state.failures.insert(tool_name_key, message.into());
         Ok(())
@@ -81,10 +95,7 @@ impl InMemoryToolRouter {
     /// Returns [`ToolRoutingError::Infrastructure`] when the in-memory state
     /// lock cannot be acquired.
     pub fn routed_call_ids(&self) -> ToolRoutingResult<Vec<String>> {
-        let state = self
-            .state
-            .read()
-            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
+        let state = self.read_state()?;
         Ok(state.routed_call_ids.clone())
     }
 }
@@ -97,10 +108,7 @@ impl ToolRouterPort for InMemoryToolRouter {
         tool_call: &ToolCallRequest,
         _context: ToolRoutingContext,
     ) -> ToolRoutingResult<ToolCallResult> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|err| ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string()))?;
+        let mut state = self.write_state()?;
         state.routed_call_ids.push(call_id.to_owned());
 
         if let Some(message) = state.failures.get(tool_call.tool_name()) {
