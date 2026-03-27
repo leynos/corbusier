@@ -32,6 +32,8 @@ pub struct HookWorld {
     pub action_executor: InMemoryHookActionExecutor,
     /// Execution log repository.
     pub execution_log: InMemoryHookExecutionLogRepository,
+    /// Policy audit repository.
+    pub policy_audit: InMemoryHookPolicyAuditRepository,
     /// Last trigger context used for execution.
     pub last_context: Option<HookTriggerContext>,
     /// Last execution results.
@@ -60,6 +62,7 @@ impl HookWorld {
             definition_repo,
             action_executor,
             execution_log,
+            policy_audit,
             last_context: None,
             last_results: None,
             request_ctx: test_request_ctx(),

@@ -164,8 +164,6 @@ where
                             "missing reserved hook execution for {existing_execution_id}"
                         ))
                     })?;
-                self.persist_policy_audit_events(ctx, &existing_result, &context)
-                    .await?;
                 results.push(existing_result);
                 continue;
             }

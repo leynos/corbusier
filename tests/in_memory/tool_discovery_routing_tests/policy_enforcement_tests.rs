@@ -32,8 +32,7 @@ type InMemoryHookEngine = HookEngineService<
     DefaultClock,
 >;
 
-type InMemoryGovernance =
-    HookBackedToolExecutionGovernance<InMemoryHookEngine, InMemoryHookPolicyAuditRepository>;
+type InMemoryGovernance = HookBackedToolExecutionGovernance<InMemoryHookEngine>;
 
 type InMemoryGovernedDiscovery = ToolDiscoveryRoutingService<
     corbusier::tool_registry::adapters::memory::InMemoryToolCatalog,
@@ -63,10 +62,7 @@ fn build_governed_infrastructure() -> GovernedInfrastructure {
         policy_audit_repository: Arc::new(policy_audit.clone()),
         clock: Arc::new(DefaultClock),
     });
-    let governance = HookBackedToolExecutionGovernance::new(
-        Arc::new(hook_engine),
-        Arc::new(policy_audit.clone()),
-    );
+    let governance = HookBackedToolExecutionGovernance::new(Arc::new(hook_engine));
     GovernedInfrastructure {
         definition_repo,
         action_executor,
@@ -84,7 +80,7 @@ fn build_discovery_with_governance(
             catalog: ctx.catalog.clone(),
             registry: ctx.registry.clone(),
             host: ctx.host.clone(),
-            policy: Arc::new(governance),
+            governance: Arc::new(governance),
             log_store: Arc::new(
                 corbusier::tool_registry::adapters::ObjectStoreLogAdapter::in_memory(),
             ),

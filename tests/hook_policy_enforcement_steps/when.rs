@@ -18,8 +18,14 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) {
     world.last_request = Some(request.clone());
     world.last_conversation_id = Some(conversation_id);
     match run_async(world.discovery.call_tool(&world.request_ctx, &request)) {
-        Ok(result) => world.last_result = Some(result),
-        Err(err) => world.last_error = Some(err),
+        Ok(result) => {
+            world.last_result = Some(result);
+            world.last_error = None;
+        }
+        Err(err) => {
+            world.last_error = Some(err);
+            world.last_result = None;
+        }
     }
 }
 
@@ -40,8 +46,14 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) {
     world.last_request = Some(request.clone());
     world.last_task_id = Some(task_id);
     match run_async(world.discovery.call_tool(&world.request_ctx, &request)) {
-        Ok(result) => world.last_result = Some(result),
-        Err(err) => world.last_error = Some(err),
+        Ok(result) => {
+            world.last_result = Some(result);
+            world.last_error = None;
+        }
+        Err(err) => {
+            world.last_error = Some(err);
+            world.last_result = None;
+        }
     }
 }
 

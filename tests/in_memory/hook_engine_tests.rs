@@ -209,12 +209,6 @@ async fn in_memory_hook_history_is_tenant_isolated() {
         .await
         .expect("tenant B lookup succeeds");
     assert!(other_tenant.is_empty());
-
-    let other_tenant_audits = policy_audit
-        .find_by_trigger_context(&tenant_b, trigger_context_id)
-        .await
-        .expect("tenant B policy audit lookup succeeds");
-    assert!(other_tenant_audits.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]

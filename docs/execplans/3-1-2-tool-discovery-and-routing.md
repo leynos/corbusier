@@ -1331,7 +1331,7 @@ Table 3.1.2: File manifest -- new files for roadmap 3.1.2
 
 Modified files (estimated 14-16):
 
-Table 3.1.2: File manifest -- modified files for roadmap 3.1.2
+Table 3.1.3: File manifest -- modified files for roadmap 3.1.2
 
 | Path                                          | Changes                                                                          |
 | --------------------------------------------- | -------------------------------------------------------------------------------- |

@@ -51,7 +51,6 @@ type TestGovernance = HookBackedToolExecutionGovernance<
         InMemoryHookPolicyAuditRepository,
         DefaultClock,
     >,
-    InMemoryHookPolicyAuditRepository,
 >;
 
 fn stdio_request(name: &str) -> Result<RegisterMcpServerRequest, ToolRegistryDomainError> {
@@ -80,7 +79,7 @@ fn discovery_with_governance<Gov: ToolExecutionGovernance + 'static>(
             catalog: Arc::new(InMemoryToolCatalog::new()),
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(governance),
+            governance: Arc::new(governance),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),
@@ -147,10 +146,7 @@ impl GovernanceTestFixture {
             policy_audit_repository: Arc::new(policy_audit.clone()),
             clock: clock.clone(),
         });
-        let governance = HookBackedToolExecutionGovernance::new(
-            Arc::new(hook_engine),
-            Arc::new(policy_audit.clone()),
-        );
+        let governance = HookBackedToolExecutionGovernance::new(Arc::new(hook_engine));
         let discovery = discovery_with_governance(&registry, &host, governance, &clock);
 
         Self {

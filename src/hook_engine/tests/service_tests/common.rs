@@ -13,7 +13,7 @@ use crate::hook_engine::ports::HookPolicyAuditRepository;
 use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
-use eyre::{Result, WrapErr};
+use eyre::{Result, WrapErr, eyre};
 use mockable::{Clock, DefaultClock};
 use rstest::fixture;
 use serde_json::json;
@@ -217,28 +217,45 @@ pub(crate) async fn assert_policy_audit_indexed_once(
         .find_by_task(ctx, keys.task_id)
         .await
         .wrap_err("query policy events by task")?;
-    assert_eq!(
-        by_task.len(),
-        1,
-        "expected exactly one policy event indexed by task"
+    eyre::ensure!(
+        by_task.len() == 1,
+        "expected exactly one policy event indexed by task, got {}",
+        by_task.len()
     );
     let by_conversation = policy_audit
         .find_by_conversation(ctx, keys.conversation_id)
         .await
         .wrap_err("query policy events by conversation")?;
-    assert_eq!(
-        by_conversation.len(),
-        1,
-        "expected exactly one policy event indexed by conversation"
+    eyre::ensure!(
+        by_conversation.len() == 1,
+        "expected exactly one policy event indexed by conversation, got {}",
+        by_conversation.len()
     );
     let by_trigger = policy_audit
         .find_by_trigger_context(ctx, keys.trigger_context_id)
         .await
         .wrap_err("query policy events by trigger")?;
-    assert_eq!(
-        by_trigger.len(),
-        1,
-        "expected exactly one policy event indexed by trigger context"
+    eyre::ensure!(
+        by_trigger.len() == 1,
+        "expected exactly one policy event indexed by trigger context, got {}",
+        by_trigger.len()
+    );
+    let task_event = by_task
+        .first()
+        .ok_or_else(|| eyre!("missing task-indexed policy event after length check"))?;
+    let conversation_event = by_conversation
+        .first()
+        .ok_or_else(|| eyre!("missing conversation-indexed policy event after length check"))?;
+    let trigger_event = by_trigger
+        .first()
+        .ok_or_else(|| eyre!("missing trigger-indexed policy event after length check"))?;
+    eyre::ensure!(
+        task_event.id() == conversation_event.id(),
+        "task and conversation queries returned different policy audit events"
+    );
+    eyre::ensure!(
+        task_event.id() == trigger_event.id(),
+        "task and trigger queries returned different policy audit events"
     );
     Ok(())
 }

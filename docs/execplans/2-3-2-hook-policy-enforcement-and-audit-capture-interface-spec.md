@@ -103,6 +103,24 @@ pub struct ToolExecutionScope {
 }
 
 impl ToolExecutionScope {
+    pub const fn with_task_id(mut self, task_id: TaskId) -> Self {
+        self.task_id = Some(task_id);
+        self
+    }
+
+    pub const fn with_conversation_id(
+        mut self,
+        conversation_id: ConversationId,
+    ) -> Self {
+        self.conversation_id = Some(conversation_id);
+        self
+    }
+
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
     pub const fn task_id(&self) -> Option<TaskId> { self.task_id }
 
     pub const fn conversation_id(&self) -> Option<ConversationId> {

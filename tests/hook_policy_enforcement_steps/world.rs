@@ -32,8 +32,7 @@ pub type HookPolicyHookEngine = HookEngineService<
     DefaultClock,
 >;
 
-pub type HookPolicyGovernance =
-    HookBackedToolExecutionGovernance<HookPolicyHookEngine, InMemoryHookPolicyAuditRepository>;
+pub type HookPolicyGovernance = HookBackedToolExecutionGovernance<HookPolicyHookEngine>;
 
 pub type HookPolicyLifecycleService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
@@ -87,16 +86,13 @@ impl HookPolicyWorld {
             policy_audit_repository: Arc::new(policy_audit.clone()),
             clock: clock.clone(),
         });
-        let governance = HookBackedToolExecutionGovernance::new(
-            Arc::new(hook_engine),
-            Arc::new(policy_audit.clone()),
-        );
+        let governance = HookBackedToolExecutionGovernance::new(Arc::new(hook_engine));
         let discovery = ToolDiscoveryRoutingService::new(
             ServicePorts {
                 catalog,
                 registry,
                 host: host.clone(),
-                policy: Arc::new(governance),
+                governance: Arc::new(governance),
                 log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
             },
             LogRetentionPolicy::default(),

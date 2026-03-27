@@ -23,6 +23,18 @@ enum QueryKey {
     Trigger(TriggerContextId),
 }
 
+impl QueryKey {
+    fn matches(&self, event: &PolicyAuditEvent) -> bool {
+        match self {
+            Self::Task(task_id) => event.task_id() == Some(*task_id),
+            Self::Conversation(conversation_id) => {
+                event.conversation_id() == Some(*conversation_id)
+            }
+            Self::Trigger(trigger_context_id) => event.trigger_context_id() == *trigger_context_id,
+        }
+    }
+}
+
 impl InMemoryHookPolicyAuditRepository {
     /// Creates an empty in-memory policy audit repository.
     #[must_use]
@@ -64,15 +76,7 @@ impl InMemoryHookPolicyAuditRepository {
     ) -> HookPolicyAuditResult<Vec<PolicyAuditEvent>> {
         self.filter_tenant_events(ctx, {
             let query_key = key.clone();
-            move |event| match &query_key {
-                QueryKey::Task(task_id) => event.task_id() == Some(*task_id),
-                QueryKey::Conversation(conversation_id) => {
-                    event.conversation_id() == Some(*conversation_id)
-                }
-                QueryKey::Trigger(trigger_context_id) => {
-                    event.trigger_context_id() == *trigger_context_id
-                }
-            }
+            move |event| query_key.matches(event)
         })
         .await
     }

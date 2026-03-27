@@ -1,4 +1,8 @@
-//! Diesel schema for hook execution persistence.
+//! Diesel schema for hook engine projections.
+//!
+//! This module defines the `PostgreSQL` tables used to persist hook execution
+//! records and hook policy audit projections, including
+//! `hook_policy_audit_events`.
 
 diesel::table! {
     /// Hook execution records with structured action results.

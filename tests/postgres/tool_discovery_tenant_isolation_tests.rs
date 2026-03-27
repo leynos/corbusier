@@ -72,7 +72,7 @@ async fn setup_context(cluster: PostgresCluster) -> Result<PgTestContext, BoxErr
             catalog,
             registry,
             host: host.clone(),
-            policy: Arc::new(StubGovernance::allowing()),
+            governance: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

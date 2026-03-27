@@ -56,7 +56,7 @@ pub fn discovery_service(
             catalog: catalog.clone(),
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(StubGovernance::allowing()),
+            governance: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

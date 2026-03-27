@@ -79,7 +79,7 @@ fn prepare_runtime(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     Ok(())
 }
 
-fn run_policy_setup(world: &mut HookPolicyWorld, setup: HookSetup) -> Result<(), eyre::Report> {
+fn run_policy_setup(world: &mut HookPolicyWorld, setup: HookSetup<'_>) -> Result<(), eyre::Report> {
     configure_hook(world, setup)?;
     prepare_runtime(world)
 }
@@ -99,7 +99,7 @@ fn pre_tool_use_policy_permits(world: &mut HookPolicyWorld) -> Result<(), eyre::
 
 #[given("a pre-tool-use policy hook denies tool calls")]
 fn pre_tool_use_policy_denies(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
-    configure_hook(
+    run_policy_setup(
         world,
         HookSetup {
             hook_id: "pre-tool-deny",
@@ -113,8 +113,7 @@ fn pre_tool_use_policy_denies(world: &mut HookPolicyWorld) -> Result<(), eyre::R
                 }
             }),
         },
-    )?;
-    prepare_runtime(world)
+    )
 }
 
 #[given("a post-tool-use policy hook records an allow decision")]

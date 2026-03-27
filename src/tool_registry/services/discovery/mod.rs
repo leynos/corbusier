@@ -56,7 +56,7 @@ pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
     /// Server host.
     pub host: Arc<H>,
     /// Tool execution governance.
-    pub policy: Arc<Gov>,
+    pub governance: Arc<Gov>,
     /// Log store.
     pub log_store: Arc<Log>,
 }
@@ -74,7 +74,7 @@ where
     catalog: Arc<Cat>,
     registry: Arc<Reg>,
     host: Arc<H>,
-    policy: Arc<Gov>,
+    governance: Arc<Gov>,
     log_store: Arc<Log>,
     retention_policy: LogRetentionPolicy,
     clock: Arc<C>,
@@ -100,7 +100,7 @@ where
             catalog: ports.catalog,
             registry: ports.registry,
             host: ports.host,
-            policy: ports.policy,
+            governance: ports.governance,
             log_store: ports.log_store,
             retention_policy,
             clock,
@@ -187,7 +187,7 @@ where
         Ok(self.catalog.list_all(ctx).await?)
     }
 
-    /// Routes a tool call through validation, policy, execution, stderr
+    /// Routes a tool call through validation, governance, execution, stderr
     /// capture, and audit recording.
     ///
     /// # Errors
@@ -299,7 +299,10 @@ where
                 other => other,
             }
         })?;
-        let decision = self.policy.enforce_before_call(ctx, request, entry).await?;
+        let decision = self
+            .governance
+            .enforce_before_call(ctx, request, entry)
+            .await?;
         if let ToolGovernanceDecision::Deny { reason } = decision {
             return Err(ToolRegistryDomainError::PolicyDenied {
                 tool_name: request.tool_name().to_owned(),
@@ -334,7 +337,7 @@ where
         };
         self.capture_and_audit(ctx, &completed, stderr_output).await;
         if let Err(err) = self
-            .policy
+            .governance
             .observe_after_call(
                 ctx,
                 &CompletedToolCall {

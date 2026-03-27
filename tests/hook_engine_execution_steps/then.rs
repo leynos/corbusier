@@ -2,7 +2,7 @@
 
 use super::world::{HookWorld, run_async};
 use corbusier::hook_engine::domain::HookExecutionStatus;
-use corbusier::hook_engine::ports::HookExecutionLogRepository;
+use corbusier::hook_engine::ports::{HookExecutionLogRepository, HookPolicyAuditRepository};
 use eyre::WrapErr;
 use rstest_bdd_macros::then;
 
@@ -48,6 +48,21 @@ fn assert_execution_status(
             "expected stored status {expected}, got {}",
             stored_result.status()
         ));
+    }
+
+    if expected == HookExecutionStatus::Failed {
+        let audit_events = run_async(
+            world
+                .policy_audit
+                .find_by_trigger_context(&world.request_ctx, context.id()),
+        )
+        .wrap_err("policy audit lookup failed")?;
+        if audit_events.len() != 1 {
+            return Err(eyre::eyre!(
+                "expected 1 policy audit event for failed execution, got {}",
+                audit_events.len()
+            ));
+        }
     }
     Ok(())
 }
