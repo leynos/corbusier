@@ -559,7 +559,7 @@ enforcement.
 
 ## 4. External integrations and interfaces
 
-### 4.1. VCS integration and review ingestion
+### 4.1. VCS integration and review orchestration
 
 - [ ] 4.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 2.2.3, TBD
   (non-linear dependency: 3.2.2), Podbot Step 3.1, "App authentication", Podbot
@@ -571,14 +571,48 @@ enforcement.
   - [ ] Map VCS events into task lifecycle updates. See
     corbusier-design.md §4.1.1.2.
   - [ ] Success criteria: tasks remain synchronised with VCS state transitions.
-- [ ] 4.1.2 Implement review ingestion workflows. Requires 4.1.1. See
+- [ ] 4.1.2 Introduce the dedicated review bounded context and Frankie adapter
+  ports. Requires 4.1.1 and
+  adr-011-corbusier-frankie-review-adapter-role-segregation.md. See
   corbusier-design.md §2.1.4 and §6.3.2.
-  - [ ] Ingest review comments and map them to tasks. See
+  - [ ] Define `ReviewIntakePort`, `ReviewContextPort`, and
+    `ReviewActionPort`, keeping generic VCS ports focused on issue, branch, and
+    pull-request lifecycle operations. See corbusier-design.md §6.3.1 and
+    §6.3.2.
+  - [ ] Make review threads, not flat comments, the primary orchestration unit,
+    deriving a stable thread root from reply metadata when the adapter does not
+    yet expose one directly. See corbusier-design.md §6.3.2.
+  - [ ] Success criteria: Corbusier can ingest review-thread deltas through
+    Frankie without expanding the generic VCS adapter contract.
+- [ ] 4.1.3 Persist review threads, anchors, checkpoints, and message linkage.
+  Requires 4.1.2. See corbusier-design.md §3.5.2, §6.2.1, and §6.3.2.
+  - [ ] Persist tenant-scoped review threads, raw comments, sync checkpoints,
+    and verification results keyed by pull request and thread root. See
+    corbusier-design.md §6.2.1.
+  - [ ] Preserve Frankie raw comment payloads losslessly and derive actionable
+    review anchors only when commit, file, and line metadata are present. See
     corbusier-design.md §6.3.2.
-  - [ ] Store review metadata for audit and reporting. See
-    corbusier-design.md §2.1.3.
-  - [ ] Success criteria: review comments are attached to the relevant task and
-    conversation records.
+  - [ ] Store structured review linkage in `MessageMetadata.extensions` for
+    review-linked conversation messages rather than flattening anchors into
+    plain text. See corbusier-design.md §6.2.1.2.
+  - [ ] Success criteria: review state survives restart, supports idempotent
+    sync, and links review threads to tasks and conversations without losing
+    anchor metadata.
+- [ ] 4.1.4 Wire Frankie context, verification, and reply execution into the
+  governance loop. Requires 4.1.3 and 3.3.2. See corbusier-design.md §6.3.2 and
+  §6.3.3.
+  - [ ] Materialize time-travel context on demand inside the task workspace
+    instead of persisting historical file snapshots in Corbusier. See
+    corbusier-design.md §6.3.2.
+  - [ ] Invoke Frankie diff-replay verification after Weaver-backed changes and
+    project the result into review-thread state. See
+    corbusier-design.md §6.3.2.
+  - [ ] Add outbound reply draft and submission flows that use Frankie as the
+    review action adapter while Corbusier remains the canonical owner of review
+    workflow state. See corbusier-design.md §6.3.2.
+  - [ ] Success criteria: Corbusier can verify a proposed fix, update review
+    state, and either queue or submit a reply without handing workflow
+    ownership to Frankie.
 
 ### 4.2. HTTP API surface
 

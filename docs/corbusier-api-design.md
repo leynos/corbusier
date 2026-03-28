@@ -150,6 +150,9 @@ The proposed additions are:
   grouping.
 - **plan** -- planning artefacts: plan documents, plan steps, plan reviews,
   plan execution binding to tasks.
+- **review** -- canonical review threads, anchors, sync checkpoints,
+  verification state, and outbound reply workflows backed by Frankie adapter
+  services.
 - **projections** -- read models and DTOs optimized for mockup screens and card
   rendering.
 - **governance** -- hooks, policies, policy decisions, and compliance/audit
@@ -187,7 +190,7 @@ The mockup's Kanban expects a "Planned" column distinct from "To-Do (draft)"
 and also expects hierarchy, subtasks, dependencies, priority, labels, assignee,
 due date, estimate, and an activity log.
 
-#### Proposed write-side model
+#### Review aggregate model
 
 ```rust,no_run
 use chrono::{DateTime, Utc};
@@ -286,7 +289,7 @@ pub struct TaskAggregateV2 {
 }
 ```
 
-#### Key invariants
+#### Review invariants
 
 - `project_slug` is required and immutable once a task becomes `Planned` or
   later.
@@ -385,6 +388,64 @@ _Table 1.1.1: Current versus proposed task states._
   `Abandoned` to `TaskStateV2` directly; introduce `Planned` only for tasks
   that receive scheduling data. Until then, the Kanban "Planned" column can be
   empty without breaking old tasks.
+
+### Review domain
+
+#### Guiding rule
+
+Keep `TaskState` coarse. The task aggregate should continue to signal broad
+workflow status such as `InReview`, while review-specific detail lives in a
+sibling review bounded context and its projections.
+
+#### Proposed write-side model
+
+```rust,no_run
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewThreadAggregate {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub task_id: Uuid,
+    pub conversation_id: Option<Uuid>,
+    pub pull_request_ref: String,
+    pub provider: String,
+    pub external_root_comment_id: String,
+    pub status: ReviewThreadStatus,
+    pub anchor: Option<ReviewAnchorDto>,
+    pub projection: ReviewWorkflowProjection,
+    pub last_checkpoint: Option<Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewWorkflowProjection {
+    pub open_thread_count: u32,
+    pub verification_status: String,
+    pub pending_outbound_reply: Option<String>,
+    pub last_reviewer_action: Option<String>,
+}
+```
+
+#### Key invariants
+
+- Corbusier owns the canonical review workflow projection and its durability.
+- Frankie remains an adapter for GitHub review sync, context materialization,
+  verification, and reply submission.
+- Review-linked conversation messages must preserve structured linkage in
+  `MessageMetadata.extensions` rather than flattening anchor metadata into free
+  text.
+
+#### Projection DTOs
+
+- `ReviewThreadDto` for task and PR detail screens: root comment, replies,
+  reviewer identity, anchor, verification state, and pending reply status.
+- `ReviewInboxDto` for review queues: open-thread counts, unresolved anchors,
+  and last sync checkpoint per pull request.
 
 ### Project domain
 
