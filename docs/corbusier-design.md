@@ -5774,6 +5774,88 @@ erDiagram
 _Figure: Multi-tenant entity-relationship model for tenant-owned persistence
 tables._
 
+For screen readers: The following entity-relationship diagram focuses on the
+review workflow persistence model, showing how tenants own review threads,
+review comments, and verification results, and how those records relate back to
+tasks and conversations.
+
+```mermaid
+erDiagram
+    TENANTS {
+        uuid id PK
+    }
+
+    TASKS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar pull_request_ref
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id FK
+    }
+
+    REVIEW_THREADS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid task_id FK
+        uuid conversation_id FK
+        varchar pull_request_ref
+        varchar provider
+        varchar external_root_comment_id
+        varchar thread_status
+        jsonb anchor
+        jsonb review_state
+        jsonb last_synced_checkpoint
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REVIEW_COMMENTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid review_thread_id FK
+        varchar external_comment_id
+        jsonb raw_payload
+        text body
+        jsonb author
+        varchar file_path
+        integer line_number
+        integer original_line_number
+        varchar commit_sha
+        text diff_hunk
+        varchar in_reply_to_external_comment_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REVIEW_VERIFICATION_RESULTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid review_thread_id FK
+        varchar external_comment_id
+        varchar status
+        jsonb evidence
+        varchar verified_against_commit_sha
+        timestamptz verified_at
+    }
+
+    TENANTS ||--o{ TASKS : owns
+    TENANTS ||--o{ CONVERSATIONS : owns
+    TENANTS ||--o{ REVIEW_THREADS : owns
+    TENANTS ||--o{ REVIEW_COMMENTS : owns
+    TENANTS ||--o{ REVIEW_VERIFICATION_RESULTS : owns
+
+    TASKS ||--o{ REVIEW_THREADS : has
+    CONVERSATIONS ||--o{ REVIEW_THREADS : links
+    REVIEW_THREADS ||--o{ REVIEW_COMMENTS : contains
+    REVIEW_THREADS ||--o{ REVIEW_VERIFICATION_RESULTS : verifies
+```
+
+_Figure: Review workflow entity-relationship model for tenant-owned review
+threads, comments, and verification state._
+
 #### 6.2.4 Encapsulation and Workspace Management
 
 ##### Podbot Integration
@@ -5978,27 +6060,38 @@ review-thread persistence, sync checkpoints, conversation linkage, verification
 status, and outbound reply decisions. Frankie supplies incremental thread sync,
 time-travel context, diff-based verification, and reply rendering or posting.
 
+For screen readers: The following sequence diagram shows the review-event flow
+from a GitHub pull-request review event through Corbusier's review workflow
+service, Frankie synchronization, conversation updates, agent reply drafting,
+and the final verification or reply action.
+
 ```mermaid
 sequenceDiagram
-    participant Webhook as Webhook Handler
-    participant GitHub as GitHub API
-    participant Frankie as Frankie Adapter
-    participant ReviewSvc as Review Service
-    participant ConvSvc as Conversation Service
-    participant Agent as Agent Orchestrator
-    
-    GitHub->>Webhook: PR review event
-    Webhook->>ReviewSvc: Process Review Event
-    ReviewSvc->>Frankie: Sync review threads and anchors
-    Frankie->>GitHub: Read thread delta
-    GitHub-->>Frankie: Review comments and metadata
-    Frankie-->>ReviewSvc: Threads, anchors, and checkpoint
-    ReviewSvc->>ConvSvc: Append review-linked messages
-    ConvSvc->>Agent: Trigger review response turn
-    Agent-->>ConvSvc: Generate response draft
-    ConvSvc-->>ReviewSvc: Draft with verification intent
-    ReviewSvc->>Frankie: Verify resolution or submit reply
+    participant GitHub as GitHub_API
+    participant Webhook as Webhook_Handler
+    participant ReviewSvc as ReviewWorkflowService
+    participant Frankie as FrankieAdapter
+    participant ConvSvc as ConversationService
+    participant Agent as AgentOrchestrator
+
+    GitHub->>Webhook: PR_review_event
+    Webhook->>ReviewSvc: handle_review_event
+    ReviewSvc->>Frankie: sync_threads(pull_request_ref, checkpoint)
+    Frankie->>GitHub: fetch_review_thread_delta
+    GitHub-->>Frankie: review_comments_and_metadata
+    Frankie-->>ReviewSvc: threads_anchors_checkpoint
+    ReviewSvc->>ConvSvc: append_review_linked_messages
+    ConvSvc->>Agent: trigger_review_response_turn
+    Agent-->>ConvSvc: generate_reply_draft
+    ConvSvc-->>ReviewSvc: reply_draft_with_verification_intent
+    ReviewSvc->>Frankie: verify_or_submit_reply
+    Frankie-->>ReviewSvc: verification_result_or_posted_reply
+    ReviewSvc->>ConvSvc: update_review_projection_and_conversation
 ```
+
+_Figure 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
+through Frankie synchronization, agent reply drafting, and verification or
+reply submission._
 
 ##### Review Comment Processing
 
@@ -6070,6 +6163,108 @@ pub trait ReviewActionPort: Send + Sync {
     async fn submit_reply(&self, draft: ReplyDraft) -> Result<PostedReply>;
 }
 ```
+
+For screen readers: The following class diagram shows the review workflow model
+and service boundary, including the review aggregate, its projection and anchor
+types, the materialized review thread view, and the three Frankie-backed review
+ports used by the review workflow service.
+
+```mermaid
+classDiagram
+    class ReviewThreadAggregate {
+        +Uuid id
+        +Uuid tenant_id
+        +Uuid task_id
+        +Uuid conversation_id
+        +String pull_request_ref
+        +String provider
+        +String external_root_comment_id
+        +ReviewThreadStatus status
+        +ReviewAnchorDto anchor
+        +ReviewWorkflowProjection projection
+        +Value last_checkpoint
+        +DateTime_Utc created_at
+        +DateTime_Utc updated_at
+    }
+
+    class ReviewWorkflowProjection {
+        +u32 open_thread_count
+        +String verification_status
+        +String pending_outbound_reply
+        +String last_reviewer_action
+    }
+
+    class ReviewCommentRecord {
+        +ExternalCommentId external_comment_id
+        +Value raw_payload
+        +String body
+        +PathBuf file_path
+        +u32 line_number
+        +User author
+        +u32 original_line_number
+        +String commit_sha
+        +String diff_hunk
+        +ExternalCommentId in_reply_to_id
+        +DateTime_Utc created_at
+        +DateTime_Utc updated_at
+    }
+
+    class ReviewAnchor {
+        +String commit_sha
+        +PathBuf file_path
+        +u32 original_line
+        +String diff_hunk
+    }
+
+    class ReviewThread {
+        +ExternalCommentId thread_root_id
+        +PullRequestRef pull_request_ref
+        +ReviewCommentRecord comments
+        +ReviewAnchor anchor
+        +VerificationStatus verification_status
+        +ReplyDraft pending_reply
+        +ReviewSyncCheckpoint last_synced_checkpoint
+    }
+
+    class ReviewIntakePort {
+        <<interface>>
+        +sync_threads(pull_request, checkpoint) Result_ReviewSyncDelta
+    }
+
+    class ReviewContextPort {
+        <<interface>>
+        +materialize_context(anchor, workspace_id) Result_TimeTravelBundle
+        +verify_resolution(comment, target_commit) Result_VerificationResult
+    }
+
+    class ReviewActionPort {
+        <<interface>>
+        +render_reply(thread, template_id) Result_ReplyDraft
+        +submit_reply(draft) Result_PostedReply
+    }
+
+    class ReviewWorkflowService {
+        +handle_review_event(event)
+        +update_projections_from_sync(delta)
+        +append_review_linked_messages(thread)
+        +start_verification_and_reply(thread)
+    }
+
+    ReviewThreadAggregate --> ReviewWorkflowProjection : embeds
+    ReviewThreadAggregate --> ReviewAnchor : anchors
+    ReviewThreadAggregate --> ReviewThread : materializes
+
+    ReviewThread --> ReviewCommentRecord : contains
+    ReviewThread --> ReviewAnchor : uses
+
+    ReviewWorkflowService ..> ReviewIntakePort : uses
+    ReviewWorkflowService ..> ReviewContextPort : uses
+    ReviewWorkflowService ..> ReviewActionPort : uses
+```
+
+_Figure 6.3.2.2: Review workflow class model showing the persistent aggregate,
+materialized thread view, and the review intake, context, and action ports used
+by the review workflow service._
 
 Review threads are the primary orchestration unit. Corbusier should preserve
 Frankie's raw comment payload losslessly, derive anchors only when metadata is
