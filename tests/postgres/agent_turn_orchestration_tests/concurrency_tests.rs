@@ -86,7 +86,7 @@ async fn postgres_serializes_concurrent_calls_for_same_session_key(
     let active_session = active_sessions
         .into_iter()
         .next()
-        .ok_or_else(|| Box::new(std::io::Error::other("expected active session")) as BoxError)?;
+        .expect("Expected exactly one active session to exist");
     assert_eq!(active_session.turn_count(), 2);
     Ok(())
 }
