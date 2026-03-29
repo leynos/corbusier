@@ -1134,8 +1134,8 @@ erDiagram
 
 For screen readers: The following sequence diagram shows the high-level flow
 for `execute_turn`, from backend lookup and session arbitration through message
-loading, tool routing, runtime execution, and persistence of either success or
-failure outcomes.
+loading, runtime execution, scripted tool routing, and persistence of either
+success or failure outcomes.
 
 <!-- markdownlint-disable MD031 -->
 Table 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration flow.
