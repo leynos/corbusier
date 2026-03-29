@@ -219,9 +219,11 @@ fn invalid_boolean_parameter_failure(world: &SlashCommandWorld) -> Result<()> {
     assert!(matches!(
         error,
         SlashCommandError::InvalidParameterValue { command, parameter, reason }
-        if command == "review"
-            && parameter == "include_summary"
-            && reason == "expected true or false (case-insensitive)"
+        if (command.as_str(), parameter.as_str(), reason.as_str()) == (
+            "review",
+            "include_summary",
+            "expected true or false (case-insensitive)",
+        )
     ));
     Ok(())
 }

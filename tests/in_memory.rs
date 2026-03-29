@@ -13,6 +13,8 @@
 //! - `agent_turn_orchestration_tests`: Turn execution and session continuity
 
 mod in_memory {
+    //! Groups the in-memory integration suites behind a shared module root.
+
     pub mod helpers;
 
     mod agent_turn_orchestration_tests;

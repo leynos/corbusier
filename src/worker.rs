@@ -24,6 +24,8 @@ pub fn shell_escape(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for shell escaping used by worker execution.
+
     use super::shell_escape;
 
     #[test]

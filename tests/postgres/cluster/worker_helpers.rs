@@ -129,14 +129,13 @@ mod tests {
     use crate::test_helpers::EnvVarGuard;
     use camino::{Utf8Path, Utf8PathBuf};
     use cap_std::ambient_authority;
+    #[cfg(unix)]
+    use cap_std::fs::Permissions;
+    #[cfg(unix)]
+    use cap_std::fs::PermissionsExt;
     use cap_std::fs_utf8::Dir;
     use std::ffi::OsString;
     use std::io::Write;
-
-    #[cfg(unix)]
-    use std::fs;
-    #[cfg(unix)]
-    use std::os::unix::fs::PermissionsExt as StdPermissionsExt;
 
     fn create_temp_dir(prefix: &str) -> Result<Utf8PathBuf, std::io::Error> {
         let base = Utf8PathBuf::try_from(std::env::temp_dir()).map_err(|e| {
@@ -156,6 +155,43 @@ mod tests {
         let mut file = dir_handle.create(name)?;
         file.write_all(b"#!/bin/sh\nexit 0\n")?;
         Ok(dir.join(name))
+    }
+
+    #[cfg(unix)]
+    fn set_file_mode(path: &Utf8Path, mode: u32) -> Result<(), std::io::Error> {
+        let parent = path.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("path has no parent: {path}"),
+            )
+        })?;
+        let file_name = path.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("path has no file name: {path}"),
+            )
+        })?;
+        let dir = Dir::open_ambient_dir(parent, ambient_authority())?;
+        dir.set_permissions(Utf8Path::new(file_name), Permissions::from_mode(mode))
+    }
+
+    #[cfg(unix)]
+    fn file_mode(path: &Utf8Path) -> Result<u32, std::io::Error> {
+        let parent = path.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("path has no parent: {path}"),
+            )
+        })?;
+        let file_name = path.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("path has no file name: {path}"),
+            )
+        })?;
+        let dir = Dir::open_ambient_dir(parent, ambient_authority())?;
+        let metadata = dir.metadata(Utf8Path::new(file_name))?;
+        Ok(metadata.permissions().mode())
     }
 
     #[test]
@@ -222,12 +258,7 @@ mod tests {
 
         #[cfg(unix)]
         {
-            let mut perms = fs::metadata(worker_path.as_std_path())
-                .expect("failed to read worker permissions")
-                .permissions();
-            perms.set_mode(0o600);
-            fs::set_permissions(worker_path.as_std_path(), perms)
-                .expect("failed to set worker permissions");
+            set_file_mode(&worker_path, 0o600).expect("failed to set worker permissions");
         }
 
         let prepared = prepare_pg_worker(&worker_path).expect("failed to prepare worker binary");
@@ -240,9 +271,7 @@ mod tests {
 
         #[cfg(unix)]
         {
-            let meta =
-                fs::metadata(prepared.as_std_path()).expect("failed to read prepared metadata");
-            let mode = meta.permissions().mode();
+            let mode = file_mode(&prepared).expect("failed to read prepared metadata");
             assert!(
                 mode & 0o111 != 0,
                 "expected prepared worker to be executable, mode {mode:o}",

@@ -52,8 +52,11 @@ fn create_service() -> ServiceHarness {
     }
 }
 
-#[tokio::test]
-async fn initiate_handoff_requires_active_session() {
+#[test]
+fn initiate_handoff_requires_active_session() {
+    let Ok(runtime) = tokio::runtime::Runtime::new() else {
+        panic!("expected test runtime to initialize");
+    };
     let ctx = ctx();
     let service = create_service().service;
     let session_id = AgentSessionId::new();
@@ -64,15 +67,20 @@ async fn initiate_handoff_requires_active_session() {
         TurnId::new(),
         SequenceNumber::new(5),
     );
-    let result = service.initiate(&ctx, params).await;
+    let result = runtime.block_on(async { service.initiate(&ctx, params).await });
 
     assert!(result.is_err());
-    let err = result.expect_err("should be error");
+    let Err(err) = result else {
+        panic!("expected handoff initiation to fail");
+    };
     assert!(matches!(err, HandoffError::SessionNotFound(_)));
 }
 
-#[tokio::test]
-async fn create_target_session_stores_session() {
+#[test]
+fn create_target_session_stores_session() {
+    let Ok(runtime) = tokio::runtime::Runtime::new() else {
+        panic!("expected test runtime to initialize");
+    };
     let ctx = ctx();
     let harness = create_service();
     let conversation_id = ConversationId::new();
@@ -84,22 +92,24 @@ async fn create_target_session_stores_session() {
         SequenceNumber::new(10),
         handoff_id,
     );
-    let session = harness
-        .service
-        .create_target_session(&ctx, params)
-        .await
-        .expect("should create session");
+    let Ok(session) =
+        runtime.block_on(async { harness.service.create_target_session(&ctx, params).await })
+    else {
+        panic!("expected target session creation to succeed");
+    };
 
     assert_eq!(session.conversation_id, conversation_id);
     assert_eq!(session.initiated_by_handoff, Some(handoff_id));
     assert_eq!(session.agent_backend, "target-agent");
 
-    let found = harness
-        .session_repo
-        .find_by_id(&ctx, session.session_id)
-        .await
-        .expect("should find")
-        .expect("session should exist");
+    let Ok(Some(found)) = runtime.block_on(async {
+        harness
+            .session_repo
+            .find_by_id(&ctx, session.session_id)
+            .await
+    }) else {
+        panic!("expected stored session to be retrievable");
+    };
 
     assert_eq!(found.session_id, session.session_id);
 }

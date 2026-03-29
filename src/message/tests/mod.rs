@@ -3,7 +3,9 @@
 //! Tests are organised by domain concept, covering happy paths, error cases,
 //! and edge cases for all public APIs.
 
-mod adapters_tests;
+mod adapters_query_tests;
+mod adapters_storage_tests;
+mod adapters_test_support;
 mod audit_context_tests;
 mod content_tests;
 mod conversation_row_tests;

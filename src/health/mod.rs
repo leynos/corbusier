@@ -57,6 +57,8 @@ impl HealthCheck for SimpleHealthCheck {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for health-check response and state transitions.
+
     use super::*;
 
     #[test]

@@ -304,6 +304,8 @@ fn validate_attachment_part(
 
 #[cfg(test)]
 mod tests {
+    //! Tests for message validation rules and error cases.
+
     use super::*;
     use crate::message::{
         domain::{ConversationId, Role, SequenceNumber},

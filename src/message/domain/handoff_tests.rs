@@ -78,14 +78,14 @@ fn handoff_metadata_with_tool_calls_accumulates(
 
 #[rstest]
 fn handoff_status_serialization_uses_snake_case() {
-    assert_eq!(
-        serde_json::to_string(&HandoffStatus::Initiated).expect("serialization"),
-        "\"initiated\""
-    );
-    assert_eq!(
-        serde_json::to_string(&HandoffStatus::Completed).expect("serialization"),
-        "\"completed\""
-    );
+    assert!(matches!(
+        serde_json::to_string(&HandoffStatus::Initiated),
+        Ok(ref value) if value == "\"initiated\""
+    ));
+    assert!(matches!(
+        serde_json::to_string(&HandoffStatus::Completed),
+        Ok(ref value) if value == "\"completed\""
+    ));
 }
 
 #[rstest]
