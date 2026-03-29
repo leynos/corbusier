@@ -43,7 +43,7 @@ fn execute_tool_call(
     world.last_task_id = task_id;
     store_tool_call_outcome(
         world,
-        run_async(world.discovery.call_tool(&world.request_ctx, &request))?,
+        run_async(world.discovery.call_tool(&world.request_ctx, request))?,
     );
     Ok(())
 }
