@@ -96,7 +96,7 @@ pub const ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL: &str =
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v14";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v15";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
