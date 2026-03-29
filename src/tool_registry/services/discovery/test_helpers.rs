@@ -5,7 +5,7 @@ use crate::{
     context::RequestContext,
     tool_registry::{
         adapters::{
-            AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+            InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
             memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
         },
         domain::{
@@ -34,7 +34,7 @@ pub type TestDiscoveryService = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
-    AllowAllPolicy,
+    StubGovernance,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
@@ -58,7 +58,8 @@ pub fn bundle() -> TestBundle {
     let host = Arc::new(InMemoryMcpServerHost::new());
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let (discovery, catalog) = discovery_with_policy(&registry, &host, AllowAllPolicy, &clock);
+    let (discovery, catalog) =
+        discovery_with_governance(&registry, &host, StubGovernance::allowing(), &clock);
     TestBundle {
         host,
         lifecycle,
@@ -87,14 +88,14 @@ pub fn read_file_tool() -> Result<McpToolDefinition> {
 /// Registers, starts, and discovers the default in-memory test server.
 ///
 /// NOTE: The helper is test-only and assumes `workspace_tools` semantics.
-pub async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
+pub async fn register_start_discover<Gov: crate::tool_registry::ports::ToolExecutionGovernance>(
     host: &InMemoryMcpServerHost,
     lifecycle: &TestLifecycleService,
     discovery: &ToolDiscoveryRoutingService<
         InMemoryToolCatalog,
         InMemoryMcpServerRegistry,
         InMemoryMcpServerHost,
-        Pol,
+        Gov,
         ObjectStoreLogAdapter,
         DefaultClock,
     >,
@@ -115,21 +116,23 @@ pub async fn register_start_discover<Pol: crate::tool_registry::ports::ToolPolic
 }
 
 /// Registers, starts (with startup stderr), and discovers tools.
-/// Service triplet used by helpers that are generic over the policy
+/// Service triplet used by helpers that are generic over the governance
 /// adapter.
-pub struct TestServices<'a, Pol: crate::tool_registry::ports::ToolPolicyEnforcer> {
+pub struct TestServices<'a, Gov: crate::tool_registry::ports::ToolExecutionGovernance> {
     /// The in-memory host adapter.
     pub host: &'a InMemoryMcpServerHost,
     /// The lifecycle service.
     pub lifecycle: &'a TestLifecycleService,
     /// The discovery service.
-    pub discovery: &'a PolicyDiscoveryService<Pol>,
+    pub discovery: &'a GovernanceDiscoveryService<Gov>,
 }
 
 /// Registers a server, starts it, configures startup stderr, discovers
 /// tools, and returns the server identifier and captured startup stderr.
-pub async fn register_start_with_stderr<Pol: crate::tool_registry::ports::ToolPolicyEnforcer>(
-    services: &TestServices<'_, Pol>,
+pub async fn register_start_with_stderr<
+    Gov: crate::tool_registry::ports::ToolExecutionGovernance,
+>(
+    services: &TestServices<'_, Gov>,
     ctx: &RequestContext,
     startup_stderr: bytes::Bytes,
 ) -> Result<(
@@ -213,42 +216,44 @@ pub fn assert_single_audit_stderr_path(
     Ok(())
 }
 
-/// Discovery service parameterized by a custom policy adapter.
-pub type PolicyDiscoveryService<Pol> = ToolDiscoveryRoutingService<
+/// Discovery service parameterized by a custom governance adapter.
+pub type GovernanceDiscoveryService<Gov> = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
-    Pol,
+    Gov,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
 
-/// Builds a discovery service wired to a custom policy adapter.
+/// Builds a discovery service wired to a custom governance adapter.
 ///
 /// Returns both the service and the catalogue for test assertions.
 /// NOTE: This helper is intended for in-memory, test-only wiring.
-pub fn discovery_with_policy<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
+pub fn discovery_with_governance<
+    Gov: crate::tool_registry::ports::ToolExecutionGovernance + 'static,
+>(
     registry: &Arc<InMemoryMcpServerRegistry>,
     host: &Arc<InMemoryMcpServerHost>,
-    policy: Pol,
+    governance: Gov,
     clock: &Arc<DefaultClock>,
-) -> (PolicyDiscoveryService<Pol>, Arc<InMemoryToolCatalog>) {
-    build_discovery_service(registry, host, policy, clock)
+) -> (GovernanceDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
+    build_discovery_service(registry, host, governance, clock)
 }
 
-fn build_discovery_service<Pol: crate::tool_registry::ports::ToolPolicyEnforcer + 'static>(
+fn build_discovery_service<Gov: crate::tool_registry::ports::ToolExecutionGovernance + 'static>(
     registry: &Arc<InMemoryMcpServerRegistry>,
     host: &Arc<InMemoryMcpServerHost>,
-    policy: Pol,
+    governance: Gov,
     clock: &Arc<DefaultClock>,
-) -> (PolicyDiscoveryService<Pol>, Arc<InMemoryToolCatalog>) {
+) -> (GovernanceDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let service = ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog: catalog.clone(),
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(policy),
+            governance: Arc::new(governance),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

@@ -1,8 +1,13 @@
 //! Hook engine execution port.
 
-use super::{HookActionExecutionError, HookDefinitionRepositoryError, HookExecutionLogError};
+use super::{
+    HookActionExecutionError, HookDefinitionRepositoryError, HookExecutionLogError,
+    HookPolicyAuditError,
+};
 use crate::context::RequestContext;
-use crate::hook_engine::domain::{HookExecutionResult, HookTriggerContext, HookTriggerType};
+use crate::hook_engine::domain::{
+    HookExecutionResult, HookTriggerContext, HookTriggerType, PolicyAuditProjectionError,
+};
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -44,4 +49,10 @@ pub enum HookEngineError {
     /// Execution log persistence failure.
     #[error(transparent)]
     ExecutionLog(#[from] HookExecutionLogError),
+    /// Policy audit projection failed validation.
+    #[error(transparent)]
+    PolicyAuditProjection(#[from] PolicyAuditProjectionError),
+    /// Policy audit persistence failure.
+    #[error(transparent)]
+    PolicyAudit(#[from] HookPolicyAuditError),
 }

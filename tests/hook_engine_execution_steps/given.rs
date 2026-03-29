@@ -1,11 +1,13 @@
 //! Given steps for hook engine execution scenarios.
 
-use super::world::{HookWorld, run_async};
+use super::async_utils::run_async;
+use super::world::HookWorld;
 use corbusier::hook_engine::domain::{
     ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };
 use eyre::WrapErr;
 use rstest_bdd_macros::given;
+use serde_json::json;
 
 struct HookSetup {
     hook_id: &'static str,
@@ -26,7 +28,7 @@ fn configure_hook(world: &mut HookWorld, setup: HookSetup) -> Result<HookActionI
         vec![HookAction::new(action_id.clone(), setup.action_type)],
     )
     .wrap_err("build hook definition for scenario setup")?;
-    run_async(world.definition_repo.insert(&world.request_ctx, definition))
+    run_async(world.definition_repo.insert(&world.request_ctx, definition))?
         .wrap_err("insert hook definition into in-memory scenario repository")?;
     Ok(action_id)
 }
@@ -60,5 +62,15 @@ fn post_deploy_hook_configured_to_fail(world: &mut HookWorld) -> Result<(), eyre
         .action_executor
         .set_outcome(action_id.as_str(), ActionStatus::Failed)
         .wrap_err("configure failing action outcome for scenario hook")?;
+    world
+        .action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "reason": "post-deploy validation failed",
+            }),
+        )
+        .wrap_err("configure failing policy audit output for scenario hook")?;
     Ok(())
 }

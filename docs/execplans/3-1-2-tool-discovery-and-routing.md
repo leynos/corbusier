@@ -290,8 +290,8 @@ All 11 acceptance criteria verified:
 9. Startup stderr capture: verified by unit test
    `store_startup_stderr_captures_and_sweeps`.
 10. Log rotation (`max_logs_per_server`): verified by unit test
-   `store_startup_stderr_captures_and_sweeps` (overflow sweep) and
-   integration test `log_rotation_enforces_max_count`.
+   `store_startup_stderr_captures_and_sweeps` (overflow sweep) and integration
+   test `log_rotation_enforces_max_count`.
 11. Stderr truncation: verified by unit test
    `stderr_truncation_at_max_bytes`.
 
@@ -381,7 +381,8 @@ Build gates (from `AGENTS.md` and `Makefile`):
 - `make check-fmt` -- `cargo fmt --all -- --check`
 - `make lint` -- `cargo doc --no-deps` +
   `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- `make test` -- `RUSTFLAGS="-D warnings" cargo nextest run --all-targets --all-features`
+- `make test` --
+  `RUSTFLAGS="-D warnings" cargo nextest run --all-targets --all-features`
 - `make fmt` -- formatting (code + markdown)
 - `make markdownlint` -- markdown linting
 - `make nixie` -- Mermaid diagram validation
@@ -451,7 +452,7 @@ builder method `with_stderr_log_path(path)` to attach the log reference.
 
 `validation.rs` defines
 `validate_parameters(input_schema: &Value, parameters: &Value) -> Result<(), ToolRegistryDomainError>`.
-This function checks: (a) if `input_schema` has `"type": "object"`,
+ This function checks: (a) if `input_schema` has `"type": "object"`,
 `parameters` must be a JSON object; (b) if `input_schema` has a `"required"`
 array, every listed key must be present in `parameters`. Returns
 `ToolRegistryDomainError::SchemaValidationFailed` on failure.
@@ -512,7 +513,7 @@ to its catalogue entry (returning available entries preferentially);
 
 `policy.rs` defines the `ToolPolicyEnforcer` async trait with one method:
 `evaluate(ctx, tool_name, parameters) -> Result<PolicyDecision, ToolPolicyError>`.
-Define `ToolPolicyError` with a single variant
+ Define `ToolPolicyError` with a single variant
 `EvaluationFailed { message: String }` and `ToolPolicyResult<T>` type alias.
 
 `log_store.rs` defines the `ToolLogStore` async trait -- the hexagonal port
@@ -527,13 +528,13 @@ truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
 `retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
--- reads a log blob by path.
+ — reads a log blob by path.
 
 `delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
--- deletes a single log blob.
+— deletes a single log blob.
 
 `list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
--- lists all log blob paths for a server by prefix scan on
+ — lists all log blob paths for a server by prefix scan on
 `tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
 
 `sweep_expired(&self, ctx: &RequestContext,`
@@ -737,28 +738,28 @@ dependencies as `Arc` references (`catalog`, `registry`, `host`, `policy`,
 `ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over the
 same port types plus `Clock`. The constructor
 `new(ports: ServicePorts<...>, retention_policy: LogRetentionPolicy, clock: Arc<C>)`
-destructures the grouped ports into individual fields. Internally the service
+ destructures the grouped ports into individual fields. Internally, the service
 stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
-`discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
-load server from registry (fail with `NotFound` if absent), verify lifecycle
-state allows tool queries, call `host.list_tools()` to get tool definitions,
-map each to a `CatalogEntry`, call `catalog.sync_server_tools()` to persist,
-return the entries.
+`discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
+Load the server from the registry, fail with `NotFound` if it is absent,
+verify the lifecycle state allows tool queries, call `host.list_tools()` to
+get tool definitions, map each definition to a `CatalogEntry`, call
+`catalog.sync_server_tools()` to persist the entries, and return them.
 
-`mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
-delegate to `catalog.mark_server_tools_unavailable(server_id)`.
+`mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
+Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
-`mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
-delegate to `catalog.mark_server_tools_available(server_id)`.
+`mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
+Delegate to `catalog.mark_server_tools_available(server_id)`.
 
-`list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
-delegate to `catalog.list_all()`.
+`list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
+Delegate to `catalog.list_all()`.
 
-`call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
-the core routing method. Flow:
+`call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`.
+This is the core routing method. Its flow is:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
@@ -794,20 +795,19 @@ the core routing method. Flow:
    call.
 9. Return `ToolCallResult`.
 
-`store_startup_stderr(&self, ctx, server_id, stderr)`
-`-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`: stores startup stderr
-captured from `McpServerHost::start`. Called by the caller after
-`lifecycle_service.start()` returns a `LifecycleStartResult` with non-empty
-`startup_stderr`. Builds
+`store_startup_stderr(&self, ctx, server_id, stderr) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`.
+Store startup stderr captured from `McpServerHost::start`. The caller invokes
+this after `lifecycle_service.start()` returns a `LifecycleStartResult` with
+non-empty `startup_stderr`. Build
 `LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
-stores via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
-returns the metadata. This method also triggers `sweep_expired` for the server
+store it via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
+return the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
-`sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
-triggers a retention sweep for a specific server. Delegates to
-`log_store.sweep_expired(server_id, &SweepContext { … })`. Returns the count of
-deleted log entries.
+`sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`.
+Trigger a retention sweep for a specific server. Delegate to
+`log_store.sweep_expired(server_id, &SweepContext { … })` and return the count
+of deleted log entries.
 
 Define `ToolDiscoveryRoutingServiceError` with variants:
 `Domain(from ToolRegistryDomainError)`, `Catalog(from ToolCatalogError)`,
@@ -1299,59 +1299,59 @@ where
 
 New files (estimated 23-26):
 
-Table 3.1.2: File manifest -- new files for roadmap 3.1.2
+Table 3.1.2: File manifest — new files for roadmap 3.1.2
 
-| Path | Purpose |
-| --- | --- |
-| `src/tool_registry/domain/catalog.rs` | `CatalogEntry`, `CatalogEntryId` |
-| `src/tool_registry/domain/routing.rs` | `ToolCallRequest`, `ToolCallResult`, `ToolCallOutcome`, `ToolCallId` |
-| `src/tool_registry/domain/audit.rs` | `ToolCallAuditRecord` (with `stderr_log_path`) |
-| `src/tool_registry/domain/policy.rs` | `PolicyDecision` |
-| `src/tool_registry/domain/validation.rs` | `validate_parameters()` |
-| `src/tool_registry/domain/log_capture.rs` | `LogEntryId`, `LogEntryKind`, `LogEntryMetadata`, `LogRetentionPolicy` |
-| `src/tool_registry/ports/catalog.rs` | `ToolCatalogRepository` port |
-| `src/tool_registry/ports/policy.rs` | `ToolPolicyEnforcer` port |
-| `src/tool_registry/ports/log_store.rs` | `ToolLogStore` port |
-| `src/tool_registry/services/discovery/mod.rs` | `ToolDiscoveryRoutingService` |
-| `src/tool_registry/services/discovery/tests.rs` | Service unit tests |
-| `src/tool_registry/adapters/memory/catalog.rs` | `InMemoryToolCatalog` |
-| `src/tool_registry/adapters/policy.rs` | `AllowAllPolicy`, `DenyAllPolicy` |
-| `src/tool_registry/adapters/log_store.rs` | `ObjectStoreLogAdapter` (wraps `object_store`) |
-| `src/tool_registry/adapters/postgres/catalog_schema.rs` | Diesel table macros (3 tables) |
-| `src/tool_registry/adapters/postgres/catalog_models.rs` | Row models (incl. `LogMetadataRow`) |
-| `src/tool_registry/adapters/postgres/catalog_repository.rs` | `PostgresToolCatalog` |
-| `src/tool_registry/adapters/postgres/log_metadata_repository.rs` | `PostgresLogMetadataRepository` |
-| `migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql` | Migration (3 tables) |
-| `migrations/2026-03-04-000000_add_tool_catalog_tables/down.sql` | Migration down |
-| `tests/in_memory/tool_discovery_routing_tests/` | In-memory integration (directory module) |
-| `tests/postgres/tool_discovery_routing_tests.rs` | Postgres integration |
-| `tests/features/tool_discovery_routing.feature` | BDD scenarios |
-| `tests/tool_discovery_routing_steps/` | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.) |
+| Path                                                             | Purpose                                                                |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `src/tool_registry/domain/catalog.rs`                            | `CatalogEntry`, `CatalogEntryId`                                       |
+| `src/tool_registry/domain/routing.rs`                            | `ToolCallRequest`, `ToolCallResult`, `ToolCallOutcome`, `ToolCallId`   |
+| `src/tool_registry/domain/audit.rs`                              | `ToolCallAuditRecord` (with `stderr_log_path`)                         |
+| `src/tool_registry/domain/policy.rs`                             | `PolicyDecision`                                                       |
+| `src/tool_registry/domain/validation.rs`                         | `validate_parameters()`                                                |
+| `src/tool_registry/domain/log_capture.rs`                        | `LogEntryId`, `LogEntryKind`, `LogEntryMetadata`, `LogRetentionPolicy` |
+| `src/tool_registry/ports/catalog.rs`                             | `ToolCatalogRepository` port                                           |
+| `src/tool_registry/ports/policy.rs`                              | `ToolPolicyEnforcer` port                                              |
+| `src/tool_registry/ports/log_store.rs`                           | `ToolLogStore` port                                                    |
+| `src/tool_registry/services/discovery/mod.rs`                    | `ToolDiscoveryRoutingService`                                          |
+| `src/tool_registry/services/discovery/tests.rs`                  | Service unit tests                                                     |
+| `src/tool_registry/adapters/memory/catalog.rs`                   | `InMemoryToolCatalog`                                                  |
+| `src/tool_registry/adapters/policy.rs`                           | `AllowAllPolicy`, `DenyAllPolicy`                                      |
+| `src/tool_registry/adapters/log_store.rs`                        | `ObjectStoreLogAdapter` (wraps `object_store`)                         |
+| `src/tool_registry/adapters/postgres/catalog_schema.rs`          | Diesel table macros (3 tables)                                         |
+| `src/tool_registry/adapters/postgres/catalog_models.rs`          | Row models (incl. `LogMetadataRow`)                                    |
+| `src/tool_registry/adapters/postgres/catalog_repository.rs`      | `PostgresToolCatalog`                                                  |
+| `src/tool_registry/adapters/postgres/log_metadata_repository.rs` | `PostgresLogMetadataRepository`                                        |
+| `migrations/2026-03-04-000000_add_tool_catalog_tables/up.sql`    | Migration (3 tables)                                                   |
+| `migrations/2026-03-04-000000_add_tool_catalog_tables/down.sql`  | Migration down                                                         |
+| `tests/in_memory/tool_discovery_routing_tests/`                  | In-memory integration (directory module)                               |
+| `tests/postgres/tool_discovery_routing_tests.rs`                 | Postgres integration                                                   |
+| `tests/features/tool_discovery_routing.feature`                  | BDD scenarios                                                          |
+| `tests/tool_discovery_routing_steps/`                            | BDD step definitions (directory module: `mod.rs`, `given.rs`, etc.)    |
 
 Modified files (estimated 14-16):
 
-Table 3.1.2: File manifest -- modified files for roadmap 3.1.2
+Table 3.1.3: File manifest — modified files for roadmap 3.1.2
 
-| Path | Changes |
-| --- | --- |
-| `Cargo.toml` | Add `object_store` and `bytes` dependencies |
-| `src/tool_registry/domain/error.rs` | Add 6 new error variants |
-| `src/tool_registry/domain/mod.rs` | Add module declarations and re-exports |
-| `src/tool_registry/ports/host.rs` | Add `call_tool`, change `start` return type, add result structs + error variants |
-| `src/tool_registry/ports/mod.rs` | Add catalog, policy, and log_store re-exports |
-| `src/tool_registry/adapters/runtime.rs` | Add `call_tool` + startup/call stderr to `InMemoryMcpServerHost` |
-| `src/tool_registry/adapters/memory/mod.rs` | Export `InMemoryToolCatalog` |
-| `src/tool_registry/adapters/postgres/mod.rs` | Export `PostgresToolCatalog`, `PostgresLogMetadataRepository` |
-| `src/tool_registry/adapters/mod.rs` | Export policy + log_store adapters |
-| `src/tool_registry/services/mod.rs` | Export discovery service |
-| `src/tool_registry/services/lifecycle/mod.rs` | Update `start` call site for new `StartHostResult` return type |
-| `src/tool_registry/mod.rs` | Update module-level doc comment |
-| `tests/in_memory.rs` | Add `mod tool_discovery_routing_tests;` |
-| `tests/postgres.rs` | Add `mod tool_discovery_routing_tests;` |
-| `tests/postgres/helpers.rs` | Add migration constant and apply call |
-| `docs/corbusier-design.md` | Add implementation decisions |
-| `docs/users-guide.md` | Add tool discovery/routing + log capture section |
-| `docs/roadmap.md` | Mark 3.1.2 items as done |
+| Path                                          | Changes                                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------------------- |
+| `Cargo.toml`                                  | Add `object_store` and `bytes` dependencies                                      |
+| `src/tool_registry/domain/error.rs`           | Add 6 new error variants                                                         |
+| `src/tool_registry/domain/mod.rs`             | Add module declarations and re-exports                                           |
+| `src/tool_registry/ports/host.rs`             | Add `call_tool`, change `start` return type, add result structs + error variants |
+| `src/tool_registry/ports/mod.rs`              | Add catalog, policy, and log_store re-exports                                    |
+| `src/tool_registry/adapters/runtime.rs`       | Add `call_tool` + startup/call stderr to `InMemoryMcpServerHost`                 |
+| `src/tool_registry/adapters/memory/mod.rs`    | Export `InMemoryToolCatalog`                                                     |
+| `src/tool_registry/adapters/postgres/mod.rs`  | Export `PostgresToolCatalog`, `PostgresLogMetadataRepository`                    |
+| `src/tool_registry/adapters/mod.rs`           | Export policy + log_store adapters                                               |
+| `src/tool_registry/services/mod.rs`           | Export discovery service                                                         |
+| `src/tool_registry/services/lifecycle/mod.rs` | Update `start` call site for new `StartHostResult` return type                   |
+| `src/tool_registry/mod.rs`                    | Update module-level doc comment                                                  |
+| `tests/in_memory.rs`                          | Add `mod tool_discovery_routing_tests;`                                          |
+| `tests/postgres.rs`                           | Add `mod tool_discovery_routing_tests;`                                          |
+| `tests/postgres/helpers.rs`                   | Add migration constant and apply call                                            |
+| `docs/corbusier-design.md`                    | Add implementation decisions                                                     |
+| `docs/users-guide.md`                         | Add tool discovery/routing + log capture section                                 |
+| `docs/roadmap.md`                             | Mark 3.1.2 items as done                                                         |
 
 ## Artifacts and notes
 

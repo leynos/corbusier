@@ -1,93 +1,359 @@
-//! Policy enforcement adapters for tool call authorization.
+//! Governance adapters for tool execution authorization and audit observation.
 
+use super::policy_metadata::build_scope_metadata;
 use crate::context::RequestContext;
-use crate::tool_registry::{
-    domain::PolicyDecision,
-    ports::{ToolPolicyEnforcer, ToolPolicyError},
+use crate::hook_engine::domain::{
+    HookExecutionResult, HookExecutionScope, HookTriggerContext, HookTriggerType, PolicyAuditEvent,
+    PolicyAuditProjectionError, project_policy_audit_events,
+};
+use crate::hook_engine::ports::HookEngine;
+use crate::tool_registry::domain::{
+    CatalogEntry, ToolCallRequest, ToolCallResult, ToolExecutionScope, ToolGovernanceDecision,
+};
+use crate::tool_registry::ports::{
+    CompletedToolCall, ToolExecutionGovernance, ToolGovernanceError,
 };
 use async_trait::async_trait;
-use serde_json::Value;
+use std::sync::Arc;
 
-/// Policy adapter that unconditionally allows all tool calls.
-///
-/// This is the default policy adapter, providing an extensibility point
-/// for future authorization logic without blocking current functionality.
-#[derive(Debug, Clone, Default)]
-pub struct AllowAllPolicy;
-
-#[async_trait]
-impl ToolPolicyEnforcer for AllowAllPolicy {
-    async fn evaluate(
-        &self,
-        _ctx: &RequestContext,
-        _tool_name: &str,
-        _parameters: &Value,
-    ) -> Result<PolicyDecision, ToolPolicyError> {
-        Ok(PolicyDecision::Allow)
-    }
-}
-
-/// Policy adapter that unconditionally denies all tool calls.
-///
-/// Intended for testing policy enforcement paths.
+/// The fixed outcome returned by a [`StubGovernance`] adapter.
 #[derive(Debug, Clone)]
-pub struct DenyAllPolicy {
-    reason: String,
+pub enum StubOutcome {
+    Allow,
+    Deny { reason: String },
+    Fail { message: String },
 }
 
-impl DenyAllPolicy {
-    /// Creates a deny-all policy with the given reason.
-    #[must_use]
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
+impl StubOutcome {
+    fn before_call(&self) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        match self {
+            Self::Allow => Ok(ToolGovernanceDecision::Allow),
+            Self::Deny { reason } => Ok(ToolGovernanceDecision::Deny {
+                reason: reason.clone(),
+            }),
+            Self::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
+        }
+    }
+
+    fn after_call(&self) -> Result<(), ToolGovernanceError> {
+        match self {
+            Self::Fail { message } => Err(ToolGovernanceError::EvaluationFailed {
+                message: message.clone(),
+            }),
+            Self::Allow | Self::Deny { .. } => Ok(()),
         }
     }
 }
 
-#[async_trait]
-impl ToolPolicyEnforcer for DenyAllPolicy {
-    async fn evaluate(
-        &self,
-        _ctx: &RequestContext,
-        _tool_name: &str,
-        _parameters: &Value,
-    ) -> Result<PolicyDecision, ToolPolicyError> {
-        Ok(PolicyDecision::Deny {
-            reason: self.reason.clone(),
-        })
-    }
-}
-
-/// Policy adapter that simulates a policy evaluation failure.
-///
-/// Intended for testing error propagation when the policy engine
-/// itself fails (distinct from a policy denial decision).
+/// Stub governance adapter that returns a fixed outcome regardless of request inputs.
 #[derive(Debug, Clone)]
-pub struct FailingPolicy {
-    message: String,
+pub struct StubGovernance {
+    outcome: StubOutcome,
 }
 
-impl FailingPolicy {
-    /// Creates a failing policy with the given error message.
+impl StubGovernance {
+    /// Creates a stub that always allows tool execution.
     #[must_use]
-    pub fn new(message: impl Into<String>) -> Self {
+    pub const fn allowing() -> Self {
         Self {
-            message: message.into(),
+            outcome: StubOutcome::Allow,
+        }
+    }
+
+    /// Creates a stub that always denies tool execution with the given reason.
+    #[must_use]
+    pub fn denying(reason: impl Into<String>) -> Self {
+        Self {
+            outcome: StubOutcome::Deny {
+                reason: reason.into(),
+            },
+        }
+    }
+
+    /// Creates a stub that always fails governance evaluation with the given message.
+    #[must_use]
+    pub fn failing(message: impl Into<String>) -> Self {
+        Self {
+            outcome: StubOutcome::Fail {
+                message: message.into(),
+            },
         }
     }
 }
 
+impl Default for StubGovernance {
+    fn default() -> Self {
+        Self::allowing()
+    }
+}
+
 #[async_trait]
-impl ToolPolicyEnforcer for FailingPolicy {
-    async fn evaluate(
+impl ToolExecutionGovernance for StubGovernance {
+    async fn enforce_before_call(
         &self,
         _ctx: &RequestContext,
-        _tool_name: &str,
-        _parameters: &Value,
-    ) -> Result<PolicyDecision, ToolPolicyError> {
-        Err(ToolPolicyError::EvaluationFailed {
-            message: self.message.clone(),
-        })
+        _request: &ToolCallRequest,
+        _entry: &CatalogEntry,
+    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        self.outcome.before_call()
     }
+
+    async fn observe_after_call(
+        &self,
+        _ctx: &RequestContext,
+        _call: &CompletedToolCall<'_>,
+    ) -> Result<(), ToolGovernanceError> {
+        self.outcome.after_call()
+    }
+}
+
+macro_rules! legacy_stub_policy {
+    (
+        $(#[$doc:meta])*
+        $name:ident,
+        $ctor_doc:literal,
+        $ctor:expr,
+        $default:expr
+    ) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone)]
+        pub struct $name(StubGovernance);
+
+        impl $name {
+            #[doc = $ctor_doc]
+            #[must_use]
+            pub fn new(message: impl Into<String>) -> Self { Self($ctor(message)) }
+        }
+
+        impl Default for $name {
+            fn default() -> Self { Self::new($default) }
+        }
+
+        impl From<StubGovernance> for $name {
+            fn from(governance: StubGovernance) -> Self { Self(governance) }
+        }
+
+        impl From<$name> for StubGovernance {
+            fn from(policy: $name) -> Self { policy.0 }
+        }
+
+        #[async_trait]
+        impl ToolExecutionGovernance for $name {
+            async fn enforce_before_call(
+                &self,
+                ctx: &RequestContext,
+                request: &ToolCallRequest,
+                entry: &CatalogEntry,
+            ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+                self.0.enforce_before_call(ctx, request, entry).await
+            }
+
+            async fn observe_after_call(
+                &self,
+                ctx: &RequestContext,
+                call: &CompletedToolCall<'_>,
+            ) -> Result<(), ToolGovernanceError> {
+                self.0.observe_after_call(ctx, call).await
+            }
+        }
+    };
+}
+
+/// Backwards-compatible wrapper for the always-allowing stub adapter.
+#[derive(Debug, Clone)]
+pub struct AllowAllPolicy(StubGovernance);
+
+impl AllowAllPolicy {
+    /// Creates a governance adapter that always allows tool execution.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self(StubGovernance::allowing())
+    }
+}
+
+impl Default for AllowAllPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<StubGovernance> for AllowAllPolicy {
+    fn from(governance: StubGovernance) -> Self {
+        Self(governance)
+    }
+}
+
+impl From<AllowAllPolicy> for StubGovernance {
+    fn from(policy: AllowAllPolicy) -> Self {
+        policy.0
+    }
+}
+
+#[async_trait]
+impl ToolExecutionGovernance for AllowAllPolicy {
+    async fn enforce_before_call(
+        &self,
+        ctx: &RequestContext,
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        self.0.enforce_before_call(ctx, request, entry).await
+    }
+
+    async fn observe_after_call(
+        &self,
+        ctx: &RequestContext,
+        call: &CompletedToolCall<'_>,
+    ) -> Result<(), ToolGovernanceError> {
+        self.0.observe_after_call(ctx, call).await
+    }
+}
+
+legacy_stub_policy!(
+    /// Backwards-compatible wrapper for the always-denying stub adapter.
+    DenyAllPolicy,
+    "Creates a governance adapter that always denies tool execution.",
+    StubGovernance::denying,
+    "tool execution denied"
+);
+
+legacy_stub_policy!(
+    /// Backwards-compatible wrapper for the always-failing stub adapter.
+    FailingPolicy,
+    "Creates a governance adapter that always fails evaluation.",
+    StubGovernance::failing,
+    "tool governance failed"
+);
+
+/// Governance adapter that delegates enforcement and observation to the hook
+/// engine.
+#[derive(Debug, Clone)]
+pub struct HookBackedToolExecutionGovernance<E>
+where
+    E: HookEngine,
+{
+    hook_engine: Arc<E>,
+}
+
+impl<E> HookBackedToolExecutionGovernance<E>
+where
+    E: HookEngine,
+{
+    /// Creates a new hook-backed governance adapter.
+    #[must_use]
+    pub const fn new(hook_engine: Arc<E>) -> Self {
+        Self { hook_engine }
+    }
+
+    fn build_scope_metadata(
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+        result: Option<&ToolCallResult>,
+    ) -> serde_json::Value {
+        build_scope_metadata(request, entry, result)
+    }
+
+    fn project_execution_scope(
+        scope: &ToolExecutionScope,
+        metadata: serde_json::Value,
+    ) -> HookExecutionScope {
+        HookExecutionScope::from(scope).with_metadata(metadata)
+    }
+
+    fn build_trigger_context(
+        trigger_type: HookTriggerType,
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+        result: Option<&ToolCallResult>,
+    ) -> HookTriggerContext {
+        let execution_scope = Self::project_execution_scope(
+            request.execution_scope(),
+            Self::build_scope_metadata(request, entry, result),
+        );
+        let occurred_at =
+            result.map_or_else(|| request.initiated_at(), ToolCallResult::completed_at);
+        HookTriggerContext::new_with_timestamp(trigger_type, execution_scope, occurred_at)
+    }
+}
+
+#[async_trait]
+impl<E> ToolExecutionGovernance for HookBackedToolExecutionGovernance<E>
+where
+    E: HookEngine,
+{
+    async fn enforce_before_call(
+        &self,
+        ctx: &RequestContext,
+        request: &ToolCallRequest,
+        entry: &CatalogEntry,
+    ) -> Result<ToolGovernanceDecision, ToolGovernanceError> {
+        let trigger_context =
+            Self::build_trigger_context(HookTriggerType::PreToolUse, request, entry, None);
+        let projection_context = trigger_context.clone();
+        let results = self
+            .hook_engine
+            .execute(ctx, trigger_context)
+            .await
+            .map_err(|err| ToolGovernanceError::EvaluationFailed {
+                message: err.to_string(),
+            })?;
+        let events = policy_audit_events(&results, &projection_context).map_err(|err| {
+            ToolGovernanceError::EvaluationFailed {
+                message: err.to_string(),
+            }
+        })?;
+
+        Ok(
+            denial_reason(events).map_or(ToolGovernanceDecision::Allow, |reason| {
+                ToolGovernanceDecision::Deny { reason }
+            }),
+        )
+    }
+
+    async fn observe_after_call(
+        &self,
+        ctx: &RequestContext,
+        call: &CompletedToolCall<'_>,
+    ) -> Result<(), ToolGovernanceError> {
+        let trigger_context = Self::build_trigger_context(
+            HookTriggerType::PostToolUse,
+            call.request,
+            call.entry,
+            Some(call.result),
+        );
+        self.hook_engine
+            .execute(ctx, trigger_context)
+            .await
+            .map(|_| ())
+            .map_err(|err| ToolGovernanceError::EvaluationFailed {
+                message: err.to_string(),
+            })
+    }
+}
+
+fn denial_reason(events: Vec<crate::hook_engine::domain::PolicyAuditEvent>) -> Option<String> {
+    use crate::hook_engine::domain::PolicyAuditDecision::Deny;
+
+    for event in events {
+        if matches!(event.decision(), Deny) {
+            let message = event.violation().map_or_else(
+                || "policy denied tool call".to_owned(),
+                |violation| violation.reason().to_owned(),
+            );
+            return Some(message);
+        }
+    }
+    None
+}
+
+fn policy_audit_events(
+    results: &[HookExecutionResult],
+    trigger_context: &HookTriggerContext,
+) -> Result<Vec<PolicyAuditEvent>, PolicyAuditProjectionError> {
+    results.iter().try_fold(Vec::new(), |mut events, result| {
+        events.extend(project_policy_audit_events(result, trigger_context)?);
+        Ok(events)
+    })
 }

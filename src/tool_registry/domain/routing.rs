@@ -4,6 +4,8 @@
 //! request, the outcome, and the completed result with timing metadata.
 
 use super::McpServerId;
+use crate::message::domain::ConversationId;
+use crate::task::domain::TaskId;
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
@@ -55,7 +57,73 @@ pub struct ToolCallRequest {
     call_id: ToolCallId,
     tool_name: String,
     parameters: Value,
+    execution_scope: ToolExecutionScope,
     initiated_at: DateTime<Utc>,
+}
+
+/// Workflow correlation scope for a routed tool call.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolExecutionScope {
+    task_id: Option<TaskId>,
+    conversation_id: Option<ConversationId>,
+    metadata: Value,
+}
+
+impl ToolExecutionScope {
+    /// Creates an empty execution scope.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            task_id: None,
+            conversation_id: None,
+            metadata: Value::Null,
+        }
+    }
+
+    /// Associates a task with the tool call.
+    #[must_use]
+    pub const fn with_task_id(mut self, task_id: TaskId) -> Self {
+        self.task_id = Some(task_id);
+        self
+    }
+
+    /// Associates a conversation with the tool call.
+    #[must_use]
+    pub const fn with_conversation_id(mut self, conversation_id: ConversationId) -> Self {
+        self.conversation_id = Some(conversation_id);
+        self
+    }
+
+    /// Attaches additional non-indexed execution metadata.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: Value) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    /// Returns the associated task identifier, if any.
+    #[must_use]
+    pub const fn task_id(&self) -> Option<TaskId> {
+        self.task_id
+    }
+
+    /// Returns the associated conversation identifier, if any.
+    #[must_use]
+    pub const fn conversation_id(&self) -> Option<ConversationId> {
+        self.conversation_id
+    }
+
+    /// Returns non-indexed metadata for the tool execution.
+    #[must_use]
+    pub const fn metadata(&self) -> &Value {
+        &self.metadata
+    }
+}
+
+impl Default for ToolExecutionScope {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ToolCallRequest {
@@ -66,6 +134,7 @@ impl ToolCallRequest {
             call_id: ToolCallId::new(),
             tool_name: tool_name.into(),
             parameters,
+            execution_scope: ToolExecutionScope::default(),
             initiated_at: clock.utc(),
         }
     }
@@ -88,10 +157,37 @@ impl ToolCallRequest {
         &self.parameters
     }
 
+    /// Returns the workflow correlation scope for the call.
+    #[must_use]
+    pub const fn execution_scope(&self) -> &ToolExecutionScope {
+        &self.execution_scope
+    }
+
     /// Returns the initiation timestamp.
     #[must_use]
     pub const fn initiated_at(&self) -> DateTime<Utc> {
         self.initiated_at
+    }
+
+    /// Attaches an explicit execution scope to the request.
+    #[must_use]
+    pub fn with_execution_scope(mut self, execution_scope: ToolExecutionScope) -> Self {
+        self.execution_scope = execution_scope;
+        self
+    }
+
+    /// Associates a task identifier with the request.
+    #[must_use]
+    pub fn with_task_id(mut self, task_id: TaskId) -> Self {
+        self.execution_scope = self.execution_scope.with_task_id(task_id);
+        self
+    }
+
+    /// Associates a conversation identifier with the request.
+    #[must_use]
+    pub fn with_conversation_id(mut self, conversation_id: ConversationId) -> Self {
+        self.execution_scope = self.execution_scope.with_conversation_id(conversation_id);
+        self
     }
 }
 
@@ -198,5 +294,18 @@ impl ToolCallResult {
     #[must_use]
     pub const fn completed_at(&self) -> DateTime<Utc> {
         self.completed_at
+    }
+}
+
+impl From<crate::hook_engine::domain::HookExecutionScope> for ToolExecutionScope {
+    fn from(src: crate::hook_engine::domain::HookExecutionScope) -> Self {
+        let mut scope = Self::new();
+        if let Some(task_id) = src.task_id() {
+            scope = scope.with_task_id(task_id);
+        }
+        if let Some(conversation_id) = src.conversation_id() {
+            scope = scope.with_conversation_id(conversation_id);
+        }
+        scope.with_metadata(src.metadata().clone())
     }
 }

@@ -1,11 +1,11 @@
-//! Policy decision domain types for tool call authorization.
+//! Governance decision domain types for tool call authorization.
 //!
-//! A [`PolicyDecision`] represents the outcome of evaluating a tool call
-//! against a pluggable policy enforcement point.
+//! A [`ToolGovernanceDecision`] represents the outcome of evaluating a tool
+//! call against a pluggable governance enforcement point.
 
-/// Outcome of a policy evaluation for a tool call.
+/// Outcome of a governance evaluation for a tool call.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PolicyDecision {
+pub enum ToolGovernanceDecision {
     /// The tool call is permitted.
     Allow,
     /// The tool call is denied with an explanation.
@@ -15,7 +15,7 @@ pub enum PolicyDecision {
     },
 }
 
-impl PolicyDecision {
+impl ToolGovernanceDecision {
     /// Returns `true` when the decision permits the tool call.
     #[must_use]
     pub const fn is_allowed(&self) -> bool {

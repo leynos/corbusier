@@ -11,20 +11,20 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
-It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
+ It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
 Table 1.0.0: Phase 1 subphases and delivery goals.
 
-| Subphase | Goal |
-| --- | --- |
-| 1.1 | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam. |
-| 1.2 | Introduce the canonical workspace runtime model and source-policy controls. |
-| 1.3 | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts. |
-| 1.4 | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
-| 1.5 | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults. |
-| 1.6 | Run staged migration gates and declare the evidence needed to retire legacy paths. |
+| Subphase | Goal                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------- |
+| 1.1      | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam.          |
+| 1.2      | Introduce the canonical workspace runtime model and source-policy controls.                   |
+| 1.3      | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts.          |
+| 1.4      | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
+| 1.5      | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults.       |
+| 1.6      | Run staged migration gates and declare the evidence needed to retire legacy paths.            |
 
 Use the shared dependency labels below to keep phase 1 task text readable:
 
@@ -49,10 +49,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 ### 1.1. Migration governance and runtime boundary
 
 - [ ] 1.1.1 Ratify the staged migration boundary and phase gates. Requires
-  the phase 1 hosting schema dependency and Podbot Step 4.5, "Normalized
-  launch contract". See
-  adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
-  Direction and §Migration Plan.
+  the phase 1 hosting schema dependency and Podbot Step 4.5, "Normalized launch
+  contract". See adr-010-migration-and-coexistence-strategy.md §Decision
+  Outcome / Proposed Direction and §Migration Plan.
   - [ ] Ratify ADRs 001 through 005 together, so no foundational migration
     ADR carries contradictory dependency or ownership text.
   - [ ] Record advancement criteria for warn-only, compatibility, and blocking
@@ -66,9 +65,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     dependencies, and each migration phase has explicit entry and exit gates.
 - [ ] 1.1.2 Establish the Podbot-hosted runtime seam. Requires 2.5.1, Podbot
   Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted session
-  control plane". See
-  adr-001-runtime-boundary-between-corbusier-and-podbot.md §Decision Outcome /
-  Proposed Direction and §Migration Plan.
+  control plane". See adr-001-runtime-boundary-between-corbusier-and-podbot.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define a Corbusier port for the Podbot library API and route hosted
     sessions through that port instead of inline runtime ownership.
   - [ ] Define typed adapter errors, retries, and fake-runtime seams that
@@ -88,9 +86,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.2.1 Introduce the canonical workspace runtime record. Requires 2.5.2,
   the phase 1 hosting schema dependency, the phase 1 workspace strategy
   dependency, and Podbot Step 4.5, "Normalized launch contract". See
-  adr-002-workspace-runtime-model-and-source-policy.md
-  §Decision Outcome / Proposed Direction and
-  adr-006-durable-runtime-state-and-audit-model.md §Migration Plan.
+  adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
+  Proposed Direction and adr-006-durable-runtime-state-and-audit-model.md
+  §Migration Plan.
   - [ ] Persist stable workspace identifiers linked to tenant, task, and
     hosted-session context with explicit lifecycle states.
   - [ ] Record requested source type, access mode, and runtime identifiers
@@ -122,12 +120,11 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   Podbot Step 2.2, "Container creation", Podbot Step 2.3, "Credential
   injection", Podbot Step 3.1, "App authentication", Podbot Step 3.2,
   "Installation token acquisition", Podbot Step 3.3, "Token daemon", Podbot
-  Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and
-  the phase 1 workspace strategy dependency. See
+  Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and the
+  phase 1 workspace strategy dependency. See
   adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
-  Proposed Direction and
-  adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
-  Proposed Direction.
+  Proposed Direction and adr-009-security-and-privilege-boundary-defaults.md
+  §Decision Outcome / Proposed Direction.
   - [ ] Add canonical path resolution, allowed-root validation, and symlink
     escape protection for host mounts before Podbot is allowed to mount them.
   - [ ] Enforce explicit read-only or read-write access modes for clone-backed
@@ -164,8 +161,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.3.2 Replace inline hook assumptions with control-channel
   acknowledgement flow. Requires 1.1.2, Podbot Step 4.6, "Hosted session
   control plane", and the phase 1 hook-recovery dependencies. See
-  adr-005-hook-execution-contract-and-control-channel-semantics.md
-  §Decision Outcome / Proposed Direction and §Migration Plan.
+  adr-005-hook-execution-contract-and-control-channel-semantics.md §Decision
+  Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed hook request, acknowledgement, completion, timeout, and
     abort message shapes with stable correlation identifiers.
   - [ ] Suspend the hosted execution path until Corbusier replies with an
@@ -180,9 +177,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     deliveries are idempotent, and every completed hook has a matching
     acknowledgement record.
 - [ ] 1.3.3 Align hosted-session launch and command surfaces with the Podbot
-  control plane. Requires 1.3.1, Podbot Step 4.5, "Normalized launch
-  contract", Podbot Step 4.6, "Hosted session control plane", Podbot Step 6.1,
-  "Subcommand dispatch", and Podbot Step 6.5, "Host subcommand". See
+  control plane. Requires 1.3.1, Podbot Step 4.5, "Normalized launch contract",
+  Podbot Step 4.6, "Hosted session control plane", Podbot Step 6.1, "Subcommand
+  dispatch", and Podbot Step 6.5, "Host subcommand". See
   adr-001-runtime-boundary-between-corbusier-and-podbot.md §Migration Plan and
   adr-010-migration-and-coexistence-strategy.md §Podbot roadmap dependencies.
   - [ ] Route hosted launch requests through the same normalized command and
@@ -201,8 +198,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.4.1 Persist hosted runtime entities with idempotent state machines.
   Requires 1.2.1, 1.3.1, 1.3.2, Podbot Step 4.6, "Hosted session control
   plane", and the phase 1 hook-recovery dependencies. See
-  adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome /
-  Proposed Direction and §Migration Plan.
+  adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome / Proposed
+  Direction and §Migration Plan.
   - [ ] Persist hosted sessions, workspaces, wires, hook invocations,
     acknowledgements, and validation snapshots with explicit terminal and
     non-terminal states.
@@ -255,10 +252,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     from repository state, and documentation examples match the normative
     schema.
 - [ ] 1.5.2 Implement structured prompt validation with capability
-  dispositions. Requires 1.5.1, the phase 1 prompt-validation dependencies,
-  and Podbot Step 4.5, "Normalized launch contract". See
-  adr-008-prompt-validation-semantics-and-capability-dispositions.md
-  §Decision Outcome / Proposed Direction and §Migration Plan.
+  dispositions. Requires 1.5.1, the phase 1 prompt-validation dependencies, and
+  Podbot Step 4.5, "Normalized launch contract". See
+  adr-008-prompt-validation-semantics-and-capability-dispositions.md §Decision
+  Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed validation request and response shapes, including the
     `native`, `host-enforced`, `translated`, `ignored`, and `rejected`
     dispositions.
@@ -298,12 +295,11 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 ### 1.6. Migration closure and legacy retirement
 
 - [ ] 1.6.1 Run staged compatibility, warn-only, and blocking migration gates.
-  Requires 1.1.1, 1.2.2, 1.3.1, 1.4.2, 1.5.2, 1.5.3, the phase 1 hosting
-  schema dependency, the phase 1 hosting core dependencies, the phase 1
+  Requires 1.1.1, 1.2.2, 1.3.1, 1.4.2, 1.5.2, 1.5.3, the phase 1 hosting schema
+  dependency, the phase 1 hosting core dependencies, the phase 1
   prompt-validation dependencies, and the phase 1 hook-recovery dependencies.
-  See
-  adr-010-migration-and-coexistence-strategy.md §Decision Outcome / Proposed
-  Direction and §Migration Plan.
+  See adr-010-migration-and-coexistence-strategy.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
   - [ ] Run warn-only validation where blocking behaviour would break active
     flows, and record diagnostics for reviewed prompt and bundle samples.
   - [ ] Freeze legacy routing and legacy transport labels on new writes while
@@ -535,13 +531,13 @@ flows without regressing existing policy enforcement.
     corbusier-design.md §6.3.3.
   - [x] Success criteria: hook execution results are recorded for every
     configured trigger.
-- [ ] 3.3.2 Add policy enforcement and audit capture. Requires 3.3.1. See
+- [x] 3.3.2 Add policy enforcement and audit capture. Requires 3.3.1. See
   corbusier-design.md §2.1.3 and §6.4.2.5.
-  - [ ] Implement policy evaluation at enforcement points. See
+  - [x] Implement policy evaluation at enforcement points. See
     corbusier-design.md §6.4.2.4.
-  - [ ] Persist policy violations and audit events. See
+  - [x] Persist policy violations and audit events. See
     corbusier-design.md §6.4.2.5.
-  - [ ] Success criteria: policy enforcement outcomes are queryable by task,
+  - [x] Success criteria: policy enforcement outcomes are queryable by task,
     conversation, and hook event.
 
 ### 3.4. Encapsulation and workspace management
@@ -564,9 +560,9 @@ enforcement.
 ### 4.1. VCS integration and review ingestion
 
 - [ ] 4.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 2.2.3, TBD
-  (non-linear dependency: 3.2.2), Podbot Step 3.1, "App authentication",
-  Podbot Step 3.2, "Installation token acquisition", Podbot Step 3.3, "Token
-  daemon", and Podbot Step 3.4, "GIT_ASKPASS mechanism (Git credential helper
+  (non-linear dependency: 3.2.2), Podbot Step 3.1, "App authentication", Podbot
+  Step 3.2, "Installation token acquisition", Podbot Step 3.3, "Token daemon",
+  and Podbot Step 3.4, "GIT_ASKPASS mechanism (Git credential helper
   variable)". See corbusier-design.md §2.1.4 and §6.3.1.
   - [ ] Implement branch, pull request, and issue operations. See
     corbusier-design.md §2.1.4.

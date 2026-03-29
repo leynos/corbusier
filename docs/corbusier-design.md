@@ -587,10 +587,12 @@ Corbusier implements this through:
   - Consistent workflow behavior across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
-  definitions supporting multiple triggers (TurnStart, TurnEnd, PreToolUse,
-  PostToolUse, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
-  PrePush, PostPush, PreDeploy, PostDeploy) and actions (QualityGate,
-  PolicyCheck, Notification, BlockAction, and Remediation).
+  definitions supporting multiple contract triggers (PreTurn maps to runtime
+  `TurnStart`, PostTurn maps to runtime `TurnEnd`, PreToolCall maps to runtime
+  `PreToolUse`, PostToolCall maps to runtime `PostToolUse`, plus PreCommit,
+  PostCommit, PreMerge, PostMerge, PrePull, PostPull, PrePush, PostPush,
+  PreDeploy, PostDeploy) and actions (QualityGate, PolicyCheck, Notification,
+  BlockAction, and Remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -2767,10 +2769,10 @@ event to handler.
 ```mermaid
 flowchart TD
     subgraph "Hook Triggers"
-        TURN_START[TurnStart]
-        TURN_END[TurnEnd]
-        PRE_TOOL_USE[PreToolUse]
-        POST_TOOL_USE[PostToolUse]
+        PRE_TURN[PreTurn]
+        POST_TURN[PostTurn]
+        PRE_TOOL_CALL[PreToolCall]
+        POST_TOOL_CALL[PostToolCall]
         PRE_COMMIT[PreCommit]
         POST_COMMIT[PostCommit]
         PRE_MERGE[PreMerge]
@@ -2798,10 +2800,10 @@ flowchart TD
         REMEDIATION[Remediation]
     end
     
-    TURN_START --> TRIGGER_MATCH
-    TURN_END --> TRIGGER_MATCH
-    PRE_TOOL_USE --> TRIGGER_MATCH
-    POST_TOOL_USE --> TRIGGER_MATCH
+    PRE_TURN --> TRIGGER_MATCH
+    POST_TURN --> TRIGGER_MATCH
+    PRE_TOOL_CALL --> TRIGGER_MATCH
+    POST_TOOL_CALL --> TRIGGER_MATCH
     PRE_COMMIT --> TRIGGER_MATCH
     POST_COMMIT --> TRIGGER_MATCH
     PRE_MERGE --> TRIGGER_MATCH
@@ -5776,6 +5778,11 @@ pub struct HookExecutionResult {
     pub executed_at: DateTime<Utc>,
 }
 ```
+
+Earlier sections of this document use legacy trigger names from the planning
+phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
+`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` ->
+`PostToolUse`.
 
 ### 6.4 Component Integration Patterns
 
@@ -9318,6 +9325,20 @@ flowchart TD
 
 ##### 6.4.2.4 Policy Enforcement Points
 
+For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
+`ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
+that runs the contract trigger `PreToolCall` (maps to runtime
+`PreToolUse`) before the MCP host executes a tool and the contract trigger
+`PostToolCall` (maps to runtime `PostToolUse`) after the call completes. The
+default adapter still permits all calls, but a hook-backed adapter translates
+tool execution requests into `HookTriggerContext` values and delegates
+evaluation to the hook engine.
+
+The execution path carries workflow correlation through a dedicated execution
+scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
+`TaskId`, `ConversationId`, and non-indexed metadata while keeping
+`RequestContext` focused on tenant and identity concerns.
+
 ###### Multi-Layer Policy Enforcement
 
 | Enforcement Layer | Implementation           | Scope                 | Performance Impact |
@@ -9371,6 +9392,22 @@ impl PolicyEnforcementPoint for ApiGatewayPEP {
 ```
 
 ##### 6.4.2.5 Audit Logging
+
+Roadmap item 2.3.2 adds a dedicated `hook_policy_audit_events` projection table
+for policy auditability. Each projection records the tenant, hook execution,
+trigger context, trigger type, hook/action identifiers, optional task and
+conversation references, decision, optional violation payload, raw policy
+payload, and timestamp. Indexed `(tenant_id, task_id, recorded_at)`,
+`(tenant_id, conversation_id, recorded_at)`, and
+`(tenant_id, trigger_context_id, recorded_at)` paths satisfy the query shapes
+required by automated workflow governance without scanning hook execution JSON.
+
+The current milestone records policy audit events for tool execution only:
+contract trigger `PreToolCall` (maps to runtime `PreToolUse`) hook denials
+block the tool call before host execution, and contract trigger
+`PostToolCall` (maps to runtime `PostToolUse`) hooks persist audit outcomes
+after the call completes. Future API- and VCS-level enforcement points remain
+owned by their respective roadmap items.
 
 ###### Comprehensive Authorization Audit Trail
 

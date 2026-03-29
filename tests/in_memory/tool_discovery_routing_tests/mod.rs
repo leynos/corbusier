@@ -6,6 +6,7 @@
 
 mod call_routing_tests;
 mod discovery_lifecycle_tests;
+mod policy_enforcement_tests;
 
 use std::sync::Arc;
 
@@ -13,7 +14,7 @@ pub use super::helpers::request_ctx;
 use corbusier::context::RequestContext;
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{
@@ -36,12 +37,13 @@ type TestDiscoveryService = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
-    AllowAllPolicy,
+    StubGovernance,
     ObjectStoreLogAdapter,
     DefaultClock,
 >;
 
 pub struct IntegrationContext {
+    pub registry: Arc<InMemoryMcpServerRegistry>,
     pub host: Arc<InMemoryMcpServerHost>,
     pub lifecycle: TestLifecycleService,
     pub discovery: TestDiscoveryService,
@@ -59,9 +61,9 @@ pub fn integration_ctx() -> IntegrationContext {
     let discovery = ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog: catalog.clone(),
-            registry,
+            registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
+            governance: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),
@@ -69,6 +71,7 @@ pub fn integration_ctx() -> IntegrationContext {
     );
 
     IntegrationContext {
+        registry,
         host,
         lifecycle,
         discovery,

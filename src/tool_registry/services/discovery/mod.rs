@@ -1,20 +1,15 @@
 //! Service layer for tool discovery, catalog management, and call routing.
-//!
-//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema
-//! validation, policy enforcement, call routing, stderr capture, and
-//! audit recording.
 
 use crate::context::RequestContext;
 use crate::tool_registry::{
     domain::{
-        CatalogEntry, LogRetentionPolicy, McpServerId, PolicyDecision, ToolCallOutcome,
-        ToolCallRequest, ToolCallResult, ToolCallTiming, ToolRegistryDomainError,
-        validation::validate_parameters,
+        CatalogEntry, LogRetentionPolicy, McpServerId, ToolCallRequest, ToolCallResult,
+        ToolGovernanceDecision, ToolRegistryDomainError, validation::validate_parameters,
     },
     ports::{
-        McpServerHost, McpServerHostError, McpServerRegistryError, McpServerRegistryRepository,
-        ToolCatalogError, ToolCatalogRepository, ToolLogStore, ToolLogStoreError,
-        ToolPolicyEnforcer, ToolPolicyError,
+        CompletedToolCall, McpServerHost, McpServerHostError, McpServerRegistryError,
+        McpServerRegistryRepository, ToolCatalogError, ToolCatalogRepository,
+        ToolExecutionGovernance, ToolGovernanceError, ToolLogStore, ToolLogStoreError,
     },
 };
 use mockable::Clock;
@@ -38,9 +33,9 @@ pub enum ToolDiscoveryRoutingServiceError {
     /// Host operation failed.
     #[error(transparent)]
     Host(#[from] McpServerHostError),
-    /// Policy evaluation failed.
+    /// Tool governance returned an error.
     #[error(transparent)]
-    Policy(#[from] ToolPolicyError),
+    Governance(#[from] ToolGovernanceError),
     /// Log store operation failed.
     #[error(transparent)]
     LogStore(#[from] ToolLogStoreError),
@@ -53,55 +48,51 @@ pub enum ToolDiscoveryRoutingServiceError {
 pub type ToolDiscoveryRoutingServiceResult<T> = Result<T, ToolDiscoveryRoutingServiceError>;
 
 /// Port dependencies for [`ToolDiscoveryRoutingService`].
-pub struct ServicePorts<Cat, Reg, H, Pol, Log> {
+pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
     /// Catalog repository.
     pub catalog: Arc<Cat>,
     /// Server registry.
     pub registry: Arc<Reg>,
     /// Server host.
     pub host: Arc<H>,
-    /// Policy enforcer.
-    pub policy: Arc<Pol>,
+    /// Tool execution governance.
+    pub governance: Arc<Gov>,
     /// Log store.
     pub log_store: Arc<Log>,
 }
 
 /// Tool discovery, catalog management, and call routing service.
-///
-/// This service is a sibling to [`super::McpServerLifecycleService`],
-/// managing tool catalog persistence and call routing as distinct
-/// responsibilities from server lifecycle state transitions.
-pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
+pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
     Reg: McpServerRegistryRepository,
     H: McpServerHost,
-    Pol: ToolPolicyEnforcer,
+    Gov: ToolExecutionGovernance,
     Log: ToolLogStore,
     C: Clock + Send + Sync,
 {
     catalog: Arc<Cat>,
     registry: Arc<Reg>,
     host: Arc<H>,
-    policy: Arc<Pol>,
+    governance: Arc<Gov>,
     log_store: Arc<Log>,
     retention_policy: LogRetentionPolicy,
     clock: Arc<C>,
 }
 
-impl<Cat, Reg, H, Pol, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>
+impl<Cat, Reg, H, Gov, Log, C> ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
     Reg: McpServerRegistryRepository,
     H: McpServerHost,
-    Pol: ToolPolicyEnforcer,
+    Gov: ToolExecutionGovernance,
     Log: ToolLogStore,
     C: Clock + Send + Sync,
 {
     /// Creates a new discovery and routing service.
     #[must_use]
     pub fn new(
-        ports: ServicePorts<Cat, Reg, H, Pol, Log>,
+        ports: ServicePorts<Cat, Reg, H, Gov, Log>,
         retention_policy: LogRetentionPolicy,
         clock: Arc<C>,
     ) -> Self {
@@ -109,20 +100,19 @@ where
             catalog: ports.catalog,
             registry: ports.registry,
             host: ports.host,
-            policy: ports.policy,
+            governance: ports.governance,
             log_store: ports.log_store,
             retention_policy,
             clock,
         }
     }
 
-    /// Discovers tools from a running server and persists them in the
-    /// catalog.
+    /// Discovers tools from a running server and persists them in the catalog.
     ///
     /// # Errors
     ///
-    /// Returns errors when the server is not found, not running, or
-    /// catalog persistence fails.
+    /// Returns an error when the server is missing, not running, or the
+    /// catalog cannot be updated.
     pub async fn discover_and_persist_tools(
         &self,
         ctx: &RequestContext,
@@ -162,7 +152,8 @@ where
     /// Marks all tools for a server as unavailable in the catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog persistence fails.
     pub async fn mark_tools_unavailable(
         &self,
         ctx: &RequestContext,
@@ -174,7 +165,8 @@ where
     /// Marks all tools for a server as available in the catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog persistence fails.
     pub async fn mark_tools_available(
         &self,
         ctx: &RequestContext,
@@ -186,7 +178,8 @@ where
     /// Returns the complete tool catalog.
     ///
     /// # Errors
-    /// Returns [`ToolCatalogError`] on persistence failures.
+    ///
+    /// Returns an error when catalog lookup fails.
     pub async fn list_catalog(
         &self,
         ctx: &RequestContext,
@@ -194,17 +187,17 @@ where
         Ok(self.catalog.list_all(ctx).await?)
     }
 
-    /// Routes a tool call through validation, policy, execution, stderr
+    /// Routes a tool call through validation, governance, execution, stderr
     /// capture, and audit recording.
     ///
-    /// Pre-execution rejections (unavailable tool, schema validation
-    /// failure, policy denial) are audited as failures before the error
-    /// propagates. Only `ToolNotFound` skips auditing because no
-    /// `server_id` is available.
-    ///
     /// # Errors
-    /// Returns errors for tool resolution, schema validation, policy
-    /// denial, host execution failures, or timeout.
+    ///
+    /// Returns an error when server resolution or validation fails, when
+    /// governance denies or errors before execution, or when host execution
+    /// fails.
+    ///
+    /// Post-call audit persistence and governance observation failures are
+    /// awaited for side effects but are not propagated from this method.
     pub async fn call_tool(
         &self,
         ctx: &RequestContext,
@@ -227,9 +220,6 @@ where
         self.execute_and_audit(ctx, request, &entry).await
     }
 
-    /// Resolves a tool from the catalog, checks availability, validates
-    /// parameters, and enforces policy. On failure returns the catalog
-    /// entry (if resolved) alongside the error for audit purposes.
     async fn resolve_and_validate(
         &self,
         ctx: &RequestContext,
@@ -250,9 +240,6 @@ where
                 return Err((None, err.into()));
             }
             1 => {
-                // SAFETY: into_iter().next() always yields Some when
-                // len() == 1; the else branch is structurally
-                // unreachable.
                 let Some(entry) = entries.into_iter().next() else {
                     let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
                     return Err((None, err.into()));
@@ -292,7 +279,6 @@ where
         res.map_err(ToolDiscoveryRoutingServiceError::Catalog)
     }
 
-    /// Validates availability, schema, and policy for a resolved entry.
     async fn validate_entry(
         &self,
         ctx: &RequestContext,
@@ -318,10 +304,10 @@ where
             }
         })?;
         let decision = self
-            .policy
-            .evaluate(ctx, request.tool_name(), request.parameters())
+            .governance
+            .enforce_before_call(ctx, request, entry)
             .await?;
-        if let PolicyDecision::Deny { reason } = decision {
+        if let ToolGovernanceDecision::Deny { reason } = decision {
             return Err(ToolRegistryDomainError::PolicyDenied {
                 tool_name: request.tool_name().to_owned(),
                 reason,
@@ -331,63 +317,47 @@ where
         Ok(())
     }
 
-    /// Executes a validated tool call and records the audit trail.
     async fn execute_and_audit(
         &self,
         ctx: &RequestContext,
         request: &ToolCallRequest,
         entry: &CatalogEntry,
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
-        let server = match self.find_running_server(ctx, entry.server_id()).await {
-            Ok(s) => s,
-            Err(err) => {
-                let rejected = log_and_audit::RejectedCallContext {
-                    request,
-                    server_id: entry.server_id(),
-                };
-                self.audit_rejection(ctx, &rejected, &err).await;
-                return Err(err);
-            }
-        };
+        let server =
+            log_and_audit::find_running_server_or_audit_rejection(self, ctx, request, entry)
+                .await?;
         let execute_result = self.host.call_tool(ctx, &server, request).await;
 
         let completed_at = self.clock.utc();
-        let duration = (completed_at - request.initiated_at())
-            .to_std()
-            .unwrap_or_default();
-        let (outcome, stderr_output, host_error) = match execute_result {
-            Ok(r) => (
-                ToolCallOutcome::Success { content: r.content },
-                r.stderr_output,
-                None,
-            ),
-            Err(e) => (
-                ToolCallOutcome::Failure {
-                    error: e.to_string(),
-                },
-                None,
-                Some(e),
-            ),
-        };
-
-        let timing = ToolCallTiming {
-            duration,
+        let (result, stderr_output, host_error) = log_and_audit::build_tool_call_result(
+            request,
+            execute_result,
+            entry.server_id(),
             completed_at,
-        };
-        let result = ToolCallResult::from_request(request, entry.server_id(), outcome, timing);
+        );
         let completed = log_and_audit::CompletedCallContext {
             request,
             result: &result,
         };
         self.capture_and_audit(ctx, &completed, stderr_output).await;
-
-        if let Some(host_err) = host_error {
-            return Err(host_err.into());
+        if let Err(err) = self
+            .governance
+            .observe_after_call(
+                ctx,
+                &CompletedToolCall {
+                    request,
+                    entry,
+                    result: &result,
+                },
+            )
+            .await
+        {
+            log_and_audit::warn_post_call_observation_failure(request, entry, &err);
         }
-        Ok(result)
+
+        log_and_audit::return_result_or_host_error(result, host_error)
     }
 
-    /// Loads a server from the registry and verifies it is running.
     async fn find_running_server(
         &self,
         ctx: &RequestContext,
@@ -404,5 +374,7 @@ where
     }
 }
 
+#[cfg(test)]
+mod governance_tests;
 #[cfg(test)]
 mod tests;

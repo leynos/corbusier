@@ -1,6 +1,9 @@
-//! Hook trigger types and trigger context metadata.
+//! Hook trigger types, execution scope, and trigger context metadata.
 
 use super::TriggerContextId;
+use crate::message::domain::ConversationId;
+use crate::task::domain::TaskId;
+use crate::tool_registry::domain::ToolExecutionScope;
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
@@ -129,8 +132,86 @@ impl TryFrom<&str> for HookTriggerType {
 pub struct HookTriggerContext {
     id: TriggerContextId,
     trigger_type: HookTriggerType,
-    metadata: serde_json::Value,
+    execution_scope: HookExecutionScope,
     occurred_at: DateTime<Utc>,
+}
+
+/// Workflow correlation scope carried alongside a trigger invocation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HookExecutionScope {
+    task_id: Option<TaskId>,
+    conversation_id: Option<ConversationId>,
+    metadata: serde_json::Value,
+}
+
+impl HookExecutionScope {
+    /// Creates an empty execution scope with no task, conversation, or metadata.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            task_id: None,
+            conversation_id: None,
+            metadata: serde_json::Value::Null,
+        }
+    }
+
+    /// Associates a task with the execution scope.
+    #[must_use]
+    pub const fn with_task_id(mut self, task_id: TaskId) -> Self {
+        self.task_id = Some(task_id);
+        self
+    }
+
+    /// Associates a conversation with the execution scope.
+    #[must_use]
+    pub const fn with_conversation_id(mut self, conversation_id: ConversationId) -> Self {
+        self.conversation_id = Some(conversation_id);
+        self
+    }
+
+    /// Attaches non-indexed execution metadata.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    /// Returns the correlated task identifier, if any.
+    #[must_use]
+    pub const fn task_id(&self) -> Option<TaskId> {
+        self.task_id
+    }
+
+    /// Returns the correlated conversation identifier, if any.
+    #[must_use]
+    pub const fn conversation_id(&self) -> Option<ConversationId> {
+        self.conversation_id
+    }
+
+    /// Returns the non-indexed execution metadata payload.
+    #[must_use]
+    pub const fn metadata(&self) -> &serde_json::Value {
+        &self.metadata
+    }
+}
+
+impl Default for HookExecutionScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<&ToolExecutionScope> for HookExecutionScope {
+    fn from(scope: &ToolExecutionScope) -> Self {
+        let mut hook_scope = Self::default();
+        if let Some(task_id) = scope.task_id() {
+            hook_scope = hook_scope.with_task_id(task_id);
+        }
+        if let Some(conversation_id) = scope.conversation_id() {
+            hook_scope = hook_scope.with_conversation_id(conversation_id);
+        }
+        hook_scope.with_metadata(scope.metadata().clone())
+    }
 }
 
 impl HookTriggerContext {
@@ -140,7 +221,7 @@ impl HookTriggerContext {
     /// stamps the context with the current time.
     #[must_use]
     pub fn new(trigger_type: HookTriggerType, clock: &impl Clock) -> Self {
-        Self::with_metadata(trigger_type, serde_json::Value::Null, clock)
+        Self::with_execution_scope(trigger_type, HookExecutionScope::default(), clock)
     }
 
     /// Creates a trigger context with metadata and the current time.
@@ -153,23 +234,38 @@ impl HookTriggerContext {
         metadata: serde_json::Value,
         clock: &impl Clock,
     ) -> Self {
-        Self::new_with_timestamp(trigger_type, metadata, clock.utc())
+        Self::with_execution_scope(
+            trigger_type,
+            HookExecutionScope::default().with_metadata(metadata),
+            clock,
+        )
+    }
+
+    /// Creates a trigger context with a typed execution scope and the current
+    /// time.
+    #[must_use]
+    pub fn with_execution_scope(
+        trigger_type: HookTriggerType,
+        execution_scope: HookExecutionScope,
+        clock: &impl Clock,
+    ) -> Self {
+        Self::new_with_timestamp(trigger_type, execution_scope, clock.utc())
     }
 
     /// Creates a trigger context with an explicit timestamp.
     ///
-    /// Example: `new_with_timestamp(trigger, Value::Null, timestamp)` uses the
-    /// supplied time.
+    /// Example: `new_with_timestamp(trigger, HookExecutionScope::default(),
+    /// timestamp)` uses the supplied time.
     #[must_use]
     pub fn new_with_timestamp(
         trigger_type: HookTriggerType,
-        metadata: serde_json::Value,
+        execution_scope: HookExecutionScope,
         occurred_at: DateTime<Utc>,
     ) -> Self {
         Self {
             id: TriggerContextId::new(),
             trigger_type,
-            metadata,
+            execution_scope,
             occurred_at,
         }
     }
@@ -195,7 +291,13 @@ impl HookTriggerContext {
     /// Example: `context.metadata()` returns the metadata JSON.
     #[must_use]
     pub const fn metadata(&self) -> &serde_json::Value {
-        &self.metadata
+        self.execution_scope.metadata()
+    }
+
+    /// Returns the typed execution scope associated with the trigger.
+    #[must_use]
+    pub const fn execution_scope(&self) -> &HookExecutionScope {
+        &self.execution_scope
     }
 
     /// Returns the trigger occurrence time.
@@ -204,5 +306,11 @@ impl HookTriggerContext {
     #[must_use]
     pub const fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_at
+    }
+}
+
+impl From<crate::tool_registry::domain::ToolExecutionScope> for HookExecutionScope {
+    fn from(src: crate::tool_registry::domain::ToolExecutionScope) -> Self {
+        Self::from(&src)
     }
 }

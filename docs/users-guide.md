@@ -439,11 +439,12 @@ fn create_tenant() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## MCP server lifecycle management
+## Model Context Protocol (MCP) server lifecycle management
 
-The `tool_registry` module can register MCP servers, start and stop them,
-refresh health status, and list tools exposed by running servers. Tool queries
-are only allowed when a server is in the `running` lifecycle state.
+The `tool_registry` module can register Model Context Protocol (MCP) servers,
+start and stop them, refresh health status, and list tools exposed by running
+servers. Tool queries are only allowed when a server is in the `running`
+lifecycle state.
 
 ```rust,no_run
 use std::sync::Arc;
@@ -511,8 +512,8 @@ async fn manage_mcp_servers() -> Result<(), Box<dyn std::error::Error>> {
 After starting an MCP server via the lifecycle service, use
 `ToolDiscoveryRoutingService` to discover its tools, persist them in a durable
 catalogue, and route tool calls by name. The service validates parameters
-against the tool's input schema, enforces a pluggable policy check, routes the
-call to the correct hosting server, and records a complete audit trail.
+against the tool's input schema, runs pluggable execution governance, routes
+the call to the correct hosting server, and records a complete audit trail.
 
 ### Discovering tools
 
@@ -538,9 +539,19 @@ parameters. The service:
 1. Resolves the tool name to a catalogue entry.
 2. Checks that the tool is available (its hosting server is running).
 3. Validates parameters against the tool's declared input schema.
-4. Enforces the configured policy (default: `AllowAllPolicy` permits all).
-5. Routes the call to the correct MCP server.
-6. Records an audit trail entry with outcome, duration, and any stderr.
+4. Runs the configured governance adapter before execution. The default
+   `StubGovernance::allowing()` adapter permits all calls, while hook-backed
+   governance can deny a call before the Model Context Protocol (MCP) host
+   runs it.
+5. Routes the call to the correct MCP server when governance permits it.
+6. Records the existing tool-call audit trail entry with outcome, duration, and
+   any stderr.
+7. Runs post-tool-use governance observation after the call completes.
+
+When hook-backed governance is configured, `ToolCallRequest` can carry a
+`TaskId` and `ConversationId` through its execution scope. Policy audit
+outcomes are then queryable from the hook engine by task, conversation, and
+hook event (`TriggerContextId`) without inspecting arbitrary JSON payloads.
 
 ### Tool availability lifecycle
 
@@ -571,7 +582,7 @@ use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
 use corbusier::tenant::TenantId;
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{
@@ -617,7 +628,7 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
             catalog,
             registry,
             host,
-            policy: Arc::new(AllowAllPolicy),
+            governance: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

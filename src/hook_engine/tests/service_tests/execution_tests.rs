@@ -1,79 +1,19 @@
-//! Service tests for hook engine execution.
+//! Execution-order and persistence tests for the hook engine service.
 
-use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
-use crate::hook_engine::adapters::memory::{
-    InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
-    InMemoryHookExecutionLogRepository,
+use super::common::{
+    HookEngineFixture, build_definition, hook_engine_fixture, request_ctx,
+    setup_failing_post_deploy_hook,
 };
 use crate::hook_engine::domain::{
-    ActionStatus, HookAction, HookActionId, HookActionType, HookDefinition, HookExecutionId,
-    HookExecutionInput, HookExecutionStatus, HookId, HookPriority, HookTriggerContext,
-    HookTriggerType,
+    HookAction, HookActionId, HookActionType, HookDefinition, HookExecutionId, HookExecutionInput,
+    HookExecutionStatus, HookId, HookPriority, HookTriggerContext, HookTriggerType,
 };
-use crate::hook_engine::ports::{HookEngine, HookExecutionLogError, HookExecutionLogRepository};
-use crate::hook_engine::services::HookEngineService;
+use crate::hook_engine::ports::{
+    HookEngine, HookExecutionLogError, HookExecutionLogRepository, HookPolicyAuditRepository,
+};
+use eyre::Result;
 use mockable::DefaultClock;
-use rstest::fixture;
-use std::sync::Arc;
-
-fn request_ctx() -> RequestContext {
-    RequestContext::new(
-        TenantId::new(),
-        CorrelationId::new(),
-        UserId::new(),
-        SessionId::new(),
-    )
-}
-
-fn build_action(id: &str) -> Result<HookAction, crate::hook_engine::domain::HookDomainError> {
-    let action_id = HookActionId::new(id)?;
-    Ok(HookAction::new(action_id, HookActionType::QualityGate))
-}
-
-fn build_definition(
-    id: &str,
-    priority: u16,
-) -> Result<HookDefinition, crate::hook_engine::domain::HookDomainError> {
-    let hook_id = HookId::new(id)?;
-    HookDefinition::new(
-        hook_id,
-        format!("Hook {id}"),
-        HookTriggerType::PreCommit,
-        vec![build_action(&format!("action-{id}"))?],
-    )
-    .map(|definition| definition.with_priority(HookPriority::new(priority)))
-}
-
-struct HookEngineFixture {
-    definition_repo: InMemoryHookDefinitionRepository,
-    action_executor: InMemoryHookActionExecutor,
-    execution_log: InMemoryHookExecutionLogRepository,
-    service: HookEngineService<
-        InMemoryHookDefinitionRepository,
-        InMemoryHookActionExecutor,
-        InMemoryHookExecutionLogRepository,
-        DefaultClock,
-    >,
-}
-
-#[fixture]
-fn hook_engine_fixture() -> HookEngineFixture {
-    let definition_repo = InMemoryHookDefinitionRepository::new();
-    let action_executor = InMemoryHookActionExecutor::new();
-    let execution_log = InMemoryHookExecutionLogRepository::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor.clone()),
-        Arc::new(execution_log.clone()),
-        Arc::new(DefaultClock),
-    );
-    HookEngineFixture {
-        definition_repo,
-        action_executor,
-        execution_log,
-        service,
-    }
-}
+use serde_json::json;
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
@@ -122,36 +62,19 @@ async fn execute_orders_hooks_by_priority_then_id(hook_engine_fixture: HookEngin
 
 #[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEngineFixture) {
+async fn execute_persists_results_and_failure_status(
+    hook_engine_fixture: HookEngineFixture,
+) -> Result<()> {
     let HookEngineFixture {
         definition_repo,
         action_executor,
         execution_log,
+        policy_audit,
         service,
     } = hook_engine_fixture;
     let ctx = request_ctx();
 
-    let action_id = HookActionId::new("failing-action").expect("failing action id should be valid");
-    let hook_id = HookId::new("hook-fail").expect("failing hook id should be valid");
-    let definition = HookDefinition::new(
-        hook_id,
-        "Failing hook",
-        HookTriggerType::PostDeploy,
-        vec![HookAction::new(
-            action_id.clone(),
-            HookActionType::PolicyCheck,
-        )],
-    )
-    .expect("failing hook definition should be valid for test")
-    .with_priority(HookPriority::new(1));
-
-    definition_repo
-        .insert(&ctx, definition)
-        .await
-        .expect("insert failing definition should succeed");
-    action_executor
-        .set_outcome(action_id.as_str(), ActionStatus::Failed)
-        .expect("configuring failing action outcome should succeed");
+    setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await?;
 
     let context = HookTriggerContext::new(HookTriggerType::PostDeploy, &DefaultClock);
     let trigger_context_id = context.id();
@@ -172,6 +95,22 @@ async fn execute_persists_results_and_failure_status(hook_engine_fixture: HookEn
         .first()
         .expect("expected one stored execution result");
     assert_eq!(stored_result.status(), HookExecutionStatus::Failed);
+
+    let audit_events = policy_audit
+        .find_by_trigger_context(&ctx, trigger_context_id)
+        .await
+        .expect("querying policy audit events should succeed");
+    assert_eq!(audit_events.len(), 1);
+    assert_eq!(
+        audit_events
+            .first()
+            .expect("expected policy audit event")
+            .violation()
+            .expect("deny event should record violation")
+            .reason(),
+        "policy blocked deployment"
+    );
+    Ok(())
 }
 
 #[rstest::rstest]
@@ -182,18 +121,34 @@ async fn execute_reuses_existing_execution_without_replaying_actions(
     let HookEngineFixture {
         definition_repo,
         execution_log,
+        policy_audit,
+        action_executor,
         service,
         ..
     } = hook_engine_fixture;
     let ctx = request_ctx();
+    let action_id = HookActionId::new("action-hook-retry").expect("valid action id");
 
     definition_repo
         .insert(
             &ctx,
-            build_definition("hook-retry", 1).expect("retry definition should be valid for test"),
+            HookDefinition::new(
+                HookId::new("hook-retry").expect("valid hook id"),
+                "Retry hook",
+                HookTriggerType::PreCommit,
+                vec![HookAction::new(
+                    action_id.clone(),
+                    HookActionType::PolicyCheck,
+                )],
+            )
+            .expect("retry definition should be valid for test")
+            .with_priority(HookPriority::new(1)),
         )
         .await
         .expect("insert retry definition should succeed");
+    action_executor
+        .set_output(action_id.as_str(), json!({"decision": "allow"}))
+        .expect("configuring retry action output should succeed");
 
     let context = HookTriggerContext::new(HookTriggerType::PreCommit, &DefaultClock);
     let trigger_context_id = context.id();
@@ -219,6 +174,11 @@ async fn execute_reuses_existing_execution_without_replaying_actions(
         .await
         .expect("querying stored retry execution should succeed");
     assert_eq!(stored.len(), 1);
+    let audit_events = policy_audit
+        .find_by_trigger_context(&ctx, trigger_context_id)
+        .await
+        .expect("querying retry audit events should succeed");
+    assert_eq!(audit_events.len(), 1);
 }
 
 #[rstest::rstest]

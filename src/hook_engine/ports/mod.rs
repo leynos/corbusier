@@ -4,6 +4,7 @@ pub mod action_executor;
 pub mod definition_repository;
 pub mod engine;
 pub mod execution_log;
+pub mod policy_audit;
 
 pub use action_executor::{
     HookActionExecutionError, HookActionExecutionResult, HookActionExecutor,
@@ -16,3 +17,4 @@ pub use execution_log::{
     HookExecutionLogError, HookExecutionLogRepository, HookExecutionLogResult,
     PendingExecutionRecord, PendingExecutionReservation,
 };
+pub use policy_audit::{HookPolicyAuditError, HookPolicyAuditRepository, HookPolicyAuditResult};

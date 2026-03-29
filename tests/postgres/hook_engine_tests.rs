@@ -4,20 +4,24 @@ use corbusier::hook_engine::adapters::memory::{
     InMemoryHookActionExecutor, InMemoryHookDefinitionRepository,
 };
 use corbusier::hook_engine::adapters::postgres::{
-    HookExecutionPgPool, PostgresHookExecutionLogRepository,
+    HookExecutionPgPool, PostgresHookExecutionLogRepository, PostgresHookPolicyAuditRepository,
 };
 use corbusier::hook_engine::domain::{
-    HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerContext,
-    HookTriggerType,
+    HookAction, HookActionId, HookActionType, HookDefinition, HookExecutionScope, HookId,
+    HookTriggerContext, HookTriggerType,
 };
-use corbusier::hook_engine::ports::{HookEngine, HookExecutionLogRepository};
-use corbusier::hook_engine::services::HookEngineService;
+use corbusier::hook_engine::ports::{
+    HookEngine, HookExecutionLogRepository, HookPolicyAuditRepository,
+};
+use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use corbusier::test_support::other_tenant_ctx;
 use corbusier::test_support::test_request_ctx;
+use corbusier::{message::domain::ConversationId, task::domain::TaskId};
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
-use mockable::DefaultClock;
+use mockable::{Clock, DefaultClock};
 use rstest::fixture;
+use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -30,6 +34,7 @@ type TestService = HookEngineService<
     InMemoryHookDefinitionRepository,
     InMemoryHookActionExecutor,
     PostgresHookExecutionLogRepository,
+    PostgresHookPolicyAuditRepository,
     DefaultClock,
 >;
 
@@ -37,6 +42,7 @@ struct HookEngineTestContext {
     service: TestService,
     definition_repo: InMemoryHookDefinitionRepository,
     execution_log: PostgresHookExecutionLogRepository,
+    policy_audit: PostgresHookPolicyAuditRepository,
     _temp_db: TemporaryDatabase,
 }
 
@@ -53,20 +59,23 @@ async fn setup_hook_engine_context(
         .max_size(1)
         .build(manager)
         .map_err(|err| Box::new(err) as BoxError)?;
-    let execution_log = PostgresHookExecutionLogRepository::new(pool);
+    let execution_log = PostgresHookExecutionLogRepository::new(pool.clone());
+    let policy_audit = PostgresHookPolicyAuditRepository::new(pool);
     let definition_repo = InMemoryHookDefinitionRepository::new();
     let action_executor = InMemoryHookActionExecutor::new();
-    let service = HookEngineService::new(
-        Arc::new(definition_repo.clone()),
-        Arc::new(action_executor),
-        Arc::new(execution_log.clone()),
-        Arc::new(DefaultClock),
-    );
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(execution_log.clone()),
+        policy_audit_repository: Arc::new(policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
 
     Ok(HookEngineTestContext {
         service,
         definition_repo,
         execution_log,
+        policy_audit,
         _temp_db: db,
     })
 }
@@ -232,5 +241,114 @@ async fn postgres_duplicate_execution_reuses_existing_result(
         .expect("lookup succeeds");
     assert_eq!(stored.len(), 1);
 
+    Ok(())
+}
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_policy_audit_is_queryable_and_tenant_scoped(
+    #[future] context: Result<HookEngineTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let ctx = context.await?;
+    let tenant_a = test_request_ctx();
+    let tenant_b = other_tenant_ctx(&tenant_a);
+    let task_id = TaskId::new();
+    let conversation_id = ConversationId::new();
+    let hook_id = HookId::new("hook-postgres-policy-audit").expect("valid hook id");
+    let action_id = HookActionId::new("action-postgres-policy-audit").expect("valid action id");
+    let definition = HookDefinition::new(
+        hook_id,
+        "Postgres policy audit hook",
+        HookTriggerType::PreToolUse,
+        vec![HookAction::new(
+            action_id.clone(),
+            HookActionType::PolicyCheck,
+        )],
+    )
+    .expect("definition should be valid");
+    ctx.definition_repo
+        .insert(&tenant_a, definition)
+        .await
+        .expect("insert succeeds");
+    let action_executor = InMemoryHookActionExecutor::new();
+    action_executor
+        .set_output(
+            action_id.as_str(),
+            json!({
+                "decision": "deny",
+                "violation": {
+                    "code": "tool.blocked",
+                    "reason": "tool use is forbidden",
+                }
+            }),
+        )
+        .expect("configure policy output succeeds");
+
+    let service = HookEngineService::new(HookEngineServiceDeps {
+        definition_repository: Arc::new(ctx.definition_repo.clone()),
+        action_executor: Arc::new(action_executor),
+        execution_log: Arc::new(ctx.execution_log.clone()),
+        policy_audit_repository: Arc::new(ctx.policy_audit.clone()),
+        clock: Arc::new(DefaultClock),
+    });
+    let trigger_context = HookTriggerContext::new_with_timestamp(
+        HookTriggerType::PreToolUse,
+        HookExecutionScope::default()
+            .with_task_id(task_id)
+            .with_conversation_id(conversation_id)
+            .with_metadata(json!({"tool_name": "read_file"})),
+        DefaultClock.utc(),
+    );
+    let trigger_context_id = trigger_context.id();
+    service
+        .execute(&tenant_a, trigger_context)
+        .await
+        .expect("execution succeeds");
+
+    assert_eq!(
+        ctx.policy_audit
+            .find_by_task(&tenant_a, task_id)
+            .await
+            .expect("query by task succeeds")
+            .len(),
+        1
+    );
+    assert_eq!(
+        ctx.policy_audit
+            .find_by_conversation(&tenant_a, conversation_id)
+            .await
+            .expect("query by conversation succeeds")
+            .len(),
+        1
+    );
+    assert_eq!(
+        ctx.policy_audit
+            .find_by_trigger_context(&tenant_a, trigger_context_id)
+            .await
+            .expect("query by trigger succeeds")
+            .len(),
+        1
+    );
+    assert!(
+        ctx.policy_audit
+            .find_by_task(&tenant_b, task_id)
+            .await
+            .expect("cross-tenant query succeeds")
+            .is_empty()
+    );
+    assert!(
+        ctx.policy_audit
+            .find_by_conversation(&tenant_b, conversation_id)
+            .await
+            .expect("cross-tenant conversation query succeeds")
+            .is_empty()
+    );
+    assert!(
+        ctx.policy_audit
+            .find_by_trigger_context(&tenant_b, trigger_context_id)
+            .await
+            .expect("cross-tenant trigger query succeeds")
+            .is_empty()
+    );
     Ok(())
 }
