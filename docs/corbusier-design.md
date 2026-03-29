@@ -1093,7 +1093,7 @@ registrations and conversations each own zero or more agent turn sessions used
 for orchestrated backend execution state.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.3.2: Entity-relationship diagram showing backend registrations,
+Table 2.2.3.2: Entity-relationship diagram showing backend registrations,
 conversations, and agent turn sessions.
 
 ```mermaid
@@ -1117,9 +1117,10 @@ erDiagram
         uuid tenant_id
         uuid backend_id FK
         uuid conversation_id FK
-        text runtime_session_id
+        varchar runtime_session_id
         varchar status
-        int turn_count
+        bigint ttl_seconds
+        bigint turn_count
         timestamptz started_at
         timestamptz last_used_at
         timestamptz expires_at
@@ -1137,7 +1138,7 @@ loading, tool routing, runtime execution, and persistence of either success or
 failure outcomes.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration flow.
+Table 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration flow.
 
 ```mermaid
 sequenceDiagram
