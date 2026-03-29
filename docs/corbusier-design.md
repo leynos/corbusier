@@ -587,10 +587,12 @@ Corbusier implements this through:
   - Consistent workflow behavior across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
-  definitions supporting multiple triggers (PreTurn, PostTurn, PreToolCall,
-  PostToolCall, PreCommit, PostCommit, PreMerge, PostMerge, PrePull, PostPull,
-  PrePush, PostPush, PreDeploy, PostDeploy) and actions (QualityGate,
-  PolicyCheck, Notification, BlockAction, and Remediation).
+  definitions supporting multiple contract triggers (PreTurn maps to runtime
+  `TurnStart`, PostTurn maps to runtime `TurnEnd`, PreToolCall maps to runtime
+  `PreToolUse`, PostToolCall maps to runtime `PostToolUse`, plus PreCommit,
+  PostCommit, PreMerge, PostMerge, PrePull, PostPull, PrePush, PostPush,
+  PreDeploy, PostDeploy) and actions (QualityGate, PolicyCheck, Notification,
+  BlockAction, and Remediation).
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management), F-006 (Weaver File
     Editing Integration)
@@ -9325,10 +9327,12 @@ flowchart TD
 
 For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
 `ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
-that runs a `PreToolCall` check before the MCP host executes a tool and a
-`PostToolCall` observation after the call completes. The default adapter still
-permits all calls, but a hook-backed adapter translates tool execution requests
-into `HookTriggerContext` values and delegates evaluation to the hook engine.
+that runs the contract trigger `PreToolCall` (maps to runtime
+`PreToolUse`) before the MCP host executes a tool and the contract trigger
+`PostToolCall` (maps to runtime `PostToolUse`) after the call completes. The
+default adapter still permits all calls, but a hook-backed adapter translates
+tool execution requests into `HookTriggerContext` values and delegates
+evaluation to the hook engine.
 
 The execution path carries workflow correlation through a dedicated execution
 scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
@@ -9399,10 +9403,11 @@ payload, and timestamp. Indexed `(tenant_id, task_id, recorded_at)`,
 required by automated workflow governance without scanning hook execution JSON.
 
 The current milestone records policy audit events for tool execution only:
-`PreToolCall` hook denials block the tool call before host execution, and
-`PostToolCall` hooks persist audit outcomes after the call completes. Future
-API- and VCS-level enforcement points remain owned by their respective roadmap
-items.
+contract trigger `PreToolCall` (maps to runtime `PreToolUse`) hook denials
+block the tool call before host execution, and contract trigger
+`PostToolCall` (maps to runtime `PostToolUse`) hooks persist audit outcomes
+after the call completes. Future API- and VCS-level enforcement points remain
+owned by their respective roadmap items.
 
 ###### Comprehensive Authorization Audit Trail
 

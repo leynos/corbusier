@@ -193,9 +193,11 @@ where
     /// # Errors
     ///
     /// Returns an error when server resolution or validation fails, when
-    /// governance denies or errors before execution, when host execution
-    /// fails, or when required audit persistence fails. Post-call governance
-    /// observation failures are logged and do not fail the tool call.
+    /// governance denies or errors before execution, or when host execution
+    /// fails.
+    ///
+    /// Post-call audit persistence and governance observation failures are
+    /// awaited for side effects but are not propagated from this method.
     pub async fn call_tool(
         &self,
         ctx: &RequestContext,

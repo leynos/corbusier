@@ -127,8 +127,8 @@ impl Default for HookPolicyWorld {
     }
 }
 
-#[fixture]
 /// Builds the default hook-policy BDD world fixture.
+#[fixture]
 pub fn world() -> HookPolicyWorld {
     HookPolicyWorld::default()
 }
@@ -137,7 +137,17 @@ pub fn world() -> HookPolicyWorld {
 /// is already active and otherwise creating a dedicated current-thread runtime.
 pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> Result<T, std::io::Error> {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        return Ok(tokio::task::block_in_place(|| handle.block_on(future)));
+        return match handle.runtime_flavor() {
+            tokio::runtime::RuntimeFlavor::MultiThread => {
+                Ok(tokio::task::block_in_place(|| handle.block_on(future)))
+            }
+            tokio::runtime::RuntimeFlavor::CurrentThread => Err(std::io::Error::other(
+                "cannot block_on within a current-thread Tokio runtime",
+            )),
+            _ => Err(std::io::Error::other(
+                "unsupported Tokio runtime flavour for blocking async helper",
+            )),
+        };
     }
 
     tokio::runtime::Builder::new_current_thread()

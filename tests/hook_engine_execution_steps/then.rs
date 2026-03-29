@@ -6,7 +6,7 @@ use corbusier::hook_engine::ports::{HookExecutionLogRepository, HookPolicyAuditR
 use eyre::{WrapErr, ensure};
 use rstest_bdd_macros::then;
 
-fn ensure_failed_execution_has_policy_audit_events(
+fn ensure_single_audit_event_for_failed(
     world: &HookWorld,
     context: &corbusier::hook_engine::domain::HookTriggerContext,
     expected: HookExecutionStatus,
@@ -22,8 +22,9 @@ fn ensure_failed_execution_has_policy_audit_events(
     )
     .wrap_err("policy audit lookup failed")?;
     ensure!(
-        !audit_events.is_empty(),
-        "expected at least 1 policy audit event for failed execution"
+        audit_events.len() == 1,
+        "expected 1 policy audit event for failed execution, got {}",
+        audit_events.len()
     );
     Ok(())
 }
@@ -72,7 +73,7 @@ fn assert_execution_status(
         ));
     }
 
-    ensure_failed_execution_has_policy_audit_events(world, context, expected)?;
+    ensure_single_audit_event_for_failed(world, context, expected)?;
     Ok(())
 }
 

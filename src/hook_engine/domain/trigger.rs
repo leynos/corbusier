@@ -210,7 +210,7 @@ impl From<&ToolExecutionScope> for HookExecutionScope {
         if let Some(conversation_id) = scope.conversation_id() {
             hook_scope = hook_scope.with_conversation_id(conversation_id);
         }
-        hook_scope
+        hook_scope.with_metadata(scope.metadata().clone())
     }
 }
 

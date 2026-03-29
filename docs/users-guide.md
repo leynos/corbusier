@@ -539,8 +539,9 @@ parameters. The service:
 2. Checks that the tool is available (its hosting server is running).
 3. Validates parameters against the tool's declared input schema.
 4. Runs the configured governance adapter before execution. The default
-   `AllowAllPolicy` adapter permits all calls, while hook-backed governance can
-   deny a call before the Model Context Protocol (MCP) host runs it.
+   `StubGovernance::allowing()` adapter permits all calls, while hook-backed
+   governance can deny a call before the Model Context Protocol (MCP) host
+   runs it.
 5. Routes the call to the correct MCP server when governance permits it.
 6. Records the existing tool-call audit trail entry with outcome, duration, and
    any stderr.
