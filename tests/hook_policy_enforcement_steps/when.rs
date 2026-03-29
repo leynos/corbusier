@@ -34,7 +34,7 @@ fn store_tool_call_outcome(
 
 fn execute_tool_call(
     world: &mut HookPolicyWorld,
-    request: ToolCallRequest,
+    request: &ToolCallRequest,
     conversation_id: Option<ConversationId>,
     task_id: Option<TaskId>,
 ) -> Result<(), eyre::Report> {
@@ -52,7 +52,7 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Repo
     let conversation_id = ConversationId::new();
     let request = ToolCallRequest::new(TEST_TOOL_NAME, test_tool_params(), &mockable::DefaultClock)
         .with_conversation_id(conversation_id);
-    execute_tool_call(world, request, Some(conversation_id), None)
+    execute_tool_call(world, &request, Some(conversation_id), None)
 }
 
 #[when("a tool call executes with conversation tracking")]
@@ -65,7 +65,7 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) -> Result<(), eyre:
     let task_id = TaskId::new();
     let request = ToolCallRequest::new(TEST_TOOL_NAME, test_tool_params(), &mockable::DefaultClock)
         .with_task_id(task_id);
-    execute_tool_call(world, request, None, Some(task_id))
+    execute_tool_call(world, &request, None, Some(task_id))
 }
 
 #[when("a successful tool call completes")]
