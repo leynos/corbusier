@@ -86,24 +86,40 @@ impl PostgresMessageRepository {
         &self.pool
     }
 
+    async fn execute_inner<TxWrap, F, T>(
+        &self,
+        tenant_id: TenantId,
+        tx_wrap: TxWrap,
+        query_fn: F,
+    ) -> RepositoryResult<T>
+    where
+        TxWrap: FnOnce(&mut PgConnection, uuid::Uuid, F) -> RepositoryResult<T> + Send + 'static,
+        F: FnOnce(&mut PgConnection) -> RepositoryResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, RepositoryError::database)?;
+                tx_wrap(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            RepositoryError::database,
+        )
+        .await
+    }
+
     /// Executes a query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> RepositoryResult<T>
     where
         F: FnOnce(&mut PgConnection) -> RepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, RepositoryError::database)?;
-                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                    .map_err(RepositoryError::database)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            RepositoryError::database,
-        )
-        .await
+        let bootstrapping_tx = |conn: &mut PgConnection, tenant_uuid: uuid::Uuid, qfn: F| {
+            ensure_tenant_exists(conn, tenant_uuid).map_err(RepositoryError::database)?;
+            with_tenant_tx(conn, tenant_uuid, qfn)
+        };
+        self.execute_inner(tenant_id, bootstrapping_tx, query_fn)
+            .await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -116,16 +132,8 @@ impl PostgresMessageRepository {
         F: FnOnce(&mut PgConnection) -> RepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, RepositoryError::database)?;
-                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            RepositoryError::database,
-        )
-        .await
+        self.execute_inner(tenant_id, with_tenant_read_tx, query_fn)
+            .await
     }
 
     /// Stores a message with audit context for tracking.
