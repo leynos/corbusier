@@ -3,6 +3,7 @@
 use super::TriggerContextId;
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
+use crate::tool_registry::domain::ToolExecutionScope;
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
@@ -197,6 +198,19 @@ impl HookExecutionScope {
 impl Default for HookExecutionScope {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl From<&ToolExecutionScope> for HookExecutionScope {
+    fn from(scope: &ToolExecutionScope) -> Self {
+        let mut hook_scope = Self::default();
+        if let Some(task_id) = scope.task_id() {
+            hook_scope = hook_scope.with_task_id(task_id);
+        }
+        if let Some(conversation_id) = scope.conversation_id() {
+            hook_scope = hook_scope.with_conversation_id(conversation_id);
+        }
+        hook_scope
     }
 }
 

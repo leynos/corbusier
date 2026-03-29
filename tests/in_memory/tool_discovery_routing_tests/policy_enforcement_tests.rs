@@ -110,7 +110,10 @@ async fn insert_deny_pre_tool_hook(
         action_id.as_str(),
         json!({
             "decision": "deny",
-            "reason": "tool use is forbidden",
+            "violation": {
+                "code": "tool.blocked",
+                "reason": "tool use is forbidden",
+            }
         }),
     )?;
     Ok(())

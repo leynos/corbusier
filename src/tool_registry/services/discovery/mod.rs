@@ -33,7 +33,7 @@ pub enum ToolDiscoveryRoutingServiceError {
     /// Host operation failed.
     #[error(transparent)]
     Host(#[from] McpServerHostError),
-    /// Policy evaluation failed.
+    /// Tool governance returned an error.
     #[error(transparent)]
     Governance(#[from] ToolGovernanceError),
     /// Log store operation failed.
@@ -192,8 +192,10 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error when resolution, validation, governance, host
-    /// execution, or audit persistence fails.
+    /// Returns an error when server resolution or validation fails, when
+    /// governance denies or errors before execution, when host execution
+    /// fails, or when required audit persistence fails. Post-call governance
+    /// observation failures are logged and do not fail the tool call.
     pub async fn call_tool(
         &self,
         ctx: &RequestContext,

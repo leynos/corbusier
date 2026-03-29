@@ -259,14 +259,7 @@ where
         scope: &ToolExecutionScope,
         metadata: serde_json::Value,
     ) -> HookExecutionScope {
-        let mut hook_scope = HookExecutionScope::default().with_metadata(metadata);
-        if let Some(task_id) = scope.task_id() {
-            hook_scope = hook_scope.with_task_id(task_id);
-        }
-        if let Some(conversation_id) = scope.conversation_id() {
-            hook_scope = hook_scope.with_conversation_id(conversation_id);
-        }
-        hook_scope
+        HookExecutionScope::from(scope).with_metadata(metadata)
     }
 
     fn build_trigger_context(

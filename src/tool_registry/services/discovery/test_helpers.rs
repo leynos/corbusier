@@ -59,7 +59,7 @@ pub fn bundle() -> TestBundle {
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let (discovery, catalog) =
-        discovery_with_policy(&registry, &host, StubGovernance::allowing(), &clock);
+        discovery_with_governance(&registry, &host, StubGovernance::allowing(), &clock);
     TestBundle {
         host,
         lifecycle,
@@ -124,7 +124,7 @@ pub struct TestServices<'a, Gov: crate::tool_registry::ports::ToolExecutionGover
     /// The lifecycle service.
     pub lifecycle: &'a TestLifecycleService,
     /// The discovery service.
-    pub discovery: &'a PolicyDiscoveryService<Gov>,
+    pub discovery: &'a GovernanceDiscoveryService<Gov>,
 }
 
 /// Registers a server, starts it, configures startup stderr, discovers
@@ -217,7 +217,7 @@ pub fn assert_single_audit_stderr_path(
 }
 
 /// Discovery service parameterized by a custom governance adapter.
-pub type PolicyDiscoveryService<Gov> = ToolDiscoveryRoutingService<
+pub type GovernanceDiscoveryService<Gov> = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
     InMemoryMcpServerHost,
@@ -230,14 +230,14 @@ pub type PolicyDiscoveryService<Gov> = ToolDiscoveryRoutingService<
 ///
 /// Returns both the service and the catalogue for test assertions.
 /// NOTE: This helper is intended for in-memory, test-only wiring.
-pub fn discovery_with_policy<
+pub fn discovery_with_governance<
     Gov: crate::tool_registry::ports::ToolExecutionGovernance + 'static,
 >(
     registry: &Arc<InMemoryMcpServerRegistry>,
     host: &Arc<InMemoryMcpServerHost>,
     governance: Gov,
     clock: &Arc<DefaultClock>,
-) -> (PolicyDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
+) -> (GovernanceDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
     build_discovery_service(registry, host, governance, clock)
 }
 
@@ -246,7 +246,7 @@ fn build_discovery_service<Gov: crate::tool_registry::ports::ToolExecutionGovern
     host: &Arc<InMemoryMcpServerHost>,
     governance: Gov,
     clock: &Arc<DefaultClock>,
-) -> (PolicyDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
+) -> (GovernanceDiscoveryService<Gov>, Arc<InMemoryToolCatalog>) {
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let service = ToolDiscoveryRoutingService::new(
         ServicePorts {

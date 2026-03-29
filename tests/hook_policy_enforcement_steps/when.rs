@@ -7,7 +7,7 @@ use corbusier::tool_registry::domain::ToolCallRequest;
 use rstest_bdd_macros::when;
 use serde_json::json;
 
-fn run_tool_call_for_world(world: &mut HookPolicyWorld) {
+fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     let conversation_id = ConversationId::new();
     let request = ToolCallRequest::new(
         "read_file",
@@ -17,7 +17,7 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) {
     .with_conversation_id(conversation_id);
     world.last_request = Some(request.clone());
     world.last_conversation_id = Some(conversation_id);
-    match run_async(world.discovery.call_tool(&world.request_ctx, &request)) {
+    match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
         Ok(result) => {
             world.last_result = Some(result);
             world.last_error = None;
@@ -27,15 +27,16 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) {
             world.last_result = None;
         }
     }
+    Ok(())
 }
 
 #[when("a tool call executes with conversation tracking")]
-fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) {
-    run_tool_call_for_world(world);
+fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
+    run_tool_call_for_world(world)
 }
 
 #[when("a tool call executes with task tracking")]
-fn tool_call_executes_with_task(world: &mut HookPolicyWorld) {
+fn tool_call_executes_with_task(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     let task_id = TaskId::new();
     let request = ToolCallRequest::new(
         "read_file",
@@ -45,7 +46,7 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) {
     .with_task_id(task_id);
     world.last_request = Some(request.clone());
     world.last_task_id = Some(task_id);
-    match run_async(world.discovery.call_tool(&world.request_ctx, &request)) {
+    match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
         Ok(result) => {
             world.last_result = Some(result);
             world.last_error = None;
@@ -55,9 +56,10 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) {
             world.last_result = None;
         }
     }
+    Ok(())
 }
 
 #[when("a successful tool call completes")]
-fn successful_tool_call_completes(world: &mut HookPolicyWorld) {
-    run_tool_call_for_world(world);
+fn successful_tool_call_completes(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
+    run_tool_call_for_world(world)
 }

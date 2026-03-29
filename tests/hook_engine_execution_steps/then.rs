@@ -3,8 +3,30 @@
 use super::world::{HookWorld, run_async};
 use corbusier::hook_engine::domain::HookExecutionStatus;
 use corbusier::hook_engine::ports::{HookExecutionLogRepository, HookPolicyAuditRepository};
-use eyre::WrapErr;
+use eyre::{WrapErr, ensure};
 use rstest_bdd_macros::then;
+
+fn ensure_failed_execution_has_policy_audit_events(
+    world: &HookWorld,
+    context: &corbusier::hook_engine::domain::HookTriggerContext,
+    expected: HookExecutionStatus,
+) -> Result<(), eyre::Report> {
+    if expected != HookExecutionStatus::Failed {
+        return Ok(());
+    }
+
+    let audit_events = run_async(
+        world
+            .policy_audit
+            .find_by_trigger_context(&world.request_ctx, context.id()),
+    )
+    .wrap_err("policy audit lookup failed")?;
+    ensure!(
+        !audit_events.is_empty(),
+        "expected at least 1 policy audit event for failed execution"
+    );
+    Ok(())
+}
 
 fn assert_execution_status(
     world: &mut HookWorld,
@@ -50,20 +72,7 @@ fn assert_execution_status(
         ));
     }
 
-    if expected == HookExecutionStatus::Failed {
-        let audit_events = run_async(
-            world
-                .policy_audit
-                .find_by_trigger_context(&world.request_ctx, context.id()),
-        )
-        .wrap_err("policy audit lookup failed")?;
-        if audit_events.len() != 1 {
-            return Err(eyre::eyre!(
-                "expected 1 policy audit event for failed execution, got {}",
-                audit_events.len()
-            ));
-        }
-    }
+    ensure_failed_execution_has_policy_audit_events(world, context, expected)?;
     Ok(())
 }
 

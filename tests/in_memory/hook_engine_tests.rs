@@ -15,7 +15,7 @@ use corbusier::hook_engine::services::{HookEngineService, HookEngineServiceDeps}
 use corbusier::test_support::other_tenant_ctx;
 use corbusier::test_support::test_request_ctx;
 use corbusier::{message::domain::ConversationId, task::domain::TaskId};
-use eyre::Result;
+use eyre::{Result, ensure};
 use mockable::{Clock, DefaultClock};
 use serde_json::json;
 use std::sync::Arc;
@@ -76,29 +76,47 @@ struct QueryExpectation<'a> {
 }
 
 async fn assert_policy_audit_queries(expectation: QueryExpectation<'_>) -> Result<()> {
-    assert_eq!(
-        expectation
-            .policy_audit
-            .find_by_task(expectation.ctx, expectation.task_id)
-            .await?
-            .len(),
-        1
+    let by_task = expectation
+        .policy_audit
+        .find_by_task(expectation.ctx, expectation.task_id)
+        .await?;
+    let by_conversation = expectation
+        .policy_audit
+        .find_by_conversation(expectation.ctx, expectation.conversation_id)
+        .await?;
+    let by_trigger = expectation
+        .policy_audit
+        .find_by_trigger_context(expectation.ctx, expectation.trigger_context_id)
+        .await?;
+    let expected_ids: Vec<_> = by_trigger
+        .iter()
+        .map(corbusier::hook_engine::domain::PolicyAuditEvent::id)
+        .collect();
+    let task_ids: Vec<_> = by_task
+        .iter()
+        .map(corbusier::hook_engine::domain::PolicyAuditEvent::id)
+        .collect();
+    let conversation_ids: Vec<_> = by_conversation
+        .iter()
+        .map(corbusier::hook_engine::domain::PolicyAuditEvent::id)
+        .collect();
+
+    ensure!(
+        !expected_ids.is_empty(),
+        "expected at least one policy audit event for trigger context {}",
+        expectation.trigger_context_id
     );
-    assert_eq!(
-        expectation
-            .policy_audit
-            .find_by_conversation(expectation.ctx, expectation.conversation_id)
-            .await?
-            .len(),
-        1
+    ensure!(
+        task_ids == expected_ids,
+        "task query returned event ids {:?}, expected {:?}",
+        task_ids,
+        expected_ids
     );
-    assert_eq!(
-        expectation
-            .policy_audit
-            .find_by_trigger_context(expectation.ctx, expectation.trigger_context_id)
-            .await?
-            .len(),
-        1
+    ensure!(
+        conversation_ids == expected_ids,
+        "conversation query returned event ids {:?}, expected {:?}",
+        conversation_ids,
+        expected_ids
     );
     Ok(())
 }

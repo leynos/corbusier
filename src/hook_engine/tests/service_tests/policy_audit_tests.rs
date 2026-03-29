@@ -101,7 +101,7 @@ async fn policy_audit_projection_error_surfaces_without_persisting_events(
             .first()
             .expect("expected stored execution result")
             .status(),
-        HookExecutionStatus::Succeeded
+        HookExecutionStatus::Pending
     );
     Ok(())
 }
@@ -115,7 +115,6 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
         definition_repo,
         action_executor,
         execution_log,
-        policy_audit,
         ..
     } = hook_engine_fixture;
     let ctx = request_ctx();
@@ -140,11 +139,12 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
     failing_policy_audit
         .expect_find_by_trigger_context()
         .returning(|_, _| Ok(vec![]));
+    let repo = Arc::new(failing_policy_audit);
     let service = HookEngineService::new(HookEngineServiceDeps {
         definition_repository: Arc::new(definition_repo.clone()),
         action_executor: Arc::new(action_executor.clone()),
         execution_log: Arc::new(execution_log.clone()),
-        policy_audit_repository: Arc::new(failing_policy_audit),
+        policy_audit_repository: repo.clone(),
         clock: Arc::new(DefaultClock),
     });
 
@@ -157,7 +157,7 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
 
     assert!(matches!(error, HookEngineError::PolicyAudit(_)));
 
-    let audit_events = policy_audit
+    let audit_events = repo
         .find_by_trigger_context(&ctx, trigger_context_id)
         .await
         .expect("querying policy audit events should succeed");

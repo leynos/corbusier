@@ -528,13 +528,13 @@ truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
 `retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
- -- reads a log blob by path.
+ — reads a log blob by path.
 
 `delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
--- deletes a single log blob.
+— deletes a single log blob.
 
 `list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
- -- lists all log blob paths for a server by prefix scan on
+ — lists all log blob paths for a server by prefix scan on
 `tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
 
 `sweep_expired(&self, ctx: &RequestContext,`

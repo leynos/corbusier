@@ -21,7 +21,7 @@ fn policy_audit_is_retrievable_by_conversation(
         world
             .policy_audit
             .find_by_conversation(&world.request_ctx, conversation_id),
-    )
+    )?
     .wrap_err("query policy audit by conversation")?;
     world.last_events.clone_from(&events);
     if !result.outcome().is_success() {
@@ -41,7 +41,7 @@ fn policy_audit_is_retrievable_by_task(world: &mut HookPolicyWorld) -> Result<()
     let task_id = world
         .last_task_id
         .ok_or_else(|| eyre!("task id should be recorded"))?;
-    let events = run_async(world.policy_audit.find_by_task(&world.request_ctx, task_id))
+    let events = run_async(world.policy_audit.find_by_task(&world.request_ctx, task_id))?
         .wrap_err("query policy audit by task")?;
     world.last_events.clone_from(&events);
     let Some(err) = &world.last_error else {
@@ -73,7 +73,7 @@ fn policy_audit_is_retrievable_by_hook_event(
         world
             .policy_audit
             .find_by_conversation(&world.request_ctx, conversation_id),
-    )
+    )?
     .wrap_err("query policy audit by conversation")?;
     if events.len() != 1 {
         return Err(eyre!("expected 1 policy audit event, got {}", events.len()));
@@ -86,7 +86,7 @@ fn policy_audit_is_retrievable_by_hook_event(
         world
             .policy_audit
             .find_by_trigger_context(&world.request_ctx, trigger_context_id),
-    )
+    )?
     .wrap_err("query policy audit by hook event")?;
     world.last_events.clone_from(&by_event);
     if by_event.len() != 1 {
@@ -117,7 +117,7 @@ fn no_policy_audit_is_persisted_for_task(world: &mut HookPolicyWorld) -> Result<
     let task_id = world
         .last_task_id
         .ok_or_else(|| eyre!("task id should be recorded"))?;
-    let events = run_async(world.policy_audit.find_by_task(&world.request_ctx, task_id))
+    let events = run_async(world.policy_audit.find_by_task(&world.request_ctx, task_id))?
         .wrap_err("query policy audit by task")?;
     world.last_events.clone_from(&events);
     if !events.is_empty() {

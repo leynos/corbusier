@@ -37,7 +37,7 @@ fn configure_hook(world: &mut HookPolicyWorld, setup: HookSetup<'_>) -> Result<(
         )],
     )
     .wrap_err("build hook definition for scenario setup")?;
-    run_async(world.definition_repo.insert(&world.request_ctx, definition))
+    run_async(world.definition_repo.insert(&world.request_ctx, definition))?
         .wrap_err("insert hook definition into scenario repository")?;
     world
         .action_executor
@@ -66,15 +66,15 @@ fn prepare_runtime(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
         world
             .lifecycle
             .register(&world.request_ctx, stdio_request("workspace_tools")?),
-    )
+    )?
     .wrap_err("register workspace_tools server")?;
-    run_async(world.lifecycle.start(&world.request_ctx, registered.id()))
+    run_async(world.lifecycle.start(&world.request_ctx, registered.id()))?
         .wrap_err("start workspace_tools server")?;
     run_async(
         world
             .discovery
             .discover_and_persist_tools(&world.request_ctx, registered.id()),
-    )
+    )?
     .wrap_err("discover tools for workspace_tools")?;
     Ok(())
 }

@@ -16,8 +16,9 @@ use serde_json::json;
 use std::sync::Arc;
 use test_helpers::{
     TestBundle, TestServices, assert_single_audit_stderr_path, bundle, call_read_file,
-    call_read_file_expecting_error, discovery_with_policy, read_file_tool, register_start_discover,
-    register_start_with_stderr, setup_success_result, stdio_request, test_request_ctx,
+    call_read_file_expecting_error, discovery_with_governance, read_file_tool,
+    register_start_discover, register_start_with_stderr, setup_success_result, stdio_request,
+    test_request_ctx,
 };
 
 async fn exercise_policy_failure<Pol>(policy: Pol) -> Result<ToolDiscoveryRoutingServiceError>
@@ -28,7 +29,7 @@ where
     let clock = Arc::new(DefaultClock);
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
-    let (discovery, _catalog) = discovery_with_policy(&registry, &host, policy, &clock);
+    let (discovery, _catalog) = discovery_with_governance(&registry, &host, policy, &clock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
 
@@ -323,7 +324,7 @@ async fn call_tool_ambiguous_returns_error() -> Result<()> {
     let clock = Arc::new(DefaultClock);
     let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
     let (discovery, _catalog) =
-        discovery_with_policy(&registry, &host, StubGovernance::allowing(), &clock);
+        discovery_with_governance(&registry, &host, StubGovernance::allowing(), &clock);
 
     register_start_discover(&host, &lifecycle, &discovery, &ctx).await?;
     host.set_tool_catalog(McpServerName::new("code_tools")?, vec![read_file_tool()?])?;

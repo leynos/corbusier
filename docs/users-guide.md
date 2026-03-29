@@ -580,7 +580,7 @@ use corbusier::context::{CorrelationId, RequestContext, SessionId, UserId};
 use corbusier::tenant::TenantId;
 use corbusier::tool_registry::{
     adapters::{
-        AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
+        InMemoryMcpServerHost, ObjectStoreLogAdapter, StubGovernance,
         memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
     },
     domain::{
@@ -626,7 +626,7 @@ async fn discover_and_call_tools() -> Result<(), Box<dyn std::error::Error>> {
             catalog,
             registry,
             host,
-            policy: Arc::new(AllowAllPolicy),
+            governance: Arc::new(StubGovernance::allowing()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

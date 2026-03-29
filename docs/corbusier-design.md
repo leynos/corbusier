@@ -5713,10 +5713,10 @@ pub struct HookDefinition {
 
 #[derive(Debug, Clone)]
 pub enum HookTriggerType {
-    PreTurn,
-    PostTurn,
-    PreToolCall,
-    PostToolCall,
+    TurnStart,
+    TurnEnd,
+    PreToolUse,
+    PostToolUse,
     PreCommit,
     PostCommit,
     PreMerge,
@@ -5776,6 +5776,11 @@ pub struct HookExecutionResult {
     pub executed_at: DateTime<Utc>,
 }
 ```
+
+Earlier sections of this document use legacy trigger names from the planning
+phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
+`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` ->
+`PostToolUse`.
 
 ### 6.4 Component Integration Patterns
 

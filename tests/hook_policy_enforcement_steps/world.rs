@@ -24,6 +24,7 @@ use corbusier::{task::domain::TaskId, tool_registry::services::RegisterMcpServer
 use mockable::DefaultClock;
 use rstest::fixture;
 
+/// Hook engine alias used by hook-backed policy enforcement scenarios.
 pub type HookPolicyHookEngine = HookEngineService<
     InMemoryHookDefinitionRepository,
     InMemoryHookActionExecutor,
@@ -32,11 +33,14 @@ pub type HookPolicyHookEngine = HookEngineService<
     DefaultClock,
 >;
 
+/// Governance adapter alias that evaluates tool calls through the hook engine.
 pub type HookPolicyGovernance = HookBackedToolExecutionGovernance<HookPolicyHookEngine>;
 
+/// Lifecycle service alias used by hook-policy BDD scenarios.
 pub type HookPolicyLifecycleService =
     McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>;
 
+/// Discovery service alias wired to hook-backed governance for BDD scenarios.
 pub type HookPolicyDiscoveryService = ToolDiscoveryRoutingService<
     InMemoryToolCatalog,
     InMemoryMcpServerRegistry,
@@ -124,14 +128,25 @@ impl Default for HookPolicyWorld {
 }
 
 #[fixture]
+/// Builds the default hook-policy BDD world fixture.
 pub fn world() -> HookPolicyWorld {
     HookPolicyWorld::default()
 }
 
-pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
-    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
+/// Runs an async operation to completion, reusing the current runtime when one
+/// is already active and otherwise creating a dedicated current-thread runtime.
+pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> Result<T, std::io::Error> {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        return Ok(tokio::task::block_in_place(|| handle.block_on(future)));
+    }
+
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map(|runtime| runtime.block_on(future))
 }
 
+/// Creates a stdio registration request for the hook-policy test server.
 pub fn stdio_request(
     name: &str,
 ) -> Result<RegisterMcpServerRequest, corbusier::tool_registry::domain::ToolRegistryDomainError> {
