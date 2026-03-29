@@ -10,6 +10,7 @@ use corbusier::agent_backend::{
     },
 };
 use rstest::rstest;
+use std::time::Duration as StdDuration;
 use uuid::Uuid;
 
 use super::common::{OrchestrationContext, context, ensure_conversation_exists, register_backend};
@@ -204,6 +205,9 @@ async fn postgres_serializes_concurrent_calls_with_different_backends_same_conve
     ctx.runtime
         .queue_turn_result(TurnExecutionResult::new("turn_2", Vec::new()))
         .map_err(|err| Box::new(err) as BoxError)?;
+    ctx.runtime
+        .queue_execute_delay(StdDuration::from_millis(100))
+        .map_err(|err| Box::new(err) as BoxError)?;
 
     let request_1 = ExecuteAgentTurnRequest::new(
         backend_1,
@@ -268,6 +272,24 @@ async fn postgres_serializes_concurrent_calls_with_different_backends_same_conve
     assert!(
         backend_ids.contains(&backend_2),
         "expected session for backend_2"
+    );
+
+    let execution_records = ctx
+        .runtime
+        .execution_records()
+        .map_err(|err| Box::new(err) as BoxError)?;
+    let first_record = execution_records
+        .iter()
+        .find(|record| record.backend_id == backend_1)
+        .expect("Expected runtime execution record for backend_1");
+    let second_record = execution_records
+        .iter()
+        .find(|record| record.backend_id == backend_2)
+        .expect("Expected runtime execution record for backend_2");
+    assert!(
+        first_record.completed_at <= second_record.started_at
+            || second_record.completed_at <= first_record.started_at,
+        "expected different backends sharing a conversation to execute without overlap under conversation-scoped execution locks"
     );
 
     Ok(())
