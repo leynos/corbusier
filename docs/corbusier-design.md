@@ -1090,6 +1090,134 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   persistence and runtime concerns remain adapter responsibilities to preserve
   hexagonal boundaries.
 
+For screen readers: The following entity-relationship diagram shows how backend
+registrations and conversations each own zero or more agent turn sessions used
+for orchestrated backend execution state.
+
+<!-- markdownlint-disable MD031 -->
+Table 2.2.3.2: Entity-relationship diagram showing backend registrations,
+conversations, and agent turn sessions.
+
+```mermaid
+erDiagram
+    BACKEND_REGISTRATIONS {
+        uuid id PK
+        text name
+        text status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id
+        timestamptz created_at
+    }
+
+    AGENT_TURN_SESSIONS {
+        uuid id PK
+        uuid tenant_id
+        uuid backend_id FK
+        uuid conversation_id FK
+        varchar runtime_session_id
+        varchar status
+        bigint ttl_seconds
+        bigint turn_count
+        timestamptz started_at
+        timestamptz last_used_at
+        timestamptz expires_at
+        timestamptz ended_at
+    }
+
+    BACKEND_REGISTRATIONS ||--o{ AGENT_TURN_SESSIONS : has
+    CONVERSATIONS ||--o{ AGENT_TURN_SESSIONS : has
+```
+<!-- markdownlint-enable MD031 -->
+
+For screen readers: The following sequence diagram shows the high-level flow
+for `execute_turn`, from backend lookup and session arbitration through message
+loading, runtime execution, scripted tool routing, and persistence of either
+success or failure outcomes.
+
+<!-- markdownlint-disable MD031 -->
+Table 2.2.3.3: Sequence diagram showing the `execute_turn` orchestration flow.
+
+```mermaid
+sequenceDiagram
+    actor Caller
+    participant Orchestrator as AgentTurnOrchestratorService
+    participant BackendRegistry as BackendRegistryRepository
+    participant SessionRepo as TurnSessionRepository
+    participant MsgRepo as MessageRepository
+    participant ToolRouter as ToolRouterPort
+    participant Runtime as AgentRuntimePort
+
+    Caller->>Orchestrator: execute_turn(ctx, ExecuteAgentTurnRequest)
+    activate Orchestrator
+
+    Orchestrator->>BackendRegistry: find_by_id(ctx, backend_id)
+    BackendRegistry-->>Orchestrator: Option<AgentBackendRegistration>
+    Orchestrator->>Orchestrator: validate BackendStatus Active
+    Orchestrator->>Orchestrator: acquire execution lock (tenant_id, conversation_id)
+
+    Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotReservation { key, now, ttl })
+    SessionRepo-->>Orchestrator: SessionSlotArbitration
+    note over Orchestrator,SessionRepo: Reused or Reserved
+
+    alt SessionSlotArbitration::Reserved
+        opt prior_expired present
+            Orchestrator->>Runtime: teardown_session(backend, runtime_session_id)
+            Runtime-->>Orchestrator: Result
+        end
+    else SessionSlotArbitration::Reused
+    end
+
+    Orchestrator->>MsgRepo: find_by_conversation(ctx, conversation_id)
+    MsgRepo-->>Orchestrator: Vec<Message>
+
+    Orchestrator->>ToolRouter: list_available_tools(ctx)
+    ToolRouter-->>Orchestrator: Vec<McpToolDefinition>
+
+    Orchestrator->>Runtime: execute_turn(backend, runtime_session_id, TurnExecutionRequest)
+    activate Runtime
+    Runtime-->>Orchestrator: RuntimeTurnResult
+    deactivate Runtime
+
+    loop per scripted tool call
+        Orchestrator->>ToolRouter: route_tool_call(call_id, ToolCallRequest)
+        ToolRouter-->>Orchestrator: ToolRoutingResult
+    end
+
+    alt Runtime success
+        Orchestrator->>SessionRepo: upsert_session(ctx, TurnSession)
+        alt upsert_session succeeds
+            SessionRepo-->>Orchestrator: Result
+            Orchestrator-->>Caller: ExecuteAgentTurnResponse
+        else upsert_session fails
+            SessionRepo-->>Orchestrator: error StorageFailure
+            opt session was newly reserved
+                Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
+                alt expire_persist_and_teardown fails
+                    Orchestrator->>Orchestrator: warn_cleanup_failure(cleanup_err, session)
+                end
+            end
+            Orchestrator-->>Caller: error StorageFailure(upsert_error)
+        end
+    else Runtime failure
+        Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
+        alt expire_persist_and_teardown succeeds
+            Orchestrator-->>Caller: error Runtime
+        else expire_persist_and_teardown fails
+            Orchestrator-->>Caller: error cleanup
+        end
+    end
+
+    Orchestrator->>Orchestrator: release execution lock (tenant_id, conversation_id)
+
+    deactivate Orchestrator
+```
+<!-- markdownlint-enable MD031 -->
+
 #### 2.2.4 Tool Orchestration Requirements
 
 | Requirement ID | Description                     | Acceptance Criteria                                             | Priority  | Complexity |

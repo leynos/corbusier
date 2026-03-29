@@ -11,7 +11,7 @@ pub use types::{AgentTurnOrchestratorConfig, ExecuteAgentTurnRequest, ExecuteAge
 
 use crate::agent_backend::{
     domain::{
-        AgentBackendRegistration, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
+        AgentBackendRegistration, BackendId, BackendStatus, ToolCallAudit, ToolCallAuditStatus,
         ToolCallRequest, ToolCallResult, TurnSession, deterministic_tool_call_id,
     },
     ports::{
@@ -51,6 +51,12 @@ struct SessionResolutionParams<'a> {
     backend: &'a AgentBackendRegistration,
     conversation_id: Uuid,
     now: chrono::DateTime<Utc>,
+}
+
+struct SessionPersistenceParams<'a> {
+    ctx: &'a RequestContext,
+    backend: &'a AgentBackendRegistration,
+    reused_session: bool,
 }
 
 /// Service that orchestrates backend turns and session lifecycle.
@@ -116,22 +122,12 @@ where
         request: ExecuteAgentTurnRequest,
     ) -> AgentTurnOrchestrationResult<ExecuteAgentTurnResponse> {
         let conversation_id = request.turn.conversation_id();
+        let backend = self.resolve_backend(ctx, request.backend_id).await?;
+
         let _execution_guard = self
             .execution_locks
-            .lock(ctx.tenant_id(), request.backend_id, conversation_id)
+            .lock(ctx.tenant_id(), conversation_id)
             .await;
-
-        let backend = self
-            .backend_registry
-            .find_by_id(ctx, request.backend_id)
-            .await?
-            .ok_or(AgentTurnOrchestrationError::BackendNotFound(
-                request.backend_id,
-            ))?;
-
-        if backend.status() != BackendStatus::Active {
-            return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
-        }
 
         let resolution_params = SessionResolutionParams {
             ctx,
@@ -167,8 +163,15 @@ where
             }
         };
 
-        self.persist_completed_turn(ctx, &backend, &mut session)
-            .await?;
+        self.persist_completed_turn(
+            &SessionPersistenceParams {
+                ctx,
+                backend: &backend,
+                reused_session,
+            },
+            &mut session,
+        )
+        .await?;
 
         Ok(ExecuteAgentTurnResponse::new(
             &session,
@@ -180,6 +183,22 @@ where
                 rotated_session,
             },
         ))
+    }
+
+    async fn resolve_backend(
+        &self,
+        ctx: &RequestContext,
+        backend_id: BackendId,
+    ) -> AgentTurnOrchestrationResult<AgentBackendRegistration> {
+        let backend = self
+            .backend_registry
+            .find_by_id(ctx, backend_id)
+            .await?
+            .ok_or(AgentTurnOrchestrationError::BackendNotFound(backend_id))?;
+        if backend.status() != BackendStatus::Active {
+            return Err(AgentTurnOrchestrationError::BackendInactive(backend.id()));
+        }
+        Ok(backend)
     }
 
     async fn resolve_session(
@@ -236,20 +255,51 @@ where
 
     async fn persist_completed_turn(
         &self,
-        ctx: &RequestContext,
-        backend: &AgentBackendRegistration,
+        params: &SessionPersistenceParams<'_>,
         session: &mut TurnSession,
     ) -> AgentTurnOrchestrationResult<()> {
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
 
-        if let Err(error) = self.turn_sessions.upsert_session(ctx, session).await {
-            self.expire_persist_and_teardown(ctx, backend, session)
-                .await?;
+        self.persist_session_or_cleanup(params, session).await
+    }
+
+    async fn persist_session_or_cleanup(
+        &self,
+        params: &SessionPersistenceParams<'_>,
+        session: &mut TurnSession,
+    ) -> AgentTurnOrchestrationResult<()> {
+        if let Err(error) = self.turn_sessions.upsert_session(params.ctx, session).await {
+            self.cleanup_after_upsert_failure(params, session).await;
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
-
         Ok(())
+    }
+
+    async fn cleanup_after_upsert_failure(
+        &self,
+        params: &SessionPersistenceParams<'_>,
+        session: &mut TurnSession,
+    ) {
+        if params.reused_session {
+            return;
+        }
+        if let Err(cleanup_err) = self
+            .expire_persist_and_teardown(params.ctx, params.backend, session)
+            .await
+        {
+            Self::warn_cleanup_failure(&cleanup_err, session);
+        }
+    }
+
+    fn warn_cleanup_failure(error: &AgentTurnOrchestrationError, session: &TurnSession) {
+        tracing::warn!(
+            error = ?error,
+            backend_id = %session.backend_id(),
+            conversation_id = %session.conversation_id(),
+            session_id = ?session.id(),
+            "cleanup failed after session upsert failure; session may leak"
+        );
     }
 
     async fn expire_session(

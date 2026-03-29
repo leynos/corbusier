@@ -55,12 +55,13 @@ impl InMemoryTurnSessionRepository {
     ///
     /// # Errors
     ///
-    /// Returns [`TurnSessionRepositoryError::Persistence`] when the in-memory
+    /// Returns [`TurnSessionRepositoryError::StorageFailure`] when the in-memory
     /// state lock cannot be acquired.
     pub fn all_sessions(&self) -> TurnSessionRepositoryResult<Vec<TurnSession>> {
-        let state = self.state.read().map_err(|err| {
-            TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self
+            .state
+            .read()
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
         Ok(state.sessions.values().cloned().collect())
     }
 
@@ -114,7 +115,7 @@ impl InMemoryTurnSessionRepository {
             ttl,
             now,
         })
-        .map_err(TurnSessionRepositoryError::invalid_domain_data)
+        .map_err(|e| TurnSessionRepositoryError::invalid_domain_data("turn_count", e))
     }
 
     fn reserve_session_slot(
@@ -226,9 +227,10 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
             backend_id,
             conversation_id,
         } = key;
-        let mut state = self.state.write().map_err(|err| {
-            TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
 
         let params = ReservationParams {
             tenant_id: ctx.tenant_id(),
@@ -258,9 +260,10 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
             backend_id,
             conversation_id,
         } = key;
-        let state = self.state.read().map_err(|err| {
-            TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self
+            .state
+            .read()
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
 
         let session = state
             .active_index
@@ -277,9 +280,10 @@ impl TurnSessionRepository for InMemoryTurnSessionRepository {
         ctx: &RequestContext,
         session: &TurnSession,
     ) -> TurnSessionRepositoryResult<()> {
-        let mut state = self.state.write().map_err(|err| {
-            TurnSessionRepositoryError::persistence(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self
+            .state
+            .write()
+            .map_err(TurnSessionRepositoryError::storage_failure)?;
         Self::reconcile_session_index(&mut state, ctx.tenant_id(), session)
     }
 }

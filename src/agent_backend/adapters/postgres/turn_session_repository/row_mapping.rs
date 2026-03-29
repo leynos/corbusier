@@ -16,7 +16,7 @@ pub(crate) fn to_new_row(
     let turn_count: i64 = session
         .turn_count()
         .try_into()
-        .map_err(TurnSessionRepositoryError::invalid_domain_data)?;
+        .map_err(|e| TurnSessionRepositoryError::invalid_domain_data("turn_count", e))?;
 
     Ok(NewAgentTurnSessionRow {
         id: session.id().into_inner(),
@@ -47,7 +47,7 @@ pub(crate) fn create_reservation_session(
         ttl,
         now,
     })
-    .map_err(TurnSessionRepositoryError::invalid_domain_data)
+    .map_err(|e| TurnSessionRepositoryError::invalid_domain_data("turn_count", e))
 }
 
 pub(crate) fn row_to_turn_session(
@@ -69,12 +69,12 @@ pub(crate) fn row_to_turn_session(
     } = row;
 
     let parsed_status = TurnSessionStatus::try_from(status.as_str())
-        .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
+        .map_err(|e| TurnSessionRepositoryError::invalid_persisted_data("status", e))?;
     let parsed_runtime_session_id = RuntimeSessionId::new(runtime_session_id)
-        .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
+        .map_err(|e| TurnSessionRepositoryError::invalid_persisted_data("runtime_session_id", e))?;
     let parsed_turn_count: u64 = turn_count
         .try_into()
-        .map_err(TurnSessionRepositoryError::invalid_persisted_data)?;
+        .map_err(|e| TurnSessionRepositoryError::invalid_persisted_data("turn_count", e))?;
 
     Ok(TurnSession::from_persisted(PersistedTurnSessionData {
         id: TurnSessionId::from_uuid(id),

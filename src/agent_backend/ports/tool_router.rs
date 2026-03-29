@@ -3,7 +3,6 @@
 use crate::agent_backend::domain::{BackendId, ToolCallRequest, ToolCallResult, TurnSessionId};
 use crate::context::TenantId;
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -77,6 +76,17 @@ pub trait ToolRouterPort: Send + Sync {
     ) -> ToolRoutingResult<ToolCallResult>;
 }
 
+/// Infrastructure-level errors from tool routing adapters.
+#[derive(Debug, Error)]
+pub enum ToolRoutingInfrastructureError {
+    /// Adapter is unavailable.
+    #[error("adapter unavailable: {0}")]
+    AdapterUnavailable(String),
+    /// Serialization error.
+    #[error("serialization error: {0}")]
+    Serialization(String),
+}
+
 /// Errors returned by tool-routing adapters.
 #[derive(Debug, Error)]
 pub enum ToolRoutingError {
@@ -90,13 +100,5 @@ pub enum ToolRoutingError {
 
     /// Infrastructure failure from the router adapter.
     #[error("tool router infrastructure error: {0}")]
-    Infrastructure(#[source] Arc<dyn std::error::Error + Send + Sync>),
-}
-
-impl ToolRoutingError {
-    /// Wraps an infrastructure-specific tool routing error.
-    #[must_use]
-    pub fn infrastructure(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::Infrastructure(Arc::new(err))
-    }
+    Infrastructure(#[from] ToolRoutingInfrastructureError),
 }

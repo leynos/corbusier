@@ -9,6 +9,7 @@ use crate::agent_backend::{
 use async_trait::async_trait;
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
+use std::time::Instant;
 use uuid::Uuid;
 
 /// Recorded runtime execution request for assertions.
@@ -20,6 +21,10 @@ pub struct RuntimeExecutionRecord {
     pub runtime_session_id: RuntimeSessionId,
     /// Request payload sent to runtime.
     pub request: TurnExecutionRequest,
+    /// Instant when runtime execution started.
+    pub started_at: Instant,
+    /// Instant when runtime execution completed.
+    pub completed_at: Instant,
 }
 
 #[derive(Debug, Default)]
@@ -27,6 +32,7 @@ struct InMemoryRuntimeState {
     next_session_ordinal: u64,
     fail_session_creation_for: HashSet<crate::agent_backend::domain::BackendId>,
     queued_results: VecDeque<TurnExecutionResult>,
+    queued_execute_delays: VecDeque<std::time::Duration>,
     next_execute_failure: Option<String>,
     created_session_ids: Vec<RuntimeSessionId>,
     execution_records: Vec<RuntimeExecutionRecord>,
@@ -56,6 +62,20 @@ impl InMemoryAgentRuntime {
             AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
         })?;
         state.queued_results.push_back(result);
+        Ok(())
+    }
+
+    /// Queues one runtime execution delay for the next `execute_turn` call.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AgentRuntimeError::Infrastructure`] when the in-memory state
+    /// lock cannot be acquired.
+    pub fn queue_execute_delay(&self, delay: std::time::Duration) -> AgentRuntimeResult<()> {
+        let mut state = self.state.write().map_err(|err| {
+            AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
+        })?;
+        state.queued_execute_delays.push_back(delay);
         Ok(())
     }
 
@@ -168,23 +188,39 @@ impl AgentRuntimePort for InMemoryAgentRuntime {
         runtime_session_id: &RuntimeSessionId,
         request: &TurnExecutionRequest,
     ) -> AgentRuntimeResult<TurnExecutionResult> {
-        let mut state = self.state.write().map_err(|err| {
-            AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let (delay, execute_failure, result) = {
+            let mut state = self.state.write().map_err(|err| {
+                AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
+            })?;
 
-        if let Some(message) = state.next_execute_failure.take() {
+            let delay = state.queued_execute_delays.pop_front();
+            let execute_failure = state.next_execute_failure.take();
+            let result = state.queued_results.pop_front().unwrap_or_else(|| {
+                TurnExecutionResult::new("in-memory default response", Vec::new())
+            });
+            (delay, execute_failure, result)
+        };
+
+        let started_at = Instant::now();
+        if let Some(execution_delay) = delay {
+            tokio::time::sleep(execution_delay).await;
+        }
+
+        if let Some(message) = execute_failure {
             return Err(AgentRuntimeError::TurnExecutionFailed(message));
         }
 
-        let result = state
-            .queued_results
-            .pop_front()
-            .unwrap_or_else(|| TurnExecutionResult::new("in-memory default response", Vec::new()));
+        let completed_at = Instant::now();
+        let mut state = self.state.write().map_err(|err| {
+            AgentRuntimeError::infrastructure(std::io::Error::other(err.to_string()))
+        })?;
 
         state.execution_records.push(RuntimeExecutionRecord {
             backend_id: backend.id(),
             runtime_session_id: runtime_session_id.clone(),
             request: request.clone(),
+            started_at,
+            completed_at,
         });
 
         Ok(result)

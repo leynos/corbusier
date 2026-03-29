@@ -2,12 +2,20 @@
 
 use crate::agent_backend::{
     domain::{ToolCallRequest, ToolCallResult},
-    ports::{ToolRouterPort, ToolRoutingContext, ToolRoutingError, ToolRoutingResult},
+    ports::{
+        ToolRouterPort, ToolRoutingContext, ToolRoutingError, ToolRoutingResult,
+        tool_router::ToolRoutingInfrastructureError,
+    },
 };
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+enum ToolConfiguration {
+    Response(Value),
+    Failure(String),
+}
 
 #[derive(Debug, Default)]
 struct InMemoryToolRouterState {
@@ -23,6 +31,42 @@ pub struct InMemoryToolRouter {
 }
 
 impl InMemoryToolRouter {
+    fn map_lock_err<T>(err: &std::sync::PoisonError<T>) -> ToolRoutingInfrastructureError {
+        ToolRoutingInfrastructureError::AdapterUnavailable(err.to_string())
+    }
+
+    fn read_state(
+        &self,
+    ) -> ToolRoutingResult<std::sync::RwLockReadGuard<'_, InMemoryToolRouterState>> {
+        Ok(self.state.read().map_err(|err| Self::map_lock_err(&err))?)
+    }
+
+    fn write_state(
+        &self,
+    ) -> ToolRoutingResult<std::sync::RwLockWriteGuard<'_, InMemoryToolRouterState>> {
+        Ok(self.state.write().map_err(|err| Self::map_lock_err(&err))?)
+    }
+
+    fn configure_tool(
+        &self,
+        tool_name: impl Into<String>,
+        config: ToolConfiguration,
+    ) -> ToolRoutingResult<()> {
+        let key = tool_name.into().trim().to_owned();
+        let mut state = self.write_state()?;
+        match config {
+            ToolConfiguration::Response(output) => {
+                state.failures.remove(&key);
+                state.responses.insert(key, output);
+            }
+            ToolConfiguration::Failure(message) => {
+                state.responses.remove(&key);
+                state.failures.insert(key, message);
+            }
+        }
+        Ok(())
+    }
+
     /// Creates a new router with empty configuration.
     #[must_use]
     pub fn new() -> Self {
@@ -40,13 +84,7 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         output: Value,
     ) -> ToolRoutingResult<()> {
-        let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
-        state.failures.remove(&tool_name_key);
-        state.responses.insert(tool_name_key, output);
-        Ok(())
+        self.configure_tool(tool_name, ToolConfiguration::Response(output))
     }
 
     /// Configures a failure for a tool name.
@@ -60,13 +98,7 @@ impl InMemoryToolRouter {
         tool_name: impl Into<String>,
         message: impl Into<String>,
     ) -> ToolRoutingResult<()> {
-        let tool_name_key = tool_name.into().trim().to_owned();
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
-        state.responses.remove(&tool_name_key);
-        state.failures.insert(tool_name_key, message.into());
-        Ok(())
+        self.configure_tool(tool_name, ToolConfiguration::Failure(message.into()))
     }
 
     /// Returns call IDs in the order they were routed.
@@ -76,9 +108,7 @@ impl InMemoryToolRouter {
     /// Returns [`ToolRoutingError::Infrastructure`] when the in-memory state
     /// lock cannot be acquired.
     pub fn routed_call_ids(&self) -> ToolRoutingResult<Vec<String>> {
-        let state = self.state.read().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let state = self.read_state()?;
         Ok(state.routed_call_ids.clone())
     }
 }
@@ -91,13 +121,11 @@ impl ToolRouterPort for InMemoryToolRouter {
         tool_call: &ToolCallRequest,
         _context: ToolRoutingContext,
     ) -> ToolRoutingResult<ToolCallResult> {
-        let mut state = self.state.write().map_err(|err| {
-            ToolRoutingError::infrastructure(std::io::Error::other(err.to_string()))
-        })?;
+        let mut state = self.write_state()?;
         state.routed_call_ids.push(call_id.to_owned());
 
         if let Some(message) = state.failures.get(tool_call.tool_name()) {
-            return Err(ToolRoutingError::ToolExecutionFailed(message.clone()));
+            return Err(ToolRoutingError::ToolExecutionFailed(message.to_owned()));
         }
 
         let output = state

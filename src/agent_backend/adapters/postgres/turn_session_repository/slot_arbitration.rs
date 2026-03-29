@@ -63,7 +63,7 @@ pub(crate) fn lock_session_key(
         .select(backend_registrations::id)
         .first::<uuid::Uuid>(connection)
         .map(|_| ())
-        .map_err(TurnSessionRepositoryError::persistence)
+        .map_err(TurnSessionRepositoryError::storage_failure)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -126,7 +126,7 @@ pub(crate) fn expire_claimed_session(
         agent_turn_sessions::ended_at.eq(Some(now)),
     ))
     .execute(conn)
-    .map_err(TurnSessionRepositoryError::persistence)?;
+    .map_err(TurnSessionRepositoryError::storage_failure)?;
     let mut expired = existing.clone();
     expired.mark_expired(now);
     Ok(expired)
@@ -152,7 +152,7 @@ fn load_claimed_session(
     .bind::<Varchar, _>(TurnSessionStatus::Reserved.as_str())
     .get_result::<AgentTurnSessionRow>(tx_conn)
     .optional()
-    .map_err(TurnSessionRepositoryError::persistence)
+    .map_err(TurnSessionRepositoryError::storage_failure)
 }
 
 fn handle_existing_claim(
@@ -175,7 +175,8 @@ fn handle_existing_claim(
             params.conversation_id,
         )),
         TurnSessionStatus::Expired => Err(TurnSessionRepositoryError::invalid_persisted_data(
-            std::io::Error::other("expired session row should not claim a session slot"),
+            "status",
+            "expired session row should not claim a session slot",
         )),
     }
 }
@@ -210,5 +211,5 @@ fn expire_stale_reservations(
     ))
     .execute(conn)
     .map(|_| ())
-    .map_err(TurnSessionRepositoryError::persistence)
+    .map_err(TurnSessionRepositoryError::storage_failure)
 }

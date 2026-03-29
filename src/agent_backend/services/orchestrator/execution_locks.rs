@@ -1,13 +1,12 @@
 //! Per-session execution locks for in-process turn serialization.
 
-use crate::agent_backend::domain::BackendId;
 use crate::context::TenantId;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tokio::sync::{Mutex, OwnedMutexGuard};
 use uuid::Uuid;
 
-type SessionKey = (TenantId, BackendId, Uuid);
+type SessionKey = (TenantId, Uuid);
 type SessionLock = Arc<Mutex<()>>;
 type SessionLockRef = Weak<Mutex<()>>;
 
@@ -23,13 +22,8 @@ impl SessionExecutionLocks {
         }
     }
 
-    fn lock_for(
-        &self,
-        tenant_id: TenantId,
-        backend_id: BackendId,
-        conversation_id: Uuid,
-    ) -> SessionLock {
-        let key = (tenant_id, backend_id, conversation_id);
+    fn lock_for(&self, tenant_id: TenantId, conversation_id: Uuid) -> SessionLock {
+        let key = (tenant_id, conversation_id);
         let mut locks = match self.locks.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -49,11 +43,8 @@ impl SessionExecutionLocks {
     pub(super) async fn lock(
         &self,
         tenant_id: TenantId,
-        backend_id: BackendId,
         conversation_id: Uuid,
     ) -> OwnedMutexGuard<()> {
-        self.lock_for(tenant_id, backend_id, conversation_id)
-            .lock_owned()
-            .await
+        self.lock_for(tenant_id, conversation_id).lock_owned().await
     }
 }

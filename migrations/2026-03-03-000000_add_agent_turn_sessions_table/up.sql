@@ -19,6 +19,8 @@ CREATE TABLE agent_turn_sessions (
     CONSTRAINT agent_turn_sessions_ttl_positive_check CHECK (
         ttl_seconds > 0
     ),
+    -- Sessions start at 0 (reserved) and increment as turns complete.
+    -- Zero is a valid initial state; only negative values are rejected.
     CONSTRAINT agent_turn_sessions_turn_count_non_negative_check CHECK (
         turn_count >= 0
     )

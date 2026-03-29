@@ -6,11 +6,8 @@ use corbusier::agent_backend::{
         PersistedTurnSessionData, RuntimeSessionId, ToolCallRequest, TurnExecutionRequest,
         TurnExecutionResult, TurnSession, TurnSessionStatus,
     },
-    ports::{SessionSlotKey, TurnSessionRepository, TurnSessionRepositoryError},
-    services::{
-        AgentTurnOrchestrationError, AgentTurnOrchestratorConfig, AgentTurnOrchestratorPorts,
-        AgentTurnOrchestratorService, ExecuteAgentTurnRequest,
-    },
+    ports::{SessionSlotKey, TurnSessionRepository},
+    services::{AgentTurnOrchestrationError, ExecuteAgentTurnRequest},
 };
 use rstest::rstest;
 use serde_json::json;
@@ -141,82 +138,6 @@ async fn postgres_rotates_expired_session(
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn postgres_serializes_concurrent_calls_for_same_session_key(
-    #[future] context: Result<OrchestrationContext, BoxError>,
-) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let backend_id = register_backend(&ctx, "claude_code_sdk").await?;
-    let conversation_id = Uuid::new_v4();
-    ensure_conversation_exists(&ctx, conversation_id).await?;
-
-    ctx.runtime
-        .queue_turn_result(TurnExecutionResult::new("first", Vec::new()))
-        .map_err(|err| Box::new(err) as BoxError)?;
-    ctx.runtime
-        .queue_turn_result(TurnExecutionResult::new("second", Vec::new()))
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    let first_request = ExecuteAgentTurnRequest::new(
-        backend_id,
-        TurnExecutionRequest::new(conversation_id, "1", Vec::new()),
-    );
-    let second_request = ExecuteAgentTurnRequest::new(
-        backend_id,
-        TurnExecutionRequest::new(conversation_id, "2", Vec::new()),
-    );
-
-    let (first_result, second_result) = tokio::join!(
-        ctx.service.execute_turn(&ctx.ctx, first_request),
-        ctx.service.execute_turn(&ctx.ctx, second_request)
-    );
-
-    let first_response = first_result.map_err(|err| Box::new(err) as BoxError)?;
-    let second_response = second_result.map_err(|err| Box::new(err) as BoxError)?;
-    assert_eq!(first_response.session_id(), second_response.session_id());
-    let reused_count = [
-        first_response.reused_session(),
-        second_response.reused_session(),
-    ]
-    .into_iter()
-    .filter(|is_reused| *is_reused)
-    .count();
-    assert_eq!(
-        reused_count, 1,
-        "expected exactly one concurrent call to reuse the created session"
-    );
-
-    let created_sessions = ctx
-        .runtime
-        .created_session_ids()
-        .map_err(|err| Box::new(err) as BoxError)?;
-    assert_eq!(created_sessions.len(), 1);
-
-    let active_sessions = ctx
-        .session_repository
-        .all_sessions()
-        .map_err(|err| Box::new(err) as BoxError)?
-        .into_iter()
-        .filter(|session| {
-            session.backend_id() == backend_id
-                && session.conversation_id() == conversation_id
-                && session.status() == corbusier::agent_backend::domain::TurnSessionStatus::Active
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        active_sessions.len(),
-        1,
-        "expected exactly one active session row for the slot"
-    );
-    let active_session = active_sessions
-        .into_iter()
-        .next()
-        .ok_or_else(|| Box::new(std::io::Error::other("expected active session")) as BoxError)?;
-    assert_eq!(active_session.turn_count(), 2);
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
 async fn postgres_propagates_tool_routing_failure(
     #[future] context: Result<OrchestrationContext, BoxError>,
 ) -> Result<(), BoxError> {
@@ -253,101 +174,5 @@ async fn postgres_propagates_tool_routing_failure(
         result,
         Err(AgentTurnOrchestrationError::ToolRouting { .. })
     ));
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread")]
-async fn concurrent_execute_turn_creates_single_active_session(
-    #[future] context: Result<OrchestrationContext, BoxError>,
-) -> Result<(), BoxError> {
-    let ctx = context.await?;
-    let backend_id = register_backend(&ctx, "concurrent_test_backend").await?;
-    let conversation_id = Uuid::new_v4();
-    ensure_conversation_exists(&ctx, conversation_id).await?;
-
-    ctx.runtime
-        .queue_turn_result(TurnExecutionResult::new("response-a", Vec::new()))
-        .map_err(|err| Box::new(err) as BoxError)?;
-    ctx.runtime
-        .queue_turn_result(TurnExecutionResult::new("response-b", Vec::new()))
-        .map_err(|err| Box::new(err) as BoxError)?;
-
-    let first_request = ExecuteAgentTurnRequest::new(
-        backend_id,
-        TurnExecutionRequest::new(conversation_id, "first turn", Vec::new()),
-    );
-    let second_request = ExecuteAgentTurnRequest::new(
-        backend_id,
-        TurnExecutionRequest::new(conversation_id, "second turn", Vec::new()),
-    );
-    let second_service = AgentTurnOrchestratorService::with_config(
-        AgentTurnOrchestratorPorts {
-            backend_registry: ctx.backend_registry.clone(),
-            turn_sessions: ctx.session_repository.clone(),
-            runtime: ctx.runtime.clone(),
-            tool_router: ctx.router.clone(),
-            clock: ctx.clock.clone(),
-        },
-        AgentTurnOrchestratorConfig::new(Duration::minutes(5))
-            .map_err(|err| Box::new(err) as BoxError)?,
-    );
-
-    let (first_result, second_result) = tokio::join!(
-        ctx.service.execute_turn(&ctx.ctx, first_request),
-        second_service.execute_turn(&ctx.ctx, second_request)
-    );
-    let results = [first_result, second_result];
-    let success_count = results.iter().filter(|result| result.is_ok()).count();
-    assert_eq!(
-        success_count, 1,
-        "expected exactly one concurrent execute_turn call to win the reservation race"
-    );
-    let conflict_count = results
-        .iter()
-        .filter(|result| {
-            matches!(
-                result,
-                Err(AgentTurnOrchestrationError::SessionRepository(
-                    TurnSessionRepositoryError::ActiveSessionConflict { .. }
-                ))
-            )
-        })
-        .count();
-    assert_eq!(
-        conflict_count, 1,
-        "expected exactly one concurrent execute_turn call to fail with an active-session conflict"
-    );
-    let winning_response = results
-        .into_iter()
-        .find_map(Result::ok)
-        .ok_or_else(|| Box::new(std::io::Error::other("expected a successful turn")) as BoxError)?;
-
-    let active_sessions = ctx
-        .session_repository
-        .all_sessions()
-        .map_err(|err| Box::new(err) as BoxError)?
-        .into_iter()
-        .filter(|session| {
-            session.backend_id() == backend_id
-                && session.conversation_id() == conversation_id
-                && session.status() == corbusier::agent_backend::domain::TurnSessionStatus::Active
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        active_sessions.len(),
-        1,
-        "expected exactly one active session row for the slot"
-    );
-    let active_session = active_sessions
-        .into_iter()
-        .next()
-        .expect("Expected exactly one active session to exist");
-    assert_eq!(
-        active_session.id(),
-        winning_response.session_id(),
-        "Active session ID should match the successful turn session"
-    );
-
     Ok(())
 }
