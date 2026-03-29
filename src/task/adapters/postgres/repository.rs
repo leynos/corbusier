@@ -116,7 +116,13 @@ impl PostgresTaskRepository {
         .await
     }
 
-    /// Executes a read-only query inside a transaction with tenant context.
+    /// Executes a semantically read-only query inside a tenant-scoped transaction.
+    ///
+    /// This delegates to `run_tenant_query(&self.pool, tenant_id, query_fn,
+    /// with_tenant_read_tx)`, but `with_tenant_read_tx` only sets tenant
+    /// context and does not issue `SET TRANSACTION READ ONLY`. The database
+    /// therefore does not enforce read-only behaviour here; avoiding writes
+    /// remains the caller's responsibility and discipline.
     async fn execute_read_query<F, T>(
         &self,
         tenant_id: TenantId,

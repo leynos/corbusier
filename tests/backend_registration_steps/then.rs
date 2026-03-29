@@ -90,9 +90,11 @@ fn extract_two_registered(
     eyre::Report,
 > {
     let tenant_a = world
-        .last_registered
+        .last_register_result
         .as_ref()
-        .ok_or_else(|| eyre::eyre!("tenant A backend is missing"))?;
+        .ok_or_else(|| eyre::eyre!("tenant A registration result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant A registration failed: {err}"))?;
     let tenant_b = world
         .other_register_result
         .as_ref()
@@ -125,22 +127,23 @@ fn assert_backend_id_matches(
 }
 
 #[derive(Clone, Copy)]
-struct TenantLookupExpectation<'a> {
+struct TenantLookup<'a> {
     ctx: &'a corbusier::context::RequestContext,
     expected: &'a corbusier::agent_backend::domain::AgentBackendRegistration,
+    label: &'a str,
 }
 
 fn assert_backends_by_name(
     service: &super::world::TestRegistryService,
+    tenant_a: TenantLookup<'_>,
+    tenant_b: TenantLookup<'_>,
     name: &str,
-    tenant_a: TenantLookupExpectation<'_>,
-    tenant_b: TenantLookupExpectation<'_>,
 ) -> Result<(), eyre::Report> {
-    let found_a = lookup_backend_by_name(service, tenant_a.ctx, name, "tenant A")?;
-    let found_b = lookup_backend_by_name(service, tenant_b.ctx, name, "tenant B")?;
+    let found_a = lookup_backend_by_name(service, tenant_a.ctx, name, tenant_a.label)?;
+    let found_b = lookup_backend_by_name(service, tenant_b.ctx, name, tenant_b.label)?;
 
-    assert_backend_id_matches(&found_a, tenant_a.expected, "tenant A")?;
-    assert_backend_id_matches(&found_b, tenant_b.expected, "tenant B")?;
+    assert_backend_id_matches(&found_a, tenant_a.expected, tenant_a.label)?;
+    assert_backend_id_matches(&found_b, tenant_b.expected, tenant_b.label)?;
     if found_a.id() == found_b.id() {
         return Err(eyre::eyre!("tenant lookups must return distinct backends"));
     }
@@ -153,21 +156,19 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
         .pending_backends
         .last()
         .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
-    let expected_a = world
-        .last_registered
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("tenant A expected backend is missing"))?;
-    let (_, expected_b) = extract_two_registered(world)?;
+    let (expected_a, expected_b) = extract_two_registered(world)?;
     assert_backends_by_name(
         &world.service,
-        &pending.name,
-        TenantLookupExpectation {
+        TenantLookup {
             ctx: &world.ctx,
             expected: expected_a,
+            label: "tenant A",
         },
-        TenantLookupExpectation {
+        TenantLookup {
             ctx: &world.other_ctx,
             expected: expected_b,
+            label: "tenant B",
         },
+        &pending.name,
     )
 }

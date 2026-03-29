@@ -1,8 +1,9 @@
 //! Shared execution helpers for tenant-scoped tool-catalog queries.
 
 use crate::context::TenantId;
-use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
-use crate::postgres_support::{ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx};
+use crate::postgres_support::{
+    ensure_tenant_exists, get_conn_with, run_blocking_with, with_tenant_read_tx, with_tenant_tx,
+};
 use crate::tool_registry::ports::{ToolCatalogError, ToolCatalogResult};
 use diesel::pg::PgConnection;
 

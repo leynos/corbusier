@@ -51,6 +51,7 @@ fn tenant_a_registers_backend(world: &mut BackendWorld) -> Result<(), eyre::Repo
     let request = build_request(&pending.name, &pending.provider);
     let registration = run_async(world.service.register(&world.ctx, request))
         .map_err(|err| eyre::eyre!("tenant A registration failed: {err}"))?;
+    world.last_register_result = Some(Ok(registration.clone()));
     world.last_registered = Some(registration.clone());
     world.registered_backends.push(registration);
     Ok(())
