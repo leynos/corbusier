@@ -67,11 +67,12 @@ where
 
 /// Runs `body` inside a read-only transaction that sets `app.tenant_id`.
 ///
-/// Unlike [`with_tenant_tx`], this does not call `ensure_tenant_exists`, making
-/// it suitable for read-only operations that:
+/// Unlike [`with_tenant_tx`], this configures the database transaction with
+/// `SET TRANSACTION READ ONLY` before setting tenant context, making it
+/// suitable for read-only operations that:
 /// - Should not perform writes
 /// - May run under read-only database credentials
-/// - Should not create spurious tenant rows
+/// - Benefit from `PostgreSQL` rejecting accidental writes
 ///
 /// The caller's domain error `E` must implement [`FromTxError`] so that both
 /// Diesel errors and domain errors can be propagated.

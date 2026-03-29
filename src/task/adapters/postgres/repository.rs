@@ -108,21 +108,22 @@ impl PostgresTaskRepository {
             tenant_id,
             query_fn,
             |conn, tenant_uuid, run_query| {
-                ensure_tenant_exists(conn, tenant_uuid)
-                    .map_err(TaskRepositoryError::persistence)?;
-                with_tenant_tx(conn, tenant_uuid, run_query)
+                with_tenant_tx(conn, tenant_uuid, |tx| {
+                    ensure_tenant_exists(tx, tenant_uuid)
+                        .map_err(TaskRepositoryError::persistence)?;
+                    run_query(tx)
+                })
             },
         )
         .await
     }
 
-    /// Executes a semantically read-only query inside a tenant-scoped transaction.
+    /// Executes a read-only query inside a tenant-scoped transaction.
     ///
     /// This delegates to `run_tenant_query(&self.pool, tenant_id, query_fn,
-    /// with_tenant_read_tx)`, but `with_tenant_read_tx` only sets tenant
-    /// context and does not issue `SET TRANSACTION READ ONLY`. The database
-    /// therefore does not enforce read-only behaviour here; avoiding writes
-    /// remains the caller's responsibility and discipline.
+    /// with_tenant_read_tx)`, and `with_tenant_read_tx` issues
+    /// `SET TRANSACTION READ ONLY` before setting tenant context so the
+    /// database rejects accidental writes on this path.
     async fn execute_read_query<F, T>(
         &self,
         tenant_id: TenantId,
