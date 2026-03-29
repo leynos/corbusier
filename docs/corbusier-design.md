@@ -1189,14 +1189,14 @@ sequenceDiagram
             SessionRepo-->>Orchestrator: Result
             Orchestrator-->>Caller: ExecuteAgentTurnResponse
         else upsert_session fails
-            SessionRepo-->>Orchestrator: error SessionRepository
+            SessionRepo-->>Orchestrator: error StorageFailure
             opt session was newly reserved
                 Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)
                 alt expire_persist_and_teardown fails
                     Orchestrator->>Orchestrator: warn_cleanup_failure(cleanup_err, backend_id, session)
                 end
             end
-            Orchestrator-->>Caller: error SessionRepository(upsert_error)
+            Orchestrator-->>Caller: error StorageFailure(upsert_error)
         end
     else Runtime failure
         Orchestrator->>Orchestrator: expire_persist_and_teardown(ctx, backend, session)

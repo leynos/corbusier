@@ -208,6 +208,9 @@ async fn postgres_serializes_concurrent_calls_with_different_backends_same_conve
     ctx.runtime
         .queue_execute_delay(StdDuration::from_millis(100))
         .map_err(|err| Box::new(err) as BoxError)?;
+    ctx.runtime
+        .queue_execute_delay(StdDuration::from_millis(100))
+        .map_err(|err| Box::new(err) as BoxError)?;
 
     let request_1 = ExecuteAgentTurnRequest::new(
         backend_1,
