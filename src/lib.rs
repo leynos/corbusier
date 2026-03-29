@@ -31,6 +31,7 @@ pub mod tenant;
 pub mod agent_backend;
 pub mod hook_engine;
 pub mod message;
+pub(crate) mod postgres_support;
 pub mod task;
 #[cfg(feature = "test-support")]
 pub mod test_support;

@@ -99,10 +99,17 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
         .last_registered
         .as_ref()
         .ok_or_else(|| eyre::eyre!("tenant A expected backend is missing"))?;
-    let expected_b = world
-        .other_registered
+    let expected_b = match world
+        .other_register_result
         .as_ref()
-        .ok_or_else(|| eyre::eyre!("tenant B expected backend is missing"))?;
+        .ok_or_else(|| eyre::eyre!("tenant B registration result is missing"))?
+    {
+        Ok(registration) => registration,
+        Err(err) => return Err(eyre::eyre!("tenant B registration failed: {err}")),
+    };
+    if world.other_registered.is_none() {
+        return Err(eyre::eyre!("tenant B expected backend is missing"));
+    }
     let found_a = run_async(world.service.find_by_name(&world.ctx, &pending.name))
         .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
         .ok_or_else(|| eyre::eyre!("tenant A backend not found"))?;

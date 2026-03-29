@@ -789,7 +789,9 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
     Lifecycle Management), F-003 (Agent Backend Orchestration)
   - System Dependencies: Diesel repositories, PostgreSQL RLS, audit trigger
     session variables
-  - External Dependencies: PostgreSQL 15+ row-level security support
+  - External Dependencies: PostgreSQL RLS (available since 9.5); PostgreSQL
+    15+ is required only for column-scoped `ON DELETE SET NULL (...)` on
+    composite foreign keys
   - Integration Requirements: Authentication middleware, worker/job payload
     propagation, tracing instrumentation
 
@@ -1633,7 +1635,9 @@ sequenceDiagram
     RepoPort->>PgRepo: find_task_by_issue_ref(ctx_A, issue_ref)
     PgRepo->>DB: SELECT * FROM tasks WHERE tenant_id = tenant_id_A AND issue_ref
     DB-->>PgRepo: task_row_A
-    PgRepo-->>TenantA: task_A
+    PgRepo-->>RepoPort: task_row_A
+    RepoPort-->>Service: task_A
+    Service-->>TenantA: task_A
 
     actor TenantB
     TenantB->>Service: create_task(issue_ref, tenant_id_B)

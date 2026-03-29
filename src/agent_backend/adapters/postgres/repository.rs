@@ -12,7 +12,7 @@ use crate::agent_backend::{
     ports::{BackendRegistryError, BackendRegistryRepository, BackendRegistryResult},
 };
 use crate::context::{RequestContext, TenantId};
-use crate::message::adapters::postgres::tenant_tx::{
+use crate::postgres_support::{
     FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use async_trait::async_trait;
@@ -69,14 +69,14 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let backend_id = registration.id();
         let backend_name = registration.name().clone();
         let new_row = to_new_row(registration, tenant_id)?;
 
         self.run_blocking(move |connection| {
-            ensure_tenant_exists(connection, tenant_id.into_inner())
-                .map_err(BackendRegistryError::persistence)?;
-            with_tenant_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_tx(connection, tenant_uuid, |tx| {
+                ensure_tenant_exists(tx, tenant_uuid).map_err(BackendRegistryError::persistence)?;
                 diesel::insert_into(backend_registrations::table)
                     .values(&new_row)
                     .execute(tx)
@@ -104,15 +104,16 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         registration: &AgentBackendRegistration,
     ) -> BackendRegistryResult<()> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let backend_id = registration.id().into_inner();
         let serialized = serialize_registration_fields(registration)?;
 
         self.run_blocking(move |connection| {
-            with_tenant_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_tx(connection, tenant_uuid, |tx| {
                 let updated_count = diesel::update(
                     backend_registrations::table
                         .filter(backend_registrations::id.eq(backend_id))
-                        .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner())),
+                        .filter(backend_registrations::tenant_id.eq(tenant_uuid)),
                 )
                 .set((
                     backend_registrations::status.eq(&serialized.status),
@@ -140,11 +141,12 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         id: BackendId,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         self.run_blocking(move |connection| {
-            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_read_tx(connection, tenant_uuid, |tx| {
                 let row = backend_registrations::table
                     .filter(backend_registrations::id.eq(id.into_inner()))
-                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::tenant_id.eq(tenant_uuid))
                     .select(BackendRegistrationRow::as_select())
                     .first::<BackendRegistrationRow>(tx)
                     .optional()
@@ -161,11 +163,12 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         name: &BackendName,
     ) -> BackendRegistryResult<Option<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         let name_str = name.as_str().to_owned();
         self.run_blocking(move |connection| {
-            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_read_tx(connection, tenant_uuid, |tx| {
                 let row = backend_registrations::table
-                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::tenant_id.eq(tenant_uuid))
                     .filter(backend_registrations::name.eq(&name_str))
                     .select(BackendRegistrationRow::as_select())
                     .first::<BackendRegistrationRow>(tx)
@@ -182,10 +185,11 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         self.run_blocking(move |connection| {
-            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_read_tx(connection, tenant_uuid, |tx| {
                 let rows = backend_registrations::table
-                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::tenant_id.eq(tenant_uuid))
                     .filter(backend_registrations::status.eq(BackendStatus::Active.as_str()))
                     .select(BackendRegistrationRow::as_select())
                     .load::<BackendRegistrationRow>(tx)
@@ -201,10 +205,11 @@ impl BackendRegistryRepository for PostgresBackendRegistry {
         ctx: &RequestContext,
     ) -> BackendRegistryResult<Vec<AgentBackendRegistration>> {
         let tenant_id = ctx.tenant_id();
+        let tenant_uuid = tenant_id.into_inner();
         self.run_blocking(move |connection| {
-            with_tenant_read_tx(connection, tenant_id.into_inner(), |tx| {
+            with_tenant_read_tx(connection, tenant_uuid, |tx| {
                 let rows = backend_registrations::table
-                    .filter(backend_registrations::tenant_id.eq(tenant_id.into_inner()))
+                    .filter(backend_registrations::tenant_id.eq(tenant_uuid))
                     .select(BackendRegistrationRow::as_select())
                     .load::<BackendRegistrationRow>(tx)
                     .map_err(BackendRegistryError::persistence)?;

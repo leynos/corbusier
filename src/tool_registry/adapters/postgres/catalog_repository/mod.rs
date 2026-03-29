@@ -89,6 +89,22 @@ impl PostgresToolCatalog {
         T: Send + 'static,
     {
         self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
+            with_tenant_tx(conn, tenant.into_inner(), run_query)
+        })
+        .await
+    }
+
+    /// Executes a write query that may create the tenant row before use.
+    async fn execute_query_with_bootstrap<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> ToolCatalogResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
             ensure_tenant_exists(conn, tenant.into_inner())
                 .map_err(|e| ToolCatalogError::persistence("ensure_tenant", e))?;
             with_tenant_tx(conn, tenant.into_inner(), run_query)
@@ -264,7 +280,7 @@ impl PostgresToolCatalog {
         let candidate_names: HashSet<String> =
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
-        self.execute_query(tenant, move |connection| {
+        self.execute_query_with_bootstrap(tenant, move |connection| {
             let existing_name_counts = Self::load_conflicting_name_counts(
                 connection,
                 tenant_id,
@@ -383,7 +399,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let row = audit_to_new_row(record, tid);
-        self.execute_query(tenant_id, move |connection| {
+        self.execute_query_with_bootstrap(tenant_id, move |connection| {
             diesel::insert_into(tool_call_audit_log::table)
                 .values(&row)
                 .execute(connection)

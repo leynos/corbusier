@@ -134,13 +134,14 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
     ) -> SnapshotResult<()> {
         let tenant_id = ctx.tenant_id();
         let pool = self.pool.clone();
-        let new_snapshot = snapshot_to_new_row(snapshot, tenant_id.into_inner())?;
+        let new_snapshot = snapshot_to_new_row(snapshot, tenant_id)?;
         let snapshot_id = snapshot.snapshot_id;
+        let tenant_uuid = tenant_id.into_inner();
 
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SnapshotError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), |tx| {
+                with_tenant_tx(&mut conn, tenant_uuid, |tx| {
                     let inserted = diesel::insert_into(context_snapshots::table)
                         .values(&new_snapshot)
                         .on_conflict(context_snapshots::id)
@@ -206,7 +207,7 @@ impl ContextSnapshotPort for PostgresContextSnapshotAdapter {
 /// Converts a domain `ContextWindowSnapshot` to a `NewContextSnapshot` for insertion.
 fn snapshot_to_new_row(
     snapshot: &ContextWindowSnapshot,
-    tenant_id: uuid::Uuid,
+    tenant_id: TenantId,
 ) -> SnapshotResult<NewContextSnapshot> {
     let message_summary =
         serde_json::to_value(snapshot.message_summary).map_err(SnapshotError::persistence)?;
@@ -228,7 +229,7 @@ fn snapshot_to_new_row(
 
     Ok(NewContextSnapshot {
         id: snapshot.snapshot_id,
-        tenant_id,
+        tenant_id: tenant_id.into_inner(),
         conversation_id: snapshot.conversation_id.into_inner(),
         session_id: snapshot.session_id.into_inner(),
         sequence_start,
