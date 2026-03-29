@@ -18,6 +18,7 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Repo
     .with_conversation_id(conversation_id);
     world.last_request = Some(request.clone());
     world.last_conversation_id = Some(conversation_id);
+    world.last_task_id = None;
     match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
         Ok(result) => {
             world.last_result = Some(result);
@@ -47,6 +48,7 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) -> Result<(), eyre:
     .with_task_id(task_id);
     world.last_request = Some(request.clone());
     world.last_task_id = Some(task_id);
+    world.last_conversation_id = None;
     match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
         Ok(result) => {
             world.last_result = Some(result);
