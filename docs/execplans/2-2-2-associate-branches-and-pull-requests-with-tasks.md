@@ -838,15 +838,11 @@ Prescriptive interfaces for this milestone:
 Domain types (all in `src/task/domain/`):
 
 - `BranchName` — string newtype, validated (non-empty, no colons, ≤200 chars).
-- `BranchRef` — fields:
-  `{ provider: IssueProvider, repository: RepositoryFullName }` plus
-  `branch_name: BranchName`. Canonical format:
-  `"provider:owner/repo:branch-name"`.
+- `BranchRef` — structured value containing `provider`, `repository`, and
+  `branch_name`. Canonical format: `"provider:owner/repo:branch-name"`.
 - `PullRequestNumber` — `u64` newtype, validated (positive, ≤ `i64::MAX`).
-- `PullRequestRef` — fields:
-  `{ provider: IssueProvider, repository: RepositoryFullName }` plus
-  `pull_request_number: PullRequestNumber`. Canonical format:
-  `"provider:owner/repo:42"`.
+- `PullRequestRef` — structured value containing `provider`, `repository`, and
+  `pull_request_number`. Canonical format: `"provider:owner/repo:42"`.
 - `VcsProvider` — type alias for `IssueProvider`.
 
 Port contract extensions (in `src/task/ports/repository.rs`):

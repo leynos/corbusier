@@ -14,7 +14,7 @@ Corbusier's current design positions the platform as the owner of workflow,
 task, conversation, tool, and governance state, with Frankie referenced as a
 review adapter. In practice, the review design text has still treated Frankie
 as a browser-automation-style comment ingester and has folded review handling
-into the generic VCS boundary.
+into the generic version control system (VCS) boundary.
 
 That no longer matches the intended product split. Frankie is moving toward a
 GitHub review adapter and context engine, built around GitHub APIs, local git,
@@ -175,7 +175,7 @@ Wire adapter-backed review workflows
 
 ## Outstanding Decisions
 
-- What opaque checkpoint format Corbusier should persist from Frankie sync
+- What versioned checkpoint envelope Corbusier should persist from Frankie sync
   operations
 - Whether Corbusier should queue outbound replies internally before submission
   or submit immediately after policy approval

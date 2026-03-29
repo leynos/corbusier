@@ -5564,14 +5564,35 @@ CREATE TABLE review_threads (
     pull_request_ref VARCHAR(255) NOT NULL,
     provider VARCHAR(50) NOT NULL,
     external_root_comment_id VARCHAR(255) NOT NULL,
-    thread_status VARCHAR(50) NOT NULL DEFAULT 'open',
+    status VARCHAR(50) NOT NULL DEFAULT 'open',
     anchor JSONB,
     review_state JSONB NOT NULL DEFAULT '{}',
+    -- Versioned provider envelope: {version, provider, payload}.
     last_synced_checkpoint JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT review_threads_status_check CHECK (
+        status IN (
+            'open',
+            'awaiting_agent',
+            'awaiting_reviewer',
+            'resolved',
+            'closed'
+        )
+    ),
+    CONSTRAINT review_threads_checkpoint_shape_check CHECK (
+        last_synced_checkpoint IS NULL
+        OR (
+            jsonb_typeof(last_synced_checkpoint) = 'object'
+            AND last_synced_checkpoint ? 'version'
+            AND last_synced_checkpoint ? 'provider'
+            AND last_synced_checkpoint ? 'payload'
+        )
+    ),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
     UNIQUE (id, tenant_id),
-    UNIQUE (tenant_id, provider, external_root_comment_id),
+    -- Idempotent sync identity: provider-scoped thread root within a PR.
+    UNIQUE (tenant_id, provider, pull_request_ref, external_root_comment_id),
     FOREIGN KEY (task_id, tenant_id) REFERENCES tasks(id, tenant_id),
     FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id)
 );
@@ -5703,7 +5724,7 @@ erDiagram
         varchar pull_request_ref
         varchar provider
         varchar external_root_comment_id
-        varchar thread_status
+        varchar status
         jsonb anchor
         jsonb review_state
         jsonb last_synced_checkpoint
@@ -5804,7 +5825,7 @@ erDiagram
         varchar pull_request_ref
         varchar provider
         varchar external_root_comment_id
-        varchar thread_status
+        varchar status
         jsonb anchor
         jsonb review_state
         jsonb last_synced_checkpoint
@@ -6118,6 +6139,12 @@ pub struct ReviewAnchor {
     pub diff_hunk: Option<String>,
 }
 
+pub struct ReviewSyncCheckpointEnvelope {
+    pub version: u16,
+    pub provider: String,
+    pub payload: serde_json::Value,
+}
+
 pub struct ReviewThread {
     pub thread_root_id: ExternalCommentId,
     pub pull_request_ref: PullRequestRef,
@@ -6125,7 +6152,7 @@ pub struct ReviewThread {
     pub anchor: Option<ReviewAnchor>,
     pub verification_status: VerificationStatus,
     pub pending_reply: Option<ReplyDraft>,
-    pub last_synced_checkpoint: Option<ReviewSyncCheckpoint>,
+    pub last_synced_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
 }
 
 #[async_trait::async_trait]
@@ -6182,7 +6209,7 @@ classDiagram
         +ReviewThreadStatus status
         +ReviewAnchorDto anchor
         +ReviewWorkflowProjection projection
-        +Value last_checkpoint
+        +ReviewSyncCheckpointEnvelope last_checkpoint
         +DateTime_Utc created_at
         +DateTime_Utc updated_at
     }
@@ -6223,7 +6250,7 @@ classDiagram
         +ReviewAnchor anchor
         +VerificationStatus verification_status
         +ReplyDraft pending_reply
-        +ReviewSyncCheckpoint last_synced_checkpoint
+        +ReviewSyncCheckpointEnvelope last_synced_checkpoint
     }
 
     class ReviewIntakePort {
@@ -6271,6 +6298,19 @@ Frankie's raw comment payload losslessly, derive anchors only when metadata is
 complete enough to support time travel or verification, and treat
 `in_reply_to_id.unwrap_or(id)` as the stable thread root when Frankie does not
 yet expose a richer thread aggregate directly.
+
+The durable storage contract should align SQL and Rust terminology around
+`status`. The database should enforce the same snake_case values used by
+`ReviewThreadStatus`, and the review-thread root should remain unique within a
+tenant, provider, and pull request. `UNIQUE (id, tenant_id)` stays in place as
+the composite foreign-key target for tenant-safe child tables, while
+`UNIQUE (tenant_id, provider, pull_request_ref, external_root_comment_id)`
+captures the domain identity of a synchronized review thread.
+
+Sync checkpoints should not remain an opaque blob. Corbusier should persist a
+versioned provider envelope such as `{version, provider, payload}` in
+`last_synced_checkpoint`, letting Frankie evolve its internal checkpoint
+payload without losing migration safety or debuggability.
 
 Task state remains intentionally coarse. `TaskState::InReview` signals that a
 task is in the review phase, while a sibling review projection keyed by tenant,
@@ -7465,7 +7505,7 @@ level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
 | tasks                 | B-tree     | (tenant_id, state, created_at)                | Task filtering and sorting          |
 | tasks                 | B-tree     | (tenant_id, branch_ref)                       | Branch association lookup           |
 | tasks                 | B-tree     | (tenant_id, pull_request_ref)                 | Pull request lookup                 |
-| review_threads        | B-tree     | (tenant_id, pull_request_ref, thread_status)  | Open-thread lookup per pull request |
+| review_threads        | B-tree     | (tenant_id, pull_request_ref, status)         | Open-thread lookup per pull request |
 | review_comments       | B-tree     | (tenant_id, external_comment_id)              | Idempotent sync and reply mapping   |
 | backend_registrations | B-tree     | (tenant_id, name)                             | Per-tenant backend uniqueness       |
 
@@ -7497,7 +7537,7 @@ CREATE INDEX idx_tasks_tenant_branch_ref
 CREATE INDEX idx_tasks_tenant_pull_request_ref
     ON tasks (tenant_id, pull_request_ref) WHERE pull_request_ref IS NOT NULL;
 CREATE INDEX idx_review_threads_tenant_pr_status
-    ON review_threads (tenant_id, pull_request_ref, thread_status);
+    ON review_threads (tenant_id, pull_request_ref, status);
 CREATE INDEX idx_review_comments_tenant_external_comment
     ON review_comments (tenant_id, external_comment_id);
 

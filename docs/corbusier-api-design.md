@@ -406,6 +406,23 @@ use serde_json::Value;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewThreadStatus {
+    Open,
+    AwaitingAgent,
+    AwaitingReviewer,
+    Resolved,
+    Closed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewSyncCheckpointEnvelope {
+    pub version: u16,
+    pub provider: String,
+    pub payload: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewThreadAggregate {
     pub id: Uuid,
     pub tenant_id: Uuid,
@@ -417,7 +434,7 @@ pub struct ReviewThreadAggregate {
     pub status: ReviewThreadStatus,
     pub anchor: Option<ReviewAnchorDto>,
     pub projection: ReviewWorkflowProjection,
-    pub last_checkpoint: Option<Value>,
+    pub last_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -436,6 +453,16 @@ pub struct ReviewWorkflowProjection {
 - Corbusier owns the canonical review workflow projection and its durability.
 - Frankie remains an adapter for GitHub review sync, context materialization,
   verification, and reply submission.
+- The durable thread identity is tenant-scoped and provider-scoped:
+  `(tenant_id, provider, pull_request_ref, external_root_comment_id)` must be
+  unique even though the storage model also keeps `(id, tenant_id)` available
+  for composite foreign keys.
+- Persistent review-thread status values must use the same snake_case enum
+  vocabulary in SQL and Rust: `open`, `awaiting_agent`, `awaiting_reviewer`,
+  `resolved`, and `closed`.
+- Sync checkpoints must be stored as a versioned provider envelope rather than
+  an unstructured JSON blob so migrations and sync debugging can reason about
+  the provider payload shape.
 - Review-linked conversation messages must preserve structured linkage in
   `MessageMetadata.extensions` rather than flattening anchor metadata into free
   text.

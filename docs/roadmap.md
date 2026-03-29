@@ -589,6 +589,9 @@ enforcement.
   - [ ] Persist tenant-scoped review threads, raw comments, sync checkpoints,
     and verification results keyed by pull request and thread root. See
     corbusier-design.md §6.2.1.
+  - [ ] Enforce review-thread idempotency with a tenant- and provider-scoped
+    uniqueness key over `(pull_request_ref, external_root_comment_id)` rather
+    than thread root alone. See corbusier-design.md §6.2.1.
   - [ ] Preserve Frankie raw comment payloads losslessly and derive actionable
     review anchors only when commit, file, and line metadata are present. See
     corbusier-design.md §6.3.2.
