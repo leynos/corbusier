@@ -10,6 +10,12 @@ use corbusier::tool_registry::services::ToolDiscoveryRoutingServiceError;
 use rstest_bdd_macros::when;
 use serde_json::json;
 
+const TEST_TOOL_NAME: &str = "read_file";
+
+fn test_tool_params() -> serde_json::Value {
+    json!({"path": "/tmp/test.txt"})
+}
+
 fn store_tool_call_outcome(
     world: &mut HookPolicyWorld,
     outcome: Result<ToolCallResult, ToolDiscoveryRoutingServiceError>,
@@ -28,12 +34,8 @@ fn store_tool_call_outcome(
 
 fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     let conversation_id = ConversationId::new();
-    let request = ToolCallRequest::new(
-        "read_file",
-        json!({"path": "/tmp/test.txt"}),
-        &mockable::DefaultClock,
-    )
-    .with_conversation_id(conversation_id);
+    let request = ToolCallRequest::new(TEST_TOOL_NAME, test_tool_params(), &mockable::DefaultClock)
+        .with_conversation_id(conversation_id);
     world.last_request = Some(request.clone());
     world.last_conversation_id = Some(conversation_id);
     world.last_task_id = None;
@@ -52,12 +54,8 @@ fn tool_call_executes_with_conversation(world: &mut HookPolicyWorld) -> Result<(
 #[when("a tool call executes with task tracking")]
 fn tool_call_executes_with_task(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     let task_id = TaskId::new();
-    let request = ToolCallRequest::new(
-        "read_file",
-        json!({"path": "/tmp/test.txt"}),
-        &mockable::DefaultClock,
-    )
-    .with_task_id(task_id);
+    let request = ToolCallRequest::new(TEST_TOOL_NAME, test_tool_params(), &mockable::DefaultClock)
+        .with_task_id(task_id);
     world.last_request = Some(request.clone());
     world.last_task_id = Some(task_id);
     world.last_conversation_id = None;
