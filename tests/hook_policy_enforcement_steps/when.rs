@@ -5,8 +5,26 @@ use super::world::HookPolicyWorld;
 use corbusier::message::domain::ConversationId;
 use corbusier::task::domain::TaskId;
 use corbusier::tool_registry::domain::ToolCallRequest;
+use corbusier::tool_registry::domain::ToolCallResult;
+use corbusier::tool_registry::services::ToolDiscoveryRoutingServiceError;
 use rstest_bdd_macros::when;
 use serde_json::json;
+
+fn store_tool_call_outcome(
+    world: &mut HookPolicyWorld,
+    outcome: Result<ToolCallResult, ToolDiscoveryRoutingServiceError>,
+) {
+    match outcome {
+        Ok(result) => {
+            world.last_result = Some(result);
+            world.last_error = None;
+        }
+        Err(err) => {
+            world.last_error = Some(err);
+            world.last_result = None;
+        }
+    }
+}
 
 fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Report> {
     let conversation_id = ConversationId::new();
@@ -19,16 +37,10 @@ fn run_tool_call_for_world(world: &mut HookPolicyWorld) -> Result<(), eyre::Repo
     world.last_request = Some(request.clone());
     world.last_conversation_id = Some(conversation_id);
     world.last_task_id = None;
-    match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
-        Ok(result) => {
-            world.last_result = Some(result);
-            world.last_error = None;
-        }
-        Err(err) => {
-            world.last_error = Some(err);
-            world.last_result = None;
-        }
-    }
+    store_tool_call_outcome(
+        world,
+        run_async(world.discovery.call_tool(&world.request_ctx, &request))?,
+    );
     Ok(())
 }
 
@@ -49,16 +61,10 @@ fn tool_call_executes_with_task(world: &mut HookPolicyWorld) -> Result<(), eyre:
     world.last_request = Some(request.clone());
     world.last_task_id = Some(task_id);
     world.last_conversation_id = None;
-    match run_async(world.discovery.call_tool(&world.request_ctx, &request))? {
-        Ok(result) => {
-            world.last_result = Some(result);
-            world.last_error = None;
-        }
-        Err(err) => {
-            world.last_error = Some(err);
-            world.last_result = None;
-        }
-    }
+    store_tool_call_outcome(
+        world,
+        run_async(world.discovery.call_tool(&world.request_ctx, &request))?,
+    );
     Ok(())
 }
 
