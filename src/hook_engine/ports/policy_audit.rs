@@ -11,6 +11,7 @@ use thiserror::Error;
 pub type HookPolicyAuditResult<T> = Result<T, HookPolicyAuditError>;
 
 /// Hook-owned persistence and query contract for policy audit events.
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HookPolicyAuditRepository: Send + Sync {
     /// Stores a policy audit event projection.

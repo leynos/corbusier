@@ -5,18 +5,16 @@ use super::common::{
     request_ctx, setup_deny_policy_hook, setup_failing_post_deploy_hook,
     setup_invalid_post_deploy_policy_hook,
 };
-use crate::context::RequestContext;
 use crate::hook_engine::domain::{
     HookExecutionScope, HookExecutionStatus, HookTriggerContext, HookTriggerType,
 };
 use crate::hook_engine::ports::{
     HookEngine, HookEngineError, HookExecutionLogRepository, HookPolicyAuditError,
-    HookPolicyAuditRepository,
+    HookPolicyAuditRepository, policy_audit::MockHookPolicyAuditRepository,
 };
 use crate::hook_engine::services::{HookEngineService, HookEngineServiceDeps};
 use crate::message::domain::ConversationId;
 use crate::task::domain::TaskId;
-use async_trait::async_trait;
 use eyre::Result;
 use mockable::DefaultClock;
 use std::sync::Arc;
@@ -124,7 +122,24 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
 
     setup_failing_post_deploy_hook(&ctx, &definition_repo, &action_executor).await?;
 
-    let failing_policy_audit = FailingPolicyAuditRepository::new(policy_audit.clone());
+    let mut failing_policy_audit = MockHookPolicyAuditRepository::new();
+    failing_policy_audit
+        .expect_store()
+        .once()
+        .returning(|_, _| {
+            Err(HookPolicyAuditError::persistence_failed(
+                std::io::Error::other("mock"),
+            ))
+        });
+    failing_policy_audit
+        .expect_find_by_task()
+        .returning(|_, _| Ok(vec![]));
+    failing_policy_audit
+        .expect_find_by_conversation()
+        .returning(|_, _| Ok(vec![]));
+    failing_policy_audit
+        .expect_find_by_trigger_context()
+        .returning(|_, _| Ok(vec![]));
     let service = HookEngineService::new(HookEngineServiceDeps {
         definition_repository: Arc::new(definition_repo.clone()),
         action_executor: Arc::new(action_executor.clone()),
@@ -157,57 +172,4 @@ async fn policy_audit_persistence_error_surfaces_without_persisting_events(
         .expect("querying stored execution results should succeed");
     assert_eq!(executions.len(), 1, "expected a single stored execution");
     Ok(())
-}
-
-#[derive(Clone, Debug)]
-struct FailingPolicyAuditRepository<R> {
-    inner: R,
-}
-
-impl<R> FailingPolicyAuditRepository<R> {
-    fn new(inner: R) -> Self {
-        Self { inner }
-    }
-}
-
-#[async_trait]
-impl<R> HookPolicyAuditRepository for FailingPolicyAuditRepository<R>
-where
-    R: HookPolicyAuditRepository + Send + Sync,
-{
-    async fn store(
-        &self,
-        _ctx: &RequestContext,
-        _event: &crate::hook_engine::domain::PolicyAuditEvent,
-    ) -> Result<(), HookPolicyAuditError> {
-        Err(HookPolicyAuditError::persistence_failed(
-            std::io::Error::other("failing test repository"),
-        ))
-    }
-
-    async fn find_by_task(
-        &self,
-        ctx: &RequestContext,
-        task_id: TaskId,
-    ) -> Result<Vec<crate::hook_engine::domain::PolicyAuditEvent>, HookPolicyAuditError> {
-        self.inner.find_by_task(ctx, task_id).await
-    }
-
-    async fn find_by_conversation(
-        &self,
-        ctx: &RequestContext,
-        conversation_id: ConversationId,
-    ) -> Result<Vec<crate::hook_engine::domain::PolicyAuditEvent>, HookPolicyAuditError> {
-        self.inner.find_by_conversation(ctx, conversation_id).await
-    }
-
-    async fn find_by_trigger_context(
-        &self,
-        ctx: &RequestContext,
-        trigger_context_id: crate::hook_engine::domain::TriggerContextId,
-    ) -> Result<Vec<crate::hook_engine::domain::PolicyAuditEvent>, HookPolicyAuditError> {
-        self.inner
-            .find_by_trigger_context(ctx, trigger_context_id)
-            .await
-    }
 }
