@@ -29,15 +29,16 @@ async fn store_adds_message_to_repository(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message = make_message(conversation_id, 1, &clock);
+    let message = make_message(conversation_id, 1, &clock)?;
 
     let result = repo.store(&ctx, &message).await;
 
     assert!(result.is_ok());
     assert_eq!(repo.len(), 1);
     assert!(!repo.is_empty());
+    Ok(())
 }
 
 #[rstest]
@@ -46,9 +47,9 @@ async fn store_rejects_duplicate_message_id(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message = make_message(conversation_id, 1, &clock);
+    let message = make_message(conversation_id, 1, &clock)?;
     let id = message.id();
 
     repo.store(&ctx, &message).await.expect("first store");
@@ -62,6 +63,7 @@ async fn store_rejects_duplicate_message_id(
     assert!(repo.exists(&ctx, id).await.expect("exists"));
     let found = repo.find_by_id(&ctx, id).await.expect("find_by_id");
     assert_eq!(found.expect("message should remain stored").id(), id);
+    Ok(())
 }
 
 #[rstest]
@@ -70,10 +72,10 @@ async fn store_rejects_duplicate_sequence_number(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message1 = make_message(conversation_id, 1, &clock);
-    let message2 = make_message(conversation_id, 1, &clock);
+    let message1 = make_message(conversation_id, 1, &clock)?;
+    let message2 = make_message(conversation_id, 1, &clock)?;
 
     repo.store(&ctx, &message1).await.expect("first store");
 
@@ -83,6 +85,7 @@ async fn store_rejects_duplicate_sequence_number(
         matches!(result, Err(RepositoryError::DuplicateSequence { conversation_id: cid, sequence })
             if cid == conversation_id && sequence.value() == 1)
     );
+    Ok(())
 }
 
 #[rstest]
@@ -91,13 +94,14 @@ async fn store_allows_different_message_ids(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message1 = make_message(conversation_id, 1, &clock);
-    let message2 = make_message(conversation_id, 2, &clock);
+    let message1 = make_message(conversation_id, 1, &clock)?;
+    let message2 = make_message(conversation_id, 2, &clock)?;
 
     repo.store(&ctx, &message1).await.expect("store message 1");
     repo.store(&ctx, &message2).await.expect("store message 2");
 
     assert_eq!(repo.len(), 2);
+    Ok(())
 }

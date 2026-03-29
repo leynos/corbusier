@@ -69,10 +69,7 @@ fn initiate_handoff_requires_active_session() {
     );
     let result = runtime.block_on(async { service.initiate(&ctx, params).await });
 
-    assert!(result.is_err());
-    let Err(err) = result else {
-        panic!("expected handoff initiation to fail");
-    };
+    let err = result.expect_err("expected handoff initiation to fail");
     assert!(matches!(err, HandoffError::SessionNotFound(_)));
 }
 

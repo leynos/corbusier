@@ -155,12 +155,15 @@ fn agent_session_record_turns(clock: DefaultClock) {
 
 #[rstest]
 fn agent_session_state_serialization() {
-    assert!(matches!(
-        serde_json::to_string(&AgentSessionState::Active),
-        Ok(ref value) if value == "\"active\""
-    ));
-    assert!(matches!(
-        serde_json::to_string(&AgentSessionState::HandedOff),
-        Ok(ref value) if value == "\"handed_off\""
-    ));
+    let active_result = serde_json::to_string(&AgentSessionState::Active);
+    let Ok(active) = active_result else {
+        panic!("expected active state to serialize: {active_result:?}");
+    };
+    assert_eq!(active, "\"active\"");
+
+    let handed_off_result = serde_json::to_string(&AgentSessionState::HandedOff);
+    let Ok(handed_off) = handed_off_result else {
+        panic!("expected handed-off state to serialize: {handed_off_result:?}");
+    };
+    assert_eq!(handed_off, "\"handed_off\"");
 }

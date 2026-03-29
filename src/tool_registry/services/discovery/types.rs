@@ -45,11 +45,15 @@ pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
     /// Catalog repository.
     pub catalog: Arc<Cat>,
     /// Server registry.
+
     pub registry: Arc<Reg>,
     /// Server host.
+
     pub host: Arc<H>,
     /// Tool execution governance.
+
     pub governance: Arc<Gov>,
     /// Log store.
+
     pub log_store: Arc<Log>,
 }

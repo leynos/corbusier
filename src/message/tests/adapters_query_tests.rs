@@ -16,9 +16,9 @@ async fn find_by_id_returns_stored_message(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message = make_message(conversation_id, 1, &clock);
+    let message = make_message(conversation_id, 1, &clock)?;
     let id = message.id();
 
     repo.store(&ctx, &message).await.expect("store");
@@ -26,6 +26,7 @@ async fn find_by_id_returns_stored_message(
     let result = repo.find_by_id(&ctx, id).await.expect("find_by_id");
     let found = result.expect("message should exist");
     assert_eq!(found.id(), id);
+    Ok(())
 }
 
 #[rstest]
@@ -47,11 +48,11 @@ async fn find_by_conversation_returns_messages_in_order(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
-    let message3 = make_message(conversation_id, 3, &clock);
-    let message1 = make_message(conversation_id, 1, &clock);
-    let message2 = make_message(conversation_id, 2, &clock);
+    let message3 = make_message(conversation_id, 3, &clock)?;
+    let message1 = make_message(conversation_id, 1, &clock)?;
+    let message2 = make_message(conversation_id, 2, &clock)?;
 
     repo.store(&ctx, &message3).await.expect("store 3");
     repo.store(&ctx, &message1).await.expect("store 1");
@@ -68,6 +69,7 @@ async fn find_by_conversation_returns_messages_in_order(
         .map(|message| message.sequence_number().value())
         .collect();
     assert_eq!(seq_values, vec![1, 2, 3]);
+    Ok(())
 }
 
 #[rstest]
@@ -76,13 +78,13 @@ async fn find_by_conversation_filters_by_conversation(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_a = ConversationId::new();
     let conversation_b = ConversationId::new();
 
-    let msg_a1 = make_message(conversation_a, 1, &clock);
-    let msg_a2 = make_message(conversation_a, 2, &clock);
-    let msg_b1 = make_message(conversation_b, 1, &clock);
+    let msg_a1 = make_message(conversation_a, 1, &clock)?;
+    let msg_a2 = make_message(conversation_a, 2, &clock)?;
+    let msg_b1 = make_message(conversation_b, 1, &clock)?;
 
     repo.store(&ctx, &msg_a1).await.expect("store a1");
     repo.store(&ctx, &msg_a2).await.expect("store a2");
@@ -99,6 +101,7 @@ async fn find_by_conversation_filters_by_conversation(
 
     assert_eq!(messages_a.len(), 2);
     assert_eq!(messages_b.len(), 1);
+    Ok(())
 }
 
 #[rstest]
@@ -137,11 +140,11 @@ async fn next_sequence_number_returns_max_plus_one(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_id = ConversationId::new();
 
-    let msg1 = make_message(conversation_id, 5, &clock);
-    let msg2 = make_message(conversation_id, 10, &clock);
+    let msg1 = make_message(conversation_id, 5, &clock)?;
+    let msg2 = make_message(conversation_id, 10, &clock)?;
 
     repo.store(&ctx, &msg1).await.expect("store 1");
     repo.store(&ctx, &msg2).await.expect("store 2");
@@ -152,6 +155,7 @@ async fn next_sequence_number_returns_max_plus_one(
         .expect("next_sequence_number");
 
     assert_eq!(next.value(), 11);
+    Ok(())
 }
 
 #[rstest]
@@ -160,11 +164,11 @@ async fn next_sequence_number_is_per_conversation(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let conversation_a = ConversationId::new();
     let conversation_b = ConversationId::new();
 
-    let msg_a = make_message(conversation_a, 100, &clock);
+    let msg_a = make_message(conversation_a, 100, &clock)?;
     repo.store(&ctx, &msg_a).await.expect("store a");
 
     let next_a = repo
@@ -178,6 +182,7 @@ async fn next_sequence_number_is_per_conversation(
 
     assert_eq!(next_a.value(), 101);
     assert_eq!(next_b.value(), 1);
+    Ok(())
 }
 
 #[rstest]
@@ -186,14 +191,15 @@ async fn exists_returns_true_for_stored_message(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
-    let message = make_message(ConversationId::new(), 1, &clock);
+) -> Result<(), crate::message::domain::MessageBuilderError> {
+    let message = make_message(ConversationId::new(), 1, &clock)?;
     let id = message.id();
 
     repo.store(&ctx, &message).await.expect("store");
 
     let exists = repo.exists(&ctx, id).await.expect("exists");
     assert!(exists);
+    Ok(())
 }
 
 #[rstest]
@@ -209,17 +215,18 @@ async fn len_tracks_message_count(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     assert_eq!(repo.len(), 0);
 
-    let msg1 = make_message(ConversationId::new(), 1, &clock);
-    let msg2 = make_message(ConversationId::new(), 2, &clock);
+    let msg1 = make_message(ConversationId::new(), 1, &clock)?;
+    let msg2 = make_message(ConversationId::new(), 2, &clock)?;
 
     repo.store(&ctx, &msg1).await.expect("store 1");
     assert_eq!(repo.len(), 1);
 
     repo.store(&ctx, &msg2).await.expect("store 2");
     assert_eq!(repo.len(), 2);
+    Ok(())
 }
 
 #[rstest]
@@ -228,26 +235,31 @@ async fn is_empty_reflects_repository_state(
     repo: InMemoryMessageRepository,
     clock: DefaultClock,
     ctx: RequestContext,
-) {
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     assert!(repo.is_empty());
 
-    let message = make_message(ConversationId::new(), 1, &clock);
+    let message = make_message(ConversationId::new(), 1, &clock)?;
     repo.store(&ctx, &message).await.expect("store");
 
     assert!(!repo.is_empty());
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test]
-async fn cloned_repository_shares_state(clock: DefaultClock, ctx: RequestContext) {
+async fn cloned_repository_shares_state(
+    clock: DefaultClock,
+    ctx: RequestContext,
+) -> Result<(), crate::message::domain::MessageBuilderError> {
     let repo1 = InMemoryMessageRepository::new();
     let repo2 = repo1.clone();
 
-    let message = make_message(ConversationId::new(), 1, &clock);
+    let message = make_message(ConversationId::new(), 1, &clock)?;
 
     repo1.store(&ctx, &message).await.expect("store via repo1");
 
     assert_eq!(repo2.len(), 1);
     let found = repo2.find_by_id(&ctx, message.id()).await.expect("find");
     assert!(found.is_some());
+    Ok(())
 }

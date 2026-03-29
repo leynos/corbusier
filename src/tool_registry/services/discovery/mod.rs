@@ -189,6 +189,8 @@ where
         self.execute_and_audit(ctx, request, &entry).await
     }
 
+<<<<<<< ours — function `resolve_and_validate` (T+S, confidence: medium)
+// hint: Renamed and reformatted. Prefer the structural change, verify formatting.
     async fn resolve_and_validate(
         &self,
         ctx: &RequestContext,
@@ -224,11 +226,53 @@ where
             }
         };
 
+    /// Resolves a tool from the catalog, checks availability, validates
+    /// parameters, and enforces policy. On failure returns the catalog
+    /// entry (if resolved) alongside the error for audit purposes.
+    async fn resolve_and_validate(
+        &self,
+        ctx: &RequestContext,
+        request: &ToolCallRequest,
+    ) -> Result<CatalogEntry, (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError)> {
+        let entries = match self
+            .catalog
+            .find_by_tool_name(ctx, request.tool_name())
+            .await
+        {
+            Ok(e) => e,
+            Err(err) => return Err((None, err.into())),
+        };
+
+        let entry = match entries.len() {
+            0 => {
+                let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
+                return Err((None, err.into()));
+            }
+            1 => {
+                // INVARIANT: `into_iter().next()` always yields `Some`
+                // when `len() == 1`, so the `else` branch is
+                // structurally unreachable.
+                let Some(entry) = entries.into_iter().next() else {
+                    let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
+                    return Err((None, err.into()));
+                };
+                entry
+            }
+            n => {
+                let err = ToolRegistryDomainError::AmbiguousToolName {
+                    tool_name: request.tool_name().to_owned(),
+                    server_count: n,
+                };
+                return Err((None, err.into()));
+            }
+        };
+
         if let Err(err) = self.validate_entry(ctx, &entry, request).await {
             return Err((Some(entry), err));
         }
         Ok(entry)
     }
+>>>>>>> theirs — function `resolve_and_validate` (T+S, confidence: medium)
 
     async fn set_tools_availability(
         &self,

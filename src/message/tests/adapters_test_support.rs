@@ -3,7 +3,9 @@
 use crate::context::{CorrelationId, RequestContext, SessionId, TenantId, UserId};
 use crate::message::{
     adapters::memory::InMemoryMessageRepository,
-    domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
+    domain::{
+        ContentPart, ConversationId, Message, MessageBuilderError, Role, SequenceNumber, TextPart,
+    },
 };
 use mockable::DefaultClock;
 use rstest::fixture;
@@ -32,7 +34,7 @@ pub(super) fn make_message(
     conversation_id: ConversationId,
     seq: u64,
     clock: &DefaultClock,
-) -> Message {
+) -> Result<Message, MessageBuilderError> {
     Message::new(
         conversation_id,
         Role::User,
@@ -40,5 +42,4 @@ pub(super) fn make_message(
         SequenceNumber::new(seq),
         clock,
     )
-    .expect("valid message")
 }
