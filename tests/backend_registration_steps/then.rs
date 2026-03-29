@@ -70,6 +70,25 @@ fn all_listing_includes(world: &mut BackendWorld, name: String) -> Result<(), ey
 
 #[then("both tenants successfully register distinct backends with that name")]
 fn both_tenants_register_distinct_backends(world: &BackendWorld) -> Result<(), eyre::Report> {
+    let (tenant_a, tenant_b) = extract_two_registered(world)?;
+
+    if tenant_a.id() == tenant_b.id() {
+        return Err(eyre::eyre!(
+            "tenant registrations must produce distinct IDs"
+        ));
+    }
+    Ok(())
+}
+
+fn extract_two_registered(
+    world: &BackendWorld,
+) -> Result<
+    (
+        &corbusier::agent_backend::domain::AgentBackendRegistration,
+        &corbusier::agent_backend::domain::AgentBackendRegistration,
+    ),
+    eyre::Report,
+> {
     let tenant_a = world
         .last_registered
         .as_ref()
@@ -80,13 +99,7 @@ fn both_tenants_register_distinct_backends(world: &BackendWorld) -> Result<(), e
         .ok_or_else(|| eyre::eyre!("tenant B registration result is missing"))?
         .as_ref()
         .map_err(|err| eyre::eyre!("tenant B registration failed: {err}"))?;
-
-    if tenant_a.id() == tenant_b.id() {
-        return Err(eyre::eyre!(
-            "tenant registrations must produce distinct IDs"
-        ));
-    }
-    Ok(())
+    Ok((tenant_a, tenant_b))
 }
 
 fn lookup_backend_by_name(
@@ -111,6 +124,29 @@ fn assert_backend_id_matches(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "BDD helper compares two tenant-scoped lookups against explicit expectations."
+)]
+fn assert_backends_by_name(
+    service: &super::world::TestRegistryService,
+    ctx_a: &corbusier::context::RequestContext,
+    ctx_b: &corbusier::context::RequestContext,
+    name: &str,
+    expected_a: &corbusier::agent_backend::domain::AgentBackendRegistration,
+    expected_b: &corbusier::agent_backend::domain::AgentBackendRegistration,
+) -> Result<(), eyre::Report> {
+    let found_a = lookup_backend_by_name(service, ctx_a, name, "tenant A")?;
+    let found_b = lookup_backend_by_name(service, ctx_b, name, "tenant B")?;
+
+    assert_backend_id_matches(&found_a, expected_a, "tenant A")?;
+    assert_backend_id_matches(&found_b, expected_b, "tenant B")?;
+    if found_a.id() == found_b.id() {
+        return Err(eyre::eyre!("tenant lookups must return distinct backends"));
+    }
+    Ok(())
+}
+
 #[then("each tenant can find its own backend by name")]
 fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Report> {
     let pending = world
@@ -121,25 +157,13 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
         .last_registered
         .as_ref()
         .ok_or_else(|| eyre::eyre!("tenant A expected backend is missing"))?;
-    let expected_b = match world
-        .other_register_result
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("tenant B registration result is missing"))?
-    {
-        Ok(registration) => registration,
-        Err(err) => return Err(eyre::eyre!("tenant B registration failed: {err}")),
-    };
-    if world.other_registered.is_none() {
-        return Err(eyre::eyre!("tenant B expected backend is missing"));
-    }
-    let found_a = lookup_backend_by_name(&world.service, &world.ctx, &pending.name, "tenant A")?;
-    let found_b =
-        lookup_backend_by_name(&world.service, &world.other_ctx, &pending.name, "tenant B")?;
-
-    assert_backend_id_matches(&found_a, expected_a, "tenant A")?;
-    assert_backend_id_matches(&found_b, expected_b, "tenant B")?;
-    if found_a.id() == found_b.id() {
-        return Err(eyre::eyre!("tenant lookups must return distinct backends"));
-    }
-    Ok(())
+    let (_, expected_b) = extract_two_registered(world)?;
+    assert_backends_by_name(
+        &world.service,
+        &world.ctx,
+        &world.other_ctx,
+        &pending.name,
+        expected_a,
+        expected_b,
+    )
 }

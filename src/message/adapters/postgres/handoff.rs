@@ -62,6 +62,37 @@ impl PostgresHandoffAdapter {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Combines bootstrap control and transaction wrapper in one handoff helper."
+    )]
+    async fn execute_impl<TxWrap, F, T>(
+        &self,
+        tenant_id: TenantId,
+        bootstrap: bool,
+        tx_wrap: TxWrap,
+        query_fn: F,
+    ) -> HandoffResult<T>
+    where
+        TxWrap: FnOnce(&mut PgConnection, uuid::Uuid, F) -> HandoffResult<T> + Send + 'static,
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
+                if bootstrap {
+                    ensure_tenant_exists(&mut conn, tenant_id.into_inner())
+                        .map_err(HandoffError::persistence)?;
+                }
+                tx_wrap(&mut conn, tenant_id.into_inner(), query_fn)
+            },
+            HandoffError::persistence,
+        )
+        .await
+    }
+
     /// Executes a write query that may create the tenant row before use.
     async fn execute_query_with_bootstrap<F, T>(
         &self,
@@ -72,18 +103,8 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                    .map_err(HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            HandoffError::persistence,
-        )
-        .await
+        self.execute_impl(tenant_id, true, with_tenant_tx, query_fn)
+            .await
     }
 
     /// Executes a write query inside a transaction with tenant context.
@@ -92,16 +113,8 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            HandoffError::persistence,
-        )
-        .await
+        self.execute_impl(tenant_id, false, with_tenant_tx, query_fn)
+            .await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -110,16 +123,8 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
-
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            HandoffError::persistence,
-        )
-        .await
+        self.execute_impl(tenant_id, false, with_tenant_read_tx, query_fn)
+            .await
     }
 }
 
@@ -174,15 +179,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         self.execute_query(tenant_id, move |conn| {
             // Lock the row for the duration of the transaction to
             // prevent concurrent state transitions from interleaving.
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .for_update()
-                .first::<HandoffRow>(conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+            let row = lock_handoff_row(conn, handoff_id, tenant_id)?;
 
             let mut handoff = row_to_handoff(row)?;
 
@@ -226,15 +223,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         self.execute_query(tenant_id, move |conn| {
             // Lock the row for the duration of the transaction to
             // prevent concurrent state transitions from interleaving.
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .for_update()
-                .first::<HandoffRow>(conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+            let row = lock_handoff_row(conn, handoff_id, tenant_id)?;
 
             let status =
                 HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
@@ -358,4 +347,20 @@ fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
         completed_at: row.completed_at,
         status,
     })
+}
+
+fn lock_handoff_row(
+    conn: &mut PgConnection,
+    handoff_id: HandoffId,
+    tenant_id: TenantId,
+) -> HandoffResult<HandoffRow> {
+    handoffs::table
+        .filter(handoffs::id.eq(handoff_id.into_inner()))
+        .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
+        .select(HandoffRow::as_select())
+        .for_update()
+        .first::<HandoffRow>(conn)
+        .optional()
+        .map_err(HandoffError::persistence)?
+        .ok_or(HandoffError::NotFound(handoff_id))
 }

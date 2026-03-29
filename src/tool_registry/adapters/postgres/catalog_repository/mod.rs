@@ -4,6 +4,7 @@
 //! a `PostgreSQL` session variable scoped to the current transaction.
 
 mod audit_helpers;
+mod catalog_exec;
 mod mappers;
 
 use super::{
@@ -12,10 +13,7 @@ use super::{
     repository::McpServerPgPool,
 };
 use crate::context::{RequestContext, TenantId};
-use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
-use crate::message::adapters::postgres::tenant_tx::{
-    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
-};
+use crate::postgres_support::{FromTxError, TxError};
 use crate::tool_registry::{
     domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
@@ -27,6 +25,7 @@ use diesel::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use self::audit_helpers::audit_to_new_row;
+use self::catalog_exec::{execute_query, execute_query_with_bootstrap, execute_read_query};
 use self::mappers::{entry_to_new_row, row_to_entry};
 
 // ---------------------------------------------------------------------------
@@ -59,39 +58,13 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    async fn execute_impl<F, T, W>(
-        &self,
-        tenant_id: TenantId,
-        query_fn: F,
-        execute: W,
-    ) -> ToolCatalogResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
-        T: Send + 'static,
-        W: FnOnce(&mut PgConnection, TenantId, F) -> ToolCatalogResult<T> + Send + 'static,
-    {
-        let pool = self.pool.clone();
-        run_blocking_with(
-            move || {
-                let mut conn =
-                    get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
-                execute(&mut conn, tenant_id, query_fn)
-            },
-            |e| ToolCatalogError::persistence("spawn_blocking", e),
-        )
-        .await
-    }
-
     /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
     where
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
-            with_tenant_tx(conn, tenant.into_inner(), run_query)
-        })
-        .await
+        execute_query(&self.pool, tenant_id, query_fn).await
     }
 
     /// Executes a write query that may create the tenant row before use.
@@ -104,12 +77,7 @@ impl PostgresToolCatalog {
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
-            ensure_tenant_exists(conn, tenant.into_inner())
-                .map_err(|e| ToolCatalogError::persistence("ensure_tenant", e))?;
-            with_tenant_tx(conn, tenant.into_inner(), run_query)
-        })
-        .await
+        execute_query_with_bootstrap(&self.pool, tenant_id, query_fn).await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -122,10 +90,7 @@ impl PostgresToolCatalog {
         F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, query_fn, |conn, tenant, run_query| {
-            with_tenant_read_tx(conn, tenant.into_inner(), run_query)
-        })
-        .await
+        execute_read_query(&self.pool, tenant_id, query_fn).await
     }
 
     /// Sets the `available` flag and refreshes `updated_at` for every

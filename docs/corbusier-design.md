@@ -1602,10 +1602,12 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
   orchestration tables listed above, while 1.5.3 owns tenant columns on
   `domain_events` and `audit_logs` together with the related audit-trigger,
   query-scoping, and RLS work.
-- PostgreSQL adapters received the minimum query changes needed to make the new
-  per-tenant uniqueness observable before RLS: task issue lookups and backend
-  registry reads/writes now filter by `tenant_id`, while wider adapter
-  hardening remains part of 1.5.3.
+- PostgreSQL adapters received the minimum 1.5.2 persistence changes needed to
+  make per-tenant uniqueness observable before RLS: task issue lookups, backend
+  registry reads/writes, tenant-scoped orchestration writes (`messages`,
+  `agent_sessions`, `handoffs`, `context_snapshots`), migration metadata
+  writes, and every adapter API in this milestone that persists `tenant_id`;
+  broader query hardening and RLS enforcement remain part of 1.5.3.
 
 For screen readers: The following sequence diagram shows two tenants using the
 task service with the same external issue reference. Tenant A stores and reads
@@ -1616,6 +1618,7 @@ enforced per tenant.
 <!-- markdownlint-disable MD031 -->
 Table 2.2.5.2: Sequence diagram showing tenant-scoped task creation and issue
 lookup.
+
 ```mermaid
 sequenceDiagram
     actor TenantA
@@ -1657,6 +1660,7 @@ used by downstream message, handoff, and snapshot records.
 <!-- markdownlint-disable MD031 -->
 Table 2.2.5.3: Entity-relationship diagram showing tenant-owned orchestration
 tables and their main foreign-key paths.
+
 ```mermaid
 erDiagram
     tenants {
