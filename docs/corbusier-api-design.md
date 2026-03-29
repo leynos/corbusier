@@ -190,7 +190,7 @@ The mockup's Kanban expects a "Planned" column distinct from "To-Do (draft)"
 and also expects hierarchy, subtasks, dependencies, priority, labels, assignee,
 due date, estimate, and an activity log.
 
-#### Review aggregate model
+#### Task aggregate model
 
 ```rust,no_run
 use chrono::{DateTime, Utc};
@@ -289,7 +289,7 @@ pub struct TaskAggregateV2 {
 }
 ```
 
-#### Review invariants
+#### Task invariants
 
 - `project_slug` is required and immutable once a task becomes `Planned` or
   later.

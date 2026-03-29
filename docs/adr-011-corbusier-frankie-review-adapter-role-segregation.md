@@ -20,7 +20,7 @@ That no longer matches the intended product split. Frankie is moving toward a
 GitHub review adapter and context engine, built around GitHub APIs, local git,
 incremental sync, diff-based verification, time-travel context, and reusable
 reply tooling.[^1] Corbusier should remain the canonical owner of review
-workflow state, because review state must stay correlated with tasks,
+workflow state because review state must stay correlated with tasks,
 conversations, governance outcomes, and tenant-scoped audit records.
 
 This ADR defines the ownership boundary between the two systems, the review

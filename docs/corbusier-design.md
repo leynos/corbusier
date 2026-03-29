@@ -699,7 +699,7 @@ Corbusier implements this through:
 
 - **Description:** Maintains canonical review workflow state inside Corbusier
   while delegating GitHub review intake, thread context, time-travel material,
-  verification, and reply execution to Frankie as a specialised adapter.
+  verification, and reply execution to Frankie as a specialized adapter.
 - **Business Value:**
   - Automates review feedback processing without fragmenting workflow state
   - Reduces manual overhead in review workflows
@@ -1478,6 +1478,10 @@ erDiagram
     mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
 ```
 <!-- markdownlint-enable MD031 -->
+
+For screen readers: The following sequence diagram shows how a tool call is
+resolved through catalog lookup, policy evaluation, host execution, and log
+capture.
 
 <!-- markdownlint-disable MD031 -->
 Figure 2.2.4.3: Sequence diagram for the `call_tool` flow within
@@ -2714,6 +2718,13 @@ The protocol uses JSON-RPC 2.0 messages to establish communication between
 servers that provide context and capabilities, enabling standardized tool
 integration across different agent backends.
 
+For screen readers: The following sequence diagram shows an agent tool request
+flowing through Corbusier's MCP multiplexer to a tool server and back with a
+workspace execution result.
+
+<!-- markdownlint-disable MD031 -->
+Figure 4.1.1.2a: MCP tool orchestration flow across Corbusier, the MCP
+multiplexer, and a tool workspace.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -2731,6 +2742,7 @@ sequenceDiagram
     MCP-->>Corbusier: Formatted Result
     Corbusier-->>Agent: Tool Execution Complete
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 4.1.1.3 Decision Points
 
@@ -2967,6 +2979,13 @@ flowchart TD
 
 ###### VCS Integration API Flow
 
+For screen readers: The following sequence diagram shows task and branch
+operations flowing through the VCS adapter, followed by a pull-request review
+event synchronized through Frankie.
+
+<!-- markdownlint-disable MD031 -->
+Figure 4.1.2.2a: VCS integration API flow for task metadata, branch creation,
+and review-thread synchronization.
 ```mermaid
 sequenceDiagram
     participant Corbusier as Corbusier Core
@@ -2992,6 +3011,7 @@ sequenceDiagram
     GitHub-->>Frankie: Review thread delta
     Frankie-->>Corbusier: Threads, anchors, and checkpoint
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### MCP Server Communication
 
@@ -2999,6 +3019,11 @@ The protocol uses JSON-RPC 2.0 messages to establish communication between
 servers that provide context and capabilities, ensuring standardized
 communication across all tool integrations.
 
+For screen readers: The following sequence diagram shows an MCP client opening
+JSON-RPC communication with a server, listing tools, and invoking a tool call.
+
+<!-- markdownlint-disable MD031 -->
+Figure 4.1.2.2b: MCP server communication over JSON-RPC 2.0.
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
@@ -3020,6 +3045,7 @@ sequenceDiagram
     Client->>Server: notifications/cancelled
     Server->>Tool: Cancel execution
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 4.1.2.3 Event Processing Flows
 
@@ -4390,6 +4416,12 @@ reply execution against the task workspace.
 
 #### 5.2.5 Component Interaction Diagrams
 
+For screen readers: The following sequence diagram shows a conversation turn
+flowing from the user through the conversation and agent orchestrators to tool
+execution and post-turn hooks.
+
+<!-- markdownlint-disable MD031 -->
+Figure 5.2.5.1: Conversation turn, tool call, and hook interaction flow.
 ```mermaid
 sequenceDiagram
     participant User as User Client
@@ -4410,6 +4442,7 @@ sequenceDiagram
     Agent-->>Conv: Turn Complete
     Conv-->>User: SSE Event Stream
 ```
+<!-- markdownlint-enable MD031 -->
 
 #### 5.2.6 State Transition Diagrams
 
@@ -5340,6 +5373,13 @@ The event streaming infrastructure provides real-time visibility into system
 operations through WebSocket and Server-Sent Events, enabling responsive user
 interfaces and external integrations.
 
+For screen readers: The following sequence diagram shows conversation and tool
+events being published to an event bus and streamed to a subscribed client over
+SSE.
+
+<!-- markdownlint-disable MD031 -->
+Figure 6.1.1.2a: Real-time event distribution through the conversation event
+stream.
 ```mermaid
 sequenceDiagram
     participant Client as Web Client
@@ -5368,6 +5408,7 @@ sequenceDiagram
     EventBus->>SSE: Forward event
     SSE->>Client: Send turn_completed event
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### Event Types and Schemas
 
@@ -5800,6 +5841,9 @@ review workflow persistence model, showing how tenants own review threads,
 review comments, and verification results, and how those records relate back to
 tasks and conversations.
 
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.2b: Review workflow entity-relationship model for tenant-owned
+review threads, comments, and verification state.
 ```mermaid
 erDiagram
     TENANTS {
@@ -5873,9 +5917,7 @@ erDiagram
     REVIEW_THREADS ||--o{ REVIEW_COMMENTS : contains
     REVIEW_THREADS ||--o{ REVIEW_VERIFICATION_RESULTS : verifies
 ```
-
-_Figure: Review workflow entity-relationship model for tenant-owned review
-threads, comments, and verification state._
+<!-- markdownlint-enable MD031 -->
 
 #### 6.2.4 Encapsulation and Workspace Management
 
@@ -6086,6 +6128,10 @@ from a GitHub pull-request review event through Corbusier's review workflow
 service, Frankie synchronization, conversation updates, agent reply drafting,
 and the final verification or reply action.
 
+<!-- markdownlint-disable MD031 -->
+Figure 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
+through Frankie synchronization, agent reply drafting, and verification or
+reply submission.
 ```mermaid
 sequenceDiagram
     participant GitHub as GitHub_API
@@ -6109,10 +6155,7 @@ sequenceDiagram
     Frankie-->>ReviewSvc: verification_result_or_posted_reply
     ReviewSvc->>ConvSvc: update_review_projection_and_conversation
 ```
-
-_Figure 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
-through Frankie synchronization, agent reply drafting, and verification or
-reply submission._
+<!-- markdownlint-enable MD031 -->
 
 ##### Review Comment Processing
 
@@ -6160,7 +6203,7 @@ pub trait ReviewIntakePort: Send + Sync {
     async fn sync_threads(
         &self,
         pull_request: PullRequestRef,
-        checkpoint: Option<ReviewSyncCheckpoint>,
+        checkpoint: Option<ReviewSyncCheckpointEnvelope>,
     ) -> Result<ReviewSyncDelta>;
 }
 
@@ -6196,20 +6239,24 @@ and service boundary, including the review aggregate, its projection and anchor
 types, the materialized review thread view, and the three Frankie-backed review
 ports used by the review workflow service.
 
+<!-- markdownlint-disable MD031 -->
+Figure 6.3.2.2: Review workflow class model showing the persistent aggregate,
+materialized thread view, and the review intake, context, and action ports used
+by the review workflow service.
 ```mermaid
 classDiagram
     class ReviewThreadAggregate {
         +Uuid id
         +Uuid tenant_id
         +Uuid task_id
-        +Uuid conversation_id
+        +Option~Uuid~ conversation_id
         +String pull_request_ref
         +String provider
         +String external_root_comment_id
         +ReviewThreadStatus status
-        +ReviewAnchorDto anchor
+        +Option~ReviewAnchorDto~ anchor
         +ReviewWorkflowProjection projection
-        +ReviewSyncCheckpointEnvelope last_checkpoint
+        +Option~ReviewSyncCheckpointEnvelope~ last_checkpoint
         +DateTime_Utc created_at
         +DateTime_Utc updated_at
     }
@@ -6217,8 +6264,8 @@ classDiagram
     class ReviewWorkflowProjection {
         +u32 open_thread_count
         +String verification_status
-        +String pending_outbound_reply
-        +String last_reviewer_action
+        +Option~String~ pending_outbound_reply
+        +Option~String~ last_reviewer_action
     }
 
     class ReviewCommentRecord {
@@ -6247,10 +6294,10 @@ classDiagram
         +ExternalCommentId thread_root_id
         +PullRequestRef pull_request_ref
         +ReviewCommentRecord comments
-        +ReviewAnchor anchor
+        +Option~ReviewAnchor~ anchor
         +VerificationStatus verification_status
-        +ReplyDraft pending_reply
-        +ReviewSyncCheckpointEnvelope last_synced_checkpoint
+        +Option~ReplyDraft~ pending_reply
+        +Option~ReviewSyncCheckpointEnvelope~ last_synced_checkpoint
     }
 
     class ReviewIntakePort {
@@ -6288,16 +6335,13 @@ classDiagram
     ReviewWorkflowService ..> ReviewContextPort : uses
     ReviewWorkflowService ..> ReviewActionPort : uses
 ```
-
-_Figure 6.3.2.2: Review workflow class model showing the persistent aggregate,
-materialized thread view, and the review intake, context, and action ports used
-by the review workflow service._
+<!-- markdownlint-enable MD031 -->
 
 Review threads are the primary orchestration unit. Corbusier should preserve
 Frankie's raw comment payload losslessly, derive anchors only when metadata is
 complete enough to support time travel or verification, and treat
-`in_reply_to_id.unwrap_or(id)` as the stable thread root when Frankie does not
-yet expose a richer thread aggregate directly.
+`in_reply_to_id.unwrap_or(external_comment_id)` as the stable thread root when
+Frankie does not yet expose a richer thread aggregate directly.
 
 The durable storage contract should align SQL and Rust terminology around
 `status`. The database should enforce the same snake_case values used by
@@ -6803,6 +6847,12 @@ similarly interact with the Payment Settings Domain or Module through a similar
 communication occurs over a network, whereas within a Modular Monolith,
 communication is direct within the same process."
 
+For screen readers: The following sequence diagram shows in-process module
+collaboration across conversation, task, agent, tool, and governance modules in
+the modular monolith.
+
+<!-- markdownlint-disable MD031 -->
+Figure 6.1.2.2a: Modular monolith module interaction during a user request.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -6823,6 +6873,7 @@ sequenceDiagram
     Agent-->>Conv: Turn Complete
     Conv-->>User: HTTP Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 #### 6.1.3 Scalability Design Within Monolith
 
@@ -7497,17 +7548,20 @@ types._
 JSONB provides a wide array of options to index your JSON data. At a high
 level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
 
-| Table                 | Index Type | Columns                                       | Purpose                             |
-| --------------------- | ---------- | --------------------------------------------- | ----------------------------------- |
-| messages              | B-tree     | (tenant_id, conversation_id, sequence_number) | Message ordering and pagination     |
-| messages              | GIN        | content                                       | Full-text search in message content |
-| conversations         | B-tree     | (tenant_id, task_id)                          | Task-conversation lookup            |
-| tasks                 | B-tree     | (tenant_id, state, created_at)                | Task filtering and sorting          |
-| tasks                 | B-tree     | (tenant_id, branch_ref)                       | Branch association lookup           |
-| tasks                 | B-tree     | (tenant_id, pull_request_ref)                 | Pull request lookup                 |
-| review_threads        | B-tree     | (tenant_id, pull_request_ref, status)         | Open-thread lookup per pull request |
-| review_comments       | B-tree     | (tenant_id, external_comment_id)              | Idempotent sync and reply mapping   |
-| backend_registrations | B-tree     | (tenant_id, name)                             | Per-tenant backend uniqueness       |
+| Table                       | Index Type | Columns                                            | Purpose                             |
+| --------------------------- | ---------- | -------------------------------------------------- | ----------------------------------- |
+| messages                    | B-tree     | (tenant_id, conversation_id, sequence_number)      | Message ordering and pagination     |
+| messages                    | GIN        | content                                            | Full-text search in message content |
+| conversations               | B-tree     | (tenant_id, task_id)                               | Task-conversation lookup            |
+| tasks                       | B-tree     | (tenant_id, state, created_at)                     | Task filtering and sorting          |
+| tasks                       | B-tree     | (tenant_id, branch_ref)                            | Branch association lookup           |
+| tasks                       | B-tree     | (tenant_id, pull_request_ref)                      | Pull request lookup                 |
+| review_threads              | B-tree     | (tenant_id, pull_request_ref, status)              | Open-thread lookup per pull request |
+| review_comments             | B-tree     | (tenant_id, external_comment_id)                   | Idempotent sync and reply mapping   |
+| review_verification_results | B-tree     | (tenant_id, review_thread_id, status, verified_at) | Verification projection lookup      |
+| review_verification_results | B-tree     | (tenant_id, external_comment_id)                   | Verification idempotency lookup     |
+| review_verification_results | GIN        | evidence                                           | Evidence inspection and filtering   |
+| backend_registrations       | B-tree     | (tenant_id, name)                                  | Per-tenant backend uniqueness       |
 
 ###### JSONB Indexing Strategy
 
@@ -7540,6 +7594,12 @@ CREATE INDEX idx_review_threads_tenant_pr_status
     ON review_threads (tenant_id, pull_request_ref, status);
 CREATE INDEX idx_review_comments_tenant_external_comment
     ON review_comments (tenant_id, external_comment_id);
+CREATE INDEX idx_review_verification_results_tenant_thread_status_time
+    ON review_verification_results (tenant_id, review_thread_id, status, verified_at);
+CREATE INDEX idx_review_verification_results_tenant_external_comment
+    ON review_verification_results (tenant_id, external_comment_id);
+CREATE INDEX idx_review_verification_results_evidence_gin
+    ON review_verification_results USING GIN (evidence);
 
 -- Tenant-scoped uniqueness guards
 CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
@@ -8909,6 +8969,12 @@ MCP takes inspiration from the Language Server Protocol, standardizing how to
 integrate additional context and tools into the ecosystem of AI applications.
 Corbusier implements MCP as the backbone for tool orchestration:
 
+For screen readers: The following sequence diagram shows an agent requesting a
+tool call that Corbusier routes through MCP to a tool server and back as a
+formatted result.
+
+<!-- markdownlint-disable MD031 -->
+Figure 8.1.1.1: MCP tool orchestration through Corbusier and a tool server.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -8925,6 +8991,7 @@ sequenceDiagram
     MCP-->>Corbusier: Formatted Response
     Corbusier-->>Agent: Tool Execution Complete
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### HTTP API Specification
 
@@ -9493,6 +9560,12 @@ graph TB
 Corbusier integrates with Podbot for secure workspace encapsulation, with
 extensibility for future encapsulation technologies:
 
+For screen readers: The following sequence diagram shows task workspace
+provisioning and command execution flowing through the encapsulation adapter to
+Podbot and the workspace container.
+
+<!-- markdownlint-disable MD031 -->
+Figure 8.5.2.1: Encapsulation provider integration with Podbot.
 ```mermaid
 sequenceDiagram
     participant Task as Task Service
@@ -9514,6 +9587,7 @@ sequenceDiagram
     Podbot-->>Encap: Execution Response
     Encap-->>Task: Tool Result
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### Review Integration (Frankie)
 
@@ -9797,6 +9871,13 @@ in security requirements.
 
 ###### Token Validation Pipeline
 
+For screen readers: The following sequence diagram shows bearer-token
+validation moving through middleware, token verification, session checks, and
+user lookup before authorization succeeds.
+
+<!-- markdownlint-disable MD031 -->
+Figure 8.6.4.1: Token validation pipeline across middleware and identity
+services.
 ```mermaid
 sequenceDiagram
     participant Client as Client Application
@@ -9816,6 +9897,7 @@ sequenceDiagram
     TokenSvc-->>Middleware: Validation Result
     Middleware-->>Client: Authorized Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 6.4.1.5 Password Policies
 
@@ -10636,6 +10718,13 @@ executions, and VCS operations.
 
 ###### Tracing Architecture
 
+For screen readers: The following sequence diagram shows a traced user request
+moving through HTTP handling, conversation orchestration, agent execution, and
+tool invocation with spans across each boundary.
+
+<!-- markdownlint-disable MD031 -->
+Figure 9.4.2.1: Distributed tracing architecture across Corbusier request
+handling and tool execution.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -10661,6 +10750,7 @@ sequenceDiagram
     Conv-->>HTTP: Response Ready
     HTTP-->>User: HTTP Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### Trace Context Propagation
 
@@ -11339,6 +11429,13 @@ Integration testing uses mock servers (e.g., wiremock) and binds test servers
 to ephemeral ports to eliminate non-deterministic failures caused by network
 I/O or backoff.
 
+For screen readers: The following sequence diagram shows an integration test
+setting up mocks and a test database, executing a workflow through Corbusier,
+and verifying persisted results.
+
+<!-- markdownlint-disable MD031 -->
+Figure 10.3.2.1: Service integration test flow with mock dependencies and a
+test database.
 ```mermaid
 sequenceDiagram
     participant Test as Integration Test
@@ -11360,6 +11457,7 @@ sequenceDiagram
     Corbusier-->>Test: Workflow complete
     Test->>Test: Verify end-to-end behavior
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### API Testing Strategy
 

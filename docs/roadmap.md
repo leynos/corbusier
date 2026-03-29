@@ -570,7 +570,7 @@ enforcement.
     corbusier-design.md §2.1.4.
   - [ ] Map VCS events into task lifecycle updates. See
     corbusier-design.md §4.1.1.2.
-  - [ ] Success criteria: tasks remain synchronised with VCS state transitions.
+  - [ ] Success criteria: tasks remain synchronized with VCS state transitions.
 - [ ] 4.1.2 Introduce the dedicated review bounded context and Frankie adapter
   ports. Requires 4.1.1 and
   adr-011-corbusier-frankie-review-adapter-role-segregation.md. See
