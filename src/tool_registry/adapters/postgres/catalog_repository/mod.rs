@@ -245,11 +245,11 @@ impl PostgresToolCatalog {
 
     fn load_entries_for_tenant(
         connection: &mut PgConnection,
-        tenant_id: uuid::Uuid,
+        tenant_id: TenantId,
         tool_name: Option<&str>,
     ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let mut query = mcp_tool_catalog::table
-            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
+            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id.into_inner()))
             .into_boxed::<Pg>();
 
         if let Some(name) = tool_name {
@@ -304,19 +304,17 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         tool_name: &str,
     ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
         execute_read_query(&self.pool, tenant_id, move |connection| {
-            Self::load_entries_for_tenant(connection, tid, Some(name.as_str()))
+            Self::load_entries_for_tenant(connection, tenant_id, Some(name.as_str()))
         })
         .await
     }
 
     async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
         execute_read_query(&self.pool, tenant_id, move |connection| {
-            Self::load_entries_for_tenant(connection, tid, None)
+            Self::load_entries_for_tenant(connection, tenant_id, None)
         })
         .await
     }
