@@ -35,7 +35,7 @@ async fn store_adds_message_to_repository(
 
     let result = repo.store(&ctx, &message).await;
 
-    assert!(result.is_ok());
+    result.expect("failed to store message");
     assert_eq!(repo.len(), 1);
     assert!(!repo.is_empty());
     Ok(())
