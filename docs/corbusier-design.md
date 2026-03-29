@@ -1157,7 +1157,7 @@ sequenceDiagram
     Orchestrator->>Orchestrator: validate BackendStatus Active
     Orchestrator->>Orchestrator: acquire execution lock (tenant_id, conversation_id)
 
-    Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotQuery)
+    Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotReservation { key, now, ttl })
     SessionRepo-->>Orchestrator: SessionSlotArbitration
     note over Orchestrator,SessionRepo: Reused or Reserved
 
@@ -1175,14 +1175,15 @@ sequenceDiagram
     Orchestrator->>ToolRouter: list_available_tools(ctx)
     ToolRouter-->>Orchestrator: Vec<McpToolDefinition>
 
-    Orchestrator->>Runtime: execute_turn(ctx, RuntimeTurnRequest, ToolRouter)
+    Orchestrator->>Runtime: execute_turn(backend, runtime_session_id, TurnExecutionRequest)
     activate Runtime
-    loop per scripted tool call
-        Runtime->>ToolRouter: route_tool_call(call_id, ToolCallRequest)
-        ToolRouter-->>Runtime: ToolRoutingResult
-    end
     Runtime-->>Orchestrator: RuntimeTurnResult
     deactivate Runtime
+
+    loop per scripted tool call
+        Orchestrator->>ToolRouter: route_tool_call(call_id, ToolCallRequest)
+        ToolRouter-->>Orchestrator: ToolRoutingResult
+    end
 
     alt Runtime success
         Orchestrator->>SessionRepo: upsert_session(ctx, TurnSession)
