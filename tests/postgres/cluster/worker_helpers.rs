@@ -158,39 +158,36 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn set_file_mode(path: &Utf8Path, mode: u32) -> Result<(), std::io::Error> {
+    fn open_parent_dir(path: &Utf8Path) -> Result<(Dir, String), std::io::Error> {
         let parent = path.parent().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("path has no parent: {path}"),
             )
         })?;
-        let file_name = path.file_name().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("path has no file name: {path}"),
-            )
-        })?;
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("path has no file name: {path}"),
+                )
+            })?
+            .to_owned();
         let dir = Dir::open_ambient_dir(parent, ambient_authority())?;
-        dir.set_permissions(Utf8Path::new(file_name), Permissions::from_mode(mode))
+        Ok((dir, file_name))
+    }
+
+    #[cfg(unix)]
+    fn set_file_mode(path: &Utf8Path, mode: u32) -> Result<(), std::io::Error> {
+        let (dir, file_name) = open_parent_dir(path)?;
+        dir.set_permissions(Utf8Path::new(&file_name), Permissions::from_mode(mode))
     }
 
     #[cfg(unix)]
     fn file_mode(path: &Utf8Path) -> Result<u32, std::io::Error> {
-        let parent = path.parent().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("path has no parent: {path}"),
-            )
-        })?;
-        let file_name = path.file_name().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("path has no file name: {path}"),
-            )
-        })?;
-        let dir = Dir::open_ambient_dir(parent, ambient_authority())?;
-        let metadata = dir.metadata(Utf8Path::new(file_name))?;
+        let (dir, file_name) = open_parent_dir(path)?;
+        let metadata = dir.metadata(Utf8Path::new(&file_name))?;
         Ok(metadata.permissions().mode())
     }
 
