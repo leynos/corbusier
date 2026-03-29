@@ -58,41 +58,6 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    /// Executes a write query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        execute_query(&self.pool, tenant_id, query_fn).await
-    }
-
-    /// Executes a write query that may create the tenant row before use.
-    async fn execute_query_with_bootstrap<F, T>(
-        &self,
-        tenant_id: TenantId,
-        query_fn: F,
-    ) -> ToolCatalogResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        execute_query_with_bootstrap(&self.pool, tenant_id, query_fn).await
-    }
-
-    /// Executes a read-only query inside a transaction with tenant context.
-    async fn execute_read_query<F, T>(
-        &self,
-        tenant_id: TenantId,
-        query_fn: F,
-    ) -> ToolCatalogResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        execute_read_query(&self.pool, tenant_id, query_fn).await
-    }
-
     /// Sets the `available` flag and refreshes `updated_at` for every
     /// catalog entry belonging to `server_id` within the tenant scope.
     async fn set_server_tools_availability(
@@ -103,7 +68,7 @@ impl PostgresToolCatalog {
     ) -> ToolCatalogResult<()> {
         let sid = server_id.into_inner();
         let tid = tenant_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
+        execute_query(&self.pool, tenant_id, move |connection| {
             diesel::update(
                 mcp_tool_catalog::table
                     .filter(mcp_tool_catalog::server_id.eq(sid))
@@ -245,7 +210,7 @@ impl PostgresToolCatalog {
         let candidate_names: HashSet<String> =
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
-        self.execute_query_with_bootstrap(tenant, move |connection| {
+        execute_query_with_bootstrap(&self.pool, tenant, move |connection| {
             let existing_name_counts = Self::load_conflicting_name_counts(
                 connection,
                 tenant_id,
@@ -341,7 +306,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
-        self.execute_read_query(tenant_id, move |connection| {
+        execute_read_query(&self.pool, tenant_id, move |connection| {
             Self::load_entries_for_tenant(connection, tid, Some(name.as_str()))
         })
         .await
@@ -350,7 +315,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
     async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
-        self.execute_read_query(tenant_id, move |connection| {
+        execute_read_query(&self.pool, tenant_id, move |connection| {
             Self::load_entries_for_tenant(connection, tid, None)
         })
         .await
@@ -364,7 +329,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let row = audit_to_new_row(record, tid);
-        self.execute_query_with_bootstrap(tenant_id, move |connection| {
+        execute_query_with_bootstrap(&self.pool, tenant_id, move |connection| {
             diesel::insert_into(tool_call_audit_log::table)
                 .values(&row)
                 .execute(connection)
