@@ -89,6 +89,28 @@ fn both_tenants_register_distinct_backends(world: &BackendWorld) -> Result<(), e
     Ok(())
 }
 
+fn lookup_backend_by_name(
+    service: &super::world::TestRegistryService,
+    ctx: &corbusier::context::RequestContext,
+    name: &str,
+    label: &str,
+) -> Result<corbusier::agent_backend::domain::AgentBackendRegistration, eyre::Report> {
+    run_async(service.find_by_name(ctx, name))
+        .map_err(|err| eyre::eyre!("{label} lookup failed: {err}"))?
+        .ok_or_else(|| eyre::eyre!("{label} backend not found"))
+}
+
+fn assert_backend_id_matches(
+    found: &corbusier::agent_backend::domain::AgentBackendRegistration,
+    expected: &corbusier::agent_backend::domain::AgentBackendRegistration,
+    label: &str,
+) -> Result<(), eyre::Report> {
+    if found.id() != expected.id() {
+        return Err(eyre::eyre!("{label} lookup returned the wrong backend"));
+    }
+    Ok(())
+}
+
 #[then("each tenant can find its own backend by name")]
 fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Report> {
     let pending = world
@@ -110,19 +132,12 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
     if world.other_registered.is_none() {
         return Err(eyre::eyre!("tenant B expected backend is missing"));
     }
-    let found_a = run_async(world.service.find_by_name(&world.ctx, &pending.name))
-        .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
-        .ok_or_else(|| eyre::eyre!("tenant A backend not found"))?;
-    let found_b = run_async(world.service.find_by_name(&world.other_ctx, &pending.name))
-        .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
-        .ok_or_else(|| eyre::eyre!("tenant B backend not found"))?;
+    let found_a = lookup_backend_by_name(&world.service, &world.ctx, &pending.name, "tenant A")?;
+    let found_b =
+        lookup_backend_by_name(&world.service, &world.other_ctx, &pending.name, "tenant B")?;
 
-    if found_a.id() != expected_a.id() {
-        return Err(eyre::eyre!("tenant A lookup returned the wrong backend"));
-    }
-    if found_b.id() != expected_b.id() {
-        return Err(eyre::eyre!("tenant B lookup returned the wrong backend"));
-    }
+    assert_backend_id_matches(&found_a, expected_a, "tenant A")?;
+    assert_backend_id_matches(&found_b, expected_b, "tenant B")?;
     if found_a.id() == found_b.id() {
         return Err(eyre::eyre!("tenant lookups must return distinct backends"));
     }

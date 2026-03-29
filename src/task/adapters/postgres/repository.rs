@@ -40,14 +40,15 @@ async fn run_tenant_query<F, T, Q>(
 where
     F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
     T: Send + 'static,
-    Q: FnOnce(&mut PgConnection, TenantId, F) -> TaskRepositoryResult<T> + Send + 'static,
+    Q: FnOnce(&mut PgConnection, uuid::Uuid, F) -> TaskRepositoryResult<T> + Send + 'static,
 {
     let pool_clone = pool.clone();
+    let tenant_uuid = tenant_id.into_inner();
 
     run_blocking_with(
         move || {
             let mut conn = get_conn_with(&pool_clone, TaskRepositoryError::persistence)?;
-            run_query(&mut conn, tenant_id, query_fn)
+            run_query(&mut conn, tenant_uuid, query_fn)
         },
         TaskRepositoryError::persistence,
     )
@@ -89,13 +90,7 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        run_tenant_query(
-            &self.pool,
-            tenant_id,
-            query_fn,
-            |conn, tenant, run_query| with_tenant_tx(conn, tenant.into_inner(), run_query),
-        )
-        .await
+        run_tenant_query(&self.pool, tenant_id, query_fn, with_tenant_tx).await
     }
 
     /// Executes a write query that may create the tenant row before use.
@@ -112,10 +107,10 @@ impl PostgresTaskRepository {
             &self.pool,
             tenant_id,
             query_fn,
-            |conn, tenant, run_query| {
-                ensure_tenant_exists(conn, tenant.into_inner())
+            |conn, tenant_uuid, run_query| {
+                ensure_tenant_exists(conn, tenant_uuid)
                     .map_err(TaskRepositoryError::persistence)?;
-                with_tenant_tx(conn, tenant.into_inner(), run_query)
+                with_tenant_tx(conn, tenant_uuid, run_query)
             },
         )
         .await
@@ -131,13 +126,7 @@ impl PostgresTaskRepository {
         F: FnOnce(&mut PgConnection) -> TaskRepositoryResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        run_tenant_query(
-            &self.pool,
-            tenant_id,
-            query_fn,
-            |conn, tenant, run_query| with_tenant_read_tx(conn, tenant.into_inner(), run_query),
-        )
-        .await
+        run_tenant_query(&self.pool, tenant_id, query_fn, with_tenant_read_tx).await
     }
 }
 
