@@ -49,12 +49,19 @@ async fn store_rejects_duplicate_message_id(
 ) {
     let conversation_id = ConversationId::new();
     let message = make_message(conversation_id, 1, &clock);
+    let id = message.id();
 
     repo.store(&ctx, &message).await.expect("first store");
 
     let result = repo.store(&ctx, &message).await;
 
-    assert!(matches!(result, Err(RepositoryError::DuplicateMessage(id)) if id == message.id()));
+    assert!(
+        matches!(result, Err(RepositoryError::DuplicateMessage(duplicate_id)) if duplicate_id == message.id())
+    );
+    assert_eq!(repo.len(), 1);
+    assert!(repo.exists(&ctx, id).await.expect("exists"));
+    let found = repo.find_by_id(&ctx, id).await.expect("find_by_id");
+    assert_eq!(found.expect("message should remain stored").id(), id);
 }
 
 #[rstest]

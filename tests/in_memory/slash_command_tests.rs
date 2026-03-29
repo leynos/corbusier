@@ -55,7 +55,7 @@ fn assert_expansion_parameters(
 
 fn assert_tool_call_audit(message: &Message, audit_index: usize, expected: &ExpectedAudit<'_>) {
     let Some(audit) = message.metadata().tool_call_audits.get(audit_index) else {
-        panic!("expected tool call audit at index");
+        panic!("expected tool call audit at index {audit_index}");
     };
     assert_eq!(audit.tool_name, expected.tool_name);
     assert_eq!(&audit.status, &expected.status);
