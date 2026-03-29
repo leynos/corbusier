@@ -69,7 +69,7 @@ impl PostgresHandoffAdapter {
         query_fn: F,
     ) -> HandoffResult<T>
     where
-        TxWrap: FnOnce(&mut PgConnection, uuid::Uuid, F) -> HandoffResult<T> + Send + 'static,
+        TxWrap: FnOnce(&mut PgConnection, TenantId, F) -> HandoffResult<T> + Send + 'static,
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
@@ -77,7 +77,7 @@ impl PostgresHandoffAdapter {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                tx_wrap(&mut conn, tenant_id.into_inner(), query_fn)
+                tx_wrap(&mut conn, tenant_id, query_fn)
             },
             HandoffError::persistence,
         )
@@ -94,9 +94,12 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let bootstrapping_tx = |conn: &mut PgConnection, tenant_uuid: uuid::Uuid, qfn: F| {
-            ensure_tenant_exists(conn, tenant_uuid).map_err(HandoffError::persistence)?;
-            with_tenant_tx(conn, tenant_uuid, qfn)
+        let bootstrapping_tx = |conn: &mut PgConnection, tenant: TenantId, qfn: F| {
+            let tenant_uuid = tenant.into_inner();
+            with_tenant_tx(conn, tenant_uuid, |tx| {
+                ensure_tenant_exists(tx, tenant_uuid).map_err(HandoffError::persistence)?;
+                qfn(tx)
+            })
         };
         self.execute_impl(tenant_id, bootstrapping_tx, query_fn)
             .await
@@ -108,7 +111,12 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, with_tenant_tx, query_fn).await
+        self.execute_impl(
+            tenant_id,
+            |conn, tenant, qfn| with_tenant_tx(conn, tenant.into_inner(), qfn),
+            query_fn,
+        )
+        .await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -117,8 +125,12 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, with_tenant_read_tx, query_fn)
-            .await
+        self.execute_impl(
+            tenant_id,
+            |conn, tenant, qfn| with_tenant_read_tx(conn, tenant.into_inner(), qfn),
+            query_fn,
+        )
+        .await
     }
 }
 

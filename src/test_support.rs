@@ -23,7 +23,6 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use std::collections::HashSet;
 use std::sync::Arc;
-use uuid::Uuid;
 
 /// Shared in-memory orchestrator type for agent-turn tests.
 pub type InMemoryAgentTurnOrchestrator = AgentTurnOrchestratorService<
@@ -121,9 +120,12 @@ pub fn build_in_memory_orchestrator() -> InMemoryAgentTurnStack {
 /// ```
 pub fn bootstrap_tenant_row(
     conn: &mut PgConnection,
-    tenant_id: Uuid,
+    tenant_id: TenantId,
 ) -> diesel::QueryResult<usize> {
-    crate::message::adapters::postgres::tenant_tx::bootstrap_tenant_row(conn, tenant_id)
+    crate::message::adapters::postgres::tenant_tx::bootstrap_tenant_row(
+        conn,
+        tenant_id.into_inner(),
+    )
 }
 
 /// Fake MCP host adapter whose [`McpServerHost::health`] always

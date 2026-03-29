@@ -1,5 +1,8 @@
 //! `PostgreSQL` integration tests for tenant-aware composite foreign keys.
 
+use corbusier::context::TenantId;
+use corbusier::message::domain::{AgentSessionId, ConversationId, HandoffId, MessageId};
+use corbusier::task::domain::TaskId;
 use diesel::Connection;
 use diesel::PgConnection;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
@@ -15,8 +18,8 @@ use crate::postgres::helpers::{
     test_request_ctx,
 };
 use helpers::{
-    ContextSnapshotInsert, HandoffInsert, insert_agent_session, insert_context_snapshot,
-    insert_conversation, insert_handoff, insert_message, insert_task,
+    AgentSessionInsert, ContextSnapshotInsert, HandoffInsert, insert_agent_session,
+    insert_context_snapshot, insert_conversation, insert_handoff, insert_message, insert_task,
 };
 
 struct TenantConstraintContext {
@@ -173,10 +176,12 @@ async fn composite_foreign_keys_accept_same_tenant_links(
 fn run_fk_case(
     db_url: &str,
     case: CompositeFkCase,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    first_tenant_uuid: Uuid,
+    second_tenant_uuid: Uuid,
 ) -> Result<(), BoxError> {
     let mut conn = PgConnection::establish(db_url).map_err(|err| Box::new(err) as BoxError)?;
+    let tenant_a = TenantId::from_uuid(first_tenant_uuid);
+    let tenant_b = TenantId::from_uuid(second_tenant_uuid);
     conn.transaction(|tx| {
         execute_fk_case(tx, case, tenant_a, tenant_b)
             .map(|_| ())
@@ -187,24 +192,32 @@ fn run_fk_case(
 fn execute_fk_case(
     tx: &mut PgConnection,
     case: CompositeFkCase,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
     match case {
         CompositeFkCase::ConversationTask => {
-            let task_id = Uuid::new_v4();
+            let task_id = TaskId::new();
             insert_task(tx, task_id, tenant_a)?;
-            insert_conversation(tx, Uuid::new_v4(), tenant_b, Some(task_id))
+            insert_conversation(tx, ConversationId::new(), tenant_b, Some(task_id))
         }
         CompositeFkCase::MessageConversation => {
-            let conversation_id = Uuid::new_v4();
+            let conversation_id = ConversationId::new();
             insert_conversation(tx, conversation_id, tenant_a, None)?;
-            insert_message(tx, Uuid::new_v4(), tenant_b, conversation_id)
+            insert_message(tx, MessageId::new(), tenant_b, conversation_id)
         }
         CompositeFkCase::AgentSessionConversation => {
-            let conversation_id = Uuid::new_v4();
+            let conversation_id = ConversationId::new();
             insert_conversation(tx, conversation_id, tenant_a, None)?;
-            insert_agent_session(tx, Uuid::new_v4(), tenant_b, conversation_id)
+            insert_agent_session(
+                tx,
+                AgentSessionInsert {
+                    session: AgentSessionId::new(),
+                    tenant: tenant_b,
+                    conversation: conversation_id,
+                    is_active: true,
+                },
+            )
         }
         CompositeFkCase::HandoffSourceSession => {
             insert_handoff_source_session_case(tx, tenant_a, tenant_b)
@@ -226,15 +239,15 @@ fn execute_fk_case(
 
 fn insert_handoff_source_session_case(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
     let (session, conversation) =
         build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Session)?;
     insert_handoff(
         tx,
         HandoffInsert {
-            handoff: Uuid::new_v4(),
+            handoff: HandoffId::new(),
             tenant: tenant_b,
             source_session: session,
             conversation,
@@ -245,15 +258,15 @@ fn insert_handoff_source_session_case(
 
 fn insert_handoff_conversation_case(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
     let (session, conversation) =
         build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Conversation)?;
     insert_handoff(
         tx,
         HandoffInsert {
-            handoff: Uuid::new_v4(),
+            handoff: HandoffId::new(),
             tenant: tenant_b,
             source_session: session,
             conversation,
@@ -264,23 +277,39 @@ fn insert_handoff_conversation_case(
 
 fn insert_handoff_target_session_case(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
-    let conversation_b = Uuid::new_v4();
+    let conversation_b = ConversationId::new();
     insert_conversation(tx, conversation_b, tenant_b, None)?;
-    let source_session_b = Uuid::new_v4();
-    insert_agent_session(tx, source_session_b, tenant_b, conversation_b)?;
+    let source_session_b = AgentSessionId::new();
+    insert_agent_session(
+        tx,
+        AgentSessionInsert {
+            session: source_session_b,
+            tenant: tenant_b,
+            conversation: conversation_b,
+            is_active: true,
+        },
+    )?;
 
-    let conversation_a = Uuid::new_v4();
+    let conversation_a = ConversationId::new();
     insert_conversation(tx, conversation_a, tenant_a, None)?;
-    let target_session_a = Uuid::new_v4();
-    insert_agent_session(tx, target_session_a, tenant_a, conversation_a)?;
+    let target_session_a = AgentSessionId::new();
+    insert_agent_session(
+        tx,
+        AgentSessionInsert {
+            session: target_session_a,
+            tenant: tenant_a,
+            conversation: conversation_a,
+            is_active: true,
+        },
+    )?;
 
     insert_handoff(
         tx,
         HandoffInsert {
-            handoff: Uuid::new_v4(),
+            handoff: HandoffId::new(),
             tenant: tenant_b,
             source_session: source_session_b,
             conversation: conversation_b,
@@ -297,24 +326,40 @@ enum CrossTenantField {
 
 fn build_cross_tenant_prerequisites(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
     mismatched: CrossTenantField,
-) -> diesel::QueryResult<(Uuid, Uuid)> {
-    let conversation_a = Uuid::new_v4();
-    let conversation_b = Uuid::new_v4();
+) -> diesel::QueryResult<(AgentSessionId, ConversationId)> {
+    let conversation_a = ConversationId::new();
+    let conversation_b = ConversationId::new();
     insert_conversation(tx, conversation_a, tenant_a, None)?;
     insert_conversation(tx, conversation_b, tenant_b, None)?;
 
     match mismatched {
         CrossTenantField::Session => {
-            let session_a = Uuid::new_v4();
-            insert_agent_session(tx, session_a, tenant_a, conversation_a)?;
+            let session_a = AgentSessionId::new();
+            insert_agent_session(
+                tx,
+                AgentSessionInsert {
+                    session: session_a,
+                    tenant: tenant_a,
+                    conversation: conversation_a,
+                    is_active: true,
+                },
+            )?;
             Ok((session_a, conversation_b))
         }
         CrossTenantField::Conversation => {
-            let session_b = Uuid::new_v4();
-            insert_agent_session(tx, session_b, tenant_b, conversation_b)?;
+            let session_b = AgentSessionId::new();
+            insert_agent_session(
+                tx,
+                AgentSessionInsert {
+                    session: session_b,
+                    tenant: tenant_b,
+                    conversation: conversation_b,
+                    is_active: true,
+                },
+            )?;
             Ok((session_b, conversation_a))
         }
     }
@@ -322,8 +367,8 @@ fn build_cross_tenant_prerequisites(
 
 fn insert_context_snapshot_session_case(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
     let (session, conversation) =
         build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Session)?;
@@ -340,8 +385,8 @@ fn insert_context_snapshot_session_case(
 
 fn insert_context_snapshot_conversation_case(
     tx: &mut PgConnection,
-    tenant_a: Uuid,
-    tenant_b: Uuid,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
 ) -> diesel::QueryResult<usize> {
     let (session, conversation) =
         build_cross_tenant_prerequisites(tx, tenant_a, tenant_b, CrossTenantField::Conversation)?;

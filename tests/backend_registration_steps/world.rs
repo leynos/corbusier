@@ -63,12 +63,7 @@ impl BackendWorld {
             UserId::new(),
             SessionId::new(),
         );
-        let other_ctx = RequestContext::new(
-            TenantId::new(),
-            CorrelationId::new(),
-            UserId::new(),
-            SessionId::new(),
-        );
+        let other_ctx = corbusier::test_support::other_tenant_ctx(&ctx);
         Self {
             service,
             ctx,

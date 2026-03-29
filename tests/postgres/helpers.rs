@@ -2,7 +2,7 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
-use corbusier::context::RequestContext;
+use corbusier::context::{RequestContext, TenantId};
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
@@ -269,7 +269,7 @@ pub async fn insert_conversation(
 ) -> Result<(), BoxError> {
     let url = cluster.connection().database_url(db_name);
     let conv_uuid = conv_id.into_inner();
-    let tenant_id = ctx.tenant_id().into_inner();
+    let tenant_id = ctx.tenant_id();
 
     tokio::task::spawn_blocking(move || {
         let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
@@ -279,7 +279,7 @@ pub async fn insert_conversation(
             "VALUES ($1, $2, '{}', 'active', NOW(), NOW())",
         ))
         .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
-        .bind::<diesel::sql_types::Uuid, _>(tenant_id)
+        .bind::<diesel::sql_types::Uuid, _>(tenant_id.into_inner())
         .execute(&mut conn)
         .map_err(|e| Box::new(e) as BoxError)?;
         Ok(())
@@ -288,7 +288,7 @@ pub async fn insert_conversation(
     .map_err(|e| Box::new(e) as BoxError)?
 }
 
-fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: Uuid) -> Result<(), BoxError> {
+fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: TenantId) -> Result<(), BoxError> {
     corbusier::test_support::bootstrap_tenant_row(conn, tenant_id)
         .map(|_| ())
         .map_err(|e| Box::new(e) as BoxError)

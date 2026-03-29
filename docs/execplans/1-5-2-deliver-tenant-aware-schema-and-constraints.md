@@ -283,7 +283,8 @@ anything are:
 The current Diesel schema and model files that will need updates are:
 
 - `src/message/adapters/schema.rs`
-- `src/message/adapters/models.rs`
+- `src/message/adapters/models/mod.rs` and the table-specific modules under
+  `src/message/adapters/models/`
 - `src/task/adapters/postgres/schema.rs`
 - `src/task/adapters/postgres/models.rs`
 - `src/agent_backend/adapters/postgres/schema.rs`
@@ -428,7 +429,8 @@ join declarations to match the new composite relationships. Keep the comment in
 
 In `src/task/adapters/postgres/models.rs`,
 `src/agent_backend/adapters/postgres/models.rs`, and
-`src/message/adapters/models.rs`, add `tenant_id` to the row structs and insert
+`src/message/adapters/models/mod.rs` plus the table-specific modules under
+`src/message/adapters/models/`, add `tenant_id` to the row structs and insert
 structs wherever the underlying table now requires it.
 
 Update PostgreSQL adapter write paths so new rows always persist the caller's
@@ -638,7 +640,7 @@ The implementation should reuse, not replace, these existing building blocks:
 
 - `crate::context::RequestContext::tenant_id()` as the source of tenant
   identity for persistence writes,
-- `crate::message::adapters::postgres::tenant_tx::with_tenant_tx` for
+- `crate::postgres_support::with_tenant_tx` for
   transaction-scoped tenant context where it is already in use,
 - `crate::test_support::{test_request_ctx, other_tenant_ctx}` for multi-tenant
   test setup,

@@ -22,6 +22,7 @@ use crate::tool_registry::{
 use async_trait::async_trait;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
+use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 use std::collections::{HashMap, HashSet};
 
 use self::audit_helpers::audit_to_new_row;
@@ -49,6 +50,13 @@ impl FromTxError<Self> for ToolCatalogError {
 #[derive(Debug, Clone)]
 pub struct PostgresToolCatalog {
     pool: McpServerPgPool,
+}
+
+struct SyncAttempt<'a> {
+    tenant_id: uuid::Uuid,
+    server_id: uuid::Uuid,
+    rows: &'a [NewCatalogEntryRow],
+    candidate_names: &'a HashSet<String>,
 }
 
 impl PostgresToolCatalog {
@@ -136,13 +144,25 @@ impl PostgresToolCatalog {
             .collect())
     }
 
-    fn advisory_lock_key(tenant_id: uuid::Uuid, server_id: uuid::Uuid) -> i64 {
+    fn advisory_lock_key(tenant_id: uuid::Uuid) -> i64 {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         tenant_id.as_bytes().hash(&mut hasher);
-        server_id.as_bytes().hash(&mut hasher);
         hasher.finish().cast_signed()
+    }
+
+    fn acquire_sync_lock(
+        connection: &mut PgConnection,
+        tenant_id: uuid::Uuid,
+    ) -> ToolCatalogResult<()> {
+        diesel::sql_query(format!(
+            "SELECT pg_advisory_xact_lock({})",
+            Self::advisory_lock_key(tenant_id)
+        ))
+        .execute(connection)
+        .map_err(|e| ToolCatalogError::persistence("advisory_lock", e))?;
+        Ok(())
     }
 
     fn sync_rows_tx(
@@ -154,7 +174,7 @@ impl PostgresToolCatalog {
         conn.transaction(|transaction| {
             diesel::sql_query(format!(
                 "SELECT pg_advisory_xact_lock({})",
-                Self::advisory_lock_key(tenant_id, server_id)
+                Self::advisory_lock_key(tenant_id)
             ))
             .execute(transaction)?;
 
@@ -200,6 +220,42 @@ impl PostgresToolCatalog {
             })
     }
 
+    fn is_catalog_name_unique_violation(info: &dyn DatabaseErrorInformation) -> bool {
+        info.constraint_name()
+            .is_some_and(|name| name == "idx_mcp_tool_catalog_tenant_tool_name")
+    }
+
+    fn duplicate_entry_from_counts(
+        rows: &[NewCatalogEntryRow],
+        name_counts: &HashMap<String, usize>,
+    ) -> Option<ToolCatalogError> {
+        rows.iter()
+            .find(|row| name_counts.contains_key(&row.tool_name))
+            .map(|row| Self::duplicate_entry_error(row, name_counts))
+    }
+
+    fn map_sync_rows_error(
+        connection: &mut PgConnection,
+        attempt: &SyncAttempt<'_>,
+        err: DieselError,
+    ) -> ToolCatalogError {
+        if let DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info) = err
+            && Self::is_catalog_name_unique_violation(info.as_ref())
+            && let Ok(refreshed_counts) = Self::load_conflicting_name_counts(
+                connection,
+                attempt.tenant_id,
+                attempt.server_id,
+                attempt.candidate_names,
+            )
+            && let Some(duplicate_entry) =
+                Self::duplicate_entry_from_counts(attempt.rows, &refreshed_counts)
+        {
+            return duplicate_entry;
+        }
+
+        ToolCatalogError::persistence("transaction", err)
+    }
+
     async fn run_sync_in_pool(
         &self,
         tenant_id: uuid::Uuid,
@@ -211,6 +267,8 @@ impl PostgresToolCatalog {
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
         execute_query_with_bootstrap(&self.pool, tenant, move |connection| {
+            Self::acquire_sync_lock(connection, tenant_id)?;
+
             let existing_name_counts = Self::load_conflicting_name_counts(
                 connection,
                 tenant_id,
@@ -225,8 +283,18 @@ impl PostgresToolCatalog {
                 return Err(Self::duplicate_entry_error(row, &existing_name_counts));
             }
 
-            Self::sync_rows_tx(connection, tenant_id, server_id, &rows)
-                .map_err(|e| ToolCatalogError::persistence("transaction", e))
+            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
+                Ok(()) => Ok(()),
+                Err(err) => {
+                    let attempt = SyncAttempt {
+                        tenant_id,
+                        server_id,
+                        rows: &rows,
+                        candidate_names: &candidate_names,
+                    };
+                    Err(Self::map_sync_rows_error(connection, &attempt, err))
+                }
+            }
         })
         .await
     }
