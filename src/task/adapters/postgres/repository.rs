@@ -14,7 +14,7 @@ use crate::context::{RequestContext, TenantId};
 use crate::message::adapters::postgres::blocking_helpers::{
     PgPool, get_conn_with, run_blocking_with,
 };
-use crate::message::adapters::postgres::tenant_tx::{
+use crate::postgres_support::{
     FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
 };
 use crate::task::{

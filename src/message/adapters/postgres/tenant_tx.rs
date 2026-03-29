@@ -85,6 +85,7 @@ where
     F: FnOnce(&mut PgConnection) -> Result<T, E>,
 {
     conn.transaction::<T, TxError<E>, _>(|tx| {
+        diesel::sql_query("SET TRANSACTION READ ONLY").execute(tx)?;
         set_tenant_context(tx, tenant_id)?;
         body(tx).map_err(TxError::Domain)
     })

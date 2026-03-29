@@ -115,8 +115,10 @@ impl PostgresMessageRepository {
         T: Send + 'static,
     {
         let bootstrapping_tx = |conn: &mut PgConnection, tenant_uuid: uuid::Uuid, qfn: F| {
-            ensure_tenant_exists(conn, tenant_uuid).map_err(RepositoryError::database)?;
-            with_tenant_tx(conn, tenant_uuid, qfn)
+            with_tenant_tx(conn, tenant_uuid, |tx| {
+                ensure_tenant_exists(tx, tenant_uuid).map_err(RepositoryError::database)?;
+                qfn(tx)
+            })
         };
         self.execute_inner(tenant_id, bootstrapping_tx, query_fn)
             .await
