@@ -1155,6 +1155,7 @@ sequenceDiagram
     Orchestrator->>BackendRegistry: find_by_id(ctx, backend_id)
     BackendRegistry-->>Orchestrator: Option<AgentBackendRegistration>
     Orchestrator->>Orchestrator: validate BackendStatus Active
+    Orchestrator->>Orchestrator: acquire execution lock (tenant_id, conversation_id)
 
     Orchestrator->>SessionRepo: arbitrate_session_slot(ctx, SessionSlotQuery)
     SessionRepo-->>Orchestrator: SessionSlotArbitration
@@ -1206,6 +1207,8 @@ sequenceDiagram
             Orchestrator-->>Caller: error cleanup
         end
     end
+
+    Orchestrator->>Orchestrator: release execution lock (tenant_id, conversation_id)
 
     deactivate Orchestrator
 ```
