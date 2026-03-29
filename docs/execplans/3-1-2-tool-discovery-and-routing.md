@@ -743,23 +743,23 @@ stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
-`discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
- load server from registry (fail with `NotFound` if absent), verify lifecycle
-state allows tool queries, call `host.list_tools()` to get tool definitions,
-map each to a `CatalogEntry`, call `catalog.sync_server_tools()` to persist,
-return the entries.
+`discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
+Load the server from the registry, fail with `NotFound` if it is absent,
+verify the lifecycle state allows tool queries, call `host.list_tools()` to
+get tool definitions, map each definition to a `CatalogEntry`, call
+`catalog.sync_server_tools()` to persist the entries, and return them.
 
-`mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
- delegate to `catalog.mark_server_tools_unavailable(server_id)`.
+`mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
+Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
-`mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`:
- delegate to `catalog.mark_server_tools_available(server_id)`.
+`mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
+Delegate to `catalog.mark_server_tools_available(server_id)`.
 
-`list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`:
- delegate to `catalog.list_all()`.
+`list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
+Delegate to `catalog.list_all()`.
 
-`call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`:
- the core routing method. Flow:
+`call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`.
+This is the core routing method. Its flow is:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
@@ -795,20 +795,19 @@ return the entries.
    call.
 9. Return `ToolCallResult`.
 
-`store_startup_stderr(&self, ctx, server_id, stderr)`
-`-> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`: stores startup stderr
-captured from `McpServerHost::start`. Called by the caller after
-`lifecycle_service.start()` returns a `LifecycleStartResult` with non-empty
-`startup_stderr`. Builds
+`store_startup_stderr(&self, ctx, server_id, stderr) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`.
+Store startup stderr captured from `McpServerHost::start`. The caller invokes
+this after `lifecycle_service.start()` returns a `LifecycleStartResult` with
+non-empty `startup_stderr`. Build
 `LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
-stores via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
-returns the metadata. This method also triggers `sweep_expired` for the server
+store it via `log_store.store_log(&metadata, stderr, &retention_policy)`, and
+return the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
-`sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`:
- triggers a retention sweep for a specific server. Delegates to
-`log_store.sweep_expired(server_id, &SweepContext { … })`. Returns the count of
-deleted log entries.
+`sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`.
+Trigger a retention sweep for a specific server. Delegate to
+`log_store.sweep_expired(server_id, &SweepContext { … })` and return the count
+of deleted log entries.
 
 Define `ToolDiscoveryRoutingServiceError` with variants:
 `Domain(from ToolRegistryDomainError)`, `Catalog(from ToolCatalogError)`,

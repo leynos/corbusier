@@ -1,6 +1,7 @@
 //! Given steps for hook-backed tool policy enforcement scenarios.
 
-use super::world::{HookPolicyWorld, run_async, stdio_request};
+use super::async_utils::run_async;
+use super::world::{HookPolicyWorld, stdio_request};
 use corbusier::hook_engine::domain::{
     HookAction, HookActionId, HookActionType, HookDefinition, HookId, HookTriggerType,
 };

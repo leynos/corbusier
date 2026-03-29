@@ -1,6 +1,7 @@
 //! Then steps for hook-backed tool policy enforcement scenarios.
 
-use super::world::{HookPolicyWorld, run_async};
+use super::async_utils::run_async;
+use super::world::HookPolicyWorld;
 use corbusier::hook_engine::ports::HookPolicyAuditRepository;
 use corbusier::tool_registry::domain::ToolRegistryDomainError;
 use corbusier::tool_registry::services::ToolDiscoveryRoutingServiceError;

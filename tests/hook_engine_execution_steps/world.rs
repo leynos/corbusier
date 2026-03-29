@@ -80,22 +80,3 @@ impl Default for HookWorld {
 pub fn world() -> HookWorld {
     HookWorld::default()
 }
-
-/// Runs an async operation within sync step definitions.
-///
-/// # Preconditions
-///
-/// This function requires that the current thread is running inside a Tokio
-/// multi-threaded runtime. It uses [`tokio::task::block_in_place`] internally,
-/// which will **panic** if called outside such a runtime or from a current-thread
-/// runtime. Ensure that the calling context is within a `#[tokio::test(flavor = "multi_thread")]`
-/// or equivalent multi-threaded async runtime environment.
-///
-/// # Panics
-///
-/// Panics if called outside a multi-threaded Tokio runtime, as
-/// [`tokio::task::block_in_place`] and [`tokio::runtime::Handle::current`]
-/// require an active runtime context.
-pub fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
-    tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
-}

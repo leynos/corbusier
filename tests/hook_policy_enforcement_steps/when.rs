@@ -1,6 +1,7 @@
 //! When steps for hook-backed tool policy enforcement scenarios.
 
-use super::world::{HookPolicyWorld, run_async};
+use super::async_utils::run_async;
+use super::world::HookPolicyWorld;
 use corbusier::message::domain::ConversationId;
 use corbusier::task::domain::TaskId;
 use corbusier::tool_registry::domain::ToolCallRequest;

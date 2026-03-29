@@ -1,6 +1,7 @@
 //! When steps for hook engine execution scenarios.
 
-use super::world::{HookWorld, run_async};
+use super::async_utils::run_async;
+use super::world::HookWorld;
 use corbusier::hook_engine::domain::{HookTriggerContext, HookTriggerType};
 use corbusier::hook_engine::ports::HookEngine;
 use eyre::WrapErr;
@@ -10,7 +11,7 @@ use rstest_bdd_macros::when;
 fn fire_trigger(world: &mut HookWorld, trigger: HookTriggerType) -> Result<(), eyre::Report> {
     let context = HookTriggerContext::new(trigger, &DefaultClock);
     let stored_context = context.clone();
-    let results = run_async(world.service.execute(&world.request_ctx, context))
+    let results = run_async(world.service.execute(&world.request_ctx, context))?
         .wrap_err("hook execution failed")?;
     world.last_context = Some(stored_context);
     world.last_results = Some(results);
