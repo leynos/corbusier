@@ -117,7 +117,7 @@ Observable operator outcome:
       integration, and `rstest-bdd` behavioural tests.
 - [x] Stage E: updated design and user documentation; marked roadmap 2.3.2
       done.
-- [x] Stage F: ran formatting, lint, test, Markdown, and Mermaid validation
+- [x] Stage F: ran formatting, lint, tests, Markdown, and Mermaid validation
       gates; validation details are captured in the companion checklist.
 
 ## Surprises & discoveries

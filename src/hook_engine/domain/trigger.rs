@@ -311,13 +311,6 @@ impl HookTriggerContext {
 
 impl From<crate::tool_registry::domain::ToolExecutionScope> for HookExecutionScope {
     fn from(src: crate::tool_registry::domain::ToolExecutionScope) -> Self {
-        let mut scope = Self::new();
-        if let Some(task_id) = src.task_id() {
-            scope = scope.with_task_id(task_id);
-        }
-        if let Some(conversation_id) = src.conversation_id() {
-            scope = scope.with_conversation_id(conversation_id);
-        }
-        scope.with_metadata(src.metadata().clone())
+        Self::from(&src)
     }
 }

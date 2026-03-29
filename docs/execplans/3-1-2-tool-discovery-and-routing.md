@@ -738,7 +738,7 @@ dependencies as `Arc` references (`catalog`, `registry`, `host`, `policy`,
 `ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over the
 same port types plus `Clock`. The constructor
 `new(ports: ServicePorts<...>, retention_policy: LogRetentionPolicy, clock: Arc<C>)`
- destructures the grouped ports into individual fields. Internally the service
+ destructures the grouped ports into individual fields. Internally, the service
 stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
@@ -1300,7 +1300,7 @@ where
 
 New files (estimated 23-26):
 
-Table 3.1.2: File manifest -- new files for roadmap 3.1.2
+Table 3.1.2: File manifest — new files for roadmap 3.1.2
 
 | Path                                                             | Purpose                                                                |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------- |

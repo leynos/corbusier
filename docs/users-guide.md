@@ -439,11 +439,12 @@ fn create_tenant() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## MCP server lifecycle management
+## Model Context Protocol (MCP) server lifecycle management
 
-The `tool_registry` module can register MCP servers, start and stop them,
-refresh health status, and list tools exposed by running servers. Tool queries
-are only allowed when a server is in the `running` lifecycle state.
+The `tool_registry` module can register Model Context Protocol (MCP) servers,
+start and stop them, refresh health status, and list tools exposed by running
+servers. Tool queries are only allowed when a server is in the `running`
+lifecycle state.
 
 ```rust,no_run
 use std::sync::Arc;

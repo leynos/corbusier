@@ -52,18 +52,32 @@ pub type HookPolicyDiscoveryService = ToolDiscoveryRoutingService<
 
 /// Scenario world for hook-backed policy enforcement behaviour.
 pub struct HookPolicyWorld {
+    /// Request context used for lifecycle, discovery, and governance calls.
     pub request_ctx: RequestContext,
+    /// In-memory MCP host used to simulate server behaviour during scenarios.
     pub host: Arc<InMemoryMcpServerHost>,
+    /// Lifecycle service used to register, start, and stop test servers.
     pub lifecycle: HookPolicyLifecycleService,
+    /// Discovery service under test, wired to hook-backed governance.
     pub discovery: HookPolicyDiscoveryService,
+    /// Hook definition repository populated by scenario setup steps.
     pub definition_repo: InMemoryHookDefinitionRepository,
+    /// Action executor seeded with hook policy outputs for each scenario.
     pub action_executor: InMemoryHookActionExecutor,
+    /// Policy audit repository queried by assertions after tool execution.
     pub policy_audit: InMemoryHookPolicyAuditRepository,
+    /// Most recent tool call request issued during a scenario, if any.
     pub last_request: Option<ToolCallRequest>,
+    /// Most recent successful tool call result recorded by a scenario step.
     pub last_result: Option<ToolCallResult>,
+    /// Most recent discovery or governance error captured by a scenario step.
     pub last_error: Option<ToolDiscoveryRoutingServiceError>,
+    /// Task identifier associated with the current scenario request, if set.
     pub last_task_id: Option<TaskId>,
+    /// Conversation identifier associated with the current scenario request, if
+    /// set.
     pub last_conversation_id: Option<ConversationId>,
+    /// Policy audit events captured for the most recent scenario assertion.
     pub last_events: Vec<PolicyAuditEvent>,
 }
 
