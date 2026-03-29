@@ -22,6 +22,9 @@ fn assert_last_error_matches(
         ToolDiscoveryRoutingServiceError::Domain(other) => {
             eyre::bail!("{message}; got Domain({other:?})")
         }
+        ToolDiscoveryRoutingServiceError::NotFound(server_id) => {
+            eyre::bail!("{message}; got NotFound({server_id:?})")
+        }
         other => eyre::bail!("{message}; got non-domain error: {other:?}"),
     }
 }
