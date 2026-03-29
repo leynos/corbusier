@@ -124,23 +124,23 @@ fn assert_backend_id_matches(
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "BDD helper compares two tenant-scoped lookups against explicit expectations."
-)]
+#[derive(Clone, Copy)]
+struct TenantLookupExpectation<'a> {
+    ctx: &'a corbusier::context::RequestContext,
+    expected: &'a corbusier::agent_backend::domain::AgentBackendRegistration,
+}
+
 fn assert_backends_by_name(
     service: &super::world::TestRegistryService,
-    ctx_a: &corbusier::context::RequestContext,
-    ctx_b: &corbusier::context::RequestContext,
     name: &str,
-    expected_a: &corbusier::agent_backend::domain::AgentBackendRegistration,
-    expected_b: &corbusier::agent_backend::domain::AgentBackendRegistration,
+    tenant_a: TenantLookupExpectation<'_>,
+    tenant_b: TenantLookupExpectation<'_>,
 ) -> Result<(), eyre::Report> {
-    let found_a = lookup_backend_by_name(service, ctx_a, name, "tenant A")?;
-    let found_b = lookup_backend_by_name(service, ctx_b, name, "tenant B")?;
+    let found_a = lookup_backend_by_name(service, tenant_a.ctx, name, "tenant A")?;
+    let found_b = lookup_backend_by_name(service, tenant_b.ctx, name, "tenant B")?;
 
-    assert_backend_id_matches(&found_a, expected_a, "tenant A")?;
-    assert_backend_id_matches(&found_b, expected_b, "tenant B")?;
+    assert_backend_id_matches(&found_a, tenant_a.expected, "tenant A")?;
+    assert_backend_id_matches(&found_b, tenant_b.expected, "tenant B")?;
     if found_a.id() == found_b.id() {
         return Err(eyre::eyre!("tenant lookups must return distinct backends"));
     }
@@ -160,10 +160,14 @@ fn each_tenant_finds_own_backend(world: &BackendWorld) -> Result<(), eyre::Repor
     let (_, expected_b) = extract_two_registered(world)?;
     assert_backends_by_name(
         &world.service,
-        &world.ctx,
-        &world.other_ctx,
         &pending.name,
-        expected_a,
-        expected_b,
+        TenantLookupExpectation {
+            ctx: &world.ctx,
+            expected: expected_a,
+        },
+        TenantLookupExpectation {
+            ctx: &world.other_ctx,
+            expected: expected_b,
+        },
     )
 }

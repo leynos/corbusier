@@ -62,14 +62,9 @@ impl PostgresHandoffAdapter {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Combines bootstrap control and transaction wrapper in one handoff helper."
-    )]
     async fn execute_impl<TxWrap, F, T>(
         &self,
         tenant_id: TenantId,
-        bootstrap: bool,
         tx_wrap: TxWrap,
         query_fn: F,
     ) -> HandoffResult<T>
@@ -82,10 +77,6 @@ impl PostgresHandoffAdapter {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                if bootstrap {
-                    ensure_tenant_exists(&mut conn, tenant_id.into_inner())
-                        .map_err(HandoffError::persistence)?;
-                }
                 tx_wrap(&mut conn, tenant_id.into_inner(), query_fn)
             },
             HandoffError::persistence,
@@ -103,7 +94,11 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, true, with_tenant_tx, query_fn)
+        let bootstrapping_tx = |conn: &mut PgConnection, tenant_uuid: uuid::Uuid, qfn: F| {
+            ensure_tenant_exists(conn, tenant_uuid).map_err(HandoffError::persistence)?;
+            with_tenant_tx(conn, tenant_uuid, qfn)
+        };
+        self.execute_impl(tenant_id, bootstrapping_tx, query_fn)
             .await
     }
 
@@ -113,8 +108,7 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, false, with_tenant_tx, query_fn)
-            .await
+        self.execute_impl(tenant_id, with_tenant_tx, query_fn).await
     }
 
     /// Executes a read-only query inside a transaction with tenant context.
@@ -123,7 +117,7 @@ impl PostgresHandoffAdapter {
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        self.execute_impl(tenant_id, false, with_tenant_read_tx, query_fn)
+        self.execute_impl(tenant_id, with_tenant_read_tx, query_fn)
             .await
     }
 }
