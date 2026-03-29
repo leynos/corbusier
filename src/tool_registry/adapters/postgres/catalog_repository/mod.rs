@@ -6,6 +6,7 @@
 mod audit_helpers;
 mod catalog_exec;
 mod mappers;
+mod sync_helpers;
 
 use super::{
     catalog_models::{CatalogEntryRow, NewCatalogEntryRow},
@@ -15,14 +16,13 @@ use super::{
 use crate::context::{RequestContext, TenantId};
 use crate::postgres_support::{FromTxError, TxError};
 use crate::tool_registry::{
-    domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
+    domain::{CatalogEntry, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
 
 use async_trait::async_trait;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
-use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 use std::collections::{HashMap, HashSet};
 
 use self::audit_helpers::audit_to_new_row;
@@ -50,13 +50,6 @@ impl FromTxError<Self> for ToolCatalogError {
 #[derive(Debug, Clone)]
 pub struct PostgresToolCatalog {
     pool: McpServerPgPool,
-}
-
-struct SyncAttempt<'a> {
-    tenant_id: uuid::Uuid,
-    server_id: uuid::Uuid,
-    rows: &'a [NewCatalogEntryRow],
-    candidate_names: &'a HashSet<String>,
 }
 
 impl PostgresToolCatalog {
@@ -194,68 +187,6 @@ impl PostgresToolCatalog {
         })
     }
 
-    fn load_conflicting_name_counts(
-        connection: &mut PgConnection,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
-        candidate_names: &HashSet<String>,
-    ) -> ToolCatalogResult<HashMap<String, usize>> {
-        let candidate_name_list: Vec<&str> = candidate_names.iter().map(String::as_str).collect();
-        mcp_tool_catalog::table
-            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
-            .filter(mcp_tool_catalog::server_id.ne(server_id))
-            .filter(mcp_tool_catalog::tool_name.eq_any(candidate_name_list))
-            .group_by(mcp_tool_catalog::tool_name)
-            .select((mcp_tool_catalog::tool_name, diesel::dsl::count_star()))
-            .load::<(String, i64)>(connection)
-            .map_err(|e| ToolCatalogError::persistence("select", e))
-            .map(|tool_names| {
-                tool_names
-                    .into_iter()
-                    .fold(HashMap::new(), |mut counts, (tool_name, count)| {
-                        *counts.entry(tool_name).or_insert(0usize) =
-                            usize::try_from(count).unwrap_or_default();
-                        counts
-                    })
-            })
-    }
-
-    fn is_catalog_name_unique_violation(info: &dyn DatabaseErrorInformation) -> bool {
-        info.constraint_name()
-            .is_some_and(|name| name == "idx_mcp_tool_catalog_tenant_tool_name")
-    }
-
-    fn duplicate_entry_from_counts(
-        rows: &[NewCatalogEntryRow],
-        name_counts: &HashMap<String, usize>,
-    ) -> Option<ToolCatalogError> {
-        rows.iter()
-            .find(|row| name_counts.contains_key(&row.tool_name))
-            .map(|row| Self::duplicate_entry_error(row, name_counts))
-    }
-
-    fn map_sync_rows_error(
-        connection: &mut PgConnection,
-        attempt: &SyncAttempt<'_>,
-        err: DieselError,
-    ) -> ToolCatalogError {
-        if let DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info) = err
-            && Self::is_catalog_name_unique_violation(info.as_ref())
-            && let Ok(refreshed_counts) = Self::load_conflicting_name_counts(
-                connection,
-                attempt.tenant_id,
-                attempt.server_id,
-                attempt.candidate_names,
-            )
-            && let Some(duplicate_entry) =
-                Self::duplicate_entry_from_counts(attempt.rows, &refreshed_counts)
-        {
-            return duplicate_entry;
-        }
-
-        ToolCatalogError::persistence("transaction", err)
-    }
-
     async fn run_sync_in_pool(
         &self,
         tenant_id: uuid::Uuid,
@@ -269,7 +200,7 @@ impl PostgresToolCatalog {
         execute_query_with_bootstrap(&self.pool, tenant, move |connection| {
             Self::acquire_sync_lock(connection, tenant_id)?;
 
-            let existing_name_counts = Self::load_conflicting_name_counts(
+            let existing_name_counts = sync_helpers::load_conflicting_name_counts(
                 connection,
                 tenant_id,
                 server_id,
@@ -280,35 +211,26 @@ impl PostgresToolCatalog {
                 .iter()
                 .find(|row| existing_name_counts.contains_key(&row.tool_name))
             {
-                return Err(Self::duplicate_entry_error(row, &existing_name_counts));
+                return Err(sync_helpers::duplicate_entry_error(
+                    row,
+                    &existing_name_counts,
+                ));
             }
 
             match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
                 Ok(()) => Ok(()),
                 Err(err) => {
-                    let attempt = SyncAttempt {
+                    let attempt = sync_helpers::SyncAttempt {
                         tenant_id,
                         server_id,
                         rows: &rows,
                         candidate_names: &candidate_names,
                     };
-                    Err(Self::map_sync_rows_error(connection, &attempt, err))
+                    Err(sync_helpers::map_sync_rows_error(connection, &attempt, err))
                 }
             }
         })
         .await
-    }
-
-    fn duplicate_entry_error(
-        row: &NewCatalogEntryRow,
-        name_counts: &HashMap<String, usize>,
-    ) -> ToolCatalogError {
-        let server_count = name_counts.get(&row.tool_name).copied().unwrap_or_default() + 1;
-        ToolCatalogError::DuplicateEntry {
-            id: CatalogEntryId::from_uuid(row.id),
-            tool_name: row.tool_name.clone(),
-            server_count,
-        }
     }
 
     fn load_entries_for_tenant(

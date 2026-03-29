@@ -95,9 +95,9 @@ ALTER TABLE messages
 
 ALTER TABLE conversations
     ADD CONSTRAINT conversations_task_fk
-        FOREIGN KEY (task_id, tenant_id)
-        REFERENCES tasks (id, tenant_id)
-        ON DELETE SET NULL (task_id);
+        FOREIGN KEY (task_id)
+        REFERENCES tasks (id)
+        ON DELETE SET NULL;
 
 ALTER TABLE agent_sessions
     ADD CONSTRAINT agent_sessions_conversation_id_fkey
