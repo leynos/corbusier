@@ -91,7 +91,7 @@ fn build_api_state() -> std::io::Result<ApiState> {
             catalog: Arc::new(PostgresToolCatalog::new(pool.clone())),
             registry: Arc::new(PostgresMcpServerRegistry::new(pool)),
             host: Arc::new(InMemoryMcpServerHost::new()),
-            policy: Arc::new(AllowAllPolicy),
+            governance: Arc::new(AllowAllPolicy::new()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

@@ -24,8 +24,8 @@ use crate::task::{
 use crate::tool_registry::{
     domain::{CatalogEntry, ToolCallRequest, ToolCallResult},
     ports::{
-        McpServerHost, McpServerRegistryRepository, ToolCatalogRepository, ToolLogStore,
-        ToolPolicyEnforcer,
+        McpServerHost, McpServerRegistryRepository, ToolCatalogRepository, ToolExecutionGovernance,
+        ToolLogStore,
     },
     services::{ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError},
 };
@@ -229,7 +229,7 @@ where
     Cat: ToolCatalogRepository + 'static,
     Reg: McpServerRegistryRepository + 'static,
     Host: McpServerHost + 'static,
-    Policy: ToolPolicyEnforcer + 'static,
+    Policy: ToolExecutionGovernance + 'static,
     Log: ToolLogStore + 'static,
     C: Clock + Send + Sync + 'static,
 {
