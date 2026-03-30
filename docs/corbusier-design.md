@@ -8540,12 +8540,46 @@ Actix Web provides middleware support for authentication, with
 actix_web_httpauth providing middleware that makes it simple to add
 authentication to any actix-based API:
 
-| Endpoint Category | Base Path               | Methods                | Authentication   | Rate Limiting  |
-| ----------------- | ----------------------- | ---------------------- | ---------------- | -------------- |
-| Conversations     | `/api/v1/conversations` | GET, POST, PUT         | JWT Bearer Token | 100 req/min    |
-| Tasks             | `/api/v1/tasks`         | GET, POST, PUT, DELETE | JWT Bearer Token | 50 req/min     |
-| Tools             | `/api/v1/tools`         | GET, POST              | JWT Bearer Token | 200 req/min    |
-| Events            | `/api/v1/events`        | GET (SSE)              | JWT Bearer Token | 10 connections |
+| Endpoint Category | Base Path               | Methods               | Authentication   | Rate Limiting  |
+| ----------------- | ----------------------- | --------------------- | ---------------- | -------------- |
+| Conversations     | `/api/v1/conversations` | POST, nested GET/POST | JWT Bearer Token | 100 req/min    |
+| Tasks             | `/api/v1/tasks`         | POST, nested GET/PUT  | JWT Bearer Token | 50 req/min     |
+| Tools             | `/api/v1/tools`         | GET, nested POST      | JWT Bearer Token | 200 req/min    |
+| Events            | `/api/v1/events`        | GET (SSE)             | JWT Bearer Token | 10 connections |
+
+###### Initial v1 implementation status
+
+The initial shipped HTTP surface is narrower than the long-term inventory in
+this section. `v1` currently exposes:
+
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/history`
+- `POST /api/v1/conversations/{conversation_id}/messages`
+- `POST /api/v1/tasks`
+- `GET /api/v1/tasks/{task_id}`
+- `PUT /api/v1/tasks/{task_id}/state`
+- `PUT /api/v1/tasks/{task_id}/branch`
+- `PUT /api/v1/tasks/{task_id}/pull-request`
+- `GET /api/v1/tools`
+- `POST /api/v1/tools/calls`
+
+Every response uses a stable JSON envelope:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null,
+  "metadata": {
+    "version": "v1",
+    "request_id": "<correlation-id>",
+    "timestamp": "<RFC3339 timestamp>"
+  }
+}
+```
+
+Error responses keep the same envelope shape and populate `error.code` plus
+`error.message`.
 
 ##### 6.3.1.2 Authentication Methods
 
@@ -8596,10 +8630,9 @@ graph TB
 
 ###### Authentication Implementation
 
-JWT middleware attempts to obtain the token from the Authorization header
-first, and if the token is not present, it will then look in the Cookies
-object, with a 401 Unauthorized error sent to the client if the token cannot be
-found in either location:
+The initial `v1` implementation accepts only `Authorization: Bearer <jwt>`
+credentials. Missing, malformed, or invalid tokens are rejected with
+`401 Unauthorized` before any domain service is called.
 
 | Authentication Method | Implementation            | Token Location       | Expiration Policy              |
 | --------------------- | ------------------------- | -------------------- | ------------------------------ |
@@ -8612,6 +8645,18 @@ services can construct request context consistently:
 `{ sub: user_id, tenant_id, session_id, role, tenant_kind }`. The initial
 release supports `tenant_kind = user`; team and organization tenants are
 deferred.
+
+The initial implementation materializes request context directly from these
+claims and issues a fresh correlation ID per HTTP request.
+
+###### Initial tenant-isolation limitation
+
+The HTTP adapter is authenticated and tenant-aware at the application layer,
+but conversation and message persistence are not yet fully isolated by schema
+or Row-Level Security. This remains blocked on roadmap items `2.5.2` and
+`2.5.3`, which will add tenant-owned schema columns plus enforced PostgreSQL
+policies. Until then, the HTTP API should be treated as an internal or trusted
+surface rather than a hardened multi-tenant boundary.
 
 ###### MCP Authentication Integration
 

@@ -6,6 +6,7 @@
 
 pub mod agent_session;
 pub mod context_snapshot;
+pub mod conversation;
 pub mod handoff;
 pub mod repository;
 pub mod slash_command;
@@ -13,6 +14,9 @@ pub mod validator;
 
 pub use agent_session::{AgentSessionRepository, SessionError, SessionResult};
 pub use context_snapshot::{ContextSnapshotPort, SnapshotError, SnapshotResult};
+pub use conversation::{
+    ConversationRepository, ConversationRepositoryError, ConversationRepositoryResult,
+};
 pub use handoff::{AgentHandoffPort, HandoffError, HandoffResult};
 pub use repository::MessageRepository;
 pub use slash_command::{

@@ -5,12 +5,14 @@
 
 mod agent_session;
 mod context_snapshot;
+mod conversation;
 mod handoff;
 mod message;
 mod slash_command;
 
 pub use agent_session::InMemoryAgentSessionRepository;
 pub use context_snapshot::InMemoryContextSnapshotAdapter;
+pub use conversation::InMemoryConversationRepository;
 pub use handoff::InMemoryHandoffAdapter;
 pub use message::InMemoryMessageRepository;
 pub use slash_command::InMemorySlashCommandRegistry;
