@@ -26,6 +26,7 @@
 
 pub mod context;
 pub mod health;
+pub mod http_api;
 pub mod tenant;
 
 pub mod agent_backend;

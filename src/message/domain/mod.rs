@@ -7,6 +7,7 @@ mod agent_session;
 mod audit;
 mod content;
 mod context_snapshot;
+mod conversation;
 mod handoff;
 mod ids;
 mod message;
@@ -28,6 +29,7 @@ pub use context_snapshot::{
     ContextWindowSnapshot, MessageSummary, ParseSnapshotTypeError, SequenceRange, SnapshotParams,
     SnapshotType,
 };
+pub use conversation::{Conversation, ConversationState};
 pub use handoff::{
     HandoffMetadata, HandoffParams, HandoffStatus, ParseHandoffStatusError, ToolCallReference,
 };

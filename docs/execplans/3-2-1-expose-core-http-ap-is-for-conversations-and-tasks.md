@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETED
 
 Current roadmap numbering places this work at `4.2.1` in
 [docs/roadmap.md](../roadmap.md). This file keeps the user-requested `3-2-1`
@@ -123,15 +123,22 @@ Observable success means:
 - [x] (2026-03-27 00:00Z) Inspected current Actix entrypoint, existing bounded
   contexts, and test patterns to ground the plan in the current tree.
 - [x] (2026-03-27 00:00Z) Authored the initial ExecPlan draft in this file.
-- [ ] Await approval before execution begins.
-- [ ] Stage A: lock the HTTP contract, versioning rule, and auth boundary.
-- [ ] Stage B: add missing application services and ports in bounded contexts.
-- [ ] Stage C: implement the HTTP adapter, middleware, and composition root.
-- [ ] Stage D: add unit, behavioural, in-memory, and Postgres-backed tests.
-- [ ] Stage E: update design and user docs, then mark roadmap item `4.2.1`
-  done.
-- [ ] Stage F: run full code and documentation quality gates and capture
-  evidence.
+- [x] (2026-03-30 00:00Z) Approval received and execution started.
+- [x] (2026-03-30 00:00Z) Stage A: locked the initial `/api/v1` contract,
+  response envelope, and bearer-token auth boundary.
+- [x] (2026-03-30 00:00Z) Stage B: added conversation-level application
+  services and repositories in the `message` bounded context, plus the narrow
+  task read path required by HTTP.
+- [x] (2026-03-30 00:00Z) Stage C: implemented the `src/http_api/` adapter and
+  wired it into `src/main.rs`.
+- [x] (2026-03-30 00:00Z) Stage D: added unit, behavioural, in-memory, and
+  Postgres-backed tests for the HTTP surface.
+- [x] (2026-03-30 00:00Z) Stage E: updated `docs/corbusier-design.md`,
+  `docs/users-guide.md`, and `docs/roadmap.md`.
+- [x] (2026-03-30 00:00Z) Stage F: quality gates passed:
+  `make check-fmt`, `make lint`,
+  `make test TEST_FLAGS='--profile long --all-targets --all-features'`,
+  `make fmt`, `PATH=/root/.bun/bin:$PATH make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
 
@@ -150,6 +157,12 @@ Observable success means:
 - The Postgres adapters for `message` and `task` document that tenant context
   is prepared for RLS but not yet enforced by schema/policies, which is a real
   production exposure risk for authenticated HTTP endpoints.
+- The first behavioural-test implementation attempted to create a Tokio runtime
+  inside Tokio-powered `rstest-bdd` scenarios. The fix was to reuse the active
+  runtime with `tokio::task::block_in_place` during synchronous world setup.
+- The shared HTTP test fixtures needed to be separated from the broader
+  Postgres test helpers to keep `clippy -D warnings` clean across all
+  integration-test crates.
 
 ## Decision Log
 
@@ -175,15 +188,57 @@ Observable success means:
   associate pull request. Rationale: this exposes existing behaviour without
   expanding into unimplemented list/delete semantics. Date/Author: 2026-03-27 /
   plan author.
+- Decision: keep JWT verification intentionally narrow for `4.2.1` by
+  accepting only `Authorization: Bearer <jwt>` plus HS256 claims
+  `{ sub, tenant_id, session_id, exp, role?, tenant_kind? }`. Rationale: this
+  enforces authentication without pulling roadmap `5.1.1` token lifecycle work
+  into the HTTP-adapter milestone. Date/Author: 2026-03-30 / implementation
+  author.
+- Decision: document, rather than hide, the current Postgres tenant-isolation
+  limitation for conversations and messages. Rationale: the adapter is
+  shippable for internal and trusted use now, but production-grade multi-tenant
+  isolation still depends on roadmap items `2.5.2` and `2.5.3`. Date/Author:
+  2026-03-30 / implementation author.
 
 ## Outcomes & Retrospective
 
-Pending implementation.
+Implemented.
 
-The target outcome is a versioned, authenticated Actix API that exposes the
-current conversation, task, and tool workflows without violating hexagonal
-boundaries. This section must be updated during execution with the final
-behaviour, validation evidence, and any lessons learned.
+The delivered HTTP adapter now exposes:
+
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/history`
+- `POST /api/v1/conversations/{conversation_id}/messages`
+- `POST /api/v1/tasks`
+- `GET /api/v1/tasks/{task_id}`
+- `PUT /api/v1/tasks/{task_id}/state`
+- `PUT /api/v1/tasks/{task_id}/branch`
+- `PUT /api/v1/tasks/{task_id}/pull-request`
+- `GET /api/v1/tools`
+- `POST /api/v1/tools/calls`
+
+Every route returns the shared versioned envelope with `metadata.version = v1`
+and enforces JWT bearer authentication before entering the owning bounded
+context.
+
+Validation evidence captured during implementation:
+
+- Targeted HTTP adapter coverage passed with `cargo nextest run --all-targets
+  --all-features http_api_surface --no-fail-fast`.
+- Full repository quality gates passed on 2026-03-30:
+  `make check-fmt`, `make lint`,
+  `make test TEST_FLAGS='--profile long --all-targets --all-features'`,
+  `make fmt`, `PATH=/root/.bun/bin:$PATH make markdownlint`, and `make nixie`.
+- The full nextest suite completed with `841` passing tests and `1` skipped
+  test under the `long` profile.
+
+Residual limitation:
+
+- Conversation and message persistence still lack hardened PostgreSQL
+  tenant-isolation via schema columns and Row-Level Security. This remains
+  tracked by roadmap items `2.5.2` and `2.5.3`, so the HTTP API should still be
+  treated as an internal or trusted surface rather than a complete multi-tenant
+  security boundary.
 
 ## Context and orientation
 

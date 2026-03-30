@@ -7,6 +7,7 @@
 mod agent_session;
 pub(crate) mod blocking_helpers;
 mod context_snapshot;
+mod conversation;
 mod conversion_helpers;
 mod handoff;
 mod sql_helpers;
@@ -14,6 +15,7 @@ pub(crate) mod tenant_tx;
 
 pub use agent_session::PostgresAgentSessionRepository;
 pub use context_snapshot::PostgresContextSnapshotAdapter;
+pub use conversation::PostgresConversationRepository;
 pub use handoff::PostgresHandoffAdapter;
 
 use async_trait::async_trait;

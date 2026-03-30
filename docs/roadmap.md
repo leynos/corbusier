@@ -580,13 +580,13 @@ enforcement.
 
 ### 4.2. HTTP API surface
 
-- [ ] 4.2.1 Expose core HTTP APIs for conversations and tasks. Requires 2.2.3.
+- [x] 4.2.1 Expose core HTTP APIs for conversations and tasks. Requires 2.2.3.
   See corbusier-design.md §2.1.4 and §6.2.1.
-  - [ ] Implement conversation, task, and tool endpoints. See
+  - [x] Implement conversation, task, and tool endpoints. See
     corbusier-design.md §6.2.1.
-  - [ ] Apply API versioning and authentication requirements. See
+  - [x] Apply API versioning and authentication requirements. See
     corbusier-design.md §6.3.1.5 and §6.4.1.
-  - [ ] Success criteria: API endpoints return versioned responses and enforce
+  - [x] Success criteria: API endpoints return versioned responses and enforce
     authentication.
 
 ### 4.3. Real-time event streaming
