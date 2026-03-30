@@ -250,6 +250,20 @@ where
         Ok(task)
     }
 
+    /// Retrieves a task by internal identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TaskLifecycleError::Repository`] when lookup fails or
+    /// [`TaskRepositoryError::NotFound`] when the task does not exist.
+    pub async fn get_by_id(
+        &self,
+        ctx: &RequestContext,
+        task_id: TaskId,
+    ) -> TaskLifecycleResult<Task> {
+        self.find_task_by_id_or_error(ctx, task_id).await
+    }
+
     /// Retrieves a task by issue reference.
     ///
     /// Returns `Ok(None)` when no task has been created from the issue.
