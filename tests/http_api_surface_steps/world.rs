@@ -115,7 +115,7 @@ pub fn world() -> HttpApiWorld {
             catalog,
             registry: registry.clone(),
             host: host.clone(),
-            policy: Arc::new(AllowAllPolicy),
+            governance: Arc::new(AllowAllPolicy::new()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),

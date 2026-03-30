@@ -14,7 +14,7 @@ use crate::task::{
 };
 use crate::tool_registry::{
     domain::ToolRegistryDomainError,
-    ports::{ToolCatalogError, ToolLogStoreError, ToolPolicyError},
+    ports::{ToolCatalogError, ToolGovernanceError, ToolLogStoreError},
     services::ToolDiscoveryRoutingServiceError,
 };
 
@@ -142,8 +142,8 @@ impl From<ToolDiscoveryRoutingServiceError> for ApiError {
             ToolDiscoveryRoutingServiceError::Host(host_error) => {
                 Self::internal(host_error.to_string())
             }
-            ToolDiscoveryRoutingServiceError::Policy(policy_error) => {
-                map_tool_policy_error(&policy_error)
+            ToolDiscoveryRoutingServiceError::Governance(governance_error) => {
+                map_tool_governance_error(&governance_error)
             }
             ToolDiscoveryRoutingServiceError::LogStore(log_store_error) => {
                 map_tool_log_store_error(&log_store_error)
@@ -255,7 +255,7 @@ fn map_tool_catalog_error(error: ToolCatalogError) -> ApiError {
     }
 }
 
-fn map_tool_policy_error(error: &ToolPolicyError) -> ApiError {
+fn map_tool_governance_error(error: &ToolGovernanceError) -> ApiError {
     ApiError::internal(error.to_string())
 }
 
