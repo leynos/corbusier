@@ -128,7 +128,10 @@ pub struct ApiState {
 
 impl ApiState {
     /// Creates a new shared API state bundle.
-    #[expect(clippy::too_many_arguments, reason = "Constructor with multiple dependencies")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Constructor with multiple dependencies"
+    )]
     #[must_use]
     pub fn new(
         conversations: Arc<dyn ConversationApplication>,
