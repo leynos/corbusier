@@ -32,6 +32,19 @@ impl ConversationState {
     }
 }
 
+impl TryFrom<&str> for ConversationState {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "active" => Ok(Self::Active),
+            "paused" => Ok(Self::Paused),
+            "archived" => Ok(Self::Archived),
+            _ => Err(format!("unknown conversation state: {value}")),
+        }
+    }
+}
+
 /// Conversation aggregate root.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Conversation {

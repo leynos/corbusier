@@ -53,6 +53,8 @@ pub struct NewConversation {
     pub updated_at: DateTime<Utc>,
 }
 
+use crate::message::domain::ConversationState;
+
 impl NewConversation {
     /// Creates a new conversation record with default state.
     #[must_use]
@@ -61,7 +63,7 @@ impl NewConversation {
             id,
             task_id: None,
             context: Value::Object(serde_json::Map::new()),
-            state: "active".to_owned(),
+            state: ConversationState::Active.as_str().to_owned(),
             created_at: now,
             updated_at: now,
         }
