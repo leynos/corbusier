@@ -96,21 +96,20 @@ impl ConversationRepository for PostgresConversationRepository {
             NewConversation::new(conversation_id.into_inner(), conversation.created_at());
 
         self.execute_query(tenant_id, move |conn| {
-            let exists: i64 = conversations::table
-                .filter(conversations::id.eq(conversation_id.into_inner()))
-                .count()
-                .get_result(conn)
+            // Use ON CONFLICT DO NOTHING for atomic insert-or-detect
+            let inserted = diesel::insert_into(conversations::table)
+                .values(&new_conversation)
+                .on_conflict(conversations::id)
+                .do_nothing()
+                .execute(conn)
                 .map_err(ConversationRepositoryError::persistence)?;
-            if exists > 0 {
+
+            if inserted == 0 {
                 return Err(ConversationRepositoryError::DuplicateConversation(
                     conversation_id,
                 ));
             }
 
-            diesel::insert_into(conversations::table)
-                .values(&new_conversation)
-                .execute(conn)
-                .map_err(ConversationRepositoryError::persistence)?;
             Ok(())
         })
         .await
