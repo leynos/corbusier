@@ -73,7 +73,7 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
         Arc::new(PostgresTaskRepository::new(pool.clone())),
         clock.clone(),
     ));
-    let tool_service = build_tool_service(pool, &ctx, clock)?;
+    let tool_service = build_tool_service(pool, &ctx, clock.clone())?;
 
     Ok((
         ApiState::new(
@@ -81,6 +81,7 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
             task_service,
             tool_service,
             BearerTokenAuthenticator::new(TEST_JWT_SECRET),
+            clock,
         ),
         auth,
     ))
