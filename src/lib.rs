@@ -16,6 +16,7 @@
 //!
 //! - [`context`]: Cross-cutting request context and identity types
 //! - [`health`]: Health-check ports and the HTTP adapter used by the runtime
+//! - [`http_api`]: HTTP API surface for conversations, tasks, and tools
 //! - [`tenant`]: Tenant identity and lifecycle
 //! - [`agent_backend`]: Agent backend registration and discovery
 //! - [`hook_engine`]: Governance hook definition and execution

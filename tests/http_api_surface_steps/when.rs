@@ -9,14 +9,18 @@ async fn create_conversation(world: &mut HttpApiWorld) -> Result<(), eyre::Repor
     world
         .send(actix_web::test::TestRequest::post().uri("/api/v1/conversations"))
         .await?;
-    if let Some(conversation_id) = world.last_body.as_ref().and_then(|body| {
-        body.get("data")
-            .and_then(|data| data.get("conversation"))
-            .and_then(|conversation| conversation.get("id"))
-            .and_then(serde_json::Value::as_str)
-    }) {
-        world.conversation_id = Some(conversation_id.to_owned());
-    }
+    let conversation_id = world
+        .last_body
+        .as_ref()
+        .and_then(|body| {
+            body.get("data")
+                .and_then(|data| data.get("conversation"))
+                .and_then(|conversation| conversation.get("id"))
+                .and_then(serde_json::Value::as_str)
+        })
+        .map(String::from)
+        .ok_or_else(|| eyre::eyre!("conversation id should be present in response"))?;
+    world.conversation_id = Some(conversation_id);
     Ok(())
 }
 
@@ -29,7 +33,7 @@ async fn append_message(
     let conversation_id = world
         .conversation_id
         .clone()
-        .unwrap_or_else(|| panic!("conversation id should be created first"));
+        .ok_or_else(|| eyre::eyre!("conversation id should be created first"))?;
     world
         .send(
             actix_web::test::TestRequest::post()
@@ -47,7 +51,7 @@ async fn request_conversation_history(world: &mut HttpApiWorld) -> Result<(), ey
     let conversation_id = world
         .conversation_id
         .clone()
-        .unwrap_or_else(|| panic!("conversation id should be created first"));
+        .ok_or_else(|| eyre::eyre!("conversation id should be created first"))?;
     world
         .send(
             actix_web::test::TestRequest::get()
@@ -74,14 +78,18 @@ async fn create_task_from_issue(
                 })),
         )
         .await?;
-    if let Some(task_id) = world.last_body.as_ref().and_then(|body| {
-        body.get("data")
-            .and_then(|data| data.get("task"))
-            .and_then(|task| task.get("id"))
-            .and_then(serde_json::Value::as_str)
-    }) {
-        world.task_id = Some(task_id.to_owned());
-    }
+    let task_id = world
+        .last_body
+        .as_ref()
+        .and_then(|body| {
+            body.get("data")
+                .and_then(|data| data.get("task"))
+                .and_then(|task| task.get("id"))
+                .and_then(serde_json::Value::as_str)
+        })
+        .map(String::from)
+        .ok_or_else(|| eyre::eyre!("task id should be present in response"))?;
+    world.task_id = Some(task_id);
     Ok(())
 }
 
@@ -93,7 +101,7 @@ async fn transition_task_state(
     let task_id = world
         .task_id
         .clone()
-        .unwrap_or_else(|| panic!("task id should be present"));
+        .ok_or_else(|| eyre::eyre!("task id should be present"))?;
     world
         .send(
             actix_web::test::TestRequest::put()

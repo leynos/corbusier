@@ -55,8 +55,8 @@ async fn task_state_is(world: &mut HttpApiWorld, expected_state: String) {
     );
 }
 
-#[then(r"the response includes {expected_tools:usize} tools")]
-async fn response_includes_tools(world: &mut HttpApiWorld, expected_tools: usize) {
+#[then(r"the response includes {expected_tools:usize} tool")]
+async fn response_includes_tool(world: &mut HttpApiWorld, expected_tools: usize) {
     let body = last_body(world);
     let tools = required_field(required_field(body, "data"), "tools")
         .as_array()

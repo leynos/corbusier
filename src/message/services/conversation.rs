@@ -141,23 +141,48 @@ where
         ctx: &RequestContext,
         request: AppendMessageRequest,
     ) -> ConversationServiceResult<Message> {
+        const MAX_RETRIES: u32 = 3;
+
         let AppendMessageRequest {
             conversation_id,
             role,
             content,
         } = request;
         self.require_conversation(ctx, conversation_id).await?;
-        let next_sequence = self
-            .message_repository
-            .next_sequence_number(ctx, conversation_id)
-            .await?;
-        let message = Message::builder(conversation_id, role, next_sequence)
-            .with_content_parts(content)
-            .build(&*self.clock)
-            .map_err(|error| Self::builder_error_to_validation(&error))?;
-        self.validator.validate(&message)?;
-        self.message_repository.store(ctx, &message).await?;
-        Ok(message)
+
+        let mut last_error = None;
+
+        for _ in 0..MAX_RETRIES {
+            let next_sequence = self
+                .message_repository
+                .next_sequence_number(ctx, conversation_id)
+                .await?;
+            let message = Message::builder(conversation_id, role, next_sequence)
+                .with_content_parts(content.clone())
+                .build(&*self.clock)
+                .map_err(|error| Self::builder_error_to_validation(&error))?;
+            self.validator.validate(&message)?;
+
+            match self.message_repository.store(ctx, &message).await {
+                Ok(()) => return Ok(message),
+                Err(RepositoryError::DuplicateSequence { .. }) => {
+                    last_error = Some(RepositoryError::DuplicateSequence {
+                        conversation_id,
+                        sequence: next_sequence,
+                    });
+                }
+                Err(other) => return Err(other.into()),
+            }
+        }
+
+        // After MAX_RETRIES, return the last duplicate sequence error
+        Err(last_error.map_or_else(
+            || {
+                // This should not happen as last_error is always set in the loop
+                ConversationServiceError::Validation(ValidationError::EmptyContent)
+            },
+            ConversationServiceError::MessageRepository,
+        ))
     }
 
     async fn require_conversation(

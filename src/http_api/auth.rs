@@ -95,9 +95,15 @@ fn extract_bearer_token(request: &HttpRequest) -> Result<&str, ApiError> {
     let header_value = header
         .to_str()
         .map_err(|_| ApiError::unauthorised("invalid authorization header"))?;
-    let Some(token) = header_value.strip_prefix("Bearer ") else {
+
+    // Split into scheme and token, handling case-insensitive "Bearer"
+    let mut parts = header_value.splitn(2, ' ');
+    let scheme = parts.next().unwrap_or("");
+    let token = parts.next().unwrap_or("");
+
+    if !scheme.eq_ignore_ascii_case("Bearer") {
         return Err(ApiError::unauthorised("invalid authorization header"));
-    };
+    }
     if token.trim().is_empty() {
         return Err(ApiError::unauthorised("missing bearer token"));
     }
@@ -129,7 +135,10 @@ impl FromRequest for AuthenticatedRequestContext {
     fn from_request(request: &HttpRequest, _payload: &mut Payload) -> Self::Future {
         let result = request
             .app_data::<web::Data<ApiState>>()
-            .ok_or_else(|| ApiError::internal("API state not configured"))
+            .ok_or_else(|| {
+                tracing::error!("API state not configured");
+                ApiError::internal()
+            })
             .and_then(|state| {
                 let token = extract_bearer_token(request)?;
                 state.authenticator.authenticate_token(token)

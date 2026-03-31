@@ -117,7 +117,12 @@ fn required_env(name: &str) -> std::io::Result<String> {
 
 fn build_pg_pool(database_url: &str) -> std::io::Result<PgPool> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
-    Pool::builder().build(manager).map_err(|error| {
-        std::io::Error::other(format!("failed to create PostgreSQL pool: {error}"))
-    })
+    Pool::builder()
+        .max_size(20)
+        .min_idle(Some(5))
+        .connection_timeout(std::time::Duration::from_secs(30))
+        .build(manager)
+        .map_err(|error| {
+            std::io::Error::other(format!("failed to create PostgreSQL pool: {error}"))
+        })
 }
