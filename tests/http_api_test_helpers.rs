@@ -82,6 +82,25 @@ impl HttpApiAuth {
         )
     }
 
+    /// Encodes custom claims into a JWT.
+    fn encode_custom_claims(
+        &self,
+        sub: String,
+        tenant_id: String,
+        session_id: String,
+        exp: i64,
+        tenant_kind: Option<String>,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
+        self.encode_claims(&CustomJwtClaims {
+            sub,
+            tenant_id,
+            session_id,
+            exp,
+            role: None,
+            tenant_kind,
+        })
+    }
+
     /// Returns a token with the specified `tenant_kind` claim.
     ///
     /// # Errors
@@ -91,15 +110,13 @@ impl HttpApiAuth {
         &self,
         tenant_kind: impl Into<String>,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        let claims = CustomJwtClaims {
-            sub: self.user_id.to_string(),
-            tenant_id: self.tenant_id.to_string(),
-            session_id: self.session_id.to_string(),
-            exp: chrono::Utc::now().timestamp().saturating_add(3600),
-            role: None,
-            tenant_kind: Some(tenant_kind.into()),
-        };
-        self.encode_claims(&claims)
+        self.encode_custom_claims(
+            self.user_id.to_string(),
+            self.tenant_id.to_string(),
+            self.session_id.to_string(),
+            chrono::Utc::now().timestamp().saturating_add(3600),
+            Some(tenant_kind.into()),
+        )
     }
 
     /// Returns a token with non-UUID strings for identifiers.
@@ -108,15 +125,13 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn token_with_invalid_uuids(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        let claims = CustomJwtClaims {
-            sub: "not-a-uuid".to_owned(),
-            tenant_id: "also-not-a-uuid".to_owned(),
-            session_id: "still-not-a-uuid".to_owned(),
-            exp: chrono::Utc::now().timestamp().saturating_add(3600),
-            role: None,
-            tenant_kind: Some("user".to_owned()),
-        };
-        self.encode_claims(&claims)
+        self.encode_custom_claims(
+            "not-a-uuid".to_owned(),
+            "also-not-a-uuid".to_owned(),
+            "still-not-a-uuid".to_owned(),
+            chrono::Utc::now().timestamp().saturating_add(3600),
+            Some("user".to_owned()),
+        )
     }
 
     /// Returns an already-expired token.
@@ -125,15 +140,13 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn expired_token(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        let claims = CustomJwtClaims {
-            sub: self.user_id.to_string(),
-            tenant_id: self.tenant_id.to_string(),
-            session_id: self.session_id.to_string(),
-            exp: chrono::Utc::now().timestamp().saturating_sub(3600),
-            role: None,
-            tenant_kind: Some("user".to_owned()),
-        };
-        self.encode_claims(&claims)
+        self.encode_custom_claims(
+            self.user_id.to_string(),
+            self.tenant_id.to_string(),
+            self.session_id.to_string(),
+            chrono::Utc::now().timestamp().saturating_sub(3600),
+            Some("user".to_owned()),
+        )
     }
 }
 
