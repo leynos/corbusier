@@ -77,16 +77,18 @@ pub(super) fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
         .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
 }
 
-fn block_on_setup<F, T>(future: F) -> T
+fn block_on_setup<F, T>(future: F) -> Result<T, eyre::Report>
 where
     F: Future<Output = T>,
 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(AssertUnwindSafe(future)))
+        Ok(tokio::task::block_in_place(|| {
+            handle.block_on(AssertUnwindSafe(future))
+        }))
     } else {
-        tokio::runtime::Runtime::new()
-            .unwrap_or_else(|err| panic!("HTTP API test runtime should be created: {err}"))
-            .block_on(AssertUnwindSafe(future))
+        let runtime = tokio::runtime::Runtime::new()
+            .map_err(|err| eyre::eyre!("HTTP API test runtime should be created: {err}"))?;
+        Ok(runtime.block_on(AssertUnwindSafe(future)))
     }
 }
 

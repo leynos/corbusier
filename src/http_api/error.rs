@@ -145,6 +145,10 @@ impl From<ConversationServiceError> for ApiError {
                 map_message_repository_error(repository_error)
             }
             ConversationServiceError::Validation(validation_error) => validation_error.into(),
+            ConversationServiceError::RetryExhausted => {
+                tracing::error!("conversation service retry exhausted");
+                Self::internal()
+            }
         }
     }
 }
