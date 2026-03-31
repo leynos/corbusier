@@ -29,7 +29,7 @@ Feature: HTTP API surface
     When I list tools through the API
     Then the response status is 200
     And the response metadata version is "v1"
-    And the response includes 1 tools
+    And the response includes 1 tool
     When I call the "read_file" tool through the API
     Then the response status is 200
     And the response metadata version is "v1"

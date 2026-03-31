@@ -24,6 +24,7 @@ pub struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
+    request_id: Option<String>,
 }
 
 impl ApiError {
@@ -34,7 +35,15 @@ impl ApiError {
             status,
             code,
             message: message.into(),
+            request_id: None,
         }
+    }
+
+    /// Sets the request ID for correlation.
+    #[must_use]
+    pub fn with_request_id(mut self, request_id: impl Into<String>) -> Self {
+        self.request_id = Some(request_id.into());
+        self
     }
 
     /// Creates a `400 Bad Request` response.
@@ -68,9 +77,16 @@ impl ApiError {
     }
 
     /// Creates a `500 Internal Server Error` response.
+    ///
+    /// Returns a generic, non-sensitive message. The original error should be
+    /// logged server-side before calling this method.
     #[must_use]
-    pub fn internal(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", message)
+    pub fn internal() -> Self {
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_server_error",
+            "An internal server error occurred",
+        )
     }
 
     /// Builds an HTTP response with the given request ID.
@@ -79,11 +95,7 @@ impl ApiError {
     /// request context so success and error responses share the same ID.
     #[must_use]
     pub fn into_response(self, request_id: impl Into<String>) -> HttpResponse {
-        json_error(
-            self.status,
-            ErrorPayload::new(self.code, self.message),
-            request_id.into(),
-        )
+        self.with_request_id(request_id).error_response()
     }
 }
 
@@ -101,13 +113,15 @@ impl ResponseError for ApiError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        // Note: This generates a fresh UUID for the error response.
+        // Use the stored request_id if present, otherwise generate a fresh UUID.
         // Handlers that have access to RequestContext should use
-        // `ApiError::into_response(request_id)` to maintain correlation.
+        // `ApiError::with_request_id()` to maintain correlation.
         json_error(
             self.status,
             ErrorPayload::new(self.code, self.message.clone()),
-            Uuid::new_v4().to_string(),
+            self.request_id
+                .clone()
+                .unwrap_or_else(|| Uuid::new_v4().to_string()),
         )
     }
 }
@@ -149,6 +163,10 @@ impl From<TaskLifecycleError> for ApiError {
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "Simple match arms on error variants"
+)]
 impl From<ToolDiscoveryRoutingServiceError> for ApiError {
     fn from(error: ToolDiscoveryRoutingServiceError) -> Self {
         match error {
@@ -159,10 +177,12 @@ impl From<ToolDiscoveryRoutingServiceError> for ApiError {
                 map_tool_catalog_error(catalog_error)
             }
             ToolDiscoveryRoutingServiceError::Registry(registry_error) => {
-                Self::internal(registry_error.to_string())
+                tracing::error!(error = %registry_error, "registry error");
+                Self::internal()
             }
             ToolDiscoveryRoutingServiceError::Host(host_error) => {
-                Self::internal(host_error.to_string())
+                tracing::error!(error = %host_error, "host error");
+                Self::internal()
             }
             ToolDiscoveryRoutingServiceError::Governance(governance_error) => {
                 map_tool_governance_error(&governance_error)
@@ -185,11 +205,16 @@ fn map_conversation_repository_error(
             ApiError::conflict("duplicate_conversation", id.to_string())
         }
         crate::message::ports::ConversationRepositoryError::Persistence(err) => {
-            ApiError::internal(err.to_string())
+            tracing::error!(error = %err, "conversation repository persistence error");
+            ApiError::internal()
         }
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "Simple match arms on error variants"
+)]
 fn map_message_repository_error(error: RepositoryError) -> ApiError {
     match error {
         RepositoryError::NotFound(message_id) => {
@@ -205,8 +230,14 @@ fn map_message_repository_error(error: RepositoryError) -> ApiError {
             "duplicate_sequence",
             format!("conversation {conversation_id} already has sequence {sequence}"),
         ),
-        RepositoryError::Database(err) => ApiError::internal(err.to_string()),
-        RepositoryError::Connection(err) => ApiError::internal(err),
+        RepositoryError::Database(err) => {
+            tracing::error!(error = %err, "message database error");
+            ApiError::internal()
+        }
+        RepositoryError::Connection(err) => {
+            tracing::error!(error = %err, "message connection error");
+            ApiError::internal()
+        }
         RepositoryError::Serialization(message) => {
             ApiError::bad_request("serialization_error", message)
         }
@@ -239,7 +270,10 @@ fn map_task_repository_error(error: TaskRepositoryError) -> ApiError {
         TaskRepositoryError::NotFound(task_id) => {
             ApiError::not_found("task_not_found", task_id.to_string())
         }
-        TaskRepositoryError::Persistence(err) => ApiError::internal(err.to_string()),
+        TaskRepositoryError::Persistence(err) => {
+            tracing::error!(error = %err, "task persistence error");
+            ApiError::internal()
+        }
     }
 }
 
@@ -273,14 +307,19 @@ fn map_tool_catalog_error(error: ToolCatalogError) -> ApiError {
         | ToolCatalogError::DuplicateWithinBatch { tool_name, .. } => {
             ApiError::conflict("duplicate_tool_catalog_entry", tool_name)
         }
-        _ => ApiError::internal(error.to_string()),
+        _ => {
+            tracing::error!(error = %error, "tool catalog error");
+            ApiError::internal()
+        }
     }
 }
 
 fn map_tool_governance_error(error: &ToolGovernanceError) -> ApiError {
-    ApiError::internal(error.to_string())
+    tracing::error!(error = %error, "tool governance error");
+    ApiError::internal()
 }
 
 fn map_tool_log_store_error(error: &ToolLogStoreError) -> ApiError {
-    ApiError::internal(error.to_string())
+    tracing::error!(error = %error, "tool log store error");
+    ApiError::internal()
 }

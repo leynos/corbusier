@@ -8540,12 +8540,13 @@ Actix Web provides middleware support for authentication, with
 actix_web_httpauth providing middleware that makes it simple to add
 authentication to any actix-based API:
 
-| Endpoint Category | Base Path               | Methods               | Authentication   | Rate Limiting  |
-| ----------------- | ----------------------- | --------------------- | ---------------- | -------------- |
-| Conversations     | `/api/v1/conversations` | POST, nested GET/POST | JWT Bearer Token | 100 req/min    |
-| Tasks             | `/api/v1/tasks`         | POST, nested GET/PUT  | JWT Bearer Token | 50 req/min     |
-| Tools             | `/api/v1/tools`         | GET, nested POST      | JWT Bearer Token | 200 req/min    |
-| Events            | `/api/v1/events`        | GET (SSE)             | JWT Bearer Token | 10 connections |
+Table: API endpoints summary — base paths, methods, auth, and rate limits
+
+| Endpoint Category | Base Path               | Methods               | Authentication   | Rate Limiting |
+| ----------------- | ----------------------- | --------------------- | ---------------- | ------------- |
+| Conversations     | `/api/v1/conversations` | POST, nested GET/POST | JWT Bearer Token | 100 req/min   |
+| Tasks             | `/api/v1/tasks`         | POST, nested GET/PUT  | JWT Bearer Token | 50 req/min    |
+| Tools             | `/api/v1/tools`         | GET, nested POST      | JWT Bearer Token | 200 req/min   |
 
 ###### Initial v1 implementation status
 
@@ -8634,11 +8635,11 @@ The initial `v1` implementation accepts only `Authorization: Bearer <jwt>`
 credentials. Missing, malformed, or invalid tokens are rejected with
 `401 Unauthorized` before any domain service is called.
 
-| Authentication Method | Implementation            | Token Location       | Expiration Policy              |
-| --------------------- | ------------------------- | -------------------- | ------------------------------ |
-| Bearer Token          | JWT with HS256            | Authorization Header | 24 hours with refresh          |
-| Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration |
-| API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     |
+| Authentication Method | Implementation            | Token Location       | Expiration Policy              | Status       |
+| --------------------- | ------------------------- | -------------------- | ------------------------------ | ------------ |
+| Bearer Token          | JWT with HS256            | Authorization Header | 24 hours with refresh          | Active in v1 |
+| Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration | Future scope |
+| API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     | Future scope |
 
 Authentication claims include both user and tenant identifiers so downstream
 services can construct request context consistently:

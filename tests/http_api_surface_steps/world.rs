@@ -121,14 +121,9 @@ fn build_task_service(
     ))
 }
 
-#[expect(
-    clippy::type_complexity,
-    reason = "Test helper with inherently complex types"
-)]
-fn build_tool_infrastructure(
-    clock: Arc<DefaultClock>,
-) -> (
-    Arc<
+/// Tool infrastructure bundle for test setup.
+struct ToolInfrastructure {
+    tool_service: Arc<
         ToolDiscoveryRoutingService<
             InMemoryToolCatalog,
             InMemoryMcpServerRegistry,
@@ -138,9 +133,12 @@ fn build_tool_infrastructure(
             DefaultClock,
         >,
     >,
-    McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>,
-    Arc<InMemoryMcpServerHost>,
-) {
+    lifecycle:
+        McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>,
+    host: Arc<InMemoryMcpServerHost>,
+}
+
+fn build_tool_infrastructure(clock: Arc<DefaultClock>) -> ToolInfrastructure {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
@@ -156,41 +154,31 @@ fn build_tool_infrastructure(
         LogRetentionPolicy::default(),
         clock,
     ));
-    (tool_service, lifecycle, host)
+    ToolInfrastructure {
+        tool_service,
+        lifecycle,
+        host,
+    }
 }
 
 fn setup_file_tools_server(
     ctx: &RequestContext,
-    lifecycle: &McpServerLifecycleService<
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        DefaultClock,
-    >,
-    host: &Arc<InMemoryMcpServerHost>,
-    tool_service: &Arc<
-        ToolDiscoveryRoutingService<
-            InMemoryToolCatalog,
-            InMemoryMcpServerRegistry,
-            InMemoryMcpServerHost,
-            AllowAllPolicy,
-            ObjectStoreLogAdapter,
-            DefaultClock,
-        >,
-    >,
-) {
+    infrastructure: &ToolInfrastructure,
+) -> Result<(), eyre::Report> {
     let server = block_on_setup(async {
-        lifecycle
+        infrastructure
+            .lifecycle
             .register(
                 ctx,
                 RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
             )
             .await
-    })
-    .unwrap_or_else(|err| panic!("tool server registration should succeed: {err}"));
-    host.set_tool_catalog(
-        server.name().clone(),
-        vec![
-            McpToolDefinition::new(
+    })?;
+    infrastructure
+        .host
+        .set_tool_catalog(
+            server.name().clone(),
+            vec![McpToolDefinition::new(
                 "read_file",
                 "Read a file from disk",
                 json!({
@@ -198,53 +186,50 @@ fn setup_file_tools_server(
                     "properties": { "path": { "type": "string" } },
                     "required": ["path"]
                 }),
-            )
-            .unwrap_or_else(|err| panic!("tool definition should be valid: {err}")),
-        ],
-    )
-    .unwrap_or_else(|err| panic!("tool catalog should be set: {err}"));
-    host.set_tool_call_result(
-        server.name().clone(),
-        "read_file",
-        json!({"content": "hello from tool"}),
-    )
-    .unwrap_or_else(|err| panic!("tool call result should be set: {err}"));
-    block_on_setup(async { lifecycle.start(ctx, server.id()).await })
-        .unwrap_or_else(|err| panic!("tool server should start: {err}"));
+            )?],
+        )
+        .map_err(|e| eyre::eyre!("tool catalog should be set: {e}"))?;
+    infrastructure
+        .host
+        .set_tool_call_result(
+            server.name().clone(),
+            "read_file",
+            json!({"content": "hello from tool"}),
+        )
+        .map_err(|e| eyre::eyre!("tool call result should be set: {e}"))?;
+    block_on_setup(async { infrastructure.lifecycle.start(ctx, server.id()).await })?;
     block_on_setup(async {
-        tool_service
+        infrastructure
+            .tool_service
             .discover_and_persist_tools(ctx, server.id())
             .await
-    })
-    .unwrap_or_else(|err| panic!("tool discovery should succeed: {err}"));
+    })?;
+    Ok(())
 }
 
 #[fixture]
-pub fn world() -> HttpApiWorld {
+pub fn world() -> Result<HttpApiWorld, eyre::Report> {
     let auth = HttpApiAuth::new(TEST_JWT_SECRET);
     let ctx = auth.request_context();
     let clock = Arc::new(DefaultClock);
 
     let conversation_service = build_conversation_service(clock.clone());
     let task_service = build_task_service(clock.clone());
-    let (tool_service, lifecycle, host) = build_tool_infrastructure(clock);
+    let infrastructure = build_tool_infrastructure(clock);
 
-    setup_file_tools_server(&ctx, &lifecycle, &host, &tool_service);
+    setup_file_tools_server(&ctx, &infrastructure)?;
 
-    HttpApiWorld {
+    Ok(HttpApiWorld {
         state: ApiState::new(
             conversation_service,
             task_service,
-            tool_service,
+            infrastructure.tool_service,
             BearerTokenAuthenticator::new(TEST_JWT_SECRET),
         ),
-        token: Some(
-            auth.token()
-                .unwrap_or_else(|err| panic!("JWT token should be encoded: {err}")),
-        ),
+        token: Some(auth.token()?),
         conversation_id: None,
         task_id: None,
         last_status: None,
         last_body: None,
-    }
+    })
 }

@@ -50,7 +50,7 @@ async fn create_and_read_history() -> Result<(), eyre::Report> {
     assert_eq!(
         history
             .first()
-            .unwrap_or_else(|| panic!("history should contain one message"))
+            .expect("history should contain one message")
             .id(),
         message.id()
     );
