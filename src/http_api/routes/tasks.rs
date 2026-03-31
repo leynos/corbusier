@@ -130,7 +130,11 @@ where
 {
     let task_id = parse_task_id(task_id_str)?;
     let task = f(task_id).await?;
-    Ok(json_success(StatusCode::OK, TaskResponse { task }, request_id))
+    Ok(json_success(
+        StatusCode::OK,
+        TaskResponse { task },
+        request_id,
+    ))
 }
 
 async fn associate_branch(
