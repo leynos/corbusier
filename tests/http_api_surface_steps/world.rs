@@ -117,6 +117,10 @@ fn build_task_service(
     ))
 }
 
+#[expect(
+    clippy::type_complexity,
+    reason = "Test helper with inherently complex types"
+)]
 fn build_tool_infrastructure(
     clock: Arc<DefaultClock>,
 ) -> (
@@ -130,11 +134,7 @@ fn build_tool_infrastructure(
             DefaultClock,
         >,
     >,
-    McpServerLifecycleService<
-        InMemoryMcpServerRegistry,
-        InMemoryMcpServerHost,
-        DefaultClock,
-    >,
+    McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>,
     Arc<InMemoryMcpServerHost>,
 ) {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
@@ -185,16 +185,18 @@ fn setup_file_tools_server(
     .unwrap_or_else(|err| panic!("tool server registration should succeed: {err}"));
     host.set_tool_catalog(
         server.name().clone(),
-        vec![McpToolDefinition::new(
-            "read_file",
-            "Read a file from disk",
-            json!({
-                "type": "object",
-                "properties": { "path": { "type": "string" } },
-                "required": ["path"]
-            }),
-        )
-        .unwrap_or_else(|err| panic!("tool definition should be valid: {err}"))],
+        vec![
+            McpToolDefinition::new(
+                "read_file",
+                "Read a file from disk",
+                json!({
+                    "type": "object",
+                    "properties": { "path": { "type": "string" } },
+                    "required": ["path"]
+                }),
+            )
+            .unwrap_or_else(|err| panic!("tool definition should be valid: {err}")),
+        ],
     )
     .unwrap_or_else(|err| panic!("tool catalog should be set: {err}"));
     host.set_tool_call_result(
