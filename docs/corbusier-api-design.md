@@ -463,9 +463,12 @@ pub struct ReviewWorkflowProjection {
 - Sync checkpoints must be stored as a versioned provider envelope rather than
   an unstructured JSON blob so migrations and sync debugging can reason about
   the provider payload shape.
-- Review-linked conversation messages must preserve structured linkage in
-  `MessageMetadata.extensions` rather than flattening anchor metadata into free
-  text.
+- Review-linked conversation messages must preserve structured linkage under
+  the reserved, versioned key `"review.linkage.v1"` inside
+  `MessageMetadata.extensions` rather than flattening anchor metadata into the
+  top-level JSON object or into free text.  The extensions map is serialized as
+  an explicit `"extensions"` field (not via `serde(flatten)`) so that
+  workflow-specific keys never collide with known struct fields.
 
 #### Projection DTOs
 

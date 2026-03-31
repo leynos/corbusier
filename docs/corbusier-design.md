@@ -1278,8 +1278,7 @@ server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.1: MCP server start and `tools/list` lifecycle interaction
-sequence.
+Table 2.2.4.1: MCP server start and `tools/list` lifecycle interaction sequence.
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -1420,7 +1419,7 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   `RequestContext` scoping and `SET LOCAL app.tenant_id`.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.2: Entity-relationship diagram showing the tool registry
+Table 2.2.4.2: Entity-relationship diagram showing the tool registry
 persistence model.
 ```mermaid
 erDiagram
@@ -1484,7 +1483,7 @@ resolved through catalog lookup, policy evaluation, host execution, and log
 capture.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.3: Sequence diagram for the `call_tool` flow within
+Table 2.2.4.3: Sequence diagram for the `call_tool` flow within
 `ToolDiscoveryRoutingService`.
 ```mermaid
 sequenceDiagram
@@ -2723,7 +2722,7 @@ flowing through Corbusier's MCP multiplexer to a tool server and back with a
 workspace execution result.
 
 <!-- markdownlint-disable MD031 -->
-Figure 4.1.1.2a: MCP tool orchestration flow across Corbusier, the MCP
+Table 4.1.1.2a: MCP tool orchestration flow across Corbusier, the MCP
 multiplexer, and a tool workspace.
 ```mermaid
 sequenceDiagram
@@ -2984,7 +2983,7 @@ operations flowing through the VCS adapter, followed by a pull-request review
 event synchronized through Frankie.
 
 <!-- markdownlint-disable MD031 -->
-Figure 4.1.2.2a: VCS integration API flow for task metadata, branch creation,
+Table 4.1.2.2a: VCS integration API flow for task metadata, branch creation,
 and review-thread synchronization.
 ```mermaid
 sequenceDiagram
@@ -3023,7 +3022,7 @@ For screen readers: The following sequence diagram shows an MCP client opening
 JSON-RPC communication with a server, listing tools, and invoking a tool call.
 
 <!-- markdownlint-disable MD031 -->
-Figure 4.1.2.2b: MCP server communication over JSON-RPC 2.0.
+Table 4.1.2.2b: MCP server communication over JSON-RPC 2.0.
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
@@ -4421,7 +4420,7 @@ flowing from the user through the conversation and agent orchestrators to tool
 execution and post-turn hooks.
 
 <!-- markdownlint-disable MD031 -->
-Figure 5.2.5.1: Conversation turn, tool call, and hook interaction flow.
+Table 5.2.5.1: Conversation turn, tool call, and hook interaction flow.
 ```mermaid
 sequenceDiagram
     participant User as User Client
@@ -5378,7 +5377,7 @@ events being published to an event bus and streamed to a subscribed client over
 SSE.
 
 <!-- markdownlint-disable MD031 -->
-Figure 6.1.1.2a: Real-time event distribution through the conversation event
+Table 6.1.1.2a: Real-time event distribution through the conversation event
 stream.
 ```mermaid
 sequenceDiagram
@@ -5702,6 +5701,10 @@ For screen readers: The following entity-relationship diagram shows tenant
 ownership and key foreign-key paths for tasks, conversations, messages, review
 threads, review comments, backend registrations, domain events, and audit logs.
 
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.2: Multi-tenant entity-relationship model for tenant-owned tasks,
+conversations, messages, review threads, review comments, backend
+registrations, domain events, and audit logs.
 ```mermaid
 erDiagram
     TENANTS {
@@ -5832,9 +5835,7 @@ erDiagram
     CONVERSATIONS ||--o{ REVIEW_THREADS : links
     REVIEW_THREADS ||--o{ REVIEW_COMMENTS : contains
 ```
-
-_Figure: Multi-tenant entity-relationship model for tenant-owned persistence
-tables._
+<!-- markdownlint-enable MD031 -->
 
 For screen readers: The following entity-relationship diagram focuses on the
 review workflow persistence model, showing how tenants own review threads,
@@ -6129,7 +6130,7 @@ service, Frankie synchronization, conversation updates, agent reply drafting,
 and the final verification or reply action.
 
 <!-- markdownlint-disable MD031 -->
-Figure 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
+Table 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
 through Frankie synchronization, agent reply drafting, and verification or
 reply submission.
 ```mermaid
@@ -6240,7 +6241,7 @@ types, the materialized review thread view, and the three Frankie-backed review
 ports used by the review workflow service.
 
 <!-- markdownlint-disable MD031 -->
-Figure 6.3.2.2: Review workflow class model showing the persistent aggregate,
+Table 6.3.2.2: Review workflow class model showing the persistent aggregate,
 materialized thread view, and the review intake, context, and action ports used
 by the review workflow service.
 ```mermaid
@@ -6272,15 +6273,15 @@ classDiagram
         +ExternalCommentId external_comment_id
         +Value raw_payload
         +String body
-        +PathBuf file_path
-        +u32 line_number
+        +Option~PathBuf~ file_path
+        +Option~u32~ line_number
         +User author
-        +u32 original_line_number
-        +String commit_sha
-        +String diff_hunk
-        +ExternalCommentId in_reply_to_id
+        +Option~u32~ original_line_number
+        +Option~String~ commit_sha
+        +Option~String~ diff_hunk
+        +Option~ExternalCommentId~ in_reply_to_id
         +DateTime_Utc created_at
-        +DateTime_Utc updated_at
+        +Option~DateTime_Utc~ updated_at
     }
 
     class ReviewAnchor {
@@ -6293,7 +6294,7 @@ classDiagram
     class ReviewThread {
         +ExternalCommentId thread_root_id
         +PullRequestRef pull_request_ref
-        +ReviewCommentRecord comments
+        +Vec~ReviewCommentRecord~ comments
         +Option~ReviewAnchor~ anchor
         +VerificationStatus verification_status
         +Option~ReplyDraft~ pending_reply
@@ -6852,7 +6853,7 @@ collaboration across conversation, task, agent, tool, and governance modules in
 the modular monolith.
 
 <!-- markdownlint-disable MD031 -->
-Figure 6.1.2.2a: Modular monolith module interaction during a user request.
+Table 6.1.2.2a: Modular monolith module interaction during a user request.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -7310,9 +7311,10 @@ Status values are standardized:
 - Tool call statuses: `queued`, `running`, `succeeded`, `failed`.
 - Agent response statuses: `completed`, `failed`, `cancelled`.
 
-Review-linked messages should keep structured review fields in
-`MessageMetadata.extensions` rather than flattening them into free text.
-Canonical extension keys include `review_comment_id`, `thread_root_id`,
+Review-linked messages must store structured review fields under the reserved,
+versioned key `"review.linkage.v1"` inside `MessageMetadata.extensions` rather
+than flattening them into the top-level JSON object or into free text.  The
+value stored at that key should contain `review_comment_id`, `thread_root_id`,
 `reviewer`, `file_path`, `commit_sha`, and `verification_status`.
 
 ###### Canonical Message Domain Model
@@ -7321,6 +7323,10 @@ For screen readers: The following class diagram illustrates the canonical
 message domain model, showing the Message aggregate root and its related value
 objects, including content parts, metadata, and identity types.
 
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.2a: Canonical message domain model class diagram showing the
+Message aggregate root with its value objects, content parts, and identity
+types.
 ```mermaid
 classDiagram
     class Message {
@@ -7536,10 +7542,7 @@ classDiagram
 
     SequenceNumber ..> Message
 ```
-
-_Figure 6.2.1.2a: Canonical message domain model class diagram showing the
-Message aggregate root with its value objects, content parts, and identity
-types._
+<!-- markdownlint-enable MD031 -->
 
 ##### 6.2.1.3 Indexing Strategy
 
@@ -8493,6 +8496,9 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE backend_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_verification_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
@@ -8501,6 +8507,9 @@ ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
 ALTER TABLE messages FORCE ROW LEVEL SECURITY;
 ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
 ALTER TABLE backend_registrations FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_threads FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_comments FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_verification_results FORCE ROW LEVEL SECURITY;
 ALTER TABLE domain_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 
@@ -8521,6 +8530,21 @@ CREATE POLICY tasks_access_policy ON tasks
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY backend_registrations_access_policy ON backend_registrations
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_threads_access_policy ON review_threads
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_comments_access_policy ON review_comments
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_verification_results_access_policy ON review_verification_results
     FOR ALL TO authenticated_users
     USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
@@ -8974,7 +8998,7 @@ tool call that Corbusier routes through MCP to a tool server and back as a
 formatted result.
 
 <!-- markdownlint-disable MD031 -->
-Figure 8.1.1.1: MCP tool orchestration through Corbusier and a tool server.
+Table 8.1.1.1: MCP tool orchestration through Corbusier and a tool server.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -9565,7 +9589,7 @@ provisioning and command execution flowing through the encapsulation adapter to
 Podbot and the workspace container.
 
 <!-- markdownlint-disable MD031 -->
-Figure 8.5.2.1: Encapsulation provider integration with Podbot.
+Table 8.5.2.1: Encapsulation provider integration with Podbot.
 ```mermaid
 sequenceDiagram
     participant Task as Task Service
@@ -9876,7 +9900,7 @@ validation moving through middleware, token verification, session checks, and
 user lookup before authorization succeeds.
 
 <!-- markdownlint-disable MD031 -->
-Figure 8.6.4.1: Token validation pipeline across middleware and identity
+Table 8.6.4.1: Token validation pipeline across middleware and identity
 services.
 ```mermaid
 sequenceDiagram
@@ -10723,7 +10747,7 @@ moving through HTTP handling, conversation orchestration, agent execution, and
 tool invocation with spans across each boundary.
 
 <!-- markdownlint-disable MD031 -->
-Figure 9.4.2.1: Distributed tracing architecture across Corbusier request
+Table 9.4.2.1: Distributed tracing architecture across Corbusier request
 handling and tool execution.
 ```mermaid
 sequenceDiagram
@@ -11434,8 +11458,8 @@ setting up mocks and a test database, executing a workflow through Corbusier,
 and verifying persisted results.
 
 <!-- markdownlint-disable MD031 -->
-Figure 10.3.2.1: Service integration test flow with mock dependencies and a
-test database.
+Table 10.3.2.1: Service integration test flow with mock dependencies and a test
+database.
 ```mermaid
 sequenceDiagram
     participant Test as Integration Test

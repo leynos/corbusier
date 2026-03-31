@@ -52,13 +52,12 @@ pub struct MessageMetadata {
 
     /// Extension data for custom metadata fields.
     ///
-    /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
-    /// fields during deserialisation will be captured here. This can cause
-    /// unexpected behaviour if an extension key collides with a future field name.
-    /// Avoid using keys like `agent_backend`, `turn_id`, `slash_command_expansion`,
-    /// `tool_call_audits`, `agent_response_audit`, `handoff_metadata`, or
-    /// `agent_session_id`.
-    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    /// Extensions are serialized under an explicit `"extensions"` key rather
+    /// than being flattened into the top-level JSON object, preventing key
+    /// collisions with known struct fields.  Workflow-specific data should
+    /// use a reserved, versioned namespace key such as `"review.linkage.v1"`
+    /// so that schema evolution and deserialization remain predictable.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub extensions: HashMap<String, Value>,
 }
 
