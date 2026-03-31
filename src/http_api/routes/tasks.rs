@@ -119,31 +119,43 @@ async fn transition_task(
     ))
 }
 
+async fn association_response<F, Fut>(
+    task_id_str: &str,
+    request_id: String,
+    f: F,
+) -> Result<HttpResponse, ApiError>
+where
+    F: FnOnce(TaskId) -> Fut,
+    Fut: std::future::Future<Output = Result<Task, ApiError>>,
+{
+    let task_id = parse_task_id(task_id_str)?;
+    let task = f(task_id).await?;
+    Ok(json_success(StatusCode::OK, TaskResponse { task }, request_id))
+}
+
 async fn associate_branch(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociateBranchBody>,
 ) -> Result<HttpResponse, ApiError> {
-    let task_id = parse_task_id(&path.task_id)?;
     let payload = body.into_inner();
-    let task = state
-        .tasks
-        .associate_branch(
-            auth.context(),
-            AssociateBranchRequest::new(
-                task_id,
-                payload.provider,
-                payload.repository,
-                payload.branch_name,
-            ),
-        )
-        .await?;
-    Ok(json_success(
-        StatusCode::OK,
-        TaskResponse { task },
-        auth.request_id(),
-    ))
+    association_response(&path.task_id, auth.request_id(), |task_id| async move {
+        state
+            .tasks
+            .associate_branch(
+                auth.context(),
+                AssociateBranchRequest::new(
+                    task_id,
+                    payload.provider,
+                    payload.repository,
+                    payload.branch_name,
+                ),
+            )
+            .await
+            .map_err(ApiError::from)
+    })
+    .await
 }
 
 async fn associate_pull_request(
@@ -152,25 +164,23 @@ async fn associate_pull_request(
     path: web::Path<TaskPath>,
     body: web::Json<AssociatePullRequestBody>,
 ) -> Result<HttpResponse, ApiError> {
-    let task_id = parse_task_id(&path.task_id)?;
     let payload = body.into_inner();
-    let task = state
-        .tasks
-        .associate_pull_request(
-            auth.context(),
-            AssociatePullRequestRequest::new(
-                task_id,
-                payload.provider,
-                payload.repository,
-                payload.pull_request_number,
-            ),
-        )
-        .await?;
-    Ok(json_success(
-        StatusCode::OK,
-        TaskResponse { task },
-        auth.request_id(),
-    ))
+    association_response(&path.task_id, auth.request_id(), |task_id| async move {
+        state
+            .tasks
+            .associate_pull_request(
+                auth.context(),
+                AssociatePullRequestRequest::new(
+                    task_id,
+                    payload.provider,
+                    payload.repository,
+                    payload.pull_request_number,
+                ),
+            )
+            .await
+            .map_err(ApiError::from)
+    })
+    .await
 }
 
 fn build_create_task_request(body: CreateTaskBody) -> CreateTaskFromIssueRequest {
