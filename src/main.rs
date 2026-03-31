@@ -95,7 +95,7 @@ fn build_api_state() -> std::io::Result<ApiState> {
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),
-        clock,
+        clock.clone(),
     ));
 
     Ok(ApiState::new(
@@ -103,6 +103,7 @@ fn build_api_state() -> std::io::Result<ApiState> {
         task_service,
         tool_service,
         BearerTokenAuthenticator::new(jwt_secret),
+        clock,
     ))
 }
 
