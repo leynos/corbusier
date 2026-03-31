@@ -29,7 +29,7 @@ use crate::tool_registry::{
     },
     services::{ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError},
 };
-use mockable::Clock;
+use mockable::{Clock, DefaultClock};
 
 /// Conversation operations exposed to the HTTP adapter.
 #[async_trait]
@@ -122,22 +122,27 @@ pub struct ApiState {
     pub tools: Arc<dyn ToolApplication>,
     /// Bearer-token authenticator.
     pub authenticator: BearerTokenAuthenticator,
+    /// Clock for time-dependent operations.
+    pub clock: Arc<DefaultClock>,
 }
 
 impl ApiState {
     /// Creates a new shared API state bundle.
+    #[expect(clippy::too_many_arguments, reason = "Constructor with multiple dependencies")]
     #[must_use]
     pub fn new(
         conversations: Arc<dyn ConversationApplication>,
         tasks: Arc<dyn TaskApplication>,
         tools: Arc<dyn ToolApplication>,
         authenticator: BearerTokenAuthenticator,
+        clock: Arc<DefaultClock>,
     ) -> Self {
         Self {
             conversations,
             tasks,
             tools,
             authenticator,
+            clock,
         }
     }
 }

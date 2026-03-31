@@ -36,7 +36,7 @@ Observable success means:
 2. Behavioural tests prove happy and unhappy paths at the HTTP boundary,
    including missing authentication and invalid input.
 3. Postgres-backed integration tests exercise the same API surface with
-   `pg-embedded-setup-unpriv` enabled for local execution.
+   `pg-embed-setup-unpriv` enabled for local execution.
 
 ## Constraints
 
@@ -523,7 +523,7 @@ Quality criteria:
 - New unit and adapter tests use `rstest`.
 - Behavioural tests use `rstest-bdd` where the HTTP contract is better
   expressed as user-observable scenarios.
-- Postgres-backed tests run locally with `pg-embedded-setup-unpriv`.
+- Postgres-backed tests run locally with `pg-embed-setup-unpriv`.
 - `make check-fmt`, `make lint`, `make test TEST_FLAGS='--profile long
   --all-targets --all-features'`, `make fmt`, `PATH=/root/.bun/bin:$PATH make
   markdownlint`, and `make nixie` all pass.

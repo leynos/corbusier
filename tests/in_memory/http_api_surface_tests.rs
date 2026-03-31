@@ -66,7 +66,7 @@ async fn build_bundle() -> Result<TestBundle, eyre::Report> {
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),
-        clock,
+        clock.clone(),
     ));
 
     let server = lifecycle
@@ -103,6 +103,7 @@ async fn build_bundle() -> Result<TestBundle, eyre::Report> {
             task_service,
             tool_service,
             BearerTokenAuthenticator::new(TEST_JWT_SECRET),
+            clock,
         ),
         auth,
     })

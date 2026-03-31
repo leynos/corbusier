@@ -215,7 +215,7 @@ pub fn world() -> Result<HttpApiWorld, eyre::Report> {
 
     let conversation_service = build_conversation_service(clock.clone());
     let task_service = build_task_service(clock.clone());
-    let infrastructure = build_tool_infrastructure(clock);
+    let infrastructure = build_tool_infrastructure(clock.clone());
 
     setup_file_tools_server(&ctx, &infrastructure)?;
 
@@ -225,6 +225,7 @@ pub fn world() -> Result<HttpApiWorld, eyre::Report> {
             task_service,
             infrastructure.tool_service,
             BearerTokenAuthenticator::new(TEST_JWT_SECRET),
+            clock,
         ),
         token: Some(auth.token()?),
         conversation_id: None,

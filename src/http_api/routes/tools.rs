@@ -4,7 +4,6 @@ use super::super::{
     auth::AuthenticatedRequestContext, error::ApiError, response::json_success, state::ApiState,
 };
 use actix_web::{HttpResponse, http::StatusCode, web};
-use mockable::DefaultClock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -54,7 +53,7 @@ async fn call_tool(
 ) -> HttpResponse {
     let request_id = auth.request_id();
     let payload = body.into_inner();
-    let request = ToolCallRequest::new(payload.tool_name, payload.parameters, &DefaultClock);
+    let request = ToolCallRequest::new(payload.tool_name, payload.parameters, &*state.clock);
     match state.tools.call_tool(auth.context(), &request).await {
         Ok(result) => json_success(StatusCode::OK, map_tool_call_result(&result), request_id),
         Err(err) => ApiError::from(err).into_response(request_id),
