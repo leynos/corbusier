@@ -63,11 +63,11 @@ impl BearerTokenAuthenticator {
 
     fn authenticate_token(&self, token: &str) -> Result<RequestContext, ApiError> {
         let token_data = decode::<JwtClaims>(token, &self.decoding_key, &self.validation)
-            .map_err(|_| ApiError::unauthorized("invalid bearer token"))?;
+            .map_err(|_| ApiError::unauthorised("invalid bearer token"))?;
         let claims = token_data.claims;
         let tenant_kind = claims.tenant_kind.as_deref().unwrap_or("user");
         if tenant_kind != "user" {
-            return Err(ApiError::unauthorized("unsupported tenant kind"));
+            return Err(ApiError::unauthorised("unsupported tenant kind"));
         }
 
         let tenant_id = parse_uuid_claim(&claims.tenant_id, "tenant_id")?;
@@ -84,22 +84,22 @@ impl BearerTokenAuthenticator {
 
 fn parse_uuid_claim(value: &str, claim_name: &str) -> Result<Uuid, ApiError> {
     Uuid::parse_str(value)
-        .map_err(|_| ApiError::unauthorized(format!("invalid {claim_name} claim")))
+        .map_err(|_| ApiError::unauthorised(format!("invalid {claim_name} claim")))
 }
 
 fn extract_bearer_token(request: &HttpRequest) -> Result<&str, ApiError> {
     let header = request
         .headers()
         .get(actix_web::http::header::AUTHORIZATION)
-        .ok_or_else(|| ApiError::unauthorized("missing bearer token"))?;
+        .ok_or_else(|| ApiError::unauthorised("missing bearer token"))?;
     let header_value = header
         .to_str()
-        .map_err(|_| ApiError::unauthorized("invalid authorization header"))?;
+        .map_err(|_| ApiError::unauthorised("invalid authorization header"))?;
     let Some(token) = header_value.strip_prefix("Bearer ") else {
-        return Err(ApiError::unauthorized("invalid authorization header"));
+        return Err(ApiError::unauthorised("invalid authorization header"));
     };
     if token.trim().is_empty() {
-        return Err(ApiError::unauthorized("missing bearer token"));
+        return Err(ApiError::unauthorised("missing bearer token"));
     }
     Ok(token)
 }

@@ -52,13 +52,13 @@ Observable success means:
   - Include core conversation, task, and tool endpoints.
   - Include API versioning and authentication enforcement.
   - Do not implement SSE or WebSocket streaming from roadmap `4.3.1`.
-  - Do not implement RBAC from roadmap `5.1.2`.
+  - Do not implement Role-Based Access Control (RBAC) from roadmap `5.1.2`.
   - Do not implement admin endpoints.
 - Reuse the existing Actix runtime in `src/main.rs` and the health adapter
   pattern already present in `src/health/`.
 - Use `rstest` for unit and adapter tests, and `rstest-bdd` for behavioural
   scenarios where user-visible HTTP behaviour is expressed.
-- Use `pg-embedded-setup-unpriv` fixtures and helpers for Postgres-backed
+- Use `pg-embed-setup-unpriv` fixtures and helpers for Postgres-backed
   integration coverage.
 - Keep files below the repository's 400-line cap by splitting modules early.
 - Maintain strict lint and formatting gates:
@@ -188,8 +188,8 @@ Observable success means:
   associate pull request. Rationale: this exposes existing behaviour without
   expanding into unimplemented list/delete semantics. Date/Author: 2026-03-27 /
   plan author.
-- Decision: keep JWT verification intentionally narrow for `4.2.1` by
-  accepting only `Authorization: Bearer <jwt>` plus HS256 claims
+- Decision: keep JSON Web Token (JWT) verification intentionally narrow for
+  `4.2.1` by accepting only `Authorization: Bearer <jwt>` plus HS256 claims
   `{ sub, tenant_id, session_id, exp, role?, tenant_kind? }`. Rationale: this
   enforces authentication without pulling roadmap `5.1.1` token lifecycle work
   into the HTTP-adapter milestone. Date/Author: 2026-03-30 / implementation
@@ -390,7 +390,8 @@ Implement the Actix-facing adapter as a pure delivery layer.
 Planned work:
 
 - Add route modules for conversations, tasks, and tools.
-- Add request DTOs and response DTOs for each route family.
+- Add request Data Transfer Objects (DTOs) and response DTOs for each route
+  family.
 - Add shared middleware or extractors for:
   - bearer token validation;
   - request identifier generation;

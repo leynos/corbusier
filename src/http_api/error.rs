@@ -43,10 +43,16 @@ impl ApiError {
         Self::new(StatusCode::BAD_REQUEST, code, message)
     }
 
-    /// Creates a `401 Unauthorized` response.
+    /// Creates a `401 Unauthorised` response.
+    #[must_use]
+    pub fn unauthorised(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "unauthorised", message)
+    }
+
+    /// Creates a `401 Unauthorised` response (US-spelled alias for API consistency).
     #[must_use]
     pub fn unauthorized(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "unauthorized", message)
+        Self::unauthorised(message)
     }
 
     /// Creates a `404 Not Found` response.
@@ -67,13 +73,16 @@ impl ApiError {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", message)
     }
 
-    /// Converts this error into an [`HttpResponse`] using the given request ID.
+    /// Builds an HTTP response with the given request ID.
+    ///
+    /// This method allows handlers to provide the correlation ID from the
+    /// request context so success and error responses share the same ID.
     #[must_use]
-    pub fn into_response(self, request_id: String) -> HttpResponse {
+    pub fn into_response(self, request_id: impl Into<String>) -> HttpResponse {
         json_error(
             self.status,
             ErrorPayload::new(self.code, self.message),
-            request_id,
+            request_id.into(),
         )
     }
 }
@@ -92,6 +101,9 @@ impl ResponseError for ApiError {
     }
 
     fn error_response(&self) -> HttpResponse {
+        // Note: This generates a fresh UUID for the error response.
+        // Handlers that have access to RequestContext should use
+        // `ApiError::into_response(request_id)` to maintain correlation.
         json_error(
             self.status,
             ErrorPayload::new(self.code, self.message.clone()),
