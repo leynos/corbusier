@@ -1,4 +1,16 @@
 {
+  "_documentation": {
+    "purpose": "Factory Droid core plugin configuration for Corbusier development environment",
+    "core_plugin": "core@factory-plugins provides local dev servers, scaffolding, and CI helpers",
+    "relation_to_http_api": "Supplies test fixtures and mock services used by HTTP API integration tests",
+    "runtime_impact": "Does NOT affect runtime HTTP logic; dev/test tooling only",
+    "setup_instructions": {
+      "enable": "factory plugin enable core@factory-plugins",
+      "disable": "factory plugin disable core@factory-plugins",
+      "initialize": "factory init",
+      "run_api_tests": "cargo test --test in_memory http_api"
+    }
+  },
   "enabledPlugins": {
     "core@factory-plugins": true
   }

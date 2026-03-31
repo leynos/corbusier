@@ -52,6 +52,9 @@ pub enum ConversationServiceError {
     /// Message validation failure.
     #[error(transparent)]
     Validation(#[from] ValidationError),
+    /// Retry exhaustion for sequence allocation.
+    #[error("retry exhausted for sequence allocation")]
+    RetryExhausted,
 }
 
 /// Result type for conversation service operations.
@@ -177,10 +180,7 @@ where
 
         // After MAX_RETRIES, return the last duplicate sequence error
         Err(last_error.map_or_else(
-            || {
-                // This should not happen as last_error is always set in the loop
-                ConversationServiceError::Validation(ValidationError::EmptyContent)
-            },
+            || ConversationServiceError::RetryExhausted,
             ConversationServiceError::MessageRepository,
         ))
     }
