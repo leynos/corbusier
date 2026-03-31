@@ -233,6 +233,101 @@ fn rejects_missing_and_invalid_bearer_tokens(runtime: io::Result<Runtime>) {
 }
 
 #[rstest]
+fn rejects_unsupported_tenant_kind(runtime: io::Result<Runtime>) {
+    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+    rt.block_on(async {
+        let bundle = build_bundle()
+            .await
+            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
+        let token = bundle
+            .auth
+            .token_with_tenant_kind("service")
+            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(bundle.state))
+                .configure(api_routes),
+        )
+        .await;
+
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
+        let body: Value = actix_test::read_body_json(response).await;
+        assert_v1_metadata(&body);
+        assert!(
+            required_str_field(required_field(&body, "error"), "message")
+                .contains("unsupported tenant kind"),
+            "error message should mention unsupported tenant kind"
+        );
+    });
+}
+
+#[rstest]
+fn rejects_malformed_uuid_claims(runtime: io::Result<Runtime>) {
+    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+    rt.block_on(async {
+        let bundle = build_bundle()
+            .await
+            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
+        let token = bundle
+            .auth
+            .token_with_invalid_uuids()
+            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(bundle.state))
+                .configure(api_routes),
+        )
+        .await;
+
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
+        let body: Value = actix_test::read_body_json(response).await;
+        assert_v1_metadata(&body);
+    });
+}
+
+#[rstest]
+fn rejects_expired_tokens(runtime: io::Result<Runtime>) {
+    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+    rt.block_on(async {
+        let bundle = build_bundle()
+            .await
+            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
+        let token = bundle
+            .auth
+            .expired_token()
+            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(bundle.state))
+                .configure(api_routes),
+        )
+        .await;
+
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
+        let body: Value = actix_test::read_body_json(response).await;
+        assert_v1_metadata(&body);
+    });
+}
+
+#[rstest]
 fn task_routes_support_create_get_and_transition(runtime: io::Result<Runtime>) {
     let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
     rt.block_on(async {

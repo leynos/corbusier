@@ -472,9 +472,10 @@ routes are:
 - `GET /api/v1/tools`
 - `POST /api/v1/tools/calls`
 
-Every request must send `Authorization: Bearer <jwt>`. The accepted JWT claims
-are `sub`, `tenant_id`, `session_id`, `exp`, and optional `role` plus
-`tenant_kind`. The current release only accepts `tenant_kind = user`.
+Every request must send `Authorization: Bearer <JSON Web Token (JWT)>`. The
+accepted JWT claims are `sub`, `tenant_id`, `session_id`, `exp`, and optional
+`role` plus `tenant_kind`. The current release only accepts
+`tenant_kind = user`.
 
 Every response, including errors, uses the same envelope shape:
 
