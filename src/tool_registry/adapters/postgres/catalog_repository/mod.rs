@@ -137,12 +137,23 @@ impl PostgresToolCatalog {
             .collect())
     }
 
+    /// Derives a stable advisory-lock key from a tenant UUID.
+    ///
+    /// Uses SHA-256 (via the `sha2` crate) to ensure the mapping is
+    /// deterministic across Rust toolchain versions, unlike
+    /// `DefaultHasher` whose output may change between releases.
     fn advisory_lock_key(tenant_id: uuid::Uuid) -> i64 {
-        use std::hash::{Hash, Hasher};
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        tenant_id.as_bytes().hash(&mut hasher);
-        hasher.finish().cast_signed()
+        let digest: [u8; 32] = Sha256::digest(tenant_id.as_bytes()).into();
+        (i64::from(digest[0]) << 56)
+            | (i64::from(digest[1]) << 48)
+            | (i64::from(digest[2]) << 40)
+            | (i64::from(digest[3]) << 32)
+            | (i64::from(digest[4]) << 24)
+            | (i64::from(digest[5]) << 16)
+            | (i64::from(digest[6]) << 8)
+            | i64::from(digest[7])
     }
 
     fn acquire_sync_lock(
@@ -189,16 +200,15 @@ impl PostgresToolCatalog {
 
     async fn run_sync_in_pool(
         &self,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
+        tenant_id: TenantId,
+        server_id: McpServerId,
         rows: Vec<NewCatalogEntryRow>,
     ) -> ToolCatalogResult<()> {
-        let tenant = TenantId::from_uuid(tenant_id);
         let candidate_names: HashSet<String> =
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
-        execute_query_with_bootstrap(&self.pool, tenant, move |connection| {
-            Self::acquire_sync_lock(connection, tenant_id)?;
+        execute_query_with_bootstrap(&self.pool, tenant_id, move |connection| {
+            Self::acquire_sync_lock(connection, tenant_id.into_inner())?;
 
             let existing_name_counts = sync_helpers::load_conflicting_name_counts(
                 connection,
@@ -217,7 +227,9 @@ impl PostgresToolCatalog {
                 ));
             }
 
-            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
+            let tid = tenant_id.into_inner();
+            let sid = server_id.into_inner();
+            match Self::sync_rows_tx(connection, tid, sid, &rows) {
                 Ok(()) => Ok(()),
                 Err(err) => {
                     let attempt = sync_helpers::SyncAttempt {
@@ -264,10 +276,9 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
         Self::validate_same_server(server_id, entries)?;
-        let tenant_id = ctx.tenant_id().into_inner();
-        let rows = Self::to_new_rows(tenant_id, entries)?;
-        self.run_sync_in_pool(tenant_id, server_id.into_inner(), rows)
-            .await
+        let tenant_id = ctx.tenant_id();
+        let rows = Self::to_new_rows(tenant_id.into_inner(), entries)?;
+        self.run_sync_in_pool(tenant_id, server_id, rows).await
     }
 
     async fn mark_server_tools_unavailable(

@@ -6,29 +6,30 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 
+use crate::context::TenantId;
 use crate::tool_registry::{
     adapters::postgres::{catalog_models::NewCatalogEntryRow, catalog_schema::mcp_tool_catalog},
-    domain::CatalogEntryId,
+    domain::{CatalogEntryId, McpServerId},
     ports::{ToolCatalogError, ToolCatalogResult},
 };
 
 pub(super) struct SyncAttempt<'a> {
-    pub(super) tenant_id: uuid::Uuid,
-    pub(super) server_id: uuid::Uuid,
+    pub(super) tenant_id: TenantId,
+    pub(super) server_id: McpServerId,
     pub(super) rows: &'a [NewCatalogEntryRow],
     pub(super) candidate_names: &'a HashSet<String>,
 }
 
 pub(super) fn load_conflicting_name_counts(
     connection: &mut PgConnection,
-    tenant_id: uuid::Uuid,
-    server_id: uuid::Uuid,
+    tenant_id: TenantId,
+    server_id: McpServerId,
     candidate_names: &HashSet<String>,
 ) -> ToolCatalogResult<HashMap<String, usize>> {
     let candidate_name_list: Vec<&str> = candidate_names.iter().map(String::as_str).collect();
     mcp_tool_catalog::table
-        .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
-        .filter(mcp_tool_catalog::server_id.ne(server_id))
+        .filter(mcp_tool_catalog::tenant_id.eq(tenant_id.into_inner()))
+        .filter(mcp_tool_catalog::server_id.ne(server_id.into_inner()))
         .filter(mcp_tool_catalog::tool_name.eq_any(candidate_name_list))
         .group_by(mcp_tool_catalog::tool_name)
         .select((mcp_tool_catalog::tool_name, diesel::dsl::count_star()))
@@ -59,24 +60,35 @@ fn duplicate_entry_from_counts(
         .map(|row| duplicate_entry_error(row, name_counts))
 }
 
+fn try_map_as_duplicate_entry(
+    connection: &mut PgConnection,
+    attempt: &SyncAttempt<'_>,
+    info: &dyn DatabaseErrorInformation,
+) -> Option<ToolCatalogError> {
+    if !is_catalog_name_unique_violation(info) {
+        return None;
+    }
+    let refreshed_counts = load_conflicting_name_counts(
+        connection,
+        attempt.tenant_id,
+        attempt.server_id,
+        attempt.candidate_names,
+    )
+    .ok()?;
+    duplicate_entry_from_counts(attempt.rows, &refreshed_counts)
+}
+
 pub(super) fn map_sync_rows_error(
     connection: &mut PgConnection,
     attempt: &SyncAttempt<'_>,
     err: DieselError,
 ) -> ToolCatalogError {
     if let DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, ref info) = err
-        && is_catalog_name_unique_violation(info.as_ref())
-        && let Ok(refreshed_counts) = load_conflicting_name_counts(
-            connection,
-            attempt.tenant_id,
-            attempt.server_id,
-            attempt.candidate_names,
-        )
-        && let Some(duplicate_entry) = duplicate_entry_from_counts(attempt.rows, &refreshed_counts)
+        && let Some(duplicate_entry) =
+            try_map_as_duplicate_entry(connection, attempt, info.as_ref())
     {
         return duplicate_entry;
     }
-
     ToolCatalogError::persistence("transaction", err)
 }
 

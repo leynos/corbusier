@@ -5949,8 +5949,7 @@ pub struct HookExecutionResult {
 
 Earlier sections of this document use legacy trigger names from the planning
 phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
-`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` ->
-`PostToolUse`.
+`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` -> `PostToolUse`.
 
 ### 6.4 Component Integration Patterns
 
@@ -9495,12 +9494,12 @@ flowchart TD
 
 For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
 `ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
-that runs the contract trigger `PreToolCall` (maps to runtime
-`PreToolUse`) before the MCP host executes a tool and the contract trigger
-`PostToolCall` (maps to runtime `PostToolUse`) after the call completes. The
-default adapter still permits all calls, but a hook-backed adapter translates
-tool execution requests into `HookTriggerContext` values and delegates
-evaluation to the hook engine.
+that runs the contract trigger `PreToolCall` (maps to runtime `PreToolUse`)
+before the MCP host executes a tool and the contract trigger `PostToolCall`
+(maps to runtime `PostToolUse`) after the call completes. The default adapter
+still permits all calls, but a hook-backed adapter translates tool execution
+requests into `HookTriggerContext` values and delegates evaluation to the hook
+engine.
 
 The execution path carries workflow correlation through a dedicated execution
 scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
@@ -9572,10 +9571,10 @@ required by automated workflow governance without scanning hook execution JSON.
 
 The current milestone records policy audit events for tool execution only:
 contract trigger `PreToolCall` (maps to runtime `PreToolUse`) hook denials
-block the tool call before host execution, and contract trigger
-`PostToolCall` (maps to runtime `PostToolUse`) hooks persist audit outcomes
-after the call completes. Future API- and VCS-level enforcement points remain
-owned by their respective roadmap items.
+block the tool call before host execution, and contract trigger `PostToolCall`
+(maps to runtime `PostToolUse`) hooks persist audit outcomes after the call
+completes. Future API- and VCS-level enforcement points remain owned by their
+respective roadmap items.
 
 ###### Comprehensive Authorization Audit Trail
 

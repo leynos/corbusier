@@ -45,7 +45,11 @@ pub(crate) fn insert_task(
     ensure_tenant_exists(conn, tenant_id)?;
     let task_uuid = task_id.into_inner();
     let upper_bits = task_uuid.as_u128() >> 64;
-    let issue_number = u64::try_from(upper_bits).unwrap_or(1).max(1);
+    // Cap to i64::MAX so the value fits PostgreSQL BIGINT when cast from JSON.
+    let issue_number = u64::try_from(upper_bits)
+        .unwrap_or(1)
+        .min(i64::MAX as u64)
+        .max(1);
     diesel::sql_query(concat!(
         "INSERT INTO tasks (id, tenant_id, origin, state, created_at, updated_at) ",
         "VALUES ($1, $2, $3::jsonb, 'draft', NOW(), NOW())"

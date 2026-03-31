@@ -1,5 +1,10 @@
 BEGIN;
 
+-- Serialise access during rollback: prevent concurrent writes to tables whose
+-- global UNIQUE indexes are being recreated, closing the TOCTOU window between
+-- the preflight duplicate checks and the later index creation.
+LOCK TABLE tasks, backend_registrations IN SHARE ROW EXCLUSIVE MODE;
+
 -- Preflight: abort rollback if multi-tenant data would violate global UNIQUE indexes.
 -- The up migration scopes uniqueness by tenant, so rolling back to global uniqueness
 -- will fail if multiple tenants share the same issue reference or backend name.
@@ -19,6 +24,9 @@ BEGIN
             COUNT(DISTINCT tenant_id) AS tenant_count
         FROM tasks
         WHERE origin->>'type' = 'issue'
+          AND origin->'issue_ref'->>'provider' IS NOT NULL
+          AND origin->'issue_ref'->>'repository' IS NOT NULL
+          AND origin->'issue_ref'->>'issue_number' IS NOT NULL
         GROUP BY provider, repository, issue_number
         HAVING COUNT(DISTINCT tenant_id) > 1
       ) duplicates;

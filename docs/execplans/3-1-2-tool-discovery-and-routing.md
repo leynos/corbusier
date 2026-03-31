@@ -528,13 +528,13 @@ truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
 `retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
- — reads a log blob by path.
+— reads a log blob by path.
 
 `delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
 — deletes a single log blob.
 
 `list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
- — lists all log blob paths for a server by prefix scan on
+— lists all log blob paths for a server by prefix scan on
 `tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
 
 `sweep_expired(&self, ctx: &RequestContext,`
@@ -744,22 +744,22 @@ stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 Public methods:
 
 `discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
-Load the server from the registry, fail with `NotFound` if it is absent,
-verify the lifecycle state allows tool queries, call `host.list_tools()` to
-get tool definitions, map each definition to a `CatalogEntry`, call
+ Load the server from the registry, fail with `NotFound` if it is absent,
+verify the lifecycle state allows tool queries, call `host.list_tools()` to get
+tool definitions, map each definition to a `CatalogEntry`, call
 `catalog.sync_server_tools()` to persist the entries, and return them.
 
 `mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
-Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
+ Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
 `mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
-Delegate to `catalog.mark_server_tools_available(server_id)`.
+ Delegate to `catalog.mark_server_tools_available(server_id)`.
 
 `list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
-Delegate to `catalog.list_all()`.
+ Delegate to `catalog.list_all()`.
 
 `call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`.
-This is the core routing method. Its flow is:
+ This is the core routing method. Its flow is:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
@@ -796,7 +796,7 @@ This is the core routing method. Its flow is:
 9. Return `ToolCallResult`.
 
 `store_startup_stderr(&self, ctx, server_id, stderr) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`.
-Store startup stderr captured from `McpServerHost::start`. The caller invokes
+ Store startup stderr captured from `McpServerHost::start`. The caller invokes
 this after `lifecycle_service.start()` returns a `LifecycleStartResult` with
 non-empty `startup_stderr`. Build
 `LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
@@ -805,7 +805,7 @@ return the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
 `sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`.
-Trigger a retention sweep for a specific server. Delegate to
+ Trigger a retention sweep for a specific server. Delegate to
 `log_store.sweep_expired(server_id, &SweepContext { … })` and return the count
 of deleted log entries.
 
