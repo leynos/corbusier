@@ -2,6 +2,7 @@
 
 use actix_web::{App, http::header, test as actix_test, web};
 use corbusier::{
+    context::RequestContext,
     http_api::{ApiState, BearerTokenAuthenticator, api_routes},
     message::{
         adapters::memory::{InMemoryConversationRepository, InMemoryMessageRepository},
@@ -89,23 +90,53 @@ where
     }
 }
 
-#[fixture]
-pub fn world() -> HttpApiWorld {
-    let auth = HttpApiAuth::new(TEST_JWT_SECRET);
-    let ctx = auth.request_context();
-    let clock = Arc::new(DefaultClock);
-
-    let conversation_service = Arc::new(ConversationService::new(
+fn build_conversation_service(
+    clock: Arc<DefaultClock>,
+) -> Arc<
+    ConversationService<
+        InMemoryConversationRepository,
+        InMemoryMessageRepository,
+        DefaultMessageValidator,
+        DefaultClock,
+    >,
+> {
+    Arc::new(ConversationService::new(
         Arc::new(InMemoryConversationRepository::new()),
         Arc::new(InMemoryMessageRepository::new()),
         Arc::new(DefaultMessageValidator::new()),
-        clock.clone(),
-    ));
-    let task_service = Arc::new(TaskLifecycleService::new(
-        Arc::new(InMemoryTaskRepository::new()),
-        clock.clone(),
-    ));
+        clock,
+    ))
+}
 
+fn build_task_service(
+    clock: Arc<DefaultClock>,
+) -> Arc<TaskLifecycleService<InMemoryTaskRepository, DefaultClock>> {
+    Arc::new(TaskLifecycleService::new(
+        Arc::new(InMemoryTaskRepository::new()),
+        clock,
+    ))
+}
+
+fn build_tool_infrastructure(
+    clock: Arc<DefaultClock>,
+) -> (
+    Arc<
+        ToolDiscoveryRoutingService<
+            InMemoryToolCatalog,
+            InMemoryMcpServerRegistry,
+            InMemoryMcpServerHost,
+            AllowAllPolicy,
+            ObjectStoreLogAdapter,
+            DefaultClock,
+        >,
+    >,
+    McpServerLifecycleService<
+        InMemoryMcpServerRegistry,
+        InMemoryMcpServerHost,
+        DefaultClock,
+    >,
+    Arc<InMemoryMcpServerHost>,
+) {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
@@ -121,11 +152,32 @@ pub fn world() -> HttpApiWorld {
         LogRetentionPolicy::default(),
         clock,
     ));
+    (tool_service, lifecycle, host)
+}
 
+fn setup_file_tools_server(
+    ctx: &RequestContext,
+    lifecycle: &McpServerLifecycleService<
+        InMemoryMcpServerRegistry,
+        InMemoryMcpServerHost,
+        DefaultClock,
+    >,
+    host: &Arc<InMemoryMcpServerHost>,
+    tool_service: &Arc<
+        ToolDiscoveryRoutingService<
+            InMemoryToolCatalog,
+            InMemoryMcpServerRegistry,
+            InMemoryMcpServerHost,
+            AllowAllPolicy,
+            ObjectStoreLogAdapter,
+            DefaultClock,
+        >,
+    >,
+) {
     let server = block_on_setup(async {
         lifecycle
             .register(
-                &ctx,
+                ctx,
                 RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
             )
             .await
@@ -133,18 +185,16 @@ pub fn world() -> HttpApiWorld {
     .unwrap_or_else(|err| panic!("tool server registration should succeed: {err}"));
     host.set_tool_catalog(
         server.name().clone(),
-        vec![
-            McpToolDefinition::new(
-                "read_file",
-                "Read a file from disk",
-                json!({
-                    "type": "object",
-                    "properties": { "path": { "type": "string" } },
-                    "required": ["path"]
-                }),
-            )
-            .unwrap_or_else(|err| panic!("tool definition should be valid: {err}")),
-        ],
+        vec![McpToolDefinition::new(
+            "read_file",
+            "Read a file from disk",
+            json!({
+                "type": "object",
+                "properties": { "path": { "type": "string" } },
+                "required": ["path"]
+            }),
+        )
+        .unwrap_or_else(|err| panic!("tool definition should be valid: {err}"))],
     )
     .unwrap_or_else(|err| panic!("tool catalog should be set: {err}"));
     host.set_tool_call_result(
@@ -153,14 +203,27 @@ pub fn world() -> HttpApiWorld {
         json!({"content": "hello from tool"}),
     )
     .unwrap_or_else(|err| panic!("tool call result should be set: {err}"));
-    block_on_setup(async { lifecycle.start(&ctx, server.id()).await })
+    block_on_setup(async { lifecycle.start(ctx, server.id()).await })
         .unwrap_or_else(|err| panic!("tool server should start: {err}"));
     block_on_setup(async {
         tool_service
-            .discover_and_persist_tools(&ctx, server.id())
+            .discover_and_persist_tools(ctx, server.id())
             .await
     })
     .unwrap_or_else(|err| panic!("tool discovery should succeed: {err}"));
+}
+
+#[fixture]
+pub fn world() -> HttpApiWorld {
+    let auth = HttpApiAuth::new(TEST_JWT_SECRET);
+    let ctx = auth.request_context();
+    let clock = Arc::new(DefaultClock);
+
+    let conversation_service = build_conversation_service(clock.clone());
+    let task_service = build_task_service(clock.clone());
+    let (tool_service, lifecycle, host) = build_tool_infrastructure(clock);
+
+    setup_file_tools_server(&ctx, &lifecycle, &host, &tool_service);
 
     HttpApiWorld {
         state: ApiState::new(
