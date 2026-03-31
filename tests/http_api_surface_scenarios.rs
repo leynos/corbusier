@@ -13,8 +13,8 @@ use rstest_bdd_macros::scenario;
     name = "Create a conversation and append a message through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_conversation_and_append_message(world: HttpApiWorld) {
-    let _ = world;
+async fn create_conversation_and_append_message(world: Result<HttpApiWorld, eyre::Report>) {
+    let _ = world.expect("world should be created");
 }
 
 #[scenario(
@@ -22,8 +22,8 @@ async fn create_conversation_and_append_message(world: HttpApiWorld) {
     name = "Create a task from issue metadata through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_task_from_issue(world: HttpApiWorld) {
-    let _ = world;
+async fn create_task_from_issue(world: Result<HttpApiWorld, eyre::Report>) {
+    let _ = world.expect("world should be created");
 }
 
 #[scenario(
@@ -31,8 +31,8 @@ async fn create_task_from_issue(world: HttpApiWorld) {
     name = "Transition a task state through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn transition_task_state(world: HttpApiWorld) {
-    let _ = world;
+async fn transition_task_state(world: Result<HttpApiWorld, eyre::Report>) {
+    let _ = world.expect("world should be created");
 }
 
 #[scenario(
@@ -40,8 +40,8 @@ async fn transition_task_state(world: HttpApiWorld) {
     name = "List tools and invoke a tool through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_tools_and_invoke(world: HttpApiWorld) {
-    let _ = world;
+async fn list_tools_and_invoke(world: Result<HttpApiWorld, eyre::Report>) {
+    let _ = world.expect("world should be created");
 }
 
 #[scenario(
@@ -49,6 +49,6 @@ async fn list_tools_and_invoke(world: HttpApiWorld) {
     name = "Reject unauthenticated access"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn reject_unauthenticated_access(world: HttpApiWorld) {
-    let _ = world;
+async fn reject_unauthenticated_access(world: Result<HttpApiWorld, eyre::Report>) {
+    let _ = world.expect("world should be created");
 }

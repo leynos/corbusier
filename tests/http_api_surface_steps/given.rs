@@ -30,14 +30,15 @@ async fn created_draft_task_through_api(world: &mut HttpApiWorld) -> Result<(), 
                 })),
         )
         .await?;
-    let task_id = world
-        .last_body
-        .as_ref()
-        .map_or_else(
-            || panic!("task id should be present"),
-            |body| required_str_field(required_field(required_field(body, "data"), "task"), "id"),
-        )
-        .to_owned();
+    let task_id = world.last_body.as_ref().map_or_else(
+        || Err(eyre::eyre!("task id should be present")),
+        |body| {
+            Ok(
+                required_str_field(required_field(required_field(body, "data"), "task"), "id")
+                    .to_owned(),
+            )
+        },
+    )?;
     world.task_id = Some(task_id);
     Ok(())
 }

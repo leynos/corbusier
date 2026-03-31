@@ -21,6 +21,7 @@
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and audit trail
 //! - `tool_policy_enforcement_tests`: Hook-backed policy enforcement for tool calls
 //! - `hook_engine_tests`: Hook execution log persistence
+//! - `http_api_surface_tests`: HTTP API surface integration tests
 
 mod http_api_test_helpers;
 mod test_helpers;
