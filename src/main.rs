@@ -28,7 +28,7 @@ use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
-use mockable::DefaultClock;
+use mockable::{Clock, DefaultClock};
 use tracing::info;
 use uuid::Uuid;
 
@@ -114,7 +114,11 @@ fn build_api_state() -> std::io::Result<ApiState> {
             // FIXME: InMemoryMcpServerHost is not persisted across restarts.
             // Replace with a persistent host implementation before production.
             host: Arc::new(InMemoryMcpServerHost::new()),
+            // FIXME: AllowAllPolicy bypasses governance enforcement.
+            // Replace with a production governance policy before release.
             governance: Arc::new(AllowAllPolicy::new()),
+            // FIXME: In-memory log storage does not persist audit logs.
+            // Replace with a production log store before release.
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
         },
         LogRetentionPolicy::default(),
@@ -127,7 +131,7 @@ fn build_api_state() -> std::io::Result<ApiState> {
         tool_service,
         ApiConfig {
             authenticator: BearerTokenAuthenticator::new(jwt_secret),
-            clock,
+            clock: clock as Arc<dyn Clock + Send + Sync>,
         },
     ))
 }

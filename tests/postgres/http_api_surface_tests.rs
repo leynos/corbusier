@@ -29,7 +29,7 @@ use corbusier::{
     },
 };
 use diesel::{PgConnection, r2d2::ConnectionManager};
-use mockable::DefaultClock;
+use mockable::{Clock, DefaultClock};
 use rstest::{fixture, rstest};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -84,7 +84,7 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
             tool_service,
             ApiConfig {
                 authenticator: BearerTokenAuthenticator::new(TEST_JWT_SECRET),
-                clock,
+                clock: clock as Arc<dyn Clock + Send + Sync>,
             },
         ),
         auth,

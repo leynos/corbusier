@@ -10,9 +10,9 @@ use serde_json::{Value, json};
 use std::io;
 use tokio::runtime::Runtime;
 
-async fn create_conversation<F, Fut, B>(send: F, token: &str) -> Result<String, eyre::Report>
+async fn create_conversation<F, Fut, B>(send: &F, token: &str) -> Result<String, eyre::Report>
 where
-    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    F: Fn(actix_web::test::TestRequest) -> Fut,
     Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
     B: actix_web::body::MessageBody,
 {
@@ -36,12 +36,12 @@ where
 }
 
 async fn append_message<F, Fut, B>(
-    send: F,
+    send: &F,
     token: &str,
     conversation_id: &str,
 ) -> Result<(), eyre::Report>
 where
-    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    F: Fn(actix_web::test::TestRequest) -> Fut,
     Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
     B: actix_web::body::MessageBody,
 {
@@ -66,12 +66,12 @@ where
 }
 
 async fn assert_history_has_one_message<F, Fut, B>(
-    send: F,
+    send: &F,
     token: &str,
     conversation_id: &str,
 ) -> Result<(), eyre::Report>
 where
-    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    F: Fn(actix_web::test::TestRequest) -> Fut,
     Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
     B: actix_web::body::MessageBody,
 {
@@ -110,24 +110,13 @@ fn authenticated_conversation_flow(runtime: io::Result<Runtime>) -> Result<(), e
                 .configure(api_routes),
         )
         .await;
+        let call = |request: actix_web::test::TestRequest| {
+            actix_web::test::call_service(&app, request.to_request())
+        };
 
-        let conversation_id = create_conversation(
-            |request| actix_web::test::call_service(&app, request.to_request()),
-            &token,
-        )
-        .await?;
-        append_message(
-            |request| actix_web::test::call_service(&app, request.to_request()),
-            &token,
-            &conversation_id,
-        )
-        .await?;
-        assert_history_has_one_message(
-            |request| actix_web::test::call_service(&app, request.to_request()),
-            &token,
-            &conversation_id,
-        )
-        .await?;
+        let conversation_id = create_conversation(&call, &token).await?;
+        append_message(&call, &token, &conversation_id).await?;
+        assert_history_has_one_message(&call, &token, &conversation_id).await?;
 
         Ok(())
     })

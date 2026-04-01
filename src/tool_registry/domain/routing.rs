@@ -129,7 +129,11 @@ impl Default for ToolExecutionScope {
 impl ToolCallRequest {
     /// Creates a new tool call request, generating a fresh call identifier.
     #[must_use]
-    pub fn new(tool_name: impl Into<String>, parameters: Value, clock: &impl Clock) -> Self {
+    pub fn new(
+        tool_name: impl Into<String>,
+        parameters: Value,
+        clock: &(impl Clock + ?Sized),
+    ) -> Self {
         Self {
             call_id: ToolCallId::new(),
             tool_name: tool_name.into(),

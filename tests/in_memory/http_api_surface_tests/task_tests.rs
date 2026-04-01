@@ -10,6 +10,89 @@ use serde_json::{Value, json};
 use std::io;
 use tokio::runtime::Runtime;
 
+async fn create_task<F, Fut, B>(send: F, token: &str) -> Result<String, eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "owner/repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 201,
+        "expected create response status 201, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    assert_v1_metadata(&body);
+    Ok(required_str_field(required_field(required_field(&body, "data"), "task"), "id").to_owned())
+}
+
+async fn get_task<F, Fut, B>(send: F, token: &str, task_id: &str) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 200,
+        "expected get response status 200, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    assert_v1_metadata(&body);
+    eyre::ensure!(
+        required_str_field(required_field(required_field(&body, "data"), "task"), "id") == task_id,
+        "expected returned task id to equal requested task id"
+    );
+    Ok(())
+}
+
+async fn transition_task<F, Fut, B>(send: F, token: &str, task_id: &str) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::put()
+            .uri(&format!("/api/v1/tasks/{task_id}/state"))
+            .set_json(json!({ "state": "in_progress" })),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 200,
+        "expected transition response status 200, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    eyre::ensure!(
+        required_field(
+            required_field(required_field(&body, "data"), "task"),
+            "state"
+        ) == "in_progress",
+        "expected transitioned task state to be in_progress"
+    );
+    assert_v1_metadata(&body);
+    Ok(())
+}
+
 #[rstest]
 fn task_routes_support_create_get_and_transition(
     runtime: io::Result<Runtime>,
@@ -25,66 +108,23 @@ fn task_routes_support_create_get_and_transition(
         )
         .await;
 
-        let create_request = with_bearer(
-            actix_web::test::TestRequest::post()
-                .uri("/api/v1/tasks")
-                .set_json(json!({
-                    "provider": "github",
-                    "repository": "owner/repo",
-                    "issue_number": 42,
-                    "title": "Implement HTTP API"
-                })),
+        let task_id = create_task(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
         )
-        .to_request();
-        let create_response = actix_web::test::call_service(&app, create_request).await;
-        eyre::ensure!(
-            create_response.status().as_u16() == 201,
-            "expected create response status 201, got {}",
-            create_response.status().as_u16()
-        );
-        let create_body: Value = actix_web::test::read_body_json(create_response).await;
-        assert_v1_metadata(&create_body);
-        let task_id = required_str_field(
-            required_field(required_field(&create_body, "data"), "task"),
-            "id",
-        )
-        .to_owned();
-
-        let get_request = with_bearer(
-            actix_web::test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
+        .await?;
+        get_task(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
+            &task_id,
         )
-        .to_request();
-        let get_response = actix_web::test::call_service(&app, get_request).await;
-        eyre::ensure!(
-            get_response.status().as_u16() == 200,
-            "expected get response status 200, got {}",
-            get_response.status().as_u16()
-        );
-
-        let transition_request = with_bearer(
-            actix_web::test::TestRequest::put()
-                .uri(&format!("/api/v1/tasks/{task_id}/state"))
-                .set_json(json!({ "state": "in_progress" })),
+        .await?;
+        transition_task(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
+            &task_id,
         )
-        .to_request();
-        let transition_response = actix_web::test::call_service(&app, transition_request).await;
-        eyre::ensure!(
-            transition_response.status().as_u16() == 200,
-            "expected transition response status 200, got {}",
-            transition_response.status().as_u16()
-        );
-        let transition_body: Value = actix_web::test::read_body_json(transition_response).await;
-        eyre::ensure!(
-            required_field(
-                required_field(required_field(&transition_body, "data"), "task"),
-                "state"
-            ) == "in_progress",
-            "expected transitioned task state to be in_progress"
-        );
-        assert_v1_metadata(&transition_body);
+        .await?;
 
         Ok(())
     })
