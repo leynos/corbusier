@@ -26,7 +26,7 @@ use mockable::DefaultClock;
 use rstest::fixture;
 use serde_json::{Value, json};
 use std::sync::Arc;
-use std::{future::Future, panic::AssertUnwindSafe};
+use std::future::Future;
 
 use crate::http_api_test_helpers::HttpApiAuth;
 
@@ -77,16 +77,20 @@ pub(super) fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
         .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
 }
 
-fn block_on_setup<F, T>(future: F) -> T
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Panic is for unrecoverable test-runtime creation failure; the Result is for the async operation"
+)]
+fn block_on_setup<F, T, E>(future: F) -> Result<T, E>
 where
-    F: Future<Output = T>,
+    F: Future<Output = Result<T, E>>,
 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(AssertUnwindSafe(future)))
+        tokio::task::block_in_place(|| handle.block_on(future))
     } else {
-        tokio::runtime::Runtime::new()
-            .unwrap_or_else(|err| panic!("HTTP API test runtime should be created: {err}"))
-            .block_on(AssertUnwindSafe(future))
+        let runtime = tokio::runtime::Runtime::new()
+            .unwrap_or_else(|err| panic!("HTTP API test runtime should be created: {err}"));
+        runtime.block_on(future)
     }
 }
 

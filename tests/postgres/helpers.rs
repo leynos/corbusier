@@ -60,6 +60,11 @@ pub const ADD_TOOL_CATALOG_SQL: &str =
 pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
     include_str!("../../migrations/2026-03-10-000000_add_tenant_id_to_tool_registry/up.sql");
 
+/// SQL to add `tenant_id` to conversations and messages tables for tenant isolation.
+pub const ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL: &str = include_str!(
+    "../../migrations/2026-04-01-000000_add_tenant_id_to_conversations_and_messages/up.sql"
+);
+
 /// SQL to add hook execution log table for roadmap 2.3.1.
 pub const ADD_HOOK_EXECUTIONS_SQL: &str =
     include_str!("../../migrations/2026-03-03-000000_add_hook_executions_table/up.sql");
@@ -157,6 +162,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL))?;
     Ok(())
 }
 
@@ -275,8 +281,16 @@ pub async fn insert_conversation(
         let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
         ensure_tenant_exists(&mut conn, tenant_id)?;
         diesel::sql_query(concat!(
+<<<<<<< LEFT
             "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
             "VALUES ($1, $2, '{}', 'active', NOW(), NOW())",
+||||||| BASE
+            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
+            "VALUES ($1, '{}', 'active', NOW(), NOW())",
+=======
+            "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
+            "VALUES ($1, '00000000-0000-0000-0000-000000000000', '{}', 'active', NOW(), NOW())",
+>>>>>>> RIGHT
         ))
         .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
         .bind::<diesel::sql_types::Uuid, _>(tenant_id.into_inner())

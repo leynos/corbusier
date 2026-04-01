@@ -66,6 +66,16 @@ impl ApiError {
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", message)
     }
+
+    /// Converts this error into an [`HttpResponse`] using the given request ID.
+    #[must_use]
+    pub fn into_response(self, request_id: String) -> HttpResponse {
+        json_error(
+            self.status,
+            ErrorPayload::new(self.code, self.message),
+            request_id,
+        )
+    }
 }
 
 impl fmt::Display for ApiError {

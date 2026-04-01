@@ -65,16 +65,9 @@ impl PostgresConversationRepository {
 }
 
 fn row_to_conversation(row: &ConversationRow) -> ConversationRepositoryResult<Conversation> {
-    let state = match row.state.as_str() {
-        "active" => ConversationState::Active,
-        "paused" => ConversationState::Paused,
-        "archived" => ConversationState::Archived,
-        _ => {
-            return Err(ConversationRepositoryError::persistence(
-                std::io::Error::other(format!("unknown conversation state: {}", row.state)),
-            ));
-        }
-    };
+    let state = ConversationState::try_from(row.state.as_str()).map_err(|err| {
+        ConversationRepositoryError::persistence(std::io::Error::other(err.to_string()))
+    })?;
     Ok(Conversation::from_persisted(
         ConversationId::from_uuid(row.id),
         state,
@@ -92,12 +85,15 @@ impl ConversationRepository for PostgresConversationRepository {
     ) -> ConversationRepositoryResult<()> {
         let tenant_id = ctx.tenant_id();
         let conversation_id = conversation.id();
+        let tenant_uuid = tenant_id.into_inner();
         let new_conversation =
-            NewConversation::new(conversation_id.into_inner(), conversation.created_at());
+            NewConversation::new(conversation_id.into_inner(), conversation.created_at())
+                .with_tenant_id(tenant_uuid);
 
         self.execute_query(tenant_id, move |conn| {
             let exists: i64 = conversations::table
                 .filter(conversations::id.eq(conversation_id.into_inner()))
+                .filter(conversations::tenant_id.eq(tenant_uuid))
                 .count()
                 .get_result(conn)
                 .map_err(ConversationRepositoryError::persistence)?;
@@ -123,9 +119,11 @@ impl ConversationRepository for PostgresConversationRepository {
     ) -> ConversationRepositoryResult<Option<Conversation>> {
         let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
+        let tenant_uuid = tenant_id.into_inner();
         self.execute_query(tenant_id, move |conn| {
             conversations::table
                 .filter(conversations::id.eq(uuid))
+                .filter(conversations::tenant_id.eq(tenant_uuid))
                 .select(ConversationRow::as_select())
                 .first::<ConversationRow>(conn)
                 .optional()
