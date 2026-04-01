@@ -22,6 +22,7 @@ use uuid::Uuid;
 fn message_row() -> MessageRow {
     MessageRow {
         id: Uuid::new_v4(),
+        tenant_id: Uuid::new_v4(),
         conversation_id: Uuid::new_v4(),
         role: "user".to_owned(),
         content: json!([{"type": "text", "text": "Hello world"}]),

@@ -31,3 +31,12 @@ async fn reject_duplicate_name(world: BackendWorld) {
 async fn deactivate_excludes_from_active(world: BackendWorld) {
     let _ = world;
 }
+
+#[scenario(
+    path = "tests/features/backend_registration.feature",
+    name = "Two tenants can register the same backend name"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_name_is_allowed_across_tenants(world: BackendWorld) {
+    let _ = world;
+}

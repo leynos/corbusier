@@ -30,7 +30,10 @@ pub(super) struct AgentSessionUpdate {
 }
 
 /// Converts a domain `AgentSession` to a `NewAgentSession` for insertion.
-pub(super) fn session_to_new_row(session: &AgentSession) -> SessionResult<NewAgentSession> {
+pub(super) fn session_to_new_row(
+    session: &AgentSession,
+    tenant_id: uuid::Uuid,
+) -> SessionResult<NewAgentSession> {
     let turn_ids = serialize_json(&session.turn_ids)?;
 
     let context_snapshots = serialize_json(&session.context_snapshots)?;
@@ -42,6 +45,7 @@ pub(super) fn session_to_new_row(session: &AgentSession) -> SessionResult<NewAge
 
     Ok(NewAgentSession {
         id: session.session_id.into_inner(),
+        tenant_id,
         conversation_id: session.conversation_id.into_inner(),
         agent_backend: session.agent_backend.clone(),
         start_sequence,

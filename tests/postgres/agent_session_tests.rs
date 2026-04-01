@@ -46,7 +46,7 @@ async fn concurrent_active_session_store_rejects_second(
         SessionId::new(),
     );
     let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id, &ctx).await?;
 
     let clock = DefaultClock;
     let session_a = AgentSession::new(conversation_id, "agent-a", SequenceNumber::new(1), &clock);
@@ -106,7 +106,7 @@ async fn sequential_duplicate_active_session_store_is_rejected(
 
     let ctx = test_request_context;
     let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id, &ctx).await?;
 
     let clock = DefaultClock;
     let session_a = AgentSession::new(conversation_id, "agent-a", SequenceNumber::new(1), &clock);
@@ -141,7 +141,7 @@ async fn update_to_active_when_another_active_exists_is_rejected(
 
     let ctx = test_request_context;
     let conversation_id = ConversationId::new();
-    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id).await?;
+    insert_conversation(prep.cluster, prep.temp_db.name(), conversation_id, &ctx).await?;
 
     let clock = DefaultClock;
 

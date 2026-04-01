@@ -26,7 +26,9 @@ use crate::message::{
 };
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use super::tenant_tx::{
+    FromTxError, TxError, ensure_tenant_exists, with_tenant_read_tx, with_tenant_tx,
+};
 
 // ---------------------------------------------------------------------------
 // Error bridging for the shared transaction helper
@@ -60,20 +62,73 @@ impl PostgresHandoffAdapter {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a query inside a transaction with tenant context.
+    async fn execute_impl<TxWrap, F, T>(
+        &self,
+        tenant_id: TenantId,
+        tx_wrap: TxWrap,
+        query_fn: F,
+    ) -> HandoffResult<T>
+    where
+        TxWrap: FnOnce(&mut PgConnection, TenantId, F) -> HandoffResult<T> + Send + 'static,
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let pool = self.pool.clone();
+        run_blocking_with(
+            move || {
+                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
+                tx_wrap(&mut conn, tenant_id, query_fn)
+            },
+            HandoffError::persistence,
+        )
+        .await
+    }
+
+    /// Executes a write query that may create the tenant row before use.
+    async fn execute_query_with_bootstrap<F, T>(
+        &self,
+        tenant_id: TenantId,
+        query_fn: F,
+    ) -> HandoffResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let bootstrapping_tx = |conn: &mut PgConnection, tenant: TenantId, qfn: F| {
+            let tenant_uuid = tenant.into_inner();
+            with_tenant_tx(conn, tenant_uuid, |tx| {
+                ensure_tenant_exists(tx, tenant_uuid).map_err(HandoffError::persistence)?;
+                qfn(tx)
+            })
+        };
+        self.execute_impl(tenant_id, bootstrapping_tx, query_fn)
+            .await
+    }
+
+    /// Executes a write query inside a transaction with tenant context.
     async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
     where
         F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let pool = self.pool.clone();
+        self.execute_impl(
+            tenant_id,
+            |conn, tenant, qfn| with_tenant_tx(conn, tenant.into_inner(), qfn),
+            query_fn,
+        )
+        .await
+    }
 
-        run_blocking_with(
-            move || {
-                let mut conn = get_conn_with(&pool, HandoffError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            HandoffError::persistence,
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> HandoffResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> HandoffResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        self.execute_impl(
+            tenant_id,
+            |conn, tenant, qfn| with_tenant_read_tx(conn, tenant.into_inner(), qfn),
+            query_fn,
         )
         .await
     }
@@ -105,9 +160,9 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             handoff = handoff.with_reason(r);
         }
 
-        let new_handoff = handoff_to_new_row(&handoff, params.conversation_id)?;
+        let new_handoff = handoff_to_new_row(&handoff, params.conversation_id, tenant_id)?;
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_query_with_bootstrap(tenant_id, move |conn| {
             diesel::insert_into(handoffs::table)
                 .values(&new_handoff)
                 .execute(conn)
@@ -130,14 +185,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         self.execute_query(tenant_id, move |conn| {
             // Lock the row for the duration of the transaction to
             // prevent concurrent state transitions from interleaving.
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .for_update()
-                .first::<HandoffRow>(conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+            let row = lock_handoff_row(conn, handoff_id, tenant_id)?;
 
             let mut handoff = row_to_handoff(row)?;
 
@@ -151,14 +199,18 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             handoff = handoff.complete(target_session_id, &clock);
             let completed_at = handoff.completed_at;
 
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set((
-                    handoffs::target_session_id.eq(target_session_id.into_inner()),
-                    handoffs::completed_at.eq(completed_at),
-                    handoffs::status.eq(HandoffStatus::Completed.as_str()),
-                ))
-                .execute(conn)
-                .map_err(HandoffError::persistence)?;
+            diesel::update(
+                handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .filter(handoffs::tenant_id.eq(tenant_id.into_inner())),
+            )
+            .set((
+                handoffs::target_session_id.eq(target_session_id.into_inner()),
+                handoffs::completed_at.eq(completed_at),
+                handoffs::status.eq(HandoffStatus::Completed.as_str()),
+            ))
+            .execute(conn)
+            .map_err(HandoffError::persistence)?;
 
             Ok(handoff)
         })
@@ -177,14 +229,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         self.execute_query(tenant_id, move |conn| {
             // Lock the row for the duration of the transaction to
             // prevent concurrent state transitions from interleaving.
-            let row = handoffs::table
-                .filter(handoffs::id.eq(handoff_id.into_inner()))
-                .select(HandoffRow::as_select())
-                .for_update()
-                .first::<HandoffRow>(conn)
-                .optional()
-                .map_err(HandoffError::persistence)?
-                .ok_or(HandoffError::NotFound(handoff_id))?;
+            let row = lock_handoff_row(conn, handoff_id, tenant_id)?;
 
             let status =
                 HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
@@ -196,13 +241,17 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
                 ));
             }
 
-            diesel::update(handoffs::table.filter(handoffs::id.eq(handoff_id.into_inner())))
-                .set((
-                    handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
-                    handoffs::reason.eq(owned_reason.or(row.reason)),
-                ))
-                .execute(conn)
-                .map_err(HandoffError::persistence)?;
+            diesel::update(
+                handoffs::table
+                    .filter(handoffs::id.eq(handoff_id.into_inner()))
+                    .filter(handoffs::tenant_id.eq(tenant_id.into_inner())),
+            )
+            .set((
+                handoffs::status.eq(HandoffStatus::Cancelled.as_str()),
+                handoffs::reason.eq(owned_reason.or(row.reason)),
+            ))
+            .execute(conn)
+            .map_err(HandoffError::persistence)?;
 
             Ok(())
         })
@@ -217,9 +266,10 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let tenant_id = ctx.tenant_id();
         let uuid = handoff_id.into_inner();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             handoffs::table
                 .filter(handoffs::id.eq(uuid))
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .select(HandoffRow::as_select())
                 .first::<HandoffRow>(conn)
                 .optional()
@@ -238,8 +288,9 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
         let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let rows = handoffs::table
+                .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
                 .filter(handoffs::conversation_id.eq(uuid))
                 .select(HandoffRow::as_select())
                 .order(handoffs::initiated_at.asc())
@@ -260,12 +311,14 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
 fn handoff_to_new_row(
     handoff: &HandoffMetadata,
     conversation_id: ConversationId,
+    tenant_id: TenantId,
 ) -> HandoffResult<NewHandoff> {
     let triggering_tool_calls =
         serde_json::to_value(&handoff.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
     Ok(NewHandoff {
         id: handoff.handoff_id.into_inner(),
+        tenant_id: tenant_id.into_inner(),
         source_session_id: handoff.source_session_id.into_inner(),
         conversation_id: conversation_id.into_inner(),
         target_session_id: handoff.target_session_id.map(AgentSessionId::into_inner),
@@ -300,4 +353,20 @@ fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
         completed_at: row.completed_at,
         status,
     })
+}
+
+fn lock_handoff_row(
+    conn: &mut PgConnection,
+    handoff_id: HandoffId,
+    tenant_id: TenantId,
+) -> HandoffResult<HandoffRow> {
+    handoffs::table
+        .filter(handoffs::id.eq(handoff_id.into_inner()))
+        .filter(handoffs::tenant_id.eq(tenant_id.into_inner()))
+        .select(HandoffRow::as_select())
+        .for_update()
+        .first::<HandoffRow>(conn)
+        .optional()
+        .map_err(HandoffError::persistence)?
+        .ok_or(HandoffError::NotFound(handoff_id))
 }

@@ -39,9 +39,10 @@ async fn store_with_audit_captures_context(
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     let (temp_db, repo) = setup_repository(cluster).await?;
+    let mut ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(cluster, temp_db.name(), conv_id, &ctx).await?;
 
     let message = Message::new(
         conv_id,
@@ -51,7 +52,6 @@ async fn store_with_audit_captures_context(
         &clock,
     )?;
 
-    let mut ctx = test_request_context;
     if include_causation {
         ctx = ctx.with_causation_id(CausationId::new());
     }

@@ -31,3 +31,12 @@ async fn reject_duplicate_issue_mapping(world: TaskWorld) {
 async fn missing_issue_lookup_returns_none(world: TaskWorld) {
     let _ = world;
 }
+
+#[scenario(
+    path = "tests/features/task_issue_creation.feature",
+    name = "Two tenants can create tasks from the same issue reference"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_issue_is_allowed_across_tenants(world: TaskWorld) {
+    let _ = world;
+}

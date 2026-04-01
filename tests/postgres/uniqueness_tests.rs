@@ -23,13 +23,13 @@ async fn store_rejects_duplicate_message_id(
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     let (temp_db, repo) = setup_repository(cluster).await?;
+    let ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(cluster, temp_db.name(), conv_id, &ctx).await?;
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let ctx = test_request_context;
 
     repo.store(&ctx, &message).await?;
 
@@ -56,12 +56,12 @@ async fn store_rejects_duplicate_sequence_in_conversation(
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     let (temp_db, repo) = setup_repository(cluster).await?;
+    let ctx = test_request_context;
 
     let conv_id = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv_id).await?;
+    insert_conversation(cluster, temp_db.name(), conv_id, &ctx).await?;
 
     let msg1 = create_test_message(&clock, conv_id, 1)?;
-    let ctx = test_request_context;
 
     repo.store(&ctx, &msg1).await?;
 
@@ -91,15 +91,15 @@ async fn store_allows_same_sequence_in_different_conversations(
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     let (temp_db, repo) = setup_repository(cluster).await?;
+    let ctx = test_request_context;
 
     let conv1 = ConversationId::new();
     let conv2 = ConversationId::new();
-    insert_conversation(cluster, temp_db.name(), conv1).await?;
-    insert_conversation(cluster, temp_db.name(), conv2).await?;
+    insert_conversation(cluster, temp_db.name(), conv1, &ctx).await?;
+    insert_conversation(cluster, temp_db.name(), conv2, &ctx).await?;
 
     let msg1 = create_test_message(&clock, conv1, 1)?;
     let msg2 = create_test_message(&clock, conv2, 1)?;
-    let ctx = test_request_context;
 
     repo.store(&ctx, &msg1).await?;
     repo.store(&ctx, &msg2).await?;

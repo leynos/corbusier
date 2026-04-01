@@ -15,6 +15,7 @@
 //! - `task_branch_pr_postgres_tests`: Branch and PR association tests
 //! - `task_lifecycle_tests`: Issue-to-task creation and lookup
 //! - `task_tenant_isolation_tests`: Tenant context propagation for task operations
+//! - `tenant_schema_constraints_tests`: Composite FK enforcement for tenant-aware core tables
 //! - `tool_discovery_tenant_isolation_tests`: Composite FK and index-plan checks
 //! - `uniqueness_tests`: Uniqueness constraint enforcement
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and audit trail
@@ -42,6 +43,7 @@ mod postgres {
     mod task_branch_pr_postgres_tests;
     mod task_lifecycle_tests;
     mod task_tenant_isolation_tests;
+    mod tenant_schema_constraints_tests;
     mod tool_discovery_routing_tests;
     mod tool_discovery_tenant_isolation_tests;
     mod tool_policy_enforcement_tests;

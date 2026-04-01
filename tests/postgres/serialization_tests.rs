@@ -69,7 +69,7 @@ async fn role_round_trip_through_persistence(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let message = Message::new(
         conv_id,
@@ -114,7 +114,7 @@ async fn content_jsonb_round_trip_with_multiple_parts(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let content = vec![
         ContentPart::Text(TextPart::new("Hello world")),
@@ -181,7 +181,7 @@ async fn tool_result_jsonb_round_trip(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let success_result =
         ToolResultPart::success("call_456", serde_json::json!({"result": "found 42 items"}));
@@ -243,7 +243,7 @@ async fn metadata_jsonb_round_trip(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let metadata = MessageMetadata::with_agent_backend("claude-3-opus")
         .with_tool_call_audit(ToolCallAudit::new(
@@ -303,7 +303,7 @@ async fn from_persisted_preserves_all_domain_invariants(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let original = Message::new(
         conv_id,
@@ -358,7 +358,7 @@ async fn uuid_round_trip_preserves_values(
     let env = test_env.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(env.cluster, env.temp_db.name(), conv_id).await?;
+    insert_conversation(env.cluster, env.temp_db.name(), conv_id, &env.ctx).await?;
 
     let specific_msg_id = MessageId::from_uuid(uuid::Uuid::parse_str(
         "550e8400-e29b-41d4-a716-446655440000",

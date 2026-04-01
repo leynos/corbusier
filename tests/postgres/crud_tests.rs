@@ -23,11 +23,11 @@ async fn store_and_retrieve_message(
     let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    let req_ctx = test_request_context;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let req_ctx = test_request_context;
 
     ctx.repo.store(&req_ctx, &message).await?;
 
@@ -68,12 +68,12 @@ async fn find_by_conversation_returns_ordered_messages(
     let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    let req_ctx = test_request_context;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let msg3 = create_test_message(&clock, conv_id, 3)?;
     let msg1 = create_test_message(&clock, conv_id, 1)?;
     let msg2 = create_test_message(&clock, conv_id, 2)?;
-    let req_ctx = test_request_context;
 
     ctx.repo.store(&req_ctx, &msg3).await?;
     ctx.repo.store(&req_ctx, &msg1).await?;
@@ -100,11 +100,11 @@ async fn exists_returns_correct_status(
     let ctx = prepared_repo.await?;
 
     let conv_id = ConversationId::new();
-    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id).await?;
+    let req_ctx = test_request_context;
+    insert_conversation(ctx.cluster, ctx.temp_db.name(), conv_id, &req_ctx).await?;
 
     let message = create_test_message(&clock, conv_id, 1)?;
     let msg_id = message.id();
-    let req_ctx = test_request_context;
 
     let exists_before = ctx.repo.exists(&req_ctx, msg_id).await?;
     assert!(!exists_before);

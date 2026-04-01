@@ -4,7 +4,9 @@
 //! a `PostgreSQL` session variable scoped to the current transaction.
 
 mod audit_helpers;
+mod catalog_exec;
 mod mappers;
+mod sync_helpers;
 
 use super::{
     catalog_models::{CatalogEntryRow, NewCatalogEntryRow},
@@ -12,10 +14,9 @@ use super::{
     repository::McpServerPgPool,
 };
 use crate::context::{RequestContext, TenantId};
-use crate::message::adapters::postgres::blocking_helpers::{get_conn_with, run_blocking_with};
-use crate::message::adapters::postgres::tenant_tx::{FromTxError, TxError, with_tenant_tx};
+use crate::postgres_support::{FromTxError, TxError};
 use crate::tool_registry::{
-    domain::{CatalogEntry, CatalogEntryId, McpServerId, ToolCallAuditRecord},
+    domain::{CatalogEntry, McpServerId, ToolCallAuditRecord},
     ports::{ToolCatalogError, ToolCatalogRepository, ToolCatalogResult},
 };
 
@@ -25,6 +26,7 @@ use diesel::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use self::audit_helpers::audit_to_new_row;
+use self::catalog_exec::{execute_query, execute_query_with_bootstrap, execute_read_query};
 use self::mappers::{entry_to_new_row, row_to_entry};
 
 // ---------------------------------------------------------------------------
@@ -57,24 +59,6 @@ impl PostgresToolCatalog {
         Self { pool }
     }
 
-    /// Executes a query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> ToolCatalogResult<T>
-    where
-        F: FnOnce(&mut PgConnection) -> ToolCatalogResult<T> + Send + 'static,
-        T: Send + 'static,
-    {
-        let pool = self.pool.clone();
-        run_blocking_with(
-            move || {
-                let mut conn =
-                    get_conn_with(&pool, |e| ToolCatalogError::persistence("connect", e))?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
-            },
-            |e| ToolCatalogError::persistence("spawn_blocking", e),
-        )
-        .await
-    }
-
     /// Sets the `available` flag and refreshes `updated_at` for every
     /// catalog entry belonging to `server_id` within the tenant scope.
     async fn set_server_tools_availability(
@@ -85,7 +69,7 @@ impl PostgresToolCatalog {
     ) -> ToolCatalogResult<()> {
         let sid = server_id.into_inner();
         let tid = tenant_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
+        execute_query(&self.pool, tenant_id, move |connection| {
             diesel::update(
                 mcp_tool_catalog::table
                     .filter(mcp_tool_catalog::server_id.eq(sid))
@@ -141,7 +125,7 @@ impl PostgresToolCatalog {
     }
 
     fn to_new_rows(
-        tenant_id: uuid::Uuid,
+        tenant_id: TenantId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<Vec<NewCatalogEntryRow>> {
         if let Some(err) = Self::find_duplicate_entry(entries) {
@@ -153,32 +137,52 @@ impl PostgresToolCatalog {
             .collect())
     }
 
-    fn advisory_lock_key(tenant_id: uuid::Uuid, server_id: uuid::Uuid) -> i64 {
-        use std::hash::{Hash, Hasher};
+    /// Derives a stable advisory-lock key from a tenant UUID.
+    ///
+    /// Uses SHA-256 (via the `sha2` crate) to ensure the mapping is
+    /// deterministic across Rust toolchain versions, unlike
+    /// `DefaultHasher` whose output may change between releases.
+    fn advisory_lock_key(tenant_id: uuid::Uuid) -> i64 {
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        tenant_id.as_bytes().hash(&mut hasher);
-        server_id.as_bytes().hash(&mut hasher);
-        hasher.finish().cast_signed()
+        let digest: [u8; 32] = Sha256::digest(tenant_id.as_bytes()).into();
+        (i64::from(digest[0]) << 56)
+            | (i64::from(digest[1]) << 48)
+            | (i64::from(digest[2]) << 40)
+            | (i64::from(digest[3]) << 32)
+            | (i64::from(digest[4]) << 24)
+            | (i64::from(digest[5]) << 16)
+            | (i64::from(digest[6]) << 8)
+            | i64::from(digest[7])
+    }
+
+    fn acquire_sync_lock(
+        connection: &mut PgConnection,
+        tenant_id: TenantId,
+    ) -> ToolCatalogResult<()> {
+        let tenant_uuid = tenant_id.into_inner();
+        diesel::sql_query(format!(
+            "SELECT pg_advisory_xact_lock({})",
+            Self::advisory_lock_key(tenant_uuid)
+        ))
+        .execute(connection)
+        .map_err(|e| ToolCatalogError::persistence("advisory_lock", e))?;
+        Ok(())
     }
 
     fn sync_rows_tx(
         conn: &mut PgConnection,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
+        tenant_id: TenantId,
+        server_id: McpServerId,
         rows: &[NewCatalogEntryRow],
     ) -> Result<(), diesel::result::Error> {
-        conn.transaction(|transaction| {
-            diesel::sql_query(format!(
-                "SELECT pg_advisory_xact_lock({})",
-                Self::advisory_lock_key(tenant_id, server_id)
-            ))
-            .execute(transaction)?;
-
+        let tenant_uuid = tenant_id.into_inner();
+        let server_uuid = server_id.into_inner();
+        conn.transaction::<_, diesel::result::Error, _>(|transaction| {
             diesel::delete(
                 mcp_tool_catalog::table
-                    .filter(mcp_tool_catalog::server_id.eq(server_id))
-                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_id)),
+                    .filter(mcp_tool_catalog::server_id.eq(server_uuid))
+                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_uuid)),
             )
             .execute(transaction)?;
 
@@ -191,44 +195,19 @@ impl PostgresToolCatalog {
         })
     }
 
-    fn load_conflicting_name_counts(
-        connection: &mut PgConnection,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
-        candidate_names: &HashSet<String>,
-    ) -> ToolCatalogResult<HashMap<String, usize>> {
-        let candidate_name_list: Vec<&str> = candidate_names.iter().map(String::as_str).collect();
-        mcp_tool_catalog::table
-            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
-            .filter(mcp_tool_catalog::server_id.ne(server_id))
-            .filter(mcp_tool_catalog::tool_name.eq_any(candidate_name_list))
-            .group_by(mcp_tool_catalog::tool_name)
-            .select((mcp_tool_catalog::tool_name, diesel::dsl::count_star()))
-            .load::<(String, i64)>(connection)
-            .map_err(|e| ToolCatalogError::persistence("select", e))
-            .map(|tool_names| {
-                tool_names
-                    .into_iter()
-                    .fold(HashMap::new(), |mut counts, (tool_name, count)| {
-                        *counts.entry(tool_name).or_insert(0usize) =
-                            usize::try_from(count).unwrap_or_default();
-                        counts
-                    })
-            })
-    }
-
     async fn run_sync_in_pool(
         &self,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
+        tenant_id: TenantId,
+        server_id: McpServerId,
         rows: Vec<NewCatalogEntryRow>,
     ) -> ToolCatalogResult<()> {
-        let tenant = TenantId::from_uuid(tenant_id);
         let candidate_names: HashSet<String> =
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
-        self.execute_query(tenant, move |connection| {
-            let existing_name_counts = Self::load_conflicting_name_counts(
+        execute_query_with_bootstrap(&self.pool, tenant_id, move |connection| {
+            Self::acquire_sync_lock(connection, tenant_id)?;
+
+            let existing_name_counts = sync_helpers::load_conflicting_name_counts(
                 connection,
                 tenant_id,
                 server_id,
@@ -239,34 +218,35 @@ impl PostgresToolCatalog {
                 .iter()
                 .find(|row| existing_name_counts.contains_key(&row.tool_name))
             {
-                return Err(Self::duplicate_entry_error(row, &existing_name_counts));
+                return Err(sync_helpers::duplicate_entry_error(
+                    row,
+                    &existing_name_counts,
+                ));
             }
 
-            Self::sync_rows_tx(connection, tenant_id, server_id, &rows)
-                .map_err(|e| ToolCatalogError::persistence("transaction", e))
+            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
+                Ok(()) => Ok(()),
+                Err(err) => {
+                    let attempt = sync_helpers::SyncAttempt {
+                        tenant_id,
+                        server_id,
+                        rows: &rows,
+                        candidate_names: &candidate_names,
+                    };
+                    Err(sync_helpers::map_sync_rows_error(connection, &attempt, err))
+                }
+            }
         })
         .await
     }
 
-    fn duplicate_entry_error(
-        row: &NewCatalogEntryRow,
-        name_counts: &HashMap<String, usize>,
-    ) -> ToolCatalogError {
-        let server_count = name_counts.get(&row.tool_name).copied().unwrap_or_default() + 1;
-        ToolCatalogError::DuplicateEntry {
-            id: CatalogEntryId::from_uuid(row.id),
-            tool_name: row.tool_name.clone(),
-            server_count,
-        }
-    }
-
     fn load_entries_for_tenant(
         connection: &mut PgConnection,
-        tenant_id: uuid::Uuid,
+        tenant_id: TenantId,
         tool_name: Option<&str>,
     ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let mut query = mcp_tool_catalog::table
-            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id))
+            .filter(mcp_tool_catalog::tenant_id.eq(tenant_id.into_inner()))
             .into_boxed::<Pg>();
 
         if let Some(name) = tool_name {
@@ -291,10 +271,9 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<()> {
         Self::validate_same_server(server_id, entries)?;
-        let tenant_id = ctx.tenant_id().into_inner();
+        let tenant_id = ctx.tenant_id();
         let rows = Self::to_new_rows(tenant_id, entries)?;
-        self.run_sync_in_pool(tenant_id, server_id.into_inner(), rows)
-            .await
+        self.run_sync_in_pool(tenant_id, server_id, rows).await
     }
 
     async fn mark_server_tools_unavailable(
@@ -321,19 +300,17 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         tool_name: &str,
     ) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
         let name = tool_name.to_owned();
-        self.execute_query(tenant_id, move |connection| {
-            Self::load_entries_for_tenant(connection, tid, Some(name.as_str()))
+        execute_read_query(&self.pool, tenant_id, move |connection| {
+            Self::load_entries_for_tenant(connection, tenant_id, Some(name.as_str()))
         })
         .await
     }
 
     async fn list_all(&self, ctx: &RequestContext) -> ToolCatalogResult<Vec<CatalogEntry>> {
         let tenant_id = ctx.tenant_id();
-        let tid = tenant_id.into_inner();
-        self.execute_query(tenant_id, move |connection| {
-            Self::load_entries_for_tenant(connection, tid, None)
+        execute_read_query(&self.pool, tenant_id, move |connection| {
+            Self::load_entries_for_tenant(connection, tenant_id, None)
         })
         .await
     }
@@ -346,7 +323,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
         let tenant_id = ctx.tenant_id();
         let tid = tenant_id.into_inner();
         let row = audit_to_new_row(record, tid);
-        self.execute_query(tenant_id, move |connection| {
+        execute_query_with_bootstrap(&self.pool, tenant_id, move |connection| {
             diesel::insert_into(tool_call_audit_log::table)
                 .values(&row)
                 .execute(connection)

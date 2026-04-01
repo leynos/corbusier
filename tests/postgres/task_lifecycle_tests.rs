@@ -16,7 +16,8 @@ use uuid::Uuid;
 
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
-    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster, test_request_context,
+    BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, other_tenant_ctx, postgres_cluster,
+    test_request_context,
 };
 
 struct TaskTestContext {
@@ -220,5 +221,61 @@ async fn postgres_repository_find_by_id_round_trips_created_task(
     assert_eq!(fetched.id(), created.id());
     assert_eq!(fetched.origin(), created.origin());
     assert_eq!(fetched.state(), created.state());
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_duplicate_issue_reference_is_scoped_per_tenant(
+    test_request_context: RequestContext,
+    #[future] context: Result<TaskTestContext, BoxError>,
+) -> Result<(), BoxError> {
+    let task_context = context.await?;
+    let service = &task_context.service;
+    let tenant_a = test_request_context;
+    let tenant_b = other_tenant_ctx(&tenant_a);
+
+    let task_a = service
+        .create_from_issue(
+            &tenant_a,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                4242,
+                "Tenant A issue mapping",
+            ),
+        )
+        .await
+        .expect("tenant A task creation should succeed");
+    let task_b = service
+        .create_from_issue(
+            &tenant_b,
+            CreateTaskFromIssueRequest::new(
+                "github",
+                "corbusier/core",
+                4242,
+                "Tenant B issue mapping",
+            ),
+        )
+        .await
+        .expect("tenant B task creation should succeed");
+
+    assert_ne!(task_a.id(), task_b.id(), "tenants must get distinct tasks");
+
+    let issue_ref =
+        IssueRef::from_parts("github", "corbusier/core", 4242).expect("valid issue reference");
+    let found_a = service
+        .find_by_issue_ref(&tenant_a, &issue_ref)
+        .await
+        .expect("tenant A lookup should succeed")
+        .expect("tenant A task should exist");
+    let found_b = service
+        .find_by_issue_ref(&tenant_b, &issue_ref)
+        .await
+        .expect("tenant B lookup should succeed")
+        .expect("tenant B task should exist");
+
+    assert_eq!(found_a.id(), task_a.id());
+    assert_eq!(found_b.id(), task_b.id());
     Ok(())
 }

@@ -5,6 +5,8 @@ diesel::table! {
     tasks (id) {
         /// Internal task identifier.
         id -> Uuid,
+        /// Owning tenant identifier.
+        tenant_id -> Uuid,
         /// Origin payload including issue reference and metadata.
         origin -> Jsonb,
         /// Optional branch reference linked to this task.

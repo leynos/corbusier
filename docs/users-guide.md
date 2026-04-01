@@ -114,6 +114,10 @@ retrieve it by the external issue reference. Issue-origin tasks start in the
 `draft` state and record lifecycle timestamps (`created_at`, `updated_at`) at
 creation time.
 
+Issue references are unique per tenant, not globally. Two tenants may each map
+the same external issue reference to their own internal task without colliding,
+while a duplicate within the same tenant is still rejected.
+
 ```rust,no_run
 use std::sync::Arc;
 
@@ -154,6 +158,19 @@ async fn create_task_from_issue() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Tenant-scoped uniqueness
+
+Tenant-owned records are partitioned by `RequestContext::tenant_id`. That
+affects both task issue references and backend registration names:
+
+- the same issue reference may exist once per tenant,
+- the same backend name may exist once per tenant, and
+- lookups return only the caller's tenant-owned records.
+
+When tests or application code reuse an external identifier or backend name for
+records that are intended to belong to different tenants, a distinct
+`RequestContext` should be used for each tenant.
 
 ## Branch and pull request association
 
@@ -541,8 +558,8 @@ parameters. The service:
 3. Validates parameters against the tool's declared input schema.
 4. Runs the configured governance adapter before execution. The default
    `StubGovernance::allowing()` adapter permits all calls, while hook-backed
-   governance can deny a call before the Model Context Protocol (MCP) host
-   runs it.
+   governance can deny a call before the Model Context Protocol (MCP) host runs
+   it.
 5. Routes the call to the correct MCP server when governance permits it.
 6. Records the existing tool-call audit trail entry with outcome, duration, and
    any stderr.

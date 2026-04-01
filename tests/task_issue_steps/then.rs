@@ -29,26 +29,32 @@ fn assert_issue_reference(
     expected_repository: &str,
     expected_issue_number: u64,
 ) -> Result<(), eyre::Report> {
-    if issue_ref.provider().as_str() != expected_provider {
-        return Err(eyre::eyre!(
-            "expected issue provider {}, found {}",
-            expected_provider,
-            issue_ref.provider().as_str()
-        ));
-    }
-    if issue_ref.repository().as_str() != expected_repository {
-        return Err(eyre::eyre!(
-            "expected issue repository {}, found {}",
-            expected_repository,
-            issue_ref.repository().as_str()
-        ));
-    }
-    if issue_ref.issue_number().value() != expected_issue_number {
-        return Err(eyre::eyre!(
-            "expected issue number {}, found {}",
-            expected_issue_number,
-            issue_ref.issue_number().value()
-        ));
+    check_eq(
+        "issue provider",
+        &expected_provider,
+        &issue_ref.provider().as_str(),
+    )?;
+    check_eq(
+        "issue repository",
+        &expected_repository,
+        &issue_ref.repository().as_str(),
+    )?;
+    check_eq(
+        "issue number",
+        &expected_issue_number,
+        &issue_ref.issue_number().value(),
+    )?;
+
+    Ok(())
+}
+
+fn check_eq<T: PartialEq + std::fmt::Display>(
+    label: &str,
+    expected: &T,
+    actual: &T,
+) -> Result<(), eyre::Report> {
+    if actual != expected {
+        return Err(eyre::eyre!("expected {label} {expected}, found {actual}"));
     }
 
     Ok(())
@@ -109,17 +115,7 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         .clone()
         .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
     let lookup_result = run_async(world.service.find_by_issue_ref(&world.ctx, &issue_ref));
-    let found = match lookup_result {
-        Ok(found) => {
-            world.last_lookup_result = Some(Ok(found.clone()));
-            found
-        }
-        Err(err) => {
-            let message = format!("lookup failed: {err}");
-            world.last_lookup_result = Some(Err(err));
-            return Err(eyre::eyre!(message));
-        }
-    };
+    let found = record_lookup(world, lookup_result)?;
 
     if found.is_none() {
         return Err(eyre::eyre!(
@@ -132,6 +128,28 @@ fn task_retrievable_by_issue_reference(world: &mut TaskWorld) -> Result<(), eyre
         return Err(eyre::eyre!("lookup task does not match created task"));
     }
     Ok(())
+}
+
+fn record_lookup(
+    world: &mut TaskWorld,
+    result: Result<Option<Task>, TaskLifecycleError>,
+) -> Result<Option<Task>, eyre::Report> {
+    match result {
+        Ok(found) => {
+            world.last_lookup_result = Some(Ok(found.clone()));
+            Ok(found)
+        }
+        Err(err) => {
+            world.last_lookup_result = Some(Err(err));
+            let display = world
+                .last_lookup_result
+                .as_ref()
+                .and_then(|stored| stored.as_ref().err())
+                .map(std::string::ToString::to_string)
+                .ok_or_else(|| eyre::eyre!("lookup failed: missing stored error"))?;
+            Err(eyre::eyre!("lookup failed: {display}"))
+        }
+    }
 }
 
 #[then("task creation fails with a duplicate issue reference error")]
@@ -168,5 +186,65 @@ fn no_task_is_returned(world: &TaskWorld) -> Result<(), eyre::Report> {
             "expected no task for unknown issue reference lookup"
         ));
     }
+    Ok(())
+}
+
+#[then("both tenants successfully create distinct tasks from the same issue")]
+fn both_tenants_create_distinct_tasks(world: &TaskWorld) -> Result<(), eyre::Report> {
+    let task_a = world
+        .last_create_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A create result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant A task creation failed: {err}"))?;
+    let task_b = world
+        .other_create_result
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B create result is missing"))?
+        .as_ref()
+        .map_err(|err| eyre::eyre!("tenant B task creation failed: {err}"))?;
+
+    if task_a.id() == task_b.id() {
+        return Err(eyre::eyre!("tenant task IDs must be distinct"));
+    }
+    Ok(())
+}
+
+#[then("each tenant can retrieve its own task by the external issue reference")]
+fn each_tenant_retrieves_own_task(world: &TaskWorld) -> Result<(), eyre::Report> {
+    let issue_ref = world
+        .pending_lookup
+        .clone()
+        .ok_or_else(|| eyre::eyre!("missing issue reference for retrieval step"))?;
+    let task_a = world
+        .last_created_task
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant A created task is missing"))?;
+    let task_b = world
+        .other_created_task
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("tenant B created task is missing"))?;
+
+    let found_a = run_async(world.service.find_by_issue_ref(&world.ctx, &issue_ref))
+        .map_err(|err| eyre::eyre!("tenant A lookup failed: {err}"))?
+        .ok_or_else(|| eyre::eyre!("tenant A task not found"))?;
+    let found_b = run_async(
+        world
+            .service
+            .find_by_issue_ref(&world.other_ctx, &issue_ref),
+    )
+    .map_err(|err| eyre::eyre!("tenant B lookup failed: {err}"))?
+    .ok_or_else(|| eyre::eyre!("tenant B task not found"))?;
+
+    assert_lookup_matches(&found_a, task_a, "tenant A")?;
+    assert_lookup_matches(&found_b, task_b, "tenant B")?;
+    Ok(())
+}
+
+fn assert_lookup_matches(found: &Task, expected: &Task, label: &str) -> Result<(), eyre::Report> {
+    if found != expected {
+        return Err(eyre::eyre!("{label} lookup returned the wrong task"));
+    }
+
     Ok(())
 }

@@ -439,16 +439,18 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     See corbusier-design.md §2.2.5.
   - [x] Success criteria: repository/service signatures require tenant-aware
     request context for tenant-owned operations.
-- [ ] 2.5.2 Deliver tenant-aware schema and constraints. Requires 2.5.1. See
+- [x] 2.5.2 Deliver tenant-aware schema and constraints. Requires 2.5.1. See
   corbusier-design.md §6.2.1 and §6.2.2.
-  - [ ] Create `tenants` and add `tenant_id` to tenant-owned tables. See
+  - [x] Create `tenants` and add `tenant_id` to tenant-owned tables. See
     corbusier-design.md §2.2.5.
-  - [ ] Scope task issue-origin uniqueness and backend registration uniqueness
+  - [x] Scope task issue-origin uniqueness and backend registration uniqueness
     by tenant. See corbusier-design.md §2.2.2 and §2.2.3.
-  - [ ] Enforce parent/child tenant consistency with composite foreign keys.
+  - [x] Enforce parent/child tenant consistency with composite foreign keys.
     See corbusier-design.md §6.2.1.
-  - [ ] Success criteria: same issue reference and backend name can exist in
-    multiple tenants without collisions.
+  - [x] Success criteria: schema changes are in place for tenant-owned
+    orchestration data, including `tenant_id`, tenant-scoped uniqueness, and
+    composite foreign keys; end-to-end two-tenant reuse and isolation proof is
+    tracked under 2.5.4 after 2.5.3 delivers full query scoping and RLS.
 - [ ] 2.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
   2.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 2.5.1 added
   `&RequestContext` to port signatures; this item makes adapters *use* the

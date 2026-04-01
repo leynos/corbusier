@@ -789,7 +789,9 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
     Lifecycle Management), F-003 (Agent Backend Orchestration)
   - System Dependencies: Diesel repositories, PostgreSQL RLS, audit trigger
     session variables
-  - External Dependencies: PostgreSQL 14+ row-level security support
+  - External Dependencies: PostgreSQL RLS (available since 9.5); PostgreSQL
+    15+ is required only for column-scoped `ON DELETE SET NULL (...)` on
+    composite foreign keys
   - Integration Requirements: Authentication middleware, worker/job payload
     propagation, tracing instrumentation
 
@@ -1701,6 +1703,173 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
 - `SlashCommandRegistry` is excluded from `RequestContext` plumbing because it
   loads static command definitions, not tenant-owned data.
 
+###### Implementation decisions (2026-03-22) — tenant-aware schema and constraints (1.5.2)
+
+- Roadmap item 1.5.2 introduced a `tenants` root table plus `tenant_id` on the
+  core orchestration tables: `tasks`, `backend_registrations`, `conversations`,
+  `messages`, `agent_sessions`, `handoffs`, and `context_snapshots`. A
+  deterministic default tenant row (`00000000-0000-0000-0000-000000000001`,
+  slug `default`) backfills legacy rows safely during migration.
+- Task issue-origin uniqueness is now tenant-scoped via a partial unique index
+  over `tenant_id` plus the provider/repository/issue-number tuple when
+  `origin.type = 'issue'`. Backend registration names are now unique per tenant
+  via `(tenant_id, name)`.
+- Parent/child tenant consistency is enforced in the database with composite
+  foreign keys, for example
+  `(conversation_id, tenant_id) -> conversations(id, tenant_id)` and
+  `(session_id, tenant_id) -> agent_sessions(id, tenant_id)`.
+- Because 1.5.2 introduces foreign keys to `tenants` before a dedicated tenant
+  provisioning workflow exists, PostgreSQL write adapters lazily provision a
+  placeholder tenant row on tenant-scoped write paths before persistence
+  operations. This preserves the existing request contract while keeping
+  explicit tenant lifecycle management out of scope for this milestone and does
+  not imply side effects for read-only access to `RequestContext.tenant_id()`.
+- `domain_events` and `audit_logs` remain outside the implemented 1.5.2
+  migration boundary even though the later target-state schema sections in this
+  document show them with `tenant_id`. Per the `docs/` knowledge-base guidance,
+  milestone timelines should be documented explicitly: 1.5.2 covers the core
+  orchestration tables listed above, while 1.5.3 owns tenant columns on
+  `domain_events` and `audit_logs` together with the related audit-trigger,
+  query-scoping, and RLS work.
+- PostgreSQL adapters received the minimum 1.5.2 persistence changes needed to
+  make per-tenant uniqueness observable before RLS: task issue lookups, backend
+  registry reads/writes, tenant-scoped orchestration writes (`messages`,
+  `agent_sessions`, `handoffs`, `context_snapshots`), migration metadata
+  writes, and every adapter API in this milestone that persists `tenant_id`;
+  broader query hardening and RLS enforcement remain part of 1.5.3.
+
+For screen readers: The following sequence diagram shows two tenants using the
+task service with the same external issue reference. Tenant A stores and reads
+its own task through tenant-scoped repository calls and SQL filters, while
+tenant B can store the same issue reference independently because uniqueness is
+enforced per tenant.
+
+<!-- markdownlint-disable MD031 -->
+Table 2.2.5.2: Sequence diagram showing tenant-scoped task creation and issue
+lookup.
+
+```mermaid
+sequenceDiagram
+    actor TenantA
+    participant Service as TaskService
+    participant RepoPort as TaskRepositoryPort
+    participant PgRepo as PostgresTaskRepository
+    participant DB as PostgresDB
+
+    TenantA->>Service: create_task(issue_ref, tenant_id_A)
+    Service->>RepoPort: store(ctx_A, task)
+    RepoPort->>PgRepo: store(ctx_A, task)
+    PgRepo->>DB: INSERT tasks(tenant_id_A, issue_ref)
+    DB-->>PgRepo: ok
+
+    TenantA->>Service: get_task_by_issue(issue_ref, tenant_id_A)
+    Service->>RepoPort: find_task_by_issue_ref(ctx_A, issue_ref)
+    RepoPort->>PgRepo: find_task_by_issue_ref(ctx_A, issue_ref)
+    PgRepo->>DB: SELECT * FROM tasks WHERE tenant_id = tenant_id_A AND issue_ref
+    DB-->>PgRepo: task_row_A
+    PgRepo-->>RepoPort: task_row_A
+    RepoPort-->>Service: task_A
+    Service-->>TenantA: task_A
+
+    actor TenantB
+    TenantB->>Service: create_task(issue_ref, tenant_id_B)
+    Service->>RepoPort: store(ctx_B, task)
+    RepoPort->>PgRepo: store(ctx_B, task)
+    PgRepo->>DB: INSERT tasks(tenant_id_B, issue_ref)
+    DB-->>PgRepo: ok (per_tenant_unique)
+```
+<!-- markdownlint-enable MD031 -->
+
+For screen readers: The following entity-relationship diagram shows the tenant
+root table and the tenant-owned task, backend, conversation, message, agent
+session, handoff, and context snapshot tables. Each child row carries
+`tenant_id`, and conversations and sessions anchor the tenant-consistent links
+used by downstream message, handoff, and snapshot records.
+
+<!-- markdownlint-disable MD031 -->
+Table 2.2.5.3: Entity-relationship diagram showing tenant-owned orchestration
+tables and their main foreign-key paths.
+
+```mermaid
+erDiagram
+    tenants {
+        uuid id
+        string slug
+        string name
+        string status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    tasks {
+        uuid id
+        uuid tenant_id
+        string provider
+        string repository
+        int issue_number
+    }
+
+    backend_registrations {
+        uuid id
+        uuid tenant_id
+        string name
+        string provider
+        string config
+    }
+
+    conversations {
+        uuid id
+        uuid tenant_id
+        uuid task_id
+    }
+
+    messages {
+        uuid id
+        uuid tenant_id
+        uuid conversation_id
+        int sequence_number
+        string role
+        text content
+    }
+
+    agent_sessions {
+        uuid id
+        uuid tenant_id
+        uuid conversation_id
+        string status
+    }
+
+    handoffs {
+        uuid id
+        uuid tenant_id
+        uuid source_session_id
+        uuid conversation_id
+    }
+
+    context_snapshots {
+        uuid id
+        uuid tenant_id
+        uuid session_id
+        uuid conversation_id
+    }
+
+    tenants ||--o{ tasks : has
+    tenants ||--o{ backend_registrations : has
+    tenants ||--o{ conversations : has
+    tenants ||--o{ messages : has
+    tenants ||--o{ agent_sessions : has
+    tenants ||--o{ handoffs : has
+    tenants ||--o{ context_snapshots : has
+    tasks ||--o{ conversations : has
+    conversations ||--o{ messages : has
+    conversations ||--o{ agent_sessions : has
+    agent_sessions ||--o{ handoffs : source_session
+    conversations ||--o{ handoffs : conversation
+    agent_sessions ||--o{ context_snapshots : session
+    conversations ||--o{ context_snapshots : conversation
+```
+<!-- markdownlint-enable MD031 -->
+
 ### 2.3 Feature Relationships
 
 #### 2.3.1 Feature Dependencies Map
@@ -2093,7 +2262,7 @@ Foundation[^2].
 
 #### 3.5.1 Primary Database Selection
 
-##### PostgreSQL 14+
+##### PostgreSQL 15+
 
 Selected as the primary database for production deployments due to:
 
@@ -5909,8 +6078,7 @@ pub struct HookExecutionResult {
 
 Earlier sections of this document use legacy trigger names from the planning
 phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
-`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` ->
-`PostToolUse`.
+`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` -> `PostToolUse`.
 
 ### 6.4 Component Integration Patterns
 
@@ -9455,12 +9623,12 @@ flowchart TD
 
 For roadmap item 2.3.2, the first concrete enforcement point is tool execution.
 `ToolDiscoveryRoutingService` now depends on a tool-plane-owned governance port
-that runs the contract trigger `PreToolCall` (maps to runtime
-`PreToolUse`) before the MCP host executes a tool and the contract trigger
-`PostToolCall` (maps to runtime `PostToolUse`) after the call completes. The
-default adapter still permits all calls, but a hook-backed adapter translates
-tool execution requests into `HookTriggerContext` values and delegates
-evaluation to the hook engine.
+that runs the contract trigger `PreToolCall` (maps to runtime `PreToolUse`)
+before the MCP host executes a tool and the contract trigger `PostToolCall`
+(maps to runtime `PostToolUse`) after the call completes. The default adapter
+still permits all calls, but a hook-backed adapter translates tool execution
+requests into `HookTriggerContext` values and delegates evaluation to the hook
+engine.
 
 The execution path carries workflow correlation through a dedicated execution
 scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
@@ -9532,10 +9700,10 @@ required by automated workflow governance without scanning hook execution JSON.
 
 The current milestone records policy audit events for tool execution only:
 contract trigger `PreToolCall` (maps to runtime `PreToolUse`) hook denials
-block the tool call before host execution, and contract trigger
-`PostToolCall` (maps to runtime `PostToolUse`) hooks persist audit outcomes
-after the call completes. Future API- and VCS-level enforcement points remain
-owned by their respective roadmap items.
+block the tool call before host execution, and contract trigger `PostToolCall`
+(maps to runtime `PostToolUse`) hooks persist audit outcomes after the call
+completes. Future API- and VCS-level enforcement points remain owned by their
+respective roadmap items.
 
 ###### Comprehensive Authorization Audit Trail
 

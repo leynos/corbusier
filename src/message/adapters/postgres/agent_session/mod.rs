@@ -17,7 +17,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
-use super::tenant_tx::with_tenant_tx;
+use super::tenant_tx::{with_tenant_read_tx, with_tenant_tx};
 use crate::context::{RequestContext, TenantId};
 use crate::message::{
     adapters::models::AgentSessionRow,
@@ -48,8 +48,8 @@ impl PostgresAgentSessionRepository {
     #[rustfmt::skip]
     pub const fn new(pool: PgPool) -> Self { Self { pool } }
 
-    /// Executes a query inside a transaction with tenant context.
-    async fn execute_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
+    /// Executes a read-only query inside a transaction with tenant context.
+    async fn execute_read_query<F, T>(&self, tenant_id: TenantId, query_fn: F) -> SessionResult<T>
     where
         F: FnOnce(&mut PgConnection) -> SessionResult<T> + Send + 'static,
         T: Send + 'static,
@@ -59,7 +59,7 @@ impl PostgresAgentSessionRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, SessionError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+                with_tenant_read_tx(&mut conn, tenant_id.into_inner(), query_fn)
             },
             SessionError::persistence,
         )
@@ -73,7 +73,9 @@ impl PostgresAgentSessionRepository {
         build_query: F,
     ) -> SessionResult<Option<AgentSession>>
     where
-        F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
+        F: FnOnce(
+                agent_sessions::BoxedQuery<'static, diesel::pg::Pg>,
+            ) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
             + Send
             + 'static,
     {
@@ -88,12 +90,18 @@ impl PostgresAgentSessionRepository {
         build_query: F,
     ) -> SessionResult<Vec<AgentSession>>
     where
-        F: FnOnce(agent_sessions::table) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
+        F: FnOnce(
+                agent_sessions::BoxedQuery<'static, diesel::pg::Pg>,
+            ) -> agent_sessions::BoxedQuery<'static, diesel::pg::Pg>
             + Send
             + 'static,
     {
-        self.execute_query(tenant_id, move |conn| {
-            let rows = build_query(agent_sessions::table)
+        self.execute_read_query(tenant_id, move |conn| {
+            let tenant_uuid = tenant_id.into_inner();
+            let base = agent_sessions::table
+                .filter(agent_sessions::tenant_id.eq(tenant_uuid))
+                .into_boxed();
+            let rows = build_query(base)
                 .select(AgentSessionRow::as_select())
                 .load::<AgentSessionRow>(conn)
                 .map_err(SessionError::persistence)?;
@@ -109,7 +117,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
     async fn store(&self, ctx: &RequestContext, session: &AgentSession) -> SessionResult<()> {
         let pool = self.pool.clone();
         let tenant_id = ctx.tenant_id();
-        let new_session = session_to_new_row(session)?;
+        let new_session = session_to_new_row(session, tenant_id.into_inner())?;
         let session_id = session.session_id;
         let conversation_id = session.conversation_id;
         let is_active = session.state == AgentSessionState::Active;
@@ -124,7 +132,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                         .map_err(|err| map_insert_error(err, session_id, conversation_id))?;
 
                     if is_active {
-                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                        check_no_active_session(tx, tenant_id, conversation_id, Some(session_id))?;
                     }
 
                     Ok(())
@@ -149,7 +157,8 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                 with_tenant_tx(&mut conn, tenant_id.into_inner(), |tx| {
                     let updated_rows = diesel::update(
                         agent_sessions::table
-                            .filter(agent_sessions::id.eq(session_id.into_inner())),
+                            .filter(agent_sessions::id.eq(session_id.into_inner()))
+                            .filter(agent_sessions::tenant_id.eq(tenant_id.into_inner())),
                     )
                     .set(&updated)
                     .execute(tx)
@@ -160,7 +169,7 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
                     }
 
                     if is_active {
-                        check_no_active_session(tx, conversation_id, Some(session_id))?;
+                        check_no_active_session(tx, tenant_id, conversation_id, Some(session_id))?;
                     }
 
                     Ok(())
@@ -179,10 +188,8 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let tenant_id = ctx.tenant_id();
         let uuid = id.into_inner();
 
-        self.find_one(tenant_id, move |table| {
-            table.filter(agent_sessions::id.eq(uuid)).into_boxed()
-        })
-        .await
+        self.find_one(tenant_id, move |q| q.filter(agent_sessions::id.eq(uuid)))
+            .await
     }
 
     async fn find_active_for_conversation(
@@ -204,11 +211,9 @@ impl AgentSessionRepository for PostgresAgentSessionRepository {
         let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        self.find_many(tenant_id, move |table| {
-            table
-                .filter(agent_sessions::conversation_id.eq(uuid))
+        self.find_many(tenant_id, move |q| {
+            q.filter(agent_sessions::conversation_id.eq(uuid))
                 .order(agent_sessions::started_at.asc())
-                .into_boxed()
         })
         .await
     }

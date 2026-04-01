@@ -41,3 +41,31 @@ fn deactivate_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
         .map_err(|err| eyre::eyre!("deactivation failed: {err}"))?;
     Ok(())
 }
+
+#[when("tenant A registers the backend")]
+fn tenant_a_registers_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
+    let pending = world
+        .pending_backends
+        .last()
+        .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
+    let request = build_request(&pending.name, &pending.provider);
+    let registration = run_async(world.service.register(&world.ctx, request))
+        .map_err(|err| eyre::eyre!("tenant A registration failed: {err}"))?;
+    world.last_register_result = Some(Ok(registration.clone()));
+    world.last_registered = Some(registration.clone());
+    world.registered_backends.push(registration);
+    Ok(())
+}
+
+#[when("tenant B registers a backend with the same name")]
+fn tenant_b_registers_backend(world: &mut BackendWorld) -> Result<(), eyre::Report> {
+    let pending = world
+        .pending_backends
+        .last()
+        .ok_or_else(|| eyre::eyre!("no pending backend in scenario world"))?;
+    let request = build_request(&pending.name, &pending.provider);
+    let result = run_async(world.service.register(&world.other_ctx, request));
+    world.other_registered = result.as_ref().ok().cloned();
+    world.other_register_result = Some(result);
+    Ok(())
+}

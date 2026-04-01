@@ -7,6 +7,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
 
+use crate::context::TenantId;
 use crate::message::{
     adapters::schema::agent_sessions,
     domain::{AgentSessionId, AgentSessionState, ConversationId},
@@ -72,13 +73,16 @@ pub(super) fn map_update_error(
 /// (used during updates to allow re-saving the same active session).
 pub(super) fn check_no_active_session(
     conn: &mut PgConnection,
+    tenant_id: TenantId,
     conversation_id: ConversationId,
     exclude_id: Option<AgentSessionId>,
 ) -> SessionResult<()> {
+    let tenant_uuid = tenant_id.into_inner();
     let active_state = AgentSessionState::Active.as_str();
     let conv_uuid = conversation_id.into_inner();
 
     let mut query = agent_sessions::table
+        .filter(agent_sessions::tenant_id.eq(tenant_uuid))
         .filter(agent_sessions::conversation_id.eq(conv_uuid))
         .filter(agent_sessions::state.eq(active_state))
         .into_boxed();

@@ -2,7 +2,7 @@
 
 pub use super::cluster::{BoxError, PostgresCluster, postgres_cluster};
 use super::cluster::{ManagedCluster, TemporaryDatabase};
-use corbusier::context::RequestContext;
+use corbusier::context::{RequestContext, TenantId};
 use corbusier::message::{
     adapters::postgres::PostgresMessageRepository,
     domain::{ContentPart, ConversationId, Message, Role, SequenceNumber, TextPart},
@@ -88,11 +88,15 @@ pub const ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL: &str =
 pub const ADD_RESERVED_TURN_SESSION_STATUS_SQL: &str = include_str!(
     "../../migrations/2026-03-20-000000_add_reserved_agent_turn_session_status/up.sql"
 );
+/// SQL to add tenant schema, tenant-aware uniqueness, and composite core FKs.
+pub const ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL: &str =
+    include_str!("../../migrations/2026-03-21-000000_add_tenant_schema_and_constraints/up.sql");
+
 /// Template database name for pre-migrated schema.
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v14";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v15";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -151,6 +155,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
     map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
+    map_box(conn.batch_execute(ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
     Ok(())
 }
@@ -260,23 +265,33 @@ pub async fn insert_conversation(
     cluster: &ManagedCluster,
     db_name: &str,
     conv_id: ConversationId,
+    ctx: &RequestContext,
 ) -> Result<(), BoxError> {
     let url = cluster.connection().database_url(db_name);
     let conv_uuid = conv_id.into_inner();
+    let tenant_id = ctx.tenant_id();
 
     tokio::task::spawn_blocking(move || {
         let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
+        ensure_tenant_exists(&mut conn, tenant_id)?;
         diesel::sql_query(concat!(
-            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
-            "VALUES ($1, '{}', 'active', NOW(), NOW())",
+            "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
+            "VALUES ($1, $2, '{}', 'active', NOW(), NOW())",
         ))
         .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
+        .bind::<diesel::sql_types::Uuid, _>(tenant_id.into_inner())
         .execute(&mut conn)
         .map_err(|e| Box::new(e) as BoxError)?;
         Ok(())
     })
     .await
     .map_err(|e| Box::new(e) as BoxError)?
+}
+
+fn ensure_tenant_exists(conn: &mut PgConnection, tenant_id: TenantId) -> Result<(), BoxError> {
+    corbusier::test_support::bootstrap_tenant_row(conn, tenant_id)
+        .map(|_| ())
+        .map_err(|e| Box::new(e) as BoxError)
 }
 
 /// Row from the `audit_logs` table for verification.
