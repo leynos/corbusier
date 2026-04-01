@@ -78,16 +78,9 @@ impl HttpApiAuth {
     /// Encodes custom claims into a JWT.
     fn encode_custom_claims(
         &self,
-        params: EncodeClaimsParams,
+        claims: CustomJwtClaims,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_claims(&CustomJwtClaims {
-            sub: params.sub,
-            tenant_id: params.tenant_id,
-            session_id: params.session_id,
-            exp: params.exp,
-            role: None,
-            tenant_kind: params.tenant_kind,
-        })
+        self.encode_claims(&claims)
     }
 
     /// Returns a token with the specified `tenant_kind` claim.
@@ -99,11 +92,12 @@ impl HttpApiAuth {
         &self,
         tenant_kind: impl Into<String>,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(EncodeClaimsParams {
+        self.encode_custom_claims(CustomJwtClaims {
             sub: self.user_id.to_string(),
             tenant_id: self.tenant_id.to_string(),
             session_id: self.session_id.to_string(),
             exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            role: None,
             tenant_kind: Some(tenant_kind.into()),
         })
     }
@@ -114,11 +108,12 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn token_with_invalid_uuids(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(EncodeClaimsParams {
+        self.encode_custom_claims(CustomJwtClaims {
             sub: "not-a-uuid".to_owned(),
             tenant_id: "also-not-a-uuid".to_owned(),
             session_id: "still-not-a-uuid".to_owned(),
             exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            role: None,
             tenant_kind: Some("user".to_owned()),
         })
     }
@@ -129,23 +124,15 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn expired_token(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(EncodeClaimsParams {
+        self.encode_custom_claims(CustomJwtClaims {
             sub: self.user_id.to_string(),
             tenant_id: self.tenant_id.to_string(),
             session_id: self.session_id.to_string(),
             exp: chrono::Utc::now().timestamp().saturating_sub(3600),
+            role: None,
             tenant_kind: Some("user".to_owned()),
         })
     }
-}
-
-/// Parameters for constructing custom JWT claims in tests.
-struct EncodeClaimsParams {
-    sub: String,
-    tenant_id: String,
-    session_id: String,
-    exp: i64,
-    tenant_kind: Option<String>,
 }
 
 /// Returns the named field from a JSON object used in HTTP API tests.
