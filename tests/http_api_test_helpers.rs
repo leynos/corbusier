@@ -83,7 +83,7 @@ impl HttpApiAuth {
     }
 
     /// Encodes custom claims into a JWT.
-    #[allow(clippy::too_many_arguments, reason = "JWT claims have many fields")]
+    #[expect(clippy::too_many_arguments, reason = "JWT claims have many fields")]
     fn encode_custom_claims(
         &self,
         sub: String,
