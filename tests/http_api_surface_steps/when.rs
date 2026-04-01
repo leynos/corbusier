@@ -12,16 +12,21 @@ async fn create_conversation(
     current_world
         .send(actix_web::test::TestRequest::post().uri("/api/v1/conversations"))
         .await?;
-    current_world.conversation_id = current_world
-        .last_body
-        .as_ref()
-        .and_then(|body| {
-            body.get("data")
-                .and_then(|data| data.get("conversation"))
-                .and_then(|conversation| conversation.get("id"))
-                .and_then(serde_json::Value::as_str)
-        })
-        .map(String::from);
+    let conversation_id = current_world.last_body.as_ref().and_then(|body| {
+        body.get("data")
+            .and_then(|data| data.get("conversation"))
+            .and_then(|conversation| conversation.get("id"))
+            .and_then(serde_json::Value::as_str)
+            .map(String::from)
+    });
+    if matches!(current_world.last_status, Some(code) if (200..300).contains(&code)) {
+        current_world.conversation_id = Some(
+            conversation_id
+                .ok_or_else(|| eyre::eyre!("conversation id should be present in response"))?,
+        );
+    } else {
+        current_world.conversation_id = None;
+    }
     Ok(())
 }
 

@@ -27,17 +27,16 @@ BEGIN
 END $$;
 
 ALTER TABLE messages
-    DROP CONSTRAINT IF EXISTS messages_conversation_id_fkey;
+    DROP CONSTRAINT IF EXISTS messages_conversation_id_fkey,
+    DROP CONSTRAINT IF EXISTS messages_conversation_fk;
 
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM pg_constraint
-        WHERE conname IN (
-            'messages_conversation_tenant_fkey',
-            'messages_conversation_fk'
-        )
+        WHERE conrelid = 'messages'::regclass
+          AND conname = 'messages_conversation_tenant_fkey'
     ) THEN
         ALTER TABLE messages
             ADD CONSTRAINT messages_conversation_tenant_fkey

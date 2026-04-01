@@ -60,7 +60,7 @@ async fn conversation_history_includes_messages(
     let body = last_body(world)?;
     let messages = required_field(required_field(body, "data"), "messages")
         .as_array()
-        .unwrap_or_else(|| panic!("messages array should be present"));
+        .ok_or_else(|| eyre::eyre!("messages array should be present"))?;
     eyre::ensure!(
         messages.len() == expected_count,
         "expected {expected_count} messages, got {}",
@@ -104,6 +104,7 @@ async fn task_state_is(
 }
 
 #[then(r"the response includes {expected_tools:usize} tool")]
+#[then(r"the response includes {expected_tools:usize} tools")]
 async fn response_includes_tool(
     world: &mut Result<HttpApiWorld, eyre::Report>,
     expected_tools: usize,
@@ -111,7 +112,7 @@ async fn response_includes_tool(
     let body = last_body(world)?;
     let tools = required_field(required_field(body, "data"), "tools")
         .as_array()
-        .unwrap_or_else(|| panic!("tools array should be present"));
+        .ok_or_else(|| eyre::eyre!("tools array should be present"))?;
     eyre::ensure!(
         tools.len() == expected_tools,
         "expected {expected_tools} tools, got {}",

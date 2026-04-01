@@ -186,37 +186,6 @@ impl MessageRepository for PostgresMessageRepository {
         let seq_num = message.sequence_number();
 
         self.execute_query(tenant_id, move |conn| {
-            // Pre-check for duplicate message ID to provide semantic error
-            let id_exists: i64 = messages::table
-                .filter(messages::id.eq(msg_id.into_inner()))
-                .filter(messages::tenant_id.eq(tenant_id.into_inner()))
-                .count()
-                .get_result(conn)
-                .map_err(RepositoryError::database)?;
-
-            if id_exists > 0 {
-                return Err(RepositoryError::DuplicateMessage(msg_id));
-            }
-
-            // Pre-check for duplicate sequence number in conversation
-            let seq_exists: i64 = messages::table
-                .filter(messages::tenant_id.eq(tenant_id.into_inner()))
-                .filter(messages::conversation_id.eq(conv_id.into_inner()))
-                .filter(
-                    messages::sequence_number.eq(i64::try_from(seq_num.value())
-                        .map_err(|e| RepositoryError::serialization(e.to_string()))?),
-                )
-                .count()
-                .get_result(conn)
-                .map_err(RepositoryError::database)?;
-
-            if seq_exists > 0 {
-                return Err(RepositoryError::DuplicateSequence {
-                    conversation_id: conv_id,
-                    sequence: seq_num,
-                });
-            }
-
             let ids = InsertIds {
                 msg_id,
                 conv_id,

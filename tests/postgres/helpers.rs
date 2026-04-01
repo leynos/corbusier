@@ -15,6 +15,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::fixture;
+use std::fmt;
 use uuid::Uuid;
 
 /// SQL to create the base schema for tests.
@@ -63,6 +64,10 @@ pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
 /// SQL to add `tenant_id` to conversations and messages tables for tenant isolation.
 pub const ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL: &str = include_str!(
     "../../migrations/2026-04-01-000000_add_tenant_id_to_conversations_and_messages/up.sql"
+);
+/// SQL to enforce tenant-aware integrity for conversations and messages.
+pub const ENFORCE_TENANT_SCOPE_FOR_CONVERSATIONS_AND_MESSAGES_SQL: &str = include_str!(
+    "../../migrations/2026-04-01-000001_enforce_tenant_scope_for_conversations_and_messages/up.sql"
 );
 
 /// SQL to add hook execution log table for roadmap 2.3.1.
@@ -140,29 +145,99 @@ fn map_box<T, E: std::error::Error + Send + Sync + 'static>(
     result.map_err(|err| Box::new(err) as BoxError)
 }
 
+#[derive(Debug)]
+struct MigrationError {
+    label: &'static str,
+    source: BoxError,
+}
+
+impl fmt::Display for MigrationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "migration {} failed", self.label)
+    }
+}
+
+impl std::error::Error for MigrationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
+fn execute_migration(
+    conn: &mut PgConnection,
+    label: &'static str,
+    sql: &'static str,
+) -> Result<(), BoxError> {
+    map_box(conn.batch_execute(sql))
+        .map_err(|source| Box::new(MigrationError { label, source }) as BoxError)
+}
+
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("CREATE_SCHEMA_SQL", CREATE_SCHEMA_SQL),
+    ("ADD_CONSTRAINTS_SQL", ADD_CONSTRAINTS_SQL),
+    ("ADD_AUDIT_TRIGGER_SQL", ADD_AUDIT_TRIGGER_SQL),
+    ("ADD_HANDOFF_SCHEMA_SQL", ADD_HANDOFF_SCHEMA_SQL),
+    ("ADD_TASKS_SCHEMA_SQL", ADD_TASKS_SCHEMA_SQL),
+    ("ADD_BRANCH_PR_INDEXES_SQL", ADD_BRANCH_PR_INDEXES_SQL),
+    (
+        "ADD_BACKEND_REGISTRATIONS_SQL",
+        ADD_BACKEND_REGISTRATIONS_SQL,
+    ),
+    ("ADD_MCP_SERVERS_SQL", ADD_MCP_SERVERS_SQL),
+    ("ADD_HOOK_EXECUTIONS_SQL", ADD_HOOK_EXECUTIONS_SQL),
+    ("ADD_AGENT_TURN_SESSIONS_SQL", ADD_AGENT_TURN_SESSIONS_SQL),
+    ("ADD_TOOL_CATALOG_SQL", ADD_TOOL_CATALOG_SQL),
+    (
+        "ADD_UNIQUE_ACTIVE_SESSION_SQL",
+        ADD_UNIQUE_ACTIVE_SESSION_SQL,
+    ),
+    (
+        "ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL",
+        ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL,
+    ),
+    (
+        "ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL",
+        ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL,
+    ),
+    (
+        "ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL",
+        ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL,
+    ),
+    (
+        "ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL",
+        ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL,
+    ),
+    (
+        "ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL",
+        ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL,
+    ),
+    (
+        "ADD_RESERVED_TURN_SESSION_STATUS_SQL",
+        ADD_RESERVED_TURN_SESSION_STATUS_SQL,
+    ),
+    (
+        "ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL",
+        ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL,
+    ),
+    (
+        "ADD_HOOK_POLICY_AUDIT_EVENTS_SQL",
+        ADD_HOOK_POLICY_AUDIT_EVENTS_SQL,
+    ),
+    (
+        "ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL",
+        ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL,
+    ),
+    (
+        "ENFORCE_TENANT_SCOPE_FOR_CONVERSATIONS_AND_MESSAGES_SQL",
+        ENFORCE_TENANT_SCOPE_FOR_CONVERSATIONS_AND_MESSAGES_SQL,
+    ),
+];
+
 fn apply_migrations(url: &str) -> Result<(), BoxError> {
     let mut conn = map_box(PgConnection::establish(url))?;
-    map_box(conn.batch_execute(CREATE_SCHEMA_SQL))?;
-    map_box(conn.batch_execute(ADD_CONSTRAINTS_SQL))?;
-    map_box(conn.batch_execute(ADD_AUDIT_TRIGGER_SQL))?;
-    map_box(conn.batch_execute(ADD_HANDOFF_SCHEMA_SQL))?;
-    map_box(conn.batch_execute(ADD_TASKS_SCHEMA_SQL))?;
-    map_box(conn.batch_execute(ADD_BRANCH_PR_INDEXES_SQL))?;
-    map_box(conn.batch_execute(ADD_BACKEND_REGISTRATIONS_SQL))?;
-    map_box(conn.batch_execute(ADD_MCP_SERVERS_SQL))?;
-    map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_SQL))?;
-    map_box(conn.batch_execute(ADD_AGENT_TURN_SESSIONS_SQL))?;
-    map_box(conn.batch_execute(ADD_TOOL_CATALOG_SQL))?;
-    map_box(conn.batch_execute(ADD_UNIQUE_ACTIVE_SESSION_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_MCP_SERVERS_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_ID_TO_HOOK_EXECUTIONS_SQL))?;
-    map_box(conn.batch_execute(ADD_HOOK_EXECUTIONS_UNIQUE_CONSTRAINT_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_SCOPE_TO_AGENT_BACKEND_SQL))?;
-    map_box(conn.batch_execute(ADD_RESERVED_TURN_SESSION_STATUS_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL))?;
-    map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
-    map_box(conn.batch_execute(ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL))?;
+    for (label, sql) in MIGRATIONS {
+        execute_migration(&mut conn, label, sql)?;
+    }
     Ok(())
 }
 

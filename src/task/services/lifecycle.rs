@@ -254,8 +254,9 @@ where
     ///
     /// # Errors
     ///
-    /// Returns [`TaskLifecycleError::Repository`] when lookup fails or
-    /// [`TaskRepositoryError::NotFound`] when the task does not exist.
+    /// Returns [`TaskLifecycleError::Repository`] when lookup fails,
+    /// including the wrapped [`TaskRepositoryError::NotFound`] case when the
+    /// task does not exist.
     pub async fn get_by_id(
         &self,
         ctx: &RequestContext,

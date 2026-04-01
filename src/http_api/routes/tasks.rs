@@ -197,18 +197,19 @@ fn build_create_task_request(body: CreateTaskBody) -> CreateTaskFromIssueRequest
         milestone,
     } = body;
     let base_request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
-    let mut req = description
-        .into_iter()
-        .fold(base_request, CreateTaskFromIssueRequest::with_description);
-    req = labels
-        .into_iter()
-        .fold(req, CreateTaskFromIssueRequest::with_labels);
-    req = assignees
-        .into_iter()
-        .fold(req, CreateTaskFromIssueRequest::with_assignees);
-    req = milestone
-        .into_iter()
-        .fold(req, CreateTaskFromIssueRequest::with_milestone);
+    let mut req = base_request;
+    if let Some(value) = description {
+        req = req.with_description(value);
+    }
+    if let Some(value) = labels {
+        req = req.with_labels(value);
+    }
+    if let Some(value) = assignees {
+        req = req.with_assignees(value);
+    }
+    if let Some(value) = milestone {
+        req = req.with_milestone(value);
+    }
     req
 }
 

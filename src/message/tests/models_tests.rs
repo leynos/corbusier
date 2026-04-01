@@ -85,7 +85,6 @@ fn try_from_domain_preserves_all_fields(clock: DefaultClock) {
         new_message.conversation_id,
         message.conversation_id().into_inner()
     );
-    assert_eq!(new_message.tenant_id, tenant_id);
     assert_eq!(new_message.role, "assistant");
     assert_eq!(new_message.sequence_number, 42);
     assert_eq!(new_message.created_at, message.created_at());

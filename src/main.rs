@@ -106,7 +106,6 @@ fn build_api_state() -> std::io::Result<ApiState> {
 
     // TODO: Replace InMemoryMcpServerHost with a persistent adapter (e.g.,
     // PostgresMcpServerHost) for production horizontal scalability.
-    // See: https://github.com/leynos/corbusier/issues/TODO
     let tool_service = Arc::new(ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog: Arc::new(PostgresToolCatalog::new(pool.clone())),

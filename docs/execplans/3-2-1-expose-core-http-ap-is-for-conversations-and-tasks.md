@@ -85,7 +85,7 @@ Observable success means:
   would rely on tenant isolation that the current schema and Row-Level Security
   (RLS) do not actually provide.
 - Dependencies: stop and escalate if the work needs more than two new runtime
-  crates beyond a focused JWT/auth solution.
+  crates beyond a focused JSON Web Token (JWT)/auth solution.
 - Contract ambiguity: stop and escalate if the required endpoint set cannot be
   reconciled between `docs/roadmap.md`, `docs/corbusier-design.md`, and the
   workflows currently implemented in `message`, `task`, and `tool_registry`.
@@ -392,7 +392,7 @@ Planned work:
 - Add route modules for conversations, tasks, and tools.
 - Add request Data Transfer Objects (DTOs) and response DTOs for each route
   family.
-- Add shared middleware or extractors for:
+- Add shared middleware or extractors for
   - bearer token validation;
   - request identifier generation;
   - `RequestContext` construction from JWT claims plus generated correlation

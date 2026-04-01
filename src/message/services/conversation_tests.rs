@@ -8,7 +8,7 @@ use crate::message::{
 };
 use crate::test_support::test_request_ctx;
 use mockable::DefaultClock;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use std::sync::Arc;
 
 type TestService = ConversationService<
@@ -18,6 +18,7 @@ type TestService = ConversationService<
     DefaultClock,
 >;
 
+#[fixture]
 fn service() -> TestService {
     ConversationService::new(
         Arc::new(InMemoryConversationRepository::new()),
@@ -27,12 +28,17 @@ fn service() -> TestService {
     )
 }
 
+#[fixture]
+fn ctx() -> crate::context::RequestContext {
+    test_request_ctx()
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_and_read_history() -> Result<(), eyre::Report> {
-    let service = service();
-    let ctx = test_request_ctx();
-
+async fn create_and_read_history(
+    service: TestService,
+    ctx: crate::context::RequestContext,
+) -> Result<(), eyre::Report> {
     let conversation = service.create_conversation(&ctx).await?;
     let message = service
         .append_message(
@@ -59,10 +65,10 @@ async fn create_and_read_history() -> Result<(), eyre::Report> {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn append_rejects_unknown_conversation() {
-    let service = service();
-    let ctx = test_request_ctx();
-
+async fn append_rejects_unknown_conversation(
+    service: TestService,
+    ctx: crate::context::RequestContext,
+) {
     let error = service
         .append_message(
             &ctx,
@@ -83,9 +89,7 @@ async fn append_rejects_unknown_conversation() {
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn append_validates_content() {
-    let service = service();
-    let ctx = test_request_ctx();
+async fn append_validates_content(service: TestService, ctx: crate::context::RequestContext) {
     let conversation = service
         .create_conversation(&ctx)
         .await

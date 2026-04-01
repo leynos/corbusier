@@ -8657,10 +8657,10 @@ claims and issues a fresh correlation ID per HTTP request.
 The HTTP adapter is authenticated and tenant-aware at the application layer,
 and schema-level tenant scoping for conversation and message persistence has
 been implemented. The remaining caveat is database-enforced policy hardening:
-roadmap items `1.5.2` and `1.5.3` still need to land PostgreSQL Row-Level
-Security and related policies. Until those database policies are enforced, the
-HTTP API should be treated as an internal or trusted surface rather than a
-hardened multi-tenant boundary.
+roadmap item `1.5.2` shipped the schema and constraint work, while `1.5.3`
+still needs to land PostgreSQL Row-Level Security and related policies. Until
+those database policies are enforced, the HTTP API should be treated as an
+internal or trusted surface rather than a hardened multi-tenant boundary.
 
 ###### MCP Authentication Integration
 
