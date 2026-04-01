@@ -1,20 +1,13 @@
 //! Shared HTTP API auth fixtures for integration tests.
 
-#![expect(
-    dead_code,
-    reason = "helpers are used selectively across integration test suites"
-)]
-#![allow(
-    unfulfilled_lint_expectations,
-    reason = "module is compiled for multiple test suites with varying usage"
-)]
-
+use actix_web::{http::header, test as actix_test};
 use corbusier::{
     context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
     http_api::JwtClaims,
 };
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
+use serde_json::Value;
 use uuid::Uuid;
 
 /// Consistent JWT and request-context fixture for HTTP API tests.
@@ -85,19 +78,15 @@ impl HttpApiAuth {
     /// Encodes custom claims into a JWT.
     fn encode_custom_claims(
         &self,
-        sub: String,
-        tenant_id: String,
-        session_id: String,
-        exp: i64,
-        tenant_kind: Option<String>,
+        params: EncodeClaimsParams,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         self.encode_claims(&CustomJwtClaims {
-            sub,
-            tenant_id,
-            session_id,
-            exp,
+            sub: params.sub,
+            tenant_id: params.tenant_id,
+            session_id: params.session_id,
+            exp: params.exp,
             role: None,
-            tenant_kind,
+            tenant_kind: params.tenant_kind,
         })
     }
 
@@ -110,13 +99,13 @@ impl HttpApiAuth {
         &self,
         tenant_kind: impl Into<String>,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(
-            self.user_id.to_string(),
-            self.tenant_id.to_string(),
-            self.session_id.to_string(),
-            chrono::Utc::now().timestamp().saturating_add(3600),
-            Some(tenant_kind.into()),
-        )
+        self.encode_custom_claims(EncodeClaimsParams {
+            sub: self.user_id.to_string(),
+            tenant_id: self.tenant_id.to_string(),
+            session_id: self.session_id.to_string(),
+            exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            tenant_kind: Some(tenant_kind.into()),
+        })
     }
 
     /// Returns a token with non-UUID strings for identifiers.
@@ -125,13 +114,13 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn token_with_invalid_uuids(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(
-            "not-a-uuid".to_owned(),
-            "also-not-a-uuid".to_owned(),
-            "still-not-a-uuid".to_owned(),
-            chrono::Utc::now().timestamp().saturating_add(3600),
-            Some("user".to_owned()),
-        )
+        self.encode_custom_claims(EncodeClaimsParams {
+            sub: "not-a-uuid".to_owned(),
+            tenant_id: "also-not-a-uuid".to_owned(),
+            session_id: "still-not-a-uuid".to_owned(),
+            exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            tenant_kind: Some("user".to_owned()),
+        })
     }
 
     /// Returns an already-expired token.
@@ -140,14 +129,61 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn expired_token(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(
-            self.user_id.to_string(),
-            self.tenant_id.to_string(),
-            self.session_id.to_string(),
-            chrono::Utc::now().timestamp().saturating_sub(3600),
-            Some("user".to_owned()),
-        )
+        self.encode_custom_claims(EncodeClaimsParams {
+            sub: self.user_id.to_string(),
+            tenant_id: self.tenant_id.to_string(),
+            session_id: self.session_id.to_string(),
+            exp: chrono::Utc::now().timestamp().saturating_sub(3600),
+            tenant_kind: Some("user".to_owned()),
+        })
     }
+}
+
+/// Parameters for constructing custom JWT claims in tests.
+struct EncodeClaimsParams {
+    sub: String,
+    tenant_id: String,
+    session_id: String,
+    exp: i64,
+    tenant_kind: Option<String>,
+}
+
+/// Returns the named field from a JSON object used in HTTP API tests.
+///
+/// # Panics
+///
+/// Panics when `value` does not contain `key`.
+#[must_use]
+pub fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
+    value
+        .get(key)
+        .unwrap_or_else(|| panic!("expected field `{key}` to be present"))
+}
+
+/// Returns the named string field from a JSON object used in HTTP API tests.
+///
+/// # Panics
+///
+/// Panics when `value` does not contain `key` or the field is not a string.
+#[must_use]
+pub fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
+    required_field(value, key)
+        .as_str()
+        .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
+}
+
+/// Adds a bearer token to a test request.
+#[must_use]
+pub fn with_bearer(request: actix_test::TestRequest, token: &str) -> actix_test::TestRequest {
+    request.insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+/// Asserts the standard v1 metadata envelope.
+pub fn assert_v1_metadata(body: &Value) {
+    let metadata = required_field(body, "metadata");
+    assert_eq!(required_field(metadata, "version"), "v1");
+    assert!(required_field(metadata, "request_id").is_string());
+    assert!(required_field(metadata, "timestamp").is_string());
 }
 
 /// Custom JWT claims for constructing edge-case tokens.
@@ -159,4 +195,43 @@ struct CustomJwtClaims {
     exp: i64,
     role: Option<String>,
     tenant_kind: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HttpApiAuth, assert_v1_metadata, required_field, required_str_field, with_bearer};
+    use actix_web::test as actix_test;
+    use serde_json::json;
+
+    #[test]
+    fn helper_surface_is_exercised() {
+        let auth = HttpApiAuth::new("test-secret");
+        let _ = auth.token().expect("token encoding should succeed");
+        let _ = auth
+            .encode_claims(&json!({ "sub": "user" }))
+            .expect("custom claims encoding should succeed");
+        let _ = auth
+            .token_with_tenant_kind("user")
+            .expect("tenant kind token encoding should succeed");
+        let _ = auth
+            .token_with_invalid_uuids()
+            .expect("invalid UUID token encoding should succeed");
+        let _ = auth
+            .expired_token()
+            .expect("expired token encoding should succeed");
+
+        let payload = json!({ "message": "hello" });
+        let field = required_field(&payload, "message");
+        assert_eq!(required_str_field(&payload, "message"), "hello");
+        assert_eq!(field, "hello");
+        assert_v1_metadata(&json!({
+            "metadata": {
+                "version": "v1",
+                "request_id": "req-123",
+                "timestamp": "2026-04-01T00:00:00Z"
+            }
+        }));
+        let request = with_bearer(actix_test::TestRequest::get(), "token-value");
+        let _request = request.to_request();
+    }
 }

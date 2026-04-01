@@ -1,13 +1,15 @@
 //! `PostgreSQL` integration tests for the HTTP API surface.
 
-use crate::http_api_test_helpers::HttpApiAuth;
+use crate::http_api_test_helpers::{
+    HttpApiAuth, assert_v1_metadata, required_field, required_str_field, with_bearer,
+};
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
 };
-use actix_web::{App, http::header, test as actix_test, web};
+use actix_web::{App, test as actix_test, web};
 use corbusier::{
-    http_api::{ApiState, BearerTokenAuthenticator, api_routes},
+    http_api::{ApiConfig, ApiState, BearerTokenAuthenticator, api_routes},
     message::{
         adapters::postgres::{PgPool, PostgresConversationRepository, PostgresMessageRepository},
         services::ConversationService,
@@ -80,8 +82,10 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
             conversation_service,
             task_service,
             tool_service,
-            BearerTokenAuthenticator::new(TEST_JWT_SECRET),
-            clock,
+            ApiConfig {
+                authenticator: BearerTokenAuthenticator::new(TEST_JWT_SECRET),
+                clock,
+            },
         ),
         auth,
     ))
@@ -170,29 +174,6 @@ async fn context(
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
     setup_context(cluster).await
-}
-
-fn with_bearer(request: actix_test::TestRequest, token: &str) -> actix_test::TestRequest {
-    request.insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
-}
-
-fn assert_v1_metadata(body: &Value) {
-    let metadata = required_field(body, "metadata");
-    assert_eq!(required_field(metadata, "version"), "v1");
-    assert!(required_field(metadata, "request_id").is_string());
-    assert!(required_field(metadata, "timestamp").is_string());
-}
-
-fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
-    value
-        .get(key)
-        .unwrap_or_else(|| panic!("expected field `{key}` to be present"))
-}
-
-fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
-    required_field(value, key)
-        .as_str()
-        .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
 }
 
 #[rstest]

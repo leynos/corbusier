@@ -1,7 +1,7 @@
 //! Authentication and request-context extraction for the HTTP API.
 
 use super::{error::ApiError, state::ApiState};
-use actix_web::{FromRequest, HttpRequest, dev::Payload, web};
+use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload, web};
 use chrono::Utc;
 use futures::future::{Ready, ready};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
@@ -61,7 +61,11 @@ impl BearerTokenAuthenticator {
         }
     }
 
-    fn authenticate_token(&self, token: &str) -> Result<RequestContext, ApiError> {
+    fn authenticate_token(
+        &self,
+        token: &str,
+        correlation_id: CorrelationId,
+    ) -> Result<RequestContext, ApiError> {
         let token_data = decode::<JwtClaims>(token, &self.decoding_key, &self.validation)
             .map_err(|_| ApiError::unauthorised("invalid bearer token"))?;
         let claims = token_data.claims;
@@ -75,7 +79,7 @@ impl BearerTokenAuthenticator {
         let session_id = parse_uuid_claim(&claims.session_id, "session_id")?;
         Ok(RequestContext::new(
             TenantId::from_uuid(tenant_id),
-            CorrelationId::new(),
+            correlation_id,
             UserId::from_uuid(user_id),
             SessionId::from_uuid(session_id),
         ))
@@ -104,10 +108,24 @@ fn extract_bearer_token(request: &HttpRequest) -> Result<&str, ApiError> {
     if !scheme.eq_ignore_ascii_case("Bearer") {
         return Err(ApiError::unauthorised("invalid authorization header"));
     }
-    if token.trim().is_empty() {
+    let trimmed_token = token.trim();
+    if trimmed_token.is_empty() {
         return Err(ApiError::unauthorised("missing bearer token"));
     }
-    Ok(token)
+    Ok(trimmed_token)
+}
+
+fn request_correlation_id(request: &HttpRequest) -> CorrelationId {
+    let existing_correlation_id = {
+        let extensions = request.extensions();
+        extensions.get::<CorrelationId>().copied()
+    };
+
+    existing_correlation_id.unwrap_or_else(|| {
+        let correlation_id = CorrelationId::new();
+        request.extensions_mut().insert(correlation_id);
+        correlation_id
+    })
 }
 
 /// Request extractor carrying the authenticated request context.
@@ -133,6 +151,7 @@ impl FromRequest for AuthenticatedRequestContext {
     type Future = Ready<Result<Self, Self::Error>>;
 
     fn from_request(request: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        let correlation_id = request_correlation_id(request);
         let result = request
             .app_data::<web::Data<ApiState>>()
             .ok_or_else(|| {
@@ -141,7 +160,9 @@ impl FromRequest for AuthenticatedRequestContext {
             })
             .and_then(|state| {
                 let token = extract_bearer_token(request)?;
-                state.authenticator.authenticate_token(token)
+                state
+                    .authenticator
+                    .authenticate_token(token, correlation_id)
             })
             .map(Self);
         ready(result)
