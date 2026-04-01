@@ -64,6 +64,10 @@ pub const ADD_TENANT_ID_TO_TOOL_REGISTRY_SQL: &str =
 pub const ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL: &str = include_str!(
     "../../migrations/2026-04-01-000000_add_tenant_id_to_conversations_and_messages/up.sql"
 );
+/// SQL to enforce tenant-aware integrity for conversations and messages.
+pub const ENFORCE_TENANT_SCOPE_FOR_CONVERSATIONS_AND_MESSAGES_SQL: &str = include_str!(
+    "../../migrations/2026-04-01-000001_enforce_tenant_scope_for_conversations_and_messages/up.sql"
+);
 
 /// SQL to add hook execution log table for roadmap 2.3.1.
 pub const ADD_HOOK_EXECUTIONS_SQL: &str =
@@ -101,7 +105,7 @@ pub const ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL: &str =
 ///
 /// Bump the version suffix whenever a new migration is added so that stale
 /// template databases created by earlier test runs are not reused.
-pub const TEMPLATE_DB: &str = "corbusier_test_template_v15";
+pub const TEMPLATE_DB: &str = "corbusier_test_template_v16";
 
 /// Provides a [`DefaultClock`] for test fixtures.
 #[fixture]
@@ -163,6 +167,7 @@ fn apply_migrations(url: &str) -> Result<(), BoxError> {
     map_box(conn.batch_execute(ADD_TENANT_SCHEMA_AND_CONSTRAINTS_SQL))?;
     map_box(conn.batch_execute(ADD_HOOK_POLICY_AUDIT_EVENTS_SQL))?;
     map_box(conn.batch_execute(ADD_TENANT_ID_TO_CONVERSATIONS_AND_MESSAGES_SQL))?;
+    map_box(conn.batch_execute(ENFORCE_TENANT_SCOPE_FOR_CONVERSATIONS_AND_MESSAGES_SQL))?;
     Ok(())
 }
 
@@ -281,16 +286,8 @@ pub async fn insert_conversation(
         let mut conn = PgConnection::establish(&url).map_err(|e| Box::new(e) as BoxError)?;
         ensure_tenant_exists(&mut conn, tenant_id)?;
         diesel::sql_query(concat!(
-<<<<<<< LEFT
             "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
             "VALUES ($1, $2, '{}', 'active', NOW(), NOW())",
-||||||| BASE
-            "INSERT INTO conversations (id, context, state, created_at, updated_at) ",
-            "VALUES ($1, '{}', 'active', NOW(), NOW())",
-=======
-            "INSERT INTO conversations (id, tenant_id, context, state, created_at, updated_at) ",
-            "VALUES ($1, '00000000-0000-0000-0000-000000000000', '{}', 'active', NOW(), NOW())",
->>>>>>> RIGHT
         ))
         .bind::<diesel::sql_types::Uuid, _>(conv_uuid)
         .bind::<diesel::sql_types::Uuid, _>(tenant_id.into_inner())
