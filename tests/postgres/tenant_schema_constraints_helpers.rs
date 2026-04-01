@@ -170,7 +170,7 @@ pub(crate) fn insert_handoff(
     .bind::<diesel::sql_types::Nullable<diesel::sql_types::Uuid>, _>(
         params.target_session.map(AgentSessionId::into_inner),
     )
-    .bind::<diesel::sql_types::Uuid, _>(Uuid::new_v4())
+    .bind::<diesel::sql_types::Uuid, _>(MessageId::new().into_inner())
     .execute(conn)
 }
 

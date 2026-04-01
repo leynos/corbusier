@@ -125,7 +125,7 @@ impl PostgresToolCatalog {
     }
 
     fn to_new_rows(
-        tenant_id: uuid::Uuid,
+        tenant_id: TenantId,
         entries: &[CatalogEntry],
     ) -> ToolCatalogResult<Vec<NewCatalogEntryRow>> {
         if let Some(err) = Self::find_duplicate_entry(entries) {
@@ -172,15 +172,17 @@ impl PostgresToolCatalog {
 
     fn sync_rows_tx(
         conn: &mut PgConnection,
-        tenant_id: uuid::Uuid,
-        server_id: uuid::Uuid,
+        tenant_id: TenantId,
+        server_id: McpServerId,
         rows: &[NewCatalogEntryRow],
     ) -> Result<(), diesel::result::Error> {
+        let tenant_uuid = tenant_id.into_inner();
+        let server_uuid = server_id.into_inner();
         conn.transaction::<_, diesel::result::Error, _>(|transaction| {
             diesel::delete(
                 mcp_tool_catalog::table
-                    .filter(mcp_tool_catalog::server_id.eq(server_id))
-                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_id)),
+                    .filter(mcp_tool_catalog::server_id.eq(server_uuid))
+                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_uuid)),
             )
             .execute(transaction)?;
 
@@ -222,9 +224,7 @@ impl PostgresToolCatalog {
                 ));
             }
 
-            let tid = tenant_id.into_inner();
-            let sid = server_id.into_inner();
-            match Self::sync_rows_tx(connection, tid, sid, &rows) {
+            match Self::sync_rows_tx(connection, tenant_id, server_id, &rows) {
                 Ok(()) => Ok(()),
                 Err(err) => {
                     let attempt = sync_helpers::SyncAttempt {
@@ -272,7 +272,7 @@ impl ToolCatalogRepository for PostgresToolCatalog {
     ) -> ToolCatalogResult<()> {
         Self::validate_same_server(server_id, entries)?;
         let tenant_id = ctx.tenant_id();
-        let rows = Self::to_new_rows(tenant_id.into_inner(), entries)?;
+        let rows = Self::to_new_rows(tenant_id, entries)?;
         self.run_sync_in_pool(tenant_id, server_id, rows).await
     }
 

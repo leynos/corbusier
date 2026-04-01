@@ -1,5 +1,6 @@
 //! Row/domain mapping helpers for the tool catalog `PostgreSQL` adapter.
 
+use crate::context::TenantId;
 use crate::tool_registry::{
     adapters::postgres::catalog_models::{CatalogEntryRow, NewCatalogEntryRow},
     domain::{
@@ -10,11 +11,11 @@ use crate::tool_registry::{
 };
 
 /// Maps a domain catalog entry into an insertable row.
-pub(super) fn entry_to_new_row(entry: &CatalogEntry, tenant_id: uuid::Uuid) -> NewCatalogEntryRow {
+pub(super) fn entry_to_new_row(entry: &CatalogEntry, tenant_id: TenantId) -> NewCatalogEntryRow {
     let tool = entry.tool();
     NewCatalogEntryRow {
         id: entry.id().into_inner(),
-        tenant_id,
+        tenant_id: tenant_id.into_inner(),
         server_id: entry.server_id().into_inner(),
         server_name: entry.server_name().as_str().to_owned(),
         tool_name: tool.name().to_owned(),
