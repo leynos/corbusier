@@ -1,4 +1,22 @@
 //! Shared application state and adapter-local service traits.
+//!
+//! The [`ApiState`] struct bundles the three application-service adapters used by
+//! the HTTP API, namely `Arc<dyn ConversationApplication>`,
+//! `Arc<dyn TaskApplication>`, and `Arc<dyn ToolApplication>`, alongside the
+//! `BearerTokenAuthenticator` and `DefaultClock` instances needed by request
+//! handling. It is injected into every Actix handler through
+//! `web::Data<ApiState>`, giving route modules a single shared access point for
+//! request-scoped orchestration.
+//!
+//! The [`ConversationApplication`], [`TaskApplication`], and
+//! [`ToolApplication`] traits decouple HTTP route handlers from concrete
+//! service implementations. That separation lets in-memory and Postgres-backed
+//! implementations be swapped in for tests and runtime wiring without altering
+//! handler code.
+//!
+//! All three traits are `Send + Sync`, and the concrete services are stored
+//! behind [`Arc`] so [`ApiState`] can be cloned cheaply and shared safely across
+//! the Actix worker pool.
 
 use super::auth::BearerTokenAuthenticator;
 use async_trait::async_trait;
