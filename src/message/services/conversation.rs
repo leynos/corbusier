@@ -84,7 +84,11 @@ where
 {
     /// Creates a new conversation service.
     #[must_use]
-    pub const fn new(
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Constructor is kept non-const to avoid implying const-context construction for runtime Arc dependencies"
+    )]
+    pub fn new(
         conversation_repository: Arc<ConvoRepo>,
         message_repository: Arc<MessageRepo>,
         validator: Arc<Validator>,

@@ -126,26 +126,29 @@ pub struct ApiState {
     pub clock: Arc<DefaultClock>,
 }
 
+/// Infrastructure configuration for the HTTP API adapter.
+pub struct ApiConfig {
+    /// Bearer-token authenticator.
+    pub authenticator: BearerTokenAuthenticator,
+    /// Clock for time-dependent operations.
+    pub clock: Arc<DefaultClock>,
+}
+
 impl ApiState {
     /// Creates a new shared API state bundle.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Constructor with multiple dependencies"
-    )]
     #[must_use]
     pub fn new(
         conversations: Arc<dyn ConversationApplication>,
         tasks: Arc<dyn TaskApplication>,
         tools: Arc<dyn ToolApplication>,
-        authenticator: BearerTokenAuthenticator,
-        clock: Arc<DefaultClock>,
+        config: ApiConfig,
     ) -> Self {
         Self {
             conversations,
             tasks,
             tools,
-            authenticator,
-            clock,
+            authenticator: config.authenticator,
+            clock: config.clock,
         }
     }
 }

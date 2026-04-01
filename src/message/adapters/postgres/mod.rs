@@ -24,7 +24,7 @@ use diesel::prelude::*;
 
 use super::audit_context::AuditContext;
 use super::models::{MessageRow, NewMessage};
-use super::schema::messages;
+use super::schema::{conversations, messages};
 use crate::context::{RequestContext, TenantId};
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
@@ -280,6 +280,19 @@ impl MessageRepository for PostgresMessageRepository {
         let uuid = conversation_id.into_inner();
 
         self.execute_read_query(tenant_id, move |conn| {
+            let conversation_exists = conversations::table
+                .filter(conversations::id.eq(uuid))
+                .filter(conversations::tenant_id.eq(tenant_uuid))
+                .select(conversations::id)
+                .for_update()
+                .first::<uuid::Uuid>(conn)
+                .optional()
+                .map_err(RepositoryError::database)?;
+
+            if conversation_exists.is_none() {
+                return Ok(SequenceNumber::new(1));
+            }
+
             let max_seq: Option<i64> = messages::table
                 .filter(messages::tenant_id.eq(tenant_id.into_inner()))
                 .filter(messages::conversation_id.eq(uuid))

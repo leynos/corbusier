@@ -8,7 +8,7 @@ ALTER TABLE conversations
 ALTER TABLE conversations
     ALTER COLUMN tenant_id DROP DEFAULT;
 
-CREATE UNIQUE INDEX idx_conversations_id_tenant
+CREATE INDEX idx_conversations_id_tenant
     ON conversations (id, tenant_id);
 
 -- 2. messages

@@ -8,4 +8,4 @@ pub mod state;
 
 pub use auth::{AuthenticatedRequestContext, BearerTokenAuthenticator, JwtClaims};
 pub use routes::api_routes;
-pub use state::ApiState;
+pub use state::{ApiConfig, ApiState};

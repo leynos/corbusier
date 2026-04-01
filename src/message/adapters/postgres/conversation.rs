@@ -86,9 +86,11 @@ impl ConversationRepository for PostgresConversationRepository {
         let tenant_id = ctx.tenant_id();
         let conversation_id = conversation.id();
         let tenant_uuid = tenant_id.into_inner();
-        let new_conversation =
-            NewConversation::new(conversation_id.into_inner(), conversation.created_at())
-                .with_tenant_id(tenant_uuid);
+        let new_conversation = NewConversation::new(
+            conversation_id.into_inner(),
+            tenant_uuid,
+            conversation.created_at(),
+        );
 
         self.execute_query(tenant_id, move |conn| {
             // Use ON CONFLICT DO NOTHING for atomic insert-or-detect
