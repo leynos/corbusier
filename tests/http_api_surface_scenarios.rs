@@ -13,8 +13,11 @@ use rstest_bdd_macros::scenario;
     name = "Create a conversation and append a message through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_conversation_and_append_message(world: Result<HttpApiWorld, eyre::Report>) {
-    let _ = world.expect("world should be created");
+async fn create_conversation_and_append_message(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
 }
 
 #[scenario(
@@ -22,8 +25,11 @@ async fn create_conversation_and_append_message(world: Result<HttpApiWorld, eyre
     name = "Create a task from issue metadata through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn create_task_from_issue(world: Result<HttpApiWorld, eyre::Report>) {
-    let _ = world.expect("world should be created");
+async fn create_task_from_issue(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
 }
 
 #[scenario(
@@ -31,8 +37,11 @@ async fn create_task_from_issue(world: Result<HttpApiWorld, eyre::Report>) {
     name = "Transition a task state through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn transition_task_state(world: Result<HttpApiWorld, eyre::Report>) {
-    let _ = world.expect("world should be created");
+async fn transition_task_state(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
 }
 
 #[scenario(
@@ -40,8 +49,11 @@ async fn transition_task_state(world: Result<HttpApiWorld, eyre::Report>) {
     name = "List tools and invoke a tool through HTTP"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn list_tools_and_invoke(world: Result<HttpApiWorld, eyre::Report>) {
-    let _ = world.expect("world should be created");
+async fn list_tools_and_invoke(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
 }
 
 #[scenario(
@@ -49,6 +61,9 @@ async fn list_tools_and_invoke(world: Result<HttpApiWorld, eyre::Report>) {
     name = "Reject unauthenticated access"
 )]
 #[tokio::test(flavor = "multi_thread")]
-async fn reject_unauthenticated_access(world: Result<HttpApiWorld, eyre::Report>) {
-    let _ = world.expect("world should be created");
+async fn reject_unauthenticated_access(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
 }

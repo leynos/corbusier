@@ -8632,15 +8632,16 @@ graph TB
 
 ###### Authentication Implementation
 
-The initial `v1` implementation accepts only `Authorization: Bearer <jwt>`
-credentials. Missing, malformed, or invalid tokens are rejected with
-`401 Unauthorized` before any domain service is called.
+The initial `v1` implementation accepts only
+`Authorization: Bearer <JSON Web Token (JWT)>` credentials. Missing, malformed,
+or invalid tokens are rejected with `401 Unauthorized` before any domain
+service is called.
 
-| Authentication Method | Implementation            | Token Location       | Expiration Policy              | Status       |
-| --------------------- | ------------------------- | -------------------- | ------------------------------ | ------------ |
-| Bearer Token          | JWT with HS256            | Authorization Header | 24 hours with refresh          | Active in v1 |
-| Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration | Future scope |
-| API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     | Future scope |
+| Authentication Method | Implementation                  | Token Location       | Expiration Policy              | Status       |
+| --------------------- | ------------------------------- | -------------------- | ------------------------------ | ------------ |
+| Bearer Token          | JSON Web Token (JWT) with HS256 | Authorization Header | 24 hours with refresh          | Active in v1 |
+| Cookie-based          | Secure HTTP-only cookies        | Cookie header        | 7 days with sliding expiration | Future scope |
+| API Key               | Static key authentication       | X-API-Key header     | No expiration (admin only)     | Future scope |
 
 Authentication claims include both user and tenant identifiers so downstream
 services can construct request context consistently:

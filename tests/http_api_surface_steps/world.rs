@@ -22,7 +22,7 @@ use corbusier::{
         },
     },
 };
-use mockable::DefaultClock;
+use mockable::{Clock, DefaultClock};
 use rstest::fixture;
 use serde_json::{Value, json};
 use std::future::Future;
@@ -40,6 +40,22 @@ pub struct HttpApiWorld {
     pub task_id: Option<String>,
     pub last_status: Option<u16>,
     pub last_body: Option<Value>,
+}
+
+pub(super) fn world_ref(
+    world: &Result<HttpApiWorld, eyre::Report>,
+) -> Result<&HttpApiWorld, eyre::Report> {
+    world
+        .as_ref()
+        .map_err(|err| eyre::eyre!("HTTP API world should be constructed: {err}"))
+}
+
+pub(super) fn world_mut(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+) -> Result<&mut HttpApiWorld, eyre::Report> {
+    world
+        .as_mut()
+        .map_err(|err| eyre::eyre!("HTTP API world should be constructed: {err}"))
 }
 
 impl HttpApiWorld {
@@ -226,7 +242,7 @@ fn build_world() -> Result<HttpApiWorld, eyre::Report> {
             infrastructure.tool_service,
             ApiConfig {
                 authenticator: BearerTokenAuthenticator::new(TEST_JWT_SECRET),
-                clock,
+                clock: clock as Arc<dyn Clock + Send + Sync>,
             },
         ),
         token: Some(token),

@@ -3,8 +3,8 @@
 //! The [`ApiState`] struct bundles the three application-service adapters used by
 //! the HTTP API, namely `Arc<dyn ConversationApplication>`,
 //! `Arc<dyn TaskApplication>`, and `Arc<dyn ToolApplication>`, alongside the
-//! `BearerTokenAuthenticator` and `DefaultClock` instances needed by request
-//! handling. It is injected into every Actix handler through
+//! `BearerTokenAuthenticator` and injectable `Clock` instances needed by
+//! request handling. It is injected into every Actix handler through
 //! `web::Data<ApiState>`, giving route modules a single shared access point for
 //! request-scoped orchestration.
 //!
@@ -47,7 +47,7 @@ use crate::tool_registry::{
     },
     services::{ToolDiscoveryRoutingService, ToolDiscoveryRoutingServiceError},
 };
-use mockable::{Clock, DefaultClock};
+use mockable::Clock;
 
 /// Conversation operations exposed to the HTTP adapter.
 #[async_trait]
@@ -141,7 +141,7 @@ pub struct ApiState {
     /// Bearer-token authenticator.
     pub authenticator: BearerTokenAuthenticator,
     /// Clock for time-dependent operations.
-    pub clock: Arc<DefaultClock>,
+    pub clock: Arc<dyn Clock + Send + Sync>,
 }
 
 /// Infrastructure configuration for the HTTP API adapter.
@@ -149,7 +149,7 @@ pub struct ApiConfig {
     /// Bearer-token authenticator.
     pub authenticator: BearerTokenAuthenticator,
     /// Clock for time-dependent operations.
-    pub clock: Arc<DefaultClock>,
+    pub clock: Arc<dyn Clock + Send + Sync>,
 }
 
 impl ApiState {

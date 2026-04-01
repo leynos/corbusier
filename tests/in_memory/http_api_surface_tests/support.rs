@@ -22,7 +22,7 @@ use corbusier::{
         },
     },
 };
-use mockable::DefaultClock;
+use mockable::{Clock, DefaultClock};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -103,7 +103,7 @@ pub async fn build_bundle() -> Result<TestBundle, eyre::Report> {
             tool_service,
             ApiConfig {
                 authenticator: BearerTokenAuthenticator::new(TEST_JWT_SECRET),
-                clock,
+                clock: clock as Arc<dyn Clock + Send + Sync>,
             },
         ),
         auth,

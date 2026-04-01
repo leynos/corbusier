@@ -1,23 +1,34 @@
 //! Given steps for HTTP API behaviour tests.
 
-use super::world::{HttpApiWorld, required_field, required_str_field};
+use super::world::{HttpApiWorld, required_field, required_str_field, world_mut};
 use rstest_bdd_macros::given;
 
 #[given("an authenticated HTTP API client")]
-async fn authenticated_http_api_client(world: &mut HttpApiWorld) {
-    assert!(
+async fn authenticated_http_api_client(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let world = world_mut(world)?;
+    eyre::ensure!(
         world.token.is_some(),
         "expected authenticated client token to be configured"
     );
+    Ok(())
 }
 
 #[given("an unauthenticated HTTP API client")]
-async fn unauthenticated_http_api_client(world: &mut HttpApiWorld) {
+async fn unauthenticated_http_api_client(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let world = world_mut(world)?;
     world.token = None;
+    Ok(())
 }
 
 #[given("I created a draft task through the API")]
-async fn created_draft_task_through_api(world: &mut HttpApiWorld) -> Result<(), eyre::Report> {
+async fn created_draft_task_through_api(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let world = world_mut(world)?;
     world
         .send(
             actix_web::test::TestRequest::post()
