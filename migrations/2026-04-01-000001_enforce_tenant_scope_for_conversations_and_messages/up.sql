@@ -1,18 +1,48 @@
 -- Enforce tenant-aware integrity for conversations and messages.
 
-ALTER TABLE conversations
-    ADD CONSTRAINT conversations_id_tenant_unique
-    UNIQUE (id, tenant_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'conversations_id_tenant_unique'
+    ) THEN
+        ALTER TABLE conversations
+            ADD CONSTRAINT conversations_id_tenant_unique
+            UNIQUE (id, tenant_id);
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'messages_id_tenant_unique'
+    ) THEN
+        ALTER TABLE messages
+            ADD CONSTRAINT messages_id_tenant_unique
+            UNIQUE (id, tenant_id);
+    END IF;
+END $$;
 
 ALTER TABLE messages
-    ADD CONSTRAINT messages_id_tenant_unique
-    UNIQUE (id, tenant_id);
+    DROP CONSTRAINT IF EXISTS messages_conversation_id_fkey;
 
-ALTER TABLE messages
-    DROP CONSTRAINT messages_conversation_id_fkey;
-
-ALTER TABLE messages
-    ADD CONSTRAINT messages_conversation_tenant_fkey
-    FOREIGN KEY (conversation_id, tenant_id)
-    REFERENCES conversations (id, tenant_id)
-    ON DELETE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname IN (
+            'messages_conversation_tenant_fkey',
+            'messages_conversation_fk'
+        )
+    ) THEN
+        ALTER TABLE messages
+            ADD CONSTRAINT messages_conversation_tenant_fkey
+            FOREIGN KEY (conversation_id, tenant_id)
+            REFERENCES conversations (id, tenant_id)
+            ON DELETE CASCADE;
+    END IF;
+END $$;

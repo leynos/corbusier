@@ -18,7 +18,7 @@ use diesel::prelude::*;
 use super::{
     PgPool,
     blocking_helpers::{get_conn_with, run_blocking_with},
-    tenant_tx::{FromTxError, TxError, with_tenant_tx},
+    tenant_tx::{FromTxError, TxError, ensure_tenant_exists, with_tenant_tx},
 };
 
 impl FromTxError<Self> for ConversationRepositoryError {
@@ -56,7 +56,11 @@ impl PostgresConversationRepository {
         run_blocking_with(
             move || {
                 let mut conn = get_conn_with(&pool, ConversationRepositoryError::persistence)?;
-                with_tenant_tx(&mut conn, tenant_id.into_inner(), query_fn)
+                with_tenant_tx(&mut conn, tenant_id.into_inner(), |tx| {
+                    ensure_tenant_exists(tx, tenant_id.into_inner())
+                        .map_err(ConversationRepositoryError::persistence)?;
+                    query_fn(tx)
+                })
             },
             ConversationRepositoryError::persistence,
         )
