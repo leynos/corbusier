@@ -18,6 +18,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@aebb3f5b831102e2a10ef909c83d7d50ea86c332
+      - name: Install OpenSSL headers for CI verification
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
       - name: Format
         run: make check-fmt
       - name: Markdown lint
@@ -28,6 +34,8 @@ jobs:
             !**/target/**
             !**/dist/**
       - name: Lint
+        env:
+          OPENSSL_NO_VENDOR: "1"
         run: make lint
       - name: Cache pg_worker binary
         id: cache-pg-worker
@@ -55,6 +63,8 @@ jobs:
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Test and Measure Coverage
+        env:
+          OPENSSL_NO_VENDOR: "1"
         uses: leynos/shared-actions/.github/actions/generate-coverage@aebb3f5b831102e2a10ef909c83d7d50ea86c332
         with:
           output-path: lcov.info
