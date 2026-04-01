@@ -1,4 +1,8 @@
-//! Task HTTP routes.
+//! Registers the authenticated task routes mounted under `/api/v1`, including
+//! `POST /tasks`, `GET /tasks/{id}`, task state transitions, and branch or
+//! pull-request association operations handled through
+//! [`AuthenticatedRequestContext`]. [`routes`] is the public entrypoint that
+//! wires these task-management handlers into the HTTP router.
 
 use super::super::{
     auth::AuthenticatedRequestContext, error::ApiError, response::json_success, state::ApiState,
@@ -182,28 +186,30 @@ async fn associate_pull_request(
 }
 
 fn build_create_task_request(body: CreateTaskBody) -> CreateTaskFromIssueRequest {
-    let base_request = CreateTaskFromIssueRequest::new(
-        body.provider,
-        body.repository,
-        body.issue_number,
-        body.title,
-    );
-    let with_description = match body.description {
-        Some(description) => base_request.with_description(description),
-        None => base_request,
-    };
-    let with_labels = match body.labels {
-        Some(labels) => with_description.with_labels(labels),
-        None => with_description,
-    };
-    let with_assignees = match body.assignees {
-        Some(assignees) => with_labels.with_assignees(assignees),
-        None => with_labels,
-    };
-    match body.milestone {
-        Some(milestone) => with_assignees.with_milestone(milestone),
-        None => with_assignees,
-    }
+    let CreateTaskBody {
+        provider,
+        repository,
+        issue_number,
+        title,
+        description,
+        labels,
+        assignees,
+        milestone,
+    } = body;
+    let base_request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
+    let mut req = description
+        .into_iter()
+        .fold(base_request, CreateTaskFromIssueRequest::with_description);
+    req = labels
+        .into_iter()
+        .fold(req, CreateTaskFromIssueRequest::with_labels);
+    req = assignees
+        .into_iter()
+        .fold(req, CreateTaskFromIssueRequest::with_assignees);
+    req = milestone
+        .into_iter()
+        .fold(req, CreateTaskFromIssueRequest::with_milestone);
+    req
 }
 
 fn parse_task_id(raw: &str) -> Result<TaskId, ApiError> {

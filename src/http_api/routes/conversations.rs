@@ -1,4 +1,8 @@
-//! Conversation HTTP routes.
+//! Registers the `/api/v1/conversations` endpoints for creating
+//! conversations, reading conversation history, and appending messages, which
+//! together manage conversation resources and return conversation data.
+//! [`routes`] is the public entrypoint used to mount these handlers on the
+//! API router.
 
 use super::super::{
     auth::AuthenticatedRequestContext, error::ApiError, response::json_success, state::ApiState,
