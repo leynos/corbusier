@@ -7,9 +7,9 @@ use rstest_bdd_macros::given;
 async fn authenticated_http_api_client(
     world: &mut Result<HttpApiWorld, eyre::Report>,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
+    let current_world = world_mut(world)?;
     eyre::ensure!(
-        world.token.is_some(),
+        current_world.token.is_some(),
         "expected authenticated client token to be configured"
     );
     Ok(())
@@ -19,8 +19,8 @@ async fn authenticated_http_api_client(
 async fn unauthenticated_http_api_client(
     world: &mut Result<HttpApiWorld, eyre::Report>,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world.token = None;
+    let current_world = world_mut(world)?;
+    current_world.token = None;
     Ok(())
 }
 
@@ -28,8 +28,8 @@ async fn unauthenticated_http_api_client(
 async fn created_draft_task_through_api(
     world: &mut Result<HttpApiWorld, eyre::Report>,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world
+    let current_world = world_mut(world)?;
+    current_world
         .send(
             actix_web::test::TestRequest::post()
                 .uri("/api/v1/tasks")
@@ -41,7 +41,7 @@ async fn created_draft_task_through_api(
                 })),
         )
         .await?;
-    let task_id = world.last_body.as_ref().map_or_else(
+    let task_id = current_world.last_body.as_ref().map_or_else(
         || Err(eyre::eyre!("task id should be present")),
         |body| {
             Ok(
@@ -50,6 +50,6 @@ async fn created_draft_task_through_api(
             )
         },
     )?;
-    world.task_id = Some(task_id);
+    current_world.task_id = Some(task_id);
     Ok(())
 }

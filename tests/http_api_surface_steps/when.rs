@@ -8,11 +8,11 @@ use serde_json::json;
 async fn create_conversation(
     world: &mut Result<HttpApiWorld, eyre::Report>,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world
+    let current_world = world_mut(world)?;
+    current_world
         .send(actix_web::test::TestRequest::post().uri("/api/v1/conversations"))
         .await?;
-    let conversation_id = world
+    current_world.conversation_id = current_world
         .last_body
         .as_ref()
         .and_then(|body| {
@@ -21,9 +21,7 @@ async fn create_conversation(
                 .and_then(|conversation| conversation.get("id"))
                 .and_then(serde_json::Value::as_str)
         })
-        .map(String::from)
-        .ok_or_else(|| eyre::eyre!("conversation id should be present in response"))?;
-    world.conversation_id = Some(conversation_id);
+        .map(String::from);
     Ok(())
 }
 
@@ -33,12 +31,12 @@ async fn append_message(
     message: String,
     role: String,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    let conversation_id = world
+    let current_world = world_mut(world)?;
+    let conversation_id = current_world
         .conversation_id
         .clone()
         .ok_or_else(|| eyre::eyre!("conversation id should be created first"))?;
-    world
+    current_world
         .send(
             actix_web::test::TestRequest::post()
                 .uri(&format!("/api/v1/conversations/{conversation_id}/messages"))
@@ -54,12 +52,12 @@ async fn append_message(
 async fn request_conversation_history(
     world: &mut Result<HttpApiWorld, eyre::Report>,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    let conversation_id = world
+    let current_world = world_mut(world)?;
+    let conversation_id = current_world
         .conversation_id
         .clone()
         .ok_or_else(|| eyre::eyre!("conversation id should be created first"))?;
-    world
+    current_world
         .send(
             actix_web::test::TestRequest::get()
                 .uri(&format!("/api/v1/conversations/{conversation_id}/history")),
@@ -73,8 +71,8 @@ async fn create_task_from_issue(
     issue_number: u64,
     repository: String,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world
+    let current_world = world_mut(world)?;
+    current_world
         .send(
             actix_web::test::TestRequest::post()
                 .uri("/api/v1/tasks")
@@ -86,7 +84,7 @@ async fn create_task_from_issue(
                 })),
         )
         .await?;
-    let task_id = world
+    let task_id = current_world
         .last_body
         .as_ref()
         .and_then(|body| {
@@ -97,7 +95,7 @@ async fn create_task_from_issue(
         })
         .map(String::from)
         .ok_or_else(|| eyre::eyre!("task id should be present in response"))?;
-    world.task_id = Some(task_id);
+    current_world.task_id = Some(task_id);
     Ok(())
 }
 
@@ -106,12 +104,12 @@ async fn transition_task_state(
     world: &mut Result<HttpApiWorld, eyre::Report>,
     state: String,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    let task_id = world
+    let current_world = world_mut(world)?;
+    let task_id = current_world
         .task_id
         .clone()
         .ok_or_else(|| eyre::eyre!("task id should be present"))?;
-    world
+    current_world
         .send(
             actix_web::test::TestRequest::put()
                 .uri(&format!("/api/v1/tasks/{task_id}/state"))
@@ -122,8 +120,8 @@ async fn transition_task_state(
 
 #[when("I list tools through the API")]
 async fn list_tools(world: &mut Result<HttpApiWorld, eyre::Report>) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world
+    let current_world = world_mut(world)?;
+    current_world
         .send(actix_web::test::TestRequest::get().uri("/api/v1/tools"))
         .await
 }
@@ -133,8 +131,8 @@ async fn call_tool(
     world: &mut Result<HttpApiWorld, eyre::Report>,
     tool_name: String,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
-    world
+    let current_world = world_mut(world)?;
+    current_world
         .send(
             actix_web::test::TestRequest::post()
                 .uri("/api/v1/tools/calls")

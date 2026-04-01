@@ -6,8 +6,8 @@ use rstest_bdd_macros::then;
 fn last_body(
     world: &Result<HttpApiWorld, eyre::Report>,
 ) -> Result<&serde_json::Value, eyre::Report> {
-    let world = world_ref(world)?;
-    world
+    let current_world = world_ref(world)?;
+    current_world
         .last_body
         .as_ref()
         .ok_or_else(|| eyre::eyre!("response body should exist"))
@@ -18,12 +18,12 @@ async fn response_status_is(
     world: &mut Result<HttpApiWorld, eyre::Report>,
     expected_status: u16,
 ) -> Result<(), eyre::Report> {
-    let world = world_mut(world)?;
+    let current_world = world_mut(world)?;
     eyre::ensure!(
-        world.last_status == Some(expected_status),
+        current_world.last_status == Some(expected_status),
         "expected response status {:?}, got {:?}",
         Some(expected_status),
-        world.last_status
+        current_world.last_status
     );
     Ok(())
 }
@@ -56,12 +56,17 @@ async fn response_metadata_version_is(
 async fn conversation_history_includes_messages(
     world: &mut Result<HttpApiWorld, eyre::Report>,
     expected_count: usize,
-) {
+) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
     let messages = required_field(required_field(body, "data"), "messages")
         .as_array()
         .unwrap_or_else(|| panic!("messages array should be present"));
-    assert_eq!(messages.len(), expected_count);
+    eyre::ensure!(
+        messages.len() == expected_count,
+        "expected {expected_count} messages, got {}",
+        messages.len()
+    );
+    Ok(())
 }
 
 #[then("the task is returned in the response")]
@@ -99,7 +104,10 @@ async fn task_state_is(
 }
 
 #[then(r"the response includes {expected_tools:usize} tool")]
-async fn response_includes_tool(world: &mut Result<HttpApiWorld, eyre::Report>, expected_tools: usize) {
+async fn response_includes_tool(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+    expected_tools: usize,
+) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
     let tools = required_field(required_field(body, "data"), "tools")
         .as_array()
@@ -109,6 +117,7 @@ async fn response_includes_tool(world: &mut Result<HttpApiWorld, eyre::Report>, 
         "expected {expected_tools} tools, got {}",
         tools.len()
     );
+    Ok(())
 }
 
 #[then(r#"the tool call response names the tool "{tool_name}""#)]
