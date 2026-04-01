@@ -466,9 +466,9 @@ pub struct ReviewWorkflowProjection {
 - Review-linked conversation messages must preserve structured linkage under
   the reserved, versioned key `"review.linkage.v1"` inside
   `MessageMetadata.extensions` rather than flattening anchor metadata into the
-  top-level JSON object or into free text.  The extensions map is serialized as
-  an explicit `"extensions"` field (not via `serde(flatten)`) so that
-  workflow-specific keys never collide with known struct fields.
+  top-level JSON object or into free text.  The extensions map must be
+  serialized as an explicit `"extensions"` field (not via `serde(flatten)`) so
+  that workflow-specific keys never collide with known struct fields.
 
 #### Projection DTOs
 

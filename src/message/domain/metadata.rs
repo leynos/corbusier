@@ -159,6 +159,51 @@ impl MessageMetadata {
         self
     }
 
+    /// Adds structured review linkage data under the reserved, versioned
+    /// namespace key `"review.linkage.v1"`.
+    ///
+    /// This groups all review-specific anchor fields into a single JSON
+    /// object, preventing key collisions with top-level extension keys
+    /// and making schema evolution predictable.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use corbusier::message::domain::{MessageMetadata, ReviewLinkage};
+    ///
+    /// let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
+    ///     .with_file_path("src/lib.rs")
+    ///     .with_commit_sha("abc123");
+    /// let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+    /// let ext = metadata.extensions.get("review.linkage.v1").unwrap();
+    /// assert_eq!(ext["review_comment_id"], "rc-42");
+    /// assert_eq!(ext["reviewer"], "alice");
+    /// ```
+    #[must_use]
+    pub fn with_review_linkage(self, linkage: ReviewLinkage) -> Self {
+        let mut obj = serde_json::Map::new();
+        obj.insert(
+            "review_comment_id".to_owned(),
+            Value::String(linkage.review_comment_id),
+        );
+        obj.insert(
+            "thread_root_id".to_owned(),
+            Value::String(linkage.thread_root_id),
+        );
+        obj.insert("reviewer".to_owned(), Value::String(linkage.reviewer));
+        if let Some(path) = linkage.file_path {
+            obj.insert("file_path".to_owned(), Value::String(path));
+        }
+        if let Some(sha) = linkage.commit_sha {
+            obj.insert("commit_sha".to_owned(), Value::String(sha));
+        }
+        obj.insert(
+            "verification_status".to_owned(),
+            Value::String(linkage.verification_status),
+        );
+        self.with_extension("review.linkage.v1", Value::Object(obj))
+    }
+
     /// Sets the handoff metadata.
     #[must_use]
     pub fn with_handoff_metadata(mut self, handoff: HandoffMetadata) -> Self {
@@ -218,6 +263,63 @@ impl SlashCommandExpansion {
     #[must_use]
     pub fn with_parameter(mut self, key: impl Into<String>, value: Value) -> Self {
         self.parameters.insert(key.into(), value);
+        self
+    }
+}
+
+/// Structured review linkage data stored under the reserved, versioned
+/// namespace key `"review.linkage.v1"` inside `MessageMetadata.extensions`.
+///
+/// Groups review-comment anchoring fields into a single typed object so
+/// that schema evolution and deserialization remain predictable.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReviewLinkage {
+    /// Identifier of the review comment in the external VCS provider.
+    pub review_comment_id: String,
+    /// Root comment identifier that anchors the review thread.
+    pub thread_root_id: String,
+    /// Login or display name of the reviewer.
+    pub reviewer: String,
+    /// Source file path the comment is anchored to (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    /// Commit SHA the comment is anchored to (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit_sha: Option<String>,
+    /// Current verification status of the review linkage.
+    pub verification_status: String,
+}
+
+impl ReviewLinkage {
+    /// Creates a new review linkage with the required fields.
+    #[must_use]
+    pub fn new(
+        review_comment_id: impl Into<String>,
+        thread_root_id: impl Into<String>,
+        reviewer: impl Into<String>,
+        verification_status: impl Into<String>,
+    ) -> Self {
+        Self {
+            review_comment_id: review_comment_id.into(),
+            thread_root_id: thread_root_id.into(),
+            reviewer: reviewer.into(),
+            file_path: None,
+            commit_sha: None,
+            verification_status: verification_status.into(),
+        }
+    }
+
+    /// Sets the file path anchor.
+    #[must_use]
+    pub fn with_file_path(mut self, path: impl Into<String>) -> Self {
+        self.file_path = Some(path.into());
+        self
+    }
+
+    /// Sets the commit SHA anchor.
+    #[must_use]
+    pub fn with_commit_sha(mut self, sha: impl Into<String>) -> Self {
+        self.commit_sha = Some(sha.into());
         self
     }
 }

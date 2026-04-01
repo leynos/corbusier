@@ -6,8 +6,8 @@
 )]
 
 use crate::message::domain::{
-    AgentResponseAudit, AgentResponseStatus, AttachmentPart, MessageMetadata, Role, TextPart,
-    ToolCallAudit, ToolCallPart, ToolCallStatus, ToolResultPart, TurnId,
+    AgentResponseAudit, AgentResponseStatus, AttachmentPart, MessageMetadata, ReviewLinkage, Role,
+    TextPart, ToolCallAudit, ToolCallPart, ToolCallStatus, ToolResultPart, TurnId,
 };
 use rstest::rstest;
 use serde_json::json;
@@ -225,4 +225,91 @@ fn agent_response_audit_builders() {
     assert_eq!(audit.response_id, Some("resp-1".to_owned()));
     assert_eq!(audit.model, Some("claude-3-opus".to_owned()));
     assert_eq!(audit.error, Some("none".to_owned()));
+}
+
+// ============================================================================
+// Review linkage extension tests
+// ============================================================================
+
+#[rstest]
+fn review_linkage_round_trip_serialization() {
+    let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
+        .with_file_path("src/lib.rs")
+        .with_commit_sha("abc123");
+    let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+
+    let json = serde_json::to_string(&metadata).expect("serialize");
+    let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
+
+    let ext = deserialized
+        .extensions
+        .get("review.linkage.v1")
+        .expect("review.linkage.v1 key present");
+    let recovered: ReviewLinkage =
+        serde_json::from_value(ext.clone()).expect("deserialize linkage");
+    assert_eq!(recovered.review_comment_id, "rc-42");
+    assert_eq!(recovered.thread_root_id, "thread-root-7");
+    assert_eq!(recovered.reviewer, "alice");
+    assert_eq!(recovered.file_path.as_deref(), Some("src/lib.rs"));
+    assert_eq!(recovered.commit_sha.as_deref(), Some("abc123"));
+    assert_eq!(recovered.verification_status, "pending");
+}
+
+#[rstest]
+fn review_linkage_with_absent_optional_fields() {
+    let linkage = ReviewLinkage::new("rc-99", "thread-root-1", "bob", "verified");
+    let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+
+    let json = serde_json::to_string(&metadata).expect("serialize");
+    let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
+
+    let ext = deserialized
+        .extensions
+        .get("review.linkage.v1")
+        .expect("review.linkage.v1 key present");
+    let recovered: ReviewLinkage =
+        serde_json::from_value(ext.clone()).expect("deserialize linkage");
+    assert_eq!(recovered.review_comment_id, "rc-99");
+    assert!(recovered.file_path.is_none());
+    assert!(recovered.commit_sha.is_none());
+    assert_eq!(recovered.verification_status, "verified");
+}
+
+#[rstest]
+fn review_linkage_does_not_collide_with_top_level_fields() {
+    let turn_id = TurnId::new();
+    let linkage = ReviewLinkage::new("rc-1", "thread-1", "reviewer", "pending")
+        .with_file_path("path.rs")
+        .with_commit_sha("deadbeef");
+    let metadata = MessageMetadata::with_agent_backend("claude")
+        .with_turn_id(turn_id)
+        .with_review_linkage(linkage);
+
+    let json = serde_json::to_string(&metadata).expect("serialize");
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse as Value");
+
+    // Top-level fields remain intact.
+    assert_eq!(
+        parsed
+            .get("agent_backend")
+            .and_then(serde_json::Value::as_str),
+        Some("claude"),
+    );
+    assert!(
+        parsed
+            .get("turn_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
+    );
+
+    // Review linkage lives under extensions, not at top level.
+    assert!(parsed.get("review_comment_id").is_none());
+    let nested = parsed
+        .get("extensions")
+        .and_then(|e| e.get("review.linkage.v1"))
+        .and_then(|l| l.get("review_comment_id"));
+    assert!(
+        nested.is_some(),
+        "review_comment_id nested under extensions"
+    );
 }

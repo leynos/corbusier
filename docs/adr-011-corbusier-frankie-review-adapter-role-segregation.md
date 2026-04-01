@@ -98,7 +98,7 @@ verification, and reply actions behind review-specific ports.
 Frankie stores review workflow state and Corbusier consumes it as a downstream
 integration feed.
 
-Table 1: Trade-offs for review-role segregation.
+Table 11.1.1: Trade-offs for review-role segregation.
 
 | Topic                                     | Option A | Option B | Option C |
 | ----------------------------------------- | -------- | -------- | -------- |

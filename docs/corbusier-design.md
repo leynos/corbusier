@@ -6288,7 +6288,7 @@ classDiagram
         +String commit_sha
         +PathBuf file_path
         +u32 original_line
-        +String diff_hunk
+        +Option~String~ diff_hunk
     }
 
     class ReviewThread {
@@ -8998,7 +8998,7 @@ tool call that Corbusier routes through MCP to a tool server and back as a
 formatted result.
 
 <!-- markdownlint-disable MD031 -->
-Table 8.1.1.1: MCP tool orchestration through Corbusier and a tool server.
+Table 6.3.1.1: MCP tool orchestration through Corbusier and a tool server.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -9589,7 +9589,7 @@ provisioning and command execution flowing through the encapsulation adapter to
 Podbot and the workspace container.
 
 <!-- markdownlint-disable MD031 -->
-Table 8.5.2.1: Encapsulation provider integration with Podbot.
+Table 6.3.3.1: Encapsulation provider integration with Podbot.
 ```mermaid
 sequenceDiagram
     participant Task as Task Service
@@ -9900,7 +9900,7 @@ validation moving through middleware, token verification, session checks, and
 user lookup before authorization succeeds.
 
 <!-- markdownlint-disable MD031 -->
-Table 8.6.4.1: Token validation pipeline across middleware and identity
+Table 6.4.1.1: Token validation pipeline across middleware and identity
 services.
 ```mermaid
 sequenceDiagram
