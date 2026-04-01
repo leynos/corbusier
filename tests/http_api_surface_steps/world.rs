@@ -3,7 +3,7 @@
 use actix_web::{App, http::header, test as actix_test, web};
 use corbusier::{
     context::RequestContext,
-    http_api::{ApiState, BearerTokenAuthenticator, api_routes},
+    http_api::{ApiConfig, ApiState, BearerTokenAuthenticator, api_routes},
     message::{
         adapters::memory::{InMemoryConversationRepository, InMemoryMessageRepository},
         services::ConversationService,
@@ -25,8 +25,8 @@ use corbusier::{
 use mockable::DefaultClock;
 use rstest::fixture;
 use serde_json::{Value, json};
-use std::sync::Arc;
 use std::future::Future;
+use std::sync::Arc;
 
 use crate::http_api_test_helpers::HttpApiAuth;
 
@@ -188,7 +188,7 @@ fn setup_file_tools_server(
                 }),
             )?],
         )
-        .map_err(|e| eyre::eyre!("tool catalog should be set: {e}"))?;
+        .map_err(|error| eyre::eyre!("tool catalog should be set: {error}"))?;
     infrastructure
         .host
         .set_tool_call_result(
@@ -196,7 +196,7 @@ fn setup_file_tools_server(
             "read_file",
             json!({"content": "hello from tool"}),
         )
-        .map_err(|e| eyre::eyre!("tool call result should be set: {e}"))?;
+        .map_err(|error| eyre::eyre!("tool call result should be set: {error}"))?;
     block_on_setup(async { infrastructure.lifecycle.start(ctx, server.id()).await })?;
     block_on_setup(async {
         infrastructure
@@ -207,8 +207,7 @@ fn setup_file_tools_server(
     Ok(())
 }
 
-#[fixture]
-pub fn world() -> Result<HttpApiWorld, eyre::Report> {
+fn build_world() -> Result<HttpApiWorld, eyre::Report> {
     let auth = HttpApiAuth::new(TEST_JWT_SECRET);
     let ctx = auth.request_context();
     let clock = Arc::new(DefaultClock);
@@ -216,6 +215,7 @@ pub fn world() -> Result<HttpApiWorld, eyre::Report> {
     let conversation_service = build_conversation_service(clock.clone());
     let task_service = build_task_service(clock.clone());
     let infrastructure = build_tool_infrastructure(clock.clone());
+    let token = auth.token()?;
 
     setup_file_tools_server(&ctx, &infrastructure)?;
 
@@ -224,13 +224,20 @@ pub fn world() -> Result<HttpApiWorld, eyre::Report> {
             conversation_service,
             task_service,
             infrastructure.tool_service,
-            BearerTokenAuthenticator::new(TEST_JWT_SECRET),
-            clock,
+            ApiConfig {
+                authenticator: BearerTokenAuthenticator::new(TEST_JWT_SECRET),
+                clock,
+            },
         ),
-        token: Some(auth.token()?),
+        token: Some(token),
         conversation_id: None,
         task_id: None,
         last_status: None,
         last_body: None,
     })
+}
+
+#[fixture]
+pub fn world() -> Result<HttpApiWorld, eyre::Report> {
+    build_world()
 }

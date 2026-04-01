@@ -10,6 +10,94 @@ use serde_json::{Value, json};
 use std::io;
 use tokio::runtime::Runtime;
 
+async fn create_conversation<F, Fut, B>(send: F, token: &str) -> Result<String, eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::post().uri("/api/v1/conversations"),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 201,
+        "expected create response status 201, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    assert_v1_metadata(&body);
+    Ok(required_str_field(
+        required_field(required_field(&body, "data"), "conversation"),
+        "id",
+    )
+    .to_owned())
+}
+
+async fn append_message<F, Fut, B>(
+    send: F,
+    token: &str,
+    conversation_id: &str,
+) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::post()
+            .uri(&format!("/api/v1/conversations/{conversation_id}/messages"))
+            .set_json(json!({
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello over HTTP" }]
+            })),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 201,
+        "expected append response status 201, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    assert_v1_metadata(&body);
+    Ok(())
+}
+
+async fn assert_history_has_one_message<F, Fut, B>(
+    send: F,
+    token: &str,
+    conversation_id: &str,
+) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_web::test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
+    B: actix_web::body::MessageBody,
+{
+    let response = send(with_bearer(
+        actix_web::test::TestRequest::get()
+            .uri(&format!("/api/v1/conversations/{conversation_id}/history")),
+        token,
+    ))
+    .await;
+    eyre::ensure!(
+        response.status().as_u16() == 200,
+        "expected history response status 200, got {}",
+        response.status().as_u16()
+    );
+    let body: Value = actix_web::test::read_body_json(response).await;
+    assert_v1_metadata(&body);
+    eyre::ensure!(
+        required_field(required_field(&body, "data"), "messages")
+            .as_array()
+            .map(Vec::len)
+            == Some(1),
+        "expected exactly one message in history"
+    );
+    Ok(())
+}
+
 #[rstest]
 fn authenticated_conversation_flow(runtime: io::Result<Runtime>) -> Result<(), eyre::Report> {
     let rt = runtime?;
@@ -23,65 +111,23 @@ fn authenticated_conversation_flow(runtime: io::Result<Runtime>) -> Result<(), e
         )
         .await;
 
-        let create_request = with_bearer(
-            actix_web::test::TestRequest::post().uri("/api/v1/conversations"),
+        let conversation_id = create_conversation(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
         )
-        .to_request();
-        let create_response = actix_web::test::call_service(&app, create_request).await;
-        eyre::ensure!(
-            create_response.status().as_u16() == 201,
-            "expected create response status 201, got {}",
-            create_response.status().as_u16()
-        );
-        let create_body: Value = actix_web::test::read_body_json(create_response).await;
-        assert_v1_metadata(&create_body);
-        let conversation_id = required_str_field(
-            required_field(required_field(&create_body, "data"), "conversation"),
-            "id",
-        )
-        .to_owned();
-
-        let append_request = with_bearer(
-            actix_web::test::TestRequest::post()
-                .uri(&format!("/api/v1/conversations/{conversation_id}/messages"))
-                .set_json(json!({
-                    "role": "user",
-                    "content": [{ "type": "text", "text": "Hello over HTTP" }]
-                })),
+        .await?;
+        append_message(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
+            &conversation_id,
         )
-        .to_request();
-        let append_response = actix_web::test::call_service(&app, append_request).await;
-        eyre::ensure!(
-            append_response.status().as_u16() == 201,
-            "expected append response status 201, got {}",
-            append_response.status().as_u16()
-        );
-        let append_body: Value = actix_web::test::read_body_json(append_response).await;
-        assert_v1_metadata(&append_body);
-
-        let history_request = with_bearer(
-            actix_web::test::TestRequest::get()
-                .uri(&format!("/api/v1/conversations/{conversation_id}/history")),
+        .await?;
+        assert_history_has_one_message(
+            |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
+            &conversation_id,
         )
-        .to_request();
-        let history_response = actix_web::test::call_service(&app, history_request).await;
-        eyre::ensure!(
-            history_response.status().as_u16() == 200,
-            "expected history response status 200, got {}",
-            history_response.status().as_u16()
-        );
-        let history_body: Value = actix_web::test::read_body_json(history_response).await;
-        assert_v1_metadata(&history_body);
-        eyre::ensure!(
-            required_field(required_field(&history_body, "data"), "messages")
-                .as_array()
-                .map(Vec::len)
-                == Some(1),
-            "expected exactly one message in history"
-        );
+        .await?;
 
         Ok(())
     })

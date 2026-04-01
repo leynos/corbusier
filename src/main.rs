@@ -133,12 +133,20 @@ fn build_api_state() -> std::io::Result<ApiState> {
 }
 
 fn required_env(name: &str) -> std::io::Result<String> {
-    std::env::var(name).map_err(|_| {
+    let value = std::env::var(name).map_err(|_| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!("missing required environment variable: {name}"),
         )
-    })
+    })?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("required environment variable is empty: {name}"),
+        ));
+    }
+    Ok(trimmed.to_owned())
 }
 
 fn build_pg_pool(database_url: &str) -> std::io::Result<PgPool> {

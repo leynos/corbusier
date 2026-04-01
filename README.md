@@ -103,7 +103,7 @@ make build
 
 The `.factory/settings.json` file configures the local Factory Droid plugin
 used for development support. `core@factory-plugins` provides local development
-servers, scaffolding, and CI helpers. For the HTTP API integration tests it
+servers, scaffolding, and CI helpers. For the HTTP API integration tests, it
 supplies fixtures and mock services, but it does not affect the runtime HTTP
 logic.
 

@@ -11,16 +11,13 @@ use std::io;
 use tokio::runtime::Runtime;
 
 #[rstest]
-fn tool_routes_list_and_call_catalogued_tools(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+fn tool_routes_list_and_call_catalogued_tools(
+    runtime: io::Result<Runtime>,
+) -> Result<(), eyre::Report> {
+    let rt = runtime?;
     rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let token = bundle
-            .auth
-            .token()
-            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+        let bundle = build_bundle().await?;
+        let token = bundle.auth.token()?;
         let app = actix_web::test::init_service(
             App::new()
                 .app_data(web::Data::new(bundle.state))
@@ -34,14 +31,19 @@ fn tool_routes_list_and_call_catalogued_tools(runtime: io::Result<Runtime>) {
         )
         .to_request();
         let list_response = actix_web::test::call_service(&app, list_request).await;
-        assert_eq!(list_response.status().as_u16(), 200);
+        eyre::ensure!(
+            list_response.status().as_u16() == 200,
+            "expected list response status 200, got {}",
+            list_response.status().as_u16()
+        );
         let list_body: Value = actix_web::test::read_body_json(list_response).await;
         assert_v1_metadata(&list_body);
-        assert_eq!(
+        eyre::ensure!(
             required_field(required_field(&list_body, "data"), "tools")
                 .as_array()
-                .map(Vec::len),
-            Some(1)
+                .map(Vec::len)
+                == Some(1),
+            "expected exactly one tool in catalog"
         );
 
         let call_request = with_bearer(
@@ -55,18 +57,23 @@ fn tool_routes_list_and_call_catalogued_tools(runtime: io::Result<Runtime>) {
         )
         .to_request();
         let call_response = actix_web::test::call_service(&app, call_request).await;
-        assert_eq!(call_response.status().as_u16(), 200);
+        eyre::ensure!(
+            call_response.status().as_u16() == 200,
+            "expected tool call response status 200, got {}",
+            call_response.status().as_u16()
+        );
         let call_body: Value = actix_web::test::read_body_json(call_response).await;
         assert_v1_metadata(&call_body);
-        assert_eq!(
+        eyre::ensure!(
             *required_field(
                 required_field(
                     required_field(required_field(&call_body, "data"), "outcome"),
                     "Success"
                 ),
                 "content"
-            ),
-            json!({ "content": "hello from tool" })
+            ) == json!({ "content": "hello from tool" }),
+            "expected tool call content payload to match fixture result"
         );
-    });
+        Ok(())
+    })
 }
