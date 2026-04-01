@@ -11,6 +11,9 @@ slash-command metadata, a directives registry, AI suggestions, and "System"
 registry pages (personnel, agent backends, Model Context Protocol (MCP) tool
 registry, hooks and policies, monitoring, and tenant management).
 
+The repository-level adoption strategy for that frontend contract is proposed
+in [RFC 0001](rfcs/0001-adopt-corbusier-front-end-pwa.md).
+
 The existing Corbusier backend already has several strong anchors: a task
 aggregate with a typed state machine and origin metadata, a message subsystem
 with immutable messages, polymorphic content parts (text, tool call, tool
