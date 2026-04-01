@@ -26,6 +26,8 @@ diesel::table! {
         created_at -> Timestamptz,
         /// When the conversation was last updated.
         updated_at -> Timestamptz,
+        /// Tenant identifier for row-level security.
+        tenant_id -> Uuid,
     }
 }
 
@@ -49,6 +51,8 @@ diesel::table! {
         created_at -> Timestamptz,
         /// Sequence number for ordering within the conversation.
         sequence_number -> Int8,
+        /// Tenant identifier for row-level security.
+        tenant_id -> Uuid,
     }
 }
 

@@ -72,30 +72,31 @@ async fn create_task(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
     body: web::Json<CreateTaskBody>,
-) -> Result<HttpResponse, ApiError> {
+) -> HttpResponse {
     let request = build_create_task_request(body.into_inner());
-    let task = state.tasks.create_task(auth.context(), request).await?;
-    Ok(json_success(
-        StatusCode::CREATED,
-        TaskResponse { task },
-        auth.request_id(),
-    ))
+    match state.tasks.create_task(auth.context(), request).await {
+        Ok(task) => json_success(
+            StatusCode::CREATED,
+            TaskResponse { task },
+            auth.request_id(),
+        ),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
 async fn get_task(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
     path: web::Path<TaskPath>,
-) -> Result<HttpResponse, ApiError> {
-    let task = state
-        .tasks
-        .get_task(auth.context(), parse_task_id(&path.task_id)?)
-        .await?;
-    Ok(json_success(
-        StatusCode::OK,
-        TaskResponse { task },
-        auth.request_id(),
-    ))
+) -> HttpResponse {
+    let task_id = match parse_task_id(&path.task_id) {
+        Ok(id) => id,
+        Err(err) => return err.into_response(auth.request_id()),
+    };
+    match state.tasks.get_task(auth.context(), task_id).await {
+        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, auth.request_id()),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
 async fn transition_task(
@@ -103,38 +104,37 @@ async fn transition_task(
     auth: AuthenticatedRequestContext,
     path: web::Path<TaskPath>,
     body: web::Json<TransitionTaskBody>,
-) -> Result<HttpResponse, ApiError> {
-    let task_id = parse_task_id(&path.task_id)?;
-    let task = state
+) -> HttpResponse {
+    let task_id = match parse_task_id(&path.task_id) {
+        Ok(id) => id,
+        Err(err) => return err.into_response(auth.request_id()),
+    };
+    match state
         .tasks
         .transition_task(
             auth.context(),
             TransitionTaskRequest::new(task_id, body.into_inner().state),
         )
-        .await?;
-    Ok(json_success(
-        StatusCode::OK,
-        TaskResponse { task },
-        auth.request_id(),
-    ))
+        .await
+    {
+        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, auth.request_id()),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
-async fn association_response<F, Fut>(
-    task_id_str: &str,
-    request_id: String,
-    f: F,
-) -> Result<HttpResponse, ApiError>
+async fn association_response<F, Fut>(task_id_str: &str, request_id: String, f: F) -> HttpResponse
 where
     F: FnOnce(TaskId) -> Fut,
     Fut: std::future::Future<Output = Result<Task, ApiError>>,
 {
-    let task_id = parse_task_id(task_id_str)?;
-    let task = f(task_id).await?;
-    Ok(json_success(
-        StatusCode::OK,
-        TaskResponse { task },
-        request_id,
-    ))
+    let task_id = match parse_task_id(task_id_str) {
+        Ok(id) => id,
+        Err(err) => return err.into_response(request_id),
+    };
+    match f(task_id).await {
+        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, request_id),
+        Err(err) => err.into_response(request_id),
+    }
 }
 
 async fn associate_branch(
@@ -142,7 +142,7 @@ async fn associate_branch(
     auth: AuthenticatedRequestContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociateBranchBody>,
-) -> Result<HttpResponse, ApiError> {
+) -> HttpResponse {
     let payload = body.into_inner();
     association_response(&path.task_id, auth.request_id(), |task_id| async move {
         state
@@ -167,7 +167,7 @@ async fn associate_pull_request(
     auth: AuthenticatedRequestContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociatePullRequestBody>,
-) -> Result<HttpResponse, ApiError> {
+) -> HttpResponse {
     let payload = body.into_inner();
     association_response(&path.task_id, auth.request_id(), |task_id| async move {
         state

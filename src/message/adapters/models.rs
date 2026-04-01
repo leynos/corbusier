@@ -33,6 +33,8 @@ pub struct ConversationRow {
     pub created_at: DateTime<Utc>,
     /// When the conversation was last updated.
     pub updated_at: DateTime<Utc>,
+    /// Tenant identifier for row-level security.
+    pub tenant_id: Uuid,
 }
 
 /// Data for inserting a new conversation.
@@ -51,6 +53,8 @@ pub struct NewConversation {
     pub created_at: DateTime<Utc>,
     /// When the conversation was last updated.
     pub updated_at: DateTime<Utc>,
+    /// Tenant identifier for row-level security.
+    pub tenant_id: Uuid,
 }
 
 use crate::message::domain::ConversationState;
@@ -58,7 +62,7 @@ use crate::message::domain::ConversationState;
 impl NewConversation {
     /// Creates a new conversation record with default state.
     #[must_use]
-    pub fn new(id: Uuid, now: DateTime<Utc>) -> Self {
+    pub fn new(id: Uuid, tenant_id: Uuid, now: DateTime<Utc>) -> Self {
         Self {
             id,
             task_id: None,
@@ -66,6 +70,7 @@ impl NewConversation {
             state: ConversationState::Active.as_str().to_owned(),
             created_at: now,
             updated_at: now,
+            tenant_id,
         }
     }
 }

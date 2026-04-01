@@ -18,7 +18,7 @@ fn new_conversation_sets_default_state() {
     let id = Uuid::new_v4();
     let now = Utc::now();
 
-    let conv = NewConversation::new(id, now);
+    let conv = NewConversation::new(id, Uuid::new_v4(), now);
 
     assert_eq!(conv.id, id);
     assert_eq!(conv.state, "active");
@@ -32,7 +32,7 @@ fn new_conversation_has_empty_context() {
     let id = Uuid::new_v4();
     let now = Utc::now();
 
-    let conv = NewConversation::new(id, now);
+    let conv = NewConversation::new(id, Uuid::new_v4(), now);
 
     assert!(conv.context.is_object());
     let context_obj = conv.context.as_object().expect("context should be object");
@@ -47,6 +47,7 @@ fn new_conversation_has_empty_context() {
 fn conversation_row_struct_holds_all_fields() {
     let id = Uuid::new_v4();
     let task_id = Some(Uuid::new_v4());
+    let tenant_id = Uuid::new_v4();
     let context = json!({"key": "value"});
     let state = "active".to_owned();
     let created_at = Utc::now();
@@ -59,6 +60,7 @@ fn conversation_row_struct_holds_all_fields() {
         state: state.clone(),
         created_at,
         updated_at,
+        tenant_id,
     };
 
     assert_eq!(row.id, id);
@@ -67,6 +69,7 @@ fn conversation_row_struct_holds_all_fields() {
     assert_eq!(row.state, state);
     assert_eq!(row.created_at, created_at);
     assert_eq!(row.updated_at, updated_at);
+    assert_eq!(row.tenant_id, tenant_id);
 }
 
 #[rstest]
@@ -78,6 +81,7 @@ fn conversation_row_clone_preserves_fields() {
         state: "completed".to_owned(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        tenant_id: Uuid::new_v4(),
     };
 
     let cloned = row.clone();
@@ -88,6 +92,7 @@ fn conversation_row_clone_preserves_fields() {
     assert_eq!(cloned.state, row.state);
     assert_eq!(cloned.created_at, row.created_at);
     assert_eq!(cloned.updated_at, row.updated_at);
+    assert_eq!(cloned.tenant_id, row.tenant_id);
 }
 
 #[rstest]
@@ -99,6 +104,7 @@ fn conversation_row_debug_format() {
         state: "active".to_owned(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        tenant_id: Uuid::nil(),
     };
 
     let debug_str = format!("{row:?}");

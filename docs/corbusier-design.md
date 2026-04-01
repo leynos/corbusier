@@ -8484,11 +8484,10 @@ claims and issues a fresh correlation ID per HTTP request.
 ###### Initial tenant-isolation limitation
 
 The HTTP adapter is authenticated and tenant-aware at the application layer,
-but conversation and message persistence are not yet fully isolated by schema
-or Row-Level Security. This remains blocked on roadmap items `2.5.2` and
-`2.5.3`, which will add tenant-owned schema columns plus enforced PostgreSQL
-policies. Until then, the HTTP API should be treated as an internal or trusted
-surface rather than a hardened multi-tenant boundary.
+and conversation and message persistence now include `tenant_id` schema columns
+per roadmap items `2.5.2` and `2.5.3`. Row-Level Security policies are
+partially implemented; additional enforcement will complete the hardened
+multi-tenant boundary.
 
 ###### MCP Authentication Integration
 

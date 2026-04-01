@@ -53,36 +53,45 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
 async fn create_conversation(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
-) -> Result<HttpResponse, ApiError> {
-    let conversation = state
+) -> HttpResponse {
+    match state
         .conversations
         .create_conversation(auth.context())
-        .await?;
-    Ok(json_success(
-        StatusCode::CREATED,
-        ConversationResponse { conversation },
-        auth.request_id(),
-    ))
+        .await
+    {
+        Ok(conversation) => json_success(
+            StatusCode::CREATED,
+            ConversationResponse { conversation },
+            auth.request_id(),
+        ),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
 async fn get_history(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
     path: web::Path<ConversationPath>,
-) -> Result<HttpResponse, ApiError> {
-    let conversation_id = parse_conversation_id(&path.conversation_id)?;
-    let messages = state
+) -> HttpResponse {
+    let conversation_id = match parse_conversation_id(&path.conversation_id) {
+        Ok(id) => id,
+        Err(err) => return err.into_response(auth.request_id()),
+    };
+    match state
         .conversations
         .history(auth.context(), conversation_id)
-        .await?;
-    Ok(json_success(
-        StatusCode::OK,
-        ConversationHistoryResponse {
-            conversation_id,
-            messages,
-        },
-        auth.request_id(),
-    ))
+        .await
+    {
+        Ok(messages) => json_success(
+            StatusCode::OK,
+            ConversationHistoryResponse {
+                conversation_id,
+                messages,
+            },
+            auth.request_id(),
+        ),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
 async fn append_message(
@@ -90,21 +99,27 @@ async fn append_message(
     auth: AuthenticatedRequestContext,
     path: web::Path<ConversationPath>,
     body: web::Json<AppendMessageBody>,
-) -> Result<HttpResponse, ApiError> {
-    let conversation_id = parse_conversation_id(&path.conversation_id)?;
+) -> HttpResponse {
+    let conversation_id = match parse_conversation_id(&path.conversation_id) {
+        Ok(id) => id,
+        Err(err) => return err.into_response(auth.request_id()),
+    };
     let payload = body.into_inner();
-    let message = state
+    match state
         .conversations
         .append_message(
             auth.context(),
             AppendMessageRequest::new(conversation_id, payload.role, payload.content),
         )
-        .await?;
-    Ok(json_success(
-        StatusCode::CREATED,
-        MessageResponse { message },
-        auth.request_id(),
-    ))
+        .await
+    {
+        Ok(message) => json_success(
+            StatusCode::CREATED,
+            MessageResponse { message },
+            auth.request_id(),
+        ),
+        Err(err) => ApiError::from(err).into_response(auth.request_id()),
+    }
 }
 
 fn parse_conversation_id(raw: &str) -> Result<ConversationId, ApiError> {
