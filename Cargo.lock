@@ -704,6 +704,7 @@ dependencies = [
 name = "corbusier"
 version = "0.1.0"
 dependencies = [
+ "actix-http",
  "actix-web",
  "async-trait",
  "bytes",

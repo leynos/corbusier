@@ -24,7 +24,7 @@ async fn response_metadata_version_is(world: &mut HttpApiWorld, expected_version
     assert!(required_field(metadata, "timestamp").is_string());
 }
 
-#[then(r"the conversation history includes {expected_count:usize} messages?")]
+#[then(r"the conversation history includes {expected_count:usize} message")]
 async fn conversation_history_includes_messages(world: &mut HttpApiWorld, expected_count: usize) {
     let body = last_body(world);
     let messages = required_field(required_field(body, "data"), "messages")

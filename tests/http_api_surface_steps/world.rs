@@ -171,7 +171,7 @@ fn setup_file_tools_server(
                 RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
             )
             .await
-    })?;
+    })??;
     infrastructure
         .host
         .set_tool_catalog(
@@ -195,8 +195,9 @@ fn setup_file_tools_server(
             json!({"content": "hello from tool"}),
         )
         .map_err(|e| eyre::eyre!("tool call result should be set: {e}"))?;
-    block_on_setup(async { infrastructure.lifecycle.start(ctx, server.id()).await })?;
-    block_on_setup(async {
+    let _start_result =
+        block_on_setup(async { infrastructure.lifecycle.start(ctx, server.id()).await })?;
+    let _discover_result = block_on_setup(async {
         infrastructure
             .tool_service
             .discover_and_persist_tools(ctx, server.id())

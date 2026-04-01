@@ -120,27 +120,6 @@ fn assert_v1_metadata(body: &Value) {
     assert!(required_field(metadata, "timestamp").is_string());
 }
 
-async fn assert_rejects_token<S, B>(app: &S, token: &str) -> Value
-where
-    S: actix_web::dev::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<B>,
-            Error = actix_web::Error,
-        >,
-    B: actix_web::body::MessageBody,
-{
-    let request = with_bearer(
-        actix_test::TestRequest::post().uri("/api/v1/conversations"),
-        token,
-    )
-    .to_request();
-    let response = actix_test::call_service(app, request).await;
-    assert_eq!(response.status().as_u16(), 401);
-    let body: Value = actix_test::read_body_json(response).await;
-    assert_v1_metadata(&body);
-    body
-}
-
 fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
     value
         .get(key)
@@ -272,7 +251,15 @@ fn rejects_unsupported_tenant_kind(runtime: io::Result<Runtime>) {
         )
         .await;
 
-        let body = assert_rejects_token(&app, &token).await;
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
+        let body: Value = actix_test::read_body_json(response).await;
+        assert_v1_metadata(&body);
         assert!(
             required_str_field(required_field(&body, "error"), "message")
                 .contains("unsupported tenant kind"),
@@ -299,7 +286,14 @@ fn rejects_malformed_uuid_claims(runtime: io::Result<Runtime>) {
         )
         .await;
 
-        assert_rejects_token(&app, &token).await;
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
+        let _body: Value = actix_test::read_body_json(response).await;
     });
 }
 
@@ -321,7 +315,13 @@ fn rejects_expired_tokens(runtime: io::Result<Runtime>) {
         )
         .await;
 
-        assert_rejects_token(&app, &token).await;
+        let request = with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &token,
+        )
+        .to_request();
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status().as_u16(), 401);
     });
 }
 
