@@ -23,10 +23,25 @@ pub(crate) struct HandoffInsert {
 
 #[derive(Clone, Copy)]
 pub(crate) struct ContextSnapshotInsert {
-    pub snapshot: Uuid,
+    pub snapshot: ContextSnapshotId,
     pub tenant: TenantId,
     pub conversation: ConversationId,
     pub session: AgentSessionId,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ContextSnapshotId(Uuid);
+
+impl ContextSnapshotId {
+    pub(crate) fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for ContextSnapshotId {
+    fn default() -> Self {
+        Self(Uuid::new_v4())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -170,7 +185,7 @@ pub(crate) fn insert_context_snapshot(
         "visible_tool_calls, token_estimate, captured_at, snapshot_type",
         ") VALUES ($1, $2, $3, $4, 1, 1, '{}'::jsonb, '[]'::jsonb, NULL, NOW(), 'checkpoint')"
     ))
-    .bind::<diesel::sql_types::Uuid, _>(params.snapshot)
+    .bind::<diesel::sql_types::Uuid, _>(params.snapshot.into_inner())
     .bind::<diesel::sql_types::Uuid, _>(params.tenant.into_inner())
     .bind::<diesel::sql_types::Uuid, _>(params.conversation.into_inner())
     .bind::<diesel::sql_types::Uuid, _>(params.session.into_inner())

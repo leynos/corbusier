@@ -38,14 +38,14 @@ pub(super) fn load_conflicting_name_counts(
         .map(|tool_names| {
             tool_names
                 .into_iter()
-                .fold(HashMap::new(), |mut counts, (tool_name, count)| {
-                    *counts.entry(tool_name).or_insert(0usize) =
-                        usize::try_from(count).unwrap_or_default();
-                    counts
-                })
+                .map(|(tool_name, count)| (tool_name, usize::try_from(count).unwrap_or_default()))
+                .collect::<HashMap<_, _>>()
         })
 }
 
+// Coupled to `idx_mcp_tool_catalog_tenant_tool_name` from migration
+// `2026-03-10-000000_add_tenant_id_to_tool_registry`; update this string and
+// any duplicate-detection tests if that migration or index name changes.
 fn is_catalog_name_unique_violation(info: &dyn DatabaseErrorInformation) -> bool {
     info.constraint_name()
         .is_some_and(|name| name == "idx_mcp_tool_catalog_tenant_tool_name")

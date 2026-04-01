@@ -18,8 +18,9 @@ use crate::postgres::helpers::{
     test_request_ctx,
 };
 use helpers::{
-    AgentSessionInsert, ContextSnapshotInsert, HandoffInsert, insert_agent_session,
-    insert_context_snapshot, insert_conversation, insert_handoff, insert_message, insert_task,
+    AgentSessionInsert, ContextSnapshotId, ContextSnapshotInsert, HandoffInsert,
+    insert_agent_session, insert_context_snapshot, insert_conversation, insert_handoff,
+    insert_message, insert_task,
 };
 
 struct TenantConstraintContext {
@@ -375,7 +376,7 @@ fn insert_context_snapshot_session_case(
     insert_context_snapshot(
         tx,
         ContextSnapshotInsert {
-            snapshot: Uuid::new_v4(),
+            snapshot: ContextSnapshotId::default(),
             tenant: tenant_b,
             conversation,
             session,
@@ -393,7 +394,7 @@ fn insert_context_snapshot_conversation_case(
     insert_context_snapshot(
         tx,
         ContextSnapshotInsert {
-            snapshot: Uuid::new_v4(),
+            snapshot: ContextSnapshotId::default(),
             tenant: tenant_b,
             conversation,
             session,

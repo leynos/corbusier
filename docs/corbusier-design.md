@@ -1592,9 +1592,10 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
   `(session_id, tenant_id) -> agent_sessions(id, tenant_id)`.
 - Because 1.5.2 introduces foreign keys to `tenants` before a dedicated tenant
   provisioning workflow exists, PostgreSQL write adapters lazily provision a
-  placeholder tenant row on first use of a `RequestContext.tenant_id()`. This
-  preserves the existing request contract while keeping explicit tenant
-  lifecycle management out of scope for this milestone.
+  placeholder tenant row on tenant-scoped write paths before persistence
+  operations. This preserves the existing request contract while keeping
+  explicit tenant lifecycle management out of scope for this milestone and does
+  not imply side effects for read-only access to `RequestContext.tenant_id()`.
 - `domain_events` and `audit_logs` remain outside the implemented 1.5.2
   migration boundary even though the later target-state schema sections in this
   document show them with `tenant_id`. Per the `docs/` knowledge-base guidance,

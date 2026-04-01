@@ -158,11 +158,12 @@ impl PostgresToolCatalog {
 
     fn acquire_sync_lock(
         connection: &mut PgConnection,
-        tenant_id: uuid::Uuid,
+        tenant_id: TenantId,
     ) -> ToolCatalogResult<()> {
+        let tenant_uuid = tenant_id.into_inner();
         diesel::sql_query(format!(
             "SELECT pg_advisory_xact_lock({})",
-            Self::advisory_lock_key(tenant_id)
+            Self::advisory_lock_key(tenant_uuid)
         ))
         .execute(connection)
         .map_err(|e| ToolCatalogError::persistence("advisory_lock", e))?;
@@ -176,12 +177,6 @@ impl PostgresToolCatalog {
         rows: &[NewCatalogEntryRow],
     ) -> Result<(), diesel::result::Error> {
         conn.transaction(|transaction| {
-            diesel::sql_query(format!(
-                "SELECT pg_advisory_xact_lock({})",
-                Self::advisory_lock_key(tenant_id)
-            ))
-            .execute(transaction)?;
-
             diesel::delete(
                 mcp_tool_catalog::table
                     .filter(mcp_tool_catalog::server_id.eq(server_id))
@@ -208,7 +203,7 @@ impl PostgresToolCatalog {
             rows.iter().map(|row| row.tool_name.clone()).collect();
 
         execute_query_with_bootstrap(&self.pool, tenant_id, move |connection| {
-            Self::acquire_sync_lock(connection, tenant_id.into_inner())?;
+            Self::acquire_sync_lock(connection, tenant_id)?;
 
             let existing_name_counts = sync_helpers::load_conflicting_name_counts(
                 connection,
