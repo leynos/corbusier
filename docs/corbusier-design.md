@@ -8653,8 +8653,8 @@ claims and issues a fresh correlation ID per HTTP request.
 
 The HTTP adapter is authenticated and tenant-aware at the application layer,
 but conversation and message persistence are not yet fully isolated by schema
-or Row-Level Security. This remains blocked on roadmap items `2.5.2` and
-`2.5.3`, which will add tenant-owned schema columns plus enforced PostgreSQL
+or Row-Level Security. This remains blocked on roadmap items `1.5.2` and
+`1.5.3`, which will add tenant-owned schema columns plus enforced PostgreSQL
 policies. Until then, the HTTP API should be treated as an internal or trusted
 surface rather than a hardened multi-tenant boundary.
 

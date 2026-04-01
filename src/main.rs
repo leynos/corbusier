@@ -90,6 +90,8 @@ fn build_api_state() -> std::io::Result<ApiState> {
         ServicePorts {
             catalog: Arc::new(PostgresToolCatalog::new(pool.clone())),
             registry: Arc::new(PostgresMcpServerRegistry::new(pool)),
+            // FIXME: InMemoryMcpServerHost is not persisted across restarts.
+            // Replace with a persistent host implementation before production.
             host: Arc::new(InMemoryMcpServerHost::new()),
             governance: Arc::new(AllowAllPolicy::new()),
             log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),

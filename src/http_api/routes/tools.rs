@@ -39,31 +39,26 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
         .service(web::resource("/tools/calls").route(web::post().to(call_tool)));
 }
 
-async fn list_tools(
-    state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
-) -> Result<HttpResponse, ApiError> {
-    let tools = state.tools.list_tools(auth.context()).await?;
-    Ok(json_success(
-        StatusCode::OK,
-        ToolCatalogResponse { tools },
-        auth.request_id(),
-    ))
+async fn list_tools(state: web::Data<ApiState>, auth: AuthenticatedRequestContext) -> HttpResponse {
+    let request_id = auth.request_id();
+    match state.tools.list_tools(auth.context()).await {
+        Ok(tools) => json_success(StatusCode::OK, ToolCatalogResponse { tools }, request_id),
+        Err(err) => ApiError::from(err).into_response(request_id),
+    }
 }
 
 async fn call_tool(
     state: web::Data<ApiState>,
     auth: AuthenticatedRequestContext,
     body: web::Json<ToolCallBody>,
-) -> Result<HttpResponse, ApiError> {
+) -> HttpResponse {
+    let request_id = auth.request_id();
     let payload = body.into_inner();
     let request = ToolCallRequest::new(payload.tool_name, payload.parameters, &DefaultClock);
-    let result = state.tools.call_tool(auth.context(), &request).await?;
-    Ok(json_success(
-        StatusCode::OK,
-        map_tool_call_result(&result),
-        auth.request_id(),
-    ))
+    match state.tools.call_tool(auth.context(), &request).await {
+        Ok(result) => json_success(StatusCode::OK, map_tool_call_result(&result), request_id),
+        Err(err) => ApiError::from(err).into_response(request_id),
+    }
 }
 
 fn map_tool_call_result(result: &ToolCallResult) -> ToolCallResponse {

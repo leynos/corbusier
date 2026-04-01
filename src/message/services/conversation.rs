@@ -24,11 +24,11 @@ pub struct AppendMessageRequest {
 impl AppendMessageRequest {
     /// Creates a request with required fields.
     #[must_use]
-    pub const fn new(
-        conversation_id: ConversationId,
-        role: Role,
-        content: Vec<ContentPart>,
-    ) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Kept non-const per design decision to allow future non-const initialisation"
+    )]
+    pub fn new(conversation_id: ConversationId, role: Role, content: Vec<ContentPart>) -> Self {
         Self {
             conversation_id,
             role,

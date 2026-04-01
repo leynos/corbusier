@@ -32,6 +32,31 @@ impl ConversationState {
     }
 }
 
+/// Error type for invalid conversation state strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConversationStateParseError(pub String);
+
+impl std::fmt::Display for ConversationStateParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown conversation state: {}", self.0)
+    }
+}
+
+impl std::error::Error for ConversationStateParseError {}
+
+impl TryFrom<&str> for ConversationState {
+    type Error = ConversationStateParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "active" => Ok(Self::Active),
+            "paused" => Ok(Self::Paused),
+            "archived" => Ok(Self::Archived),
+            _ => Err(ConversationStateParseError(value.to_owned())),
+        }
+    }
+}
+
 /// Conversation aggregate root.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Conversation {
