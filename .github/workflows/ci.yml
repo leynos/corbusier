@@ -19,11 +19,14 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@aebb3f5b831102e2a10ef909c83d7d50ea86c332
+      - name: Refresh apt package index
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: sudo apt-get update
       - name: Install OpenSSL headers for CI verification
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
           sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
       - name: Format
         run: make check-fmt
@@ -56,8 +59,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y tzdata
+          sudo apt-get install -y --no-install-recommends tzdata
           if [ ! -f ~/.cargo/bin/pg_worker ]; then
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
