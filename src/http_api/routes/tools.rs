@@ -1,4 +1,12 @@
-//! Tool HTTP routes.
+//! Tool HTTP routes for listing and invoking catalogued tools.
+//!
+//! This module exposes `GET /api/v1/tools`, which returns the authenticated
+//! tenant's available tool catalog and metadata, and `POST /api/v1/tools/calls`,
+//! which accepts a tool name plus JSON parameters and executes that tool
+//! asynchronously through the tool-routing service. Clients should use the list
+//! endpoint to discover callable tools and their descriptors before issuing a
+//! call request; both endpoints require authentication, and the call endpoint
+//! may trigger side effects depending on the selected tool.
 
 use super::super::{
     auth::AuthenticatedRequestContext, error::ApiError, response::json_success, state::ApiState,

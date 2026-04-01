@@ -78,9 +78,9 @@ impl HttpApiAuth {
     /// Encodes custom claims into a JWT.
     fn encode_custom_claims(
         &self,
-        claims: CustomJwtClaims,
+        claims: &CustomJwtClaims,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_claims(&claims)
+        self.encode_claims(claims)
     }
 
     /// Returns a token with the specified `tenant_kind` claim.
@@ -92,7 +92,7 @@ impl HttpApiAuth {
         &self,
         tenant_kind: impl Into<String>,
     ) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(CustomJwtClaims {
+        self.encode_custom_claims(&CustomJwtClaims {
             sub: self.user_id.to_string(),
             tenant_id: self.tenant_id.to_string(),
             session_id: self.session_id.to_string(),
@@ -108,7 +108,7 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn token_with_invalid_uuids(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(CustomJwtClaims {
+        self.encode_custom_claims(&CustomJwtClaims {
             sub: "not-a-uuid".to_owned(),
             tenant_id: "also-not-a-uuid".to_owned(),
             session_id: "still-not-a-uuid".to_owned(),
@@ -124,7 +124,7 @@ impl HttpApiAuth {
     ///
     /// Returns an error when the claims cannot be encoded as a JWT.
     pub fn expired_token(&self) -> Result<String, jsonwebtoken::errors::Error> {
-        self.encode_custom_claims(CustomJwtClaims {
+        self.encode_custom_claims(&CustomJwtClaims {
             sub: self.user_id.to_string(),
             tenant_id: self.tenant_id.to_string(),
             session_id: self.session_id.to_string(),
@@ -166,6 +166,13 @@ pub fn with_bearer(request: actix_test::TestRequest, token: &str) -> actix_test:
 }
 
 /// Asserts the standard v1 metadata envelope.
+///
+/// # Panics
+///
+/// Panics if the top-level `metadata` field is missing, if the `version` field
+/// is not equal to `"v1"`, or if `request_id` or `timestamp` are missing or
+/// not strings. This delegates the field presence checks to
+/// [`required_field`].
 pub fn assert_v1_metadata(body: &Value) {
     let metadata = required_field(body, "metadata");
     assert_eq!(required_field(metadata, "version"), "v1");

@@ -1,10 +1,7 @@
 //! Authentication tests for the in-memory HTTP API surface.
 
 use super::super::helpers::runtime;
-use super::support::{
-    assert_rejects_response, assert_v1_metadata, build_bundle, reject_conversations_request,
-    with_bearer,
-};
+use super::support::{assert_rejects_response, build_bundle, reject_conversations_request};
 use crate::http_api_test_helpers::{required_field, required_str_field};
 use actix_web::{App, web};
 use corbusier::http_api::api_routes;
@@ -13,111 +10,68 @@ use serde_json::Value;
 use std::io;
 use tokio::runtime::Runtime;
 
-#[rstest]
-fn rejects_missing_and_invalid_bearer_tokens(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
-    rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let app = actix_web::test::init_service(
-            App::new()
-                .app_data(web::Data::new(bundle.state))
-                .configure(api_routes),
-        )
-        .await;
+#[derive(Clone, Copy)]
+enum AuthRejectionCase {
+    Missing,
+    Invalid,
+    UnsupportedTenantKind,
+    MalformedUuids,
+    Expired,
+}
 
-        let missing_request = actix_web::test::TestRequest::post()
-            .uri("/api/v1/conversations")
-            .to_request();
-        let missing_response = actix_web::test::call_service(&app, missing_request).await;
-        assert_eq!(missing_response.status().as_u16(), 401);
-        let missing_body: Value = actix_web::test::read_body_json(missing_response).await;
-        assert_v1_metadata(&missing_body);
+async fn run_auth_rejection_case(auth_case: AuthRejectionCase) -> Result<Value, eyre::Report> {
+    let bundle = build_bundle().await?;
+    let token = match auth_case {
+        AuthRejectionCase::Missing => None,
+        AuthRejectionCase::Invalid => Some("not-a-jwt".to_owned()),
+        AuthRejectionCase::UnsupportedTenantKind => {
+            Some(bundle.auth.token_with_tenant_kind("service")?)
+        }
+        AuthRejectionCase::MalformedUuids => Some(bundle.auth.token_with_invalid_uuids()?),
+        AuthRejectionCase::Expired => Some(bundle.auth.expired_token()?),
+    };
+    let app = actix_web::test::init_service(
+        App::new()
+            .app_data(web::Data::new(bundle.state))
+            .configure(api_routes),
+    )
+    .await;
 
-        let invalid_request = with_bearer(
-            actix_web::test::TestRequest::post().uri("/api/v1/conversations"),
-            "not-a-jwt",
+    let request = token
+        .as_deref()
+        .map_or_else(
+            || actix_web::test::TestRequest::post().uri("/api/v1/conversations"),
+            reject_conversations_request,
         )
         .to_request();
-        let invalid_response = actix_web::test::call_service(&app, invalid_request).await;
-        assert_eq!(invalid_response.status().as_u16(), 401);
-        let invalid_body: Value = actix_web::test::read_body_json(invalid_response).await;
-        assert_v1_metadata(&invalid_body);
-    });
+
+    Ok(assert_rejects_response(actix_web::test::call_service(&app, request).await).await)
 }
 
 #[rstest]
-fn rejects_unsupported_tenant_kind(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+#[case::missing(AuthRejectionCase::Missing, None)]
+#[case::invalid(AuthRejectionCase::Invalid, None)]
+#[case::unsupported_tenant_kind(
+    AuthRejectionCase::UnsupportedTenantKind,
+    Some("unsupported tenant kind")
+)]
+#[case::malformed_uuids(AuthRejectionCase::MalformedUuids, None)]
+#[case::expired(AuthRejectionCase::Expired, None)]
+fn rejects_authentication_failures(
+    runtime: io::Result<Runtime>,
+    #[case] auth_case: AuthRejectionCase,
+    #[case] expected_message: Option<&str>,
+) -> Result<(), eyre::Report> {
+    let rt = runtime?;
     rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let token = bundle
-            .auth
-            .token_with_tenant_kind("service")
-            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
-        let app = actix_web::test::init_service(
-            App::new()
-                .app_data(web::Data::new(bundle.state))
-                .configure(api_routes),
-        )
-        .await;
-
-        let request = reject_conversations_request(&token).to_request();
-        let body =
-            assert_rejects_response(actix_web::test::call_service(&app, request).await).await;
-        assert!(
-            required_str_field(required_field(&body, "error"), "message")
-                .contains("unsupported tenant kind"),
-            "error message should mention unsupported tenant kind"
-        );
-    });
-}
-
-#[rstest]
-fn rejects_malformed_uuid_claims(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
-    rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let token = bundle
-            .auth
-            .token_with_invalid_uuids()
-            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
-        let app = actix_web::test::init_service(
-            App::new()
-                .app_data(web::Data::new(bundle.state))
-                .configure(api_routes),
-        )
-        .await;
-
-        let request = reject_conversations_request(&token).to_request();
-        assert_rejects_response(actix_web::test::call_service(&app, request).await).await;
-    });
-}
-
-#[rstest]
-fn rejects_expired_tokens(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
-    rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let token = bundle
-            .auth
-            .expired_token()
-            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
-        let app = actix_web::test::init_service(
-            App::new()
-                .app_data(web::Data::new(bundle.state))
-                .configure(api_routes),
-        )
-        .await;
-
-        let request = reject_conversations_request(&token).to_request();
-        assert_rejects_response(actix_web::test::call_service(&app, request).await).await;
-    });
+        let body = run_auth_rejection_case(auth_case).await?;
+        if let Some(expected_substr) = expected_message {
+            eyre::ensure!(
+                required_str_field(required_field(&body, "error"), "message")
+                    .contains(expected_substr),
+                "error message should mention {expected_substr}"
+            );
+        }
+        Ok(())
+    })
 }

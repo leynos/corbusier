@@ -11,16 +11,13 @@ use std::io;
 use tokio::runtime::Runtime;
 
 #[rstest]
-fn task_routes_support_create_get_and_transition(runtime: io::Result<Runtime>) {
-    let rt = runtime.unwrap_or_else(|err| panic!("runtime should be available: {err}"));
+fn task_routes_support_create_get_and_transition(
+    runtime: io::Result<Runtime>,
+) -> Result<(), eyre::Report> {
+    let rt = runtime?;
     rt.block_on(async {
-        let bundle = build_bundle()
-            .await
-            .unwrap_or_else(|err| panic!("bundle setup should succeed: {err}"));
-        let token = bundle
-            .auth
-            .token()
-            .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+        let bundle = build_bundle().await?;
+        let token = bundle.auth.token()?;
         let app = actix_web::test::init_service(
             App::new()
                 .app_data(web::Data::new(bundle.state))
@@ -41,7 +38,11 @@ fn task_routes_support_create_get_and_transition(runtime: io::Result<Runtime>) {
         )
         .to_request();
         let create_response = actix_web::test::call_service(&app, create_request).await;
-        assert_eq!(create_response.status().as_u16(), 201);
+        eyre::ensure!(
+            create_response.status().as_u16() == 201,
+            "expected create response status 201, got {}",
+            create_response.status().as_u16()
+        );
         let create_body: Value = actix_web::test::read_body_json(create_response).await;
         assert_v1_metadata(&create_body);
         let task_id = required_str_field(
@@ -56,7 +57,11 @@ fn task_routes_support_create_get_and_transition(runtime: io::Result<Runtime>) {
         )
         .to_request();
         let get_response = actix_web::test::call_service(&app, get_request).await;
-        assert_eq!(get_response.status().as_u16(), 200);
+        eyre::ensure!(
+            get_response.status().as_u16() == 200,
+            "expected get response status 200, got {}",
+            get_response.status().as_u16()
+        );
 
         let transition_request = with_bearer(
             actix_web::test::TestRequest::put()
@@ -66,15 +71,21 @@ fn task_routes_support_create_get_and_transition(runtime: io::Result<Runtime>) {
         )
         .to_request();
         let transition_response = actix_web::test::call_service(&app, transition_request).await;
-        assert_eq!(transition_response.status().as_u16(), 200);
+        eyre::ensure!(
+            transition_response.status().as_u16() == 200,
+            "expected transition response status 200, got {}",
+            transition_response.status().as_u16()
+        );
         let transition_body: Value = actix_web::test::read_body_json(transition_response).await;
-        assert_eq!(
+        eyre::ensure!(
             required_field(
                 required_field(required_field(&transition_body, "data"), "task"),
                 "state"
-            ),
-            "in_progress"
+            ) == "in_progress",
+            "expected transitioned task state to be in_progress"
         );
         assert_v1_metadata(&transition_body);
-    });
+
+        Ok(())
+    })
 }

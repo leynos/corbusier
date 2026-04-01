@@ -8540,7 +8540,8 @@ Actix Web provides middleware support for authentication, with
 actix_web_httpauth providing middleware that makes it simple to add
 authentication to any actix-based API:
 
-Table: API endpoints summary — base paths, methods, auth, and rate limits
+Table 6.3.1: API endpoints summary, including base paths, methods,
+authentication, and rate limits.
 
 | Endpoint Category | Base Path               | Methods               | Authentication   | Rate Limiting |
 | ----------------- | ----------------------- | --------------------- | ---------------- | ------------- |
@@ -8653,11 +8654,12 @@ claims and issues a fresh correlation ID per HTTP request.
 ###### Initial tenant-isolation limitation
 
 The HTTP adapter is authenticated and tenant-aware at the application layer,
-but conversation and message persistence are not yet fully isolated by schema
-or Row-Level Security. This remains blocked on roadmap items `1.5.2` and
-`1.5.3`, which will add tenant-owned schema columns plus enforced PostgreSQL
-policies. Until then, the HTTP API should be treated as an internal or trusted
-surface rather than a hardened multi-tenant boundary.
+and schema-level tenant scoping for conversation and message persistence has
+been implemented. The remaining caveat is database-enforced policy hardening:
+roadmap items `1.5.2` and `1.5.3` still need to land PostgreSQL Row-Level
+Security and related policies. Until those database policies are enforced, the
+HTTP API should be treated as an internal or trusted surface rather than a
+hardened multi-tenant boundary.
 
 ###### MCP Authentication Integration
 
