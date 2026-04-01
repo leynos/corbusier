@@ -3,6 +3,7 @@
 //! Provides raw SQL insert functions that bypass ORM validation to test
 //! database-level foreign key constraints.
 
+use chrono::{DateTime, Utc};
 use corbusier::context::TenantId;
 use corbusier::message::domain::{AgentSessionId, ConversationId, HandoffId, MessageId};
 use corbusier::task::domain::TaskId;
@@ -11,6 +12,13 @@ use diesel::RunQueryDsl;
 use diesel::pg::PgConnection;
 use serde_json::json;
 use uuid::Uuid;
+
+const INSERT_AGENT_SESSION_SQL: &str = concat!(
+    "INSERT INTO agent_sessions (",
+    "id, tenant_id, conversation_id, agent_backend, start_sequence, end_sequence, turn_ids, ",
+    "initiated_by_handoff, terminated_by_handoff, context_snapshots, started_at, ended_at, state",
+    ") VALUES ($1, $2, $3, 'agent', 1, NULL, '[]'::jsonb, NULL, NULL, '[]'::jsonb, NOW(), $4, $5)",
+);
 
 #[derive(Clone, Copy)]
 pub(crate) struct HandoffInsert {
@@ -130,25 +138,17 @@ pub(crate) fn insert_agent_session(
     params: AgentSessionInsert,
 ) -> diesel::QueryResult<usize> {
     ensure_tenant_exists(conn, params.tenant)?;
-    let sql = if params.is_active {
-        concat!(
-            "INSERT INTO agent_sessions (",
-            "id, tenant_id, conversation_id, agent_backend, start_sequence, end_sequence, turn_ids, ",
-            "initiated_by_handoff, terminated_by_handoff, context_snapshots, started_at, ended_at, state",
-            ") VALUES ($1, $2, $3, 'agent', 1, NULL, '[]'::jsonb, NULL, NULL, '[]'::jsonb, NOW(), NULL, 'active')",
-        )
+    let (ended_at, state): (Option<DateTime<Utc>>, &str) = if params.is_active {
+        (None, "active")
     } else {
-        concat!(
-            "INSERT INTO agent_sessions (",
-            "id, tenant_id, conversation_id, agent_backend, start_sequence, end_sequence, turn_ids, ",
-            "initiated_by_handoff, terminated_by_handoff, context_snapshots, started_at, ended_at, state",
-            ") VALUES ($1, $2, $3, 'agent', 1, NULL, '[]'::jsonb, NULL, NULL, '[]'::jsonb, NOW(), NOW(), 'completed')",
-        )
+        (Some(Utc::now()), "completed")
     };
-    diesel::sql_query(sql)
+    diesel::sql_query(INSERT_AGENT_SESSION_SQL)
         .bind::<diesel::sql_types::Uuid, _>(params.session.into_inner())
         .bind::<diesel::sql_types::Uuid, _>(params.tenant.into_inner())
         .bind::<diesel::sql_types::Uuid, _>(params.conversation.into_inner())
+        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Timestamptz>, _>(ended_at)
+        .bind::<diesel::sql_types::Text, _>(state)
         .execute(conn)
 }
 
