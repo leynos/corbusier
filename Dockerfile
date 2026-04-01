@@ -1,7 +1,8 @@
 FROM rust:1.94-slim-bookworm AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev perl pkg-config && rm -rf /var/lib/apt/lists/*
+    build-essential libpq-dev libssl-dev perl pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
+ENV OPENSSL_NO_VENDOR=1
 COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
 COPY migrations/ migrations/
