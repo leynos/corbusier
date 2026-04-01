@@ -176,21 +176,19 @@ impl PostgresToolCatalog {
         server_id: uuid::Uuid,
         rows: &[NewCatalogEntryRow],
     ) -> Result<(), diesel::result::Error> {
-        conn.transaction(|transaction| {
-            diesel::delete(
-                mcp_tool_catalog::table
-                    .filter(mcp_tool_catalog::server_id.eq(server_id))
-                    .filter(mcp_tool_catalog::tenant_id.eq(tenant_id)),
-            )
-            .execute(transaction)?;
+        diesel::delete(
+            mcp_tool_catalog::table
+                .filter(mcp_tool_catalog::server_id.eq(server_id))
+                .filter(mcp_tool_catalog::tenant_id.eq(tenant_id)),
+        )
+        .execute(conn)?;
 
-            if !rows.is_empty() {
-                diesel::insert_into(mcp_tool_catalog::table)
-                    .values(rows)
-                    .execute(transaction)?;
-            }
-            Ok(())
-        })
+        if !rows.is_empty() {
+            diesel::insert_into(mcp_tool_catalog::table)
+                .values(rows)
+                .execute(conn)?;
+        }
+        Ok(())
     }
 
     async fn run_sync_in_pool(

@@ -74,6 +74,10 @@ fn try_map_as_duplicate_entry(
         attempt.server_id,
         attempt.candidate_names,
     )
+    // `try_map_as_duplicate_entry` intentionally swallows
+    // `load_conflicting_name_counts` failures here so
+    // `duplicate_entry_from_counts` is skipped and the caller falls back to
+    // the generic persistence error path when the refresh query itself fails.
     .ok()?;
     duplicate_entry_from_counts(attempt.rows, &refreshed_counts)
 }

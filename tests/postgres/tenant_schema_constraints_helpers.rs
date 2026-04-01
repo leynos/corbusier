@@ -33,7 +33,7 @@ pub(crate) struct ContextSnapshotInsert {
 pub(crate) struct ContextSnapshotId(Uuid);
 
 impl ContextSnapshotId {
-    pub(crate) fn into_inner(self) -> Uuid {
+    pub(crate) const fn into_inner(self) -> Uuid {
         self.0
     }
 }
