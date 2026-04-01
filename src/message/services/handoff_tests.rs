@@ -52,11 +52,8 @@ fn create_service() -> ServiceHarness {
     }
 }
 
-#[test]
-fn initiate_handoff_requires_active_session() {
-    let Ok(runtime) = tokio::runtime::Runtime::new() else {
-        panic!("expected test runtime to initialize");
-    };
+#[tokio::test]
+async fn initiate_handoff_requires_active_session() {
     let ctx = ctx();
     let service = create_service().service;
     let session_id = AgentSessionId::new();
@@ -67,17 +64,14 @@ fn initiate_handoff_requires_active_session() {
         TurnId::new(),
         SequenceNumber::new(5),
     );
-    let result = runtime.block_on(async { service.initiate(&ctx, params).await });
+    let result = service.initiate(&ctx, params).await;
 
     let err = result.expect_err("expected handoff initiation to fail");
     assert!(matches!(err, HandoffError::SessionNotFound(_)));
 }
 
-#[test]
-fn create_target_session_stores_session() {
-    let Ok(runtime) = tokio::runtime::Runtime::new() else {
-        panic!("expected test runtime to initialize");
-    };
+#[tokio::test]
+async fn create_target_session_stores_session() {
     let ctx = ctx();
     let harness = create_service();
     let conversation_id = ConversationId::new();
@@ -89,9 +83,7 @@ fn create_target_session_stores_session() {
         SequenceNumber::new(10),
         handoff_id,
     );
-    let Ok(session) =
-        runtime.block_on(async { harness.service.create_target_session(&ctx, params).await })
-    else {
+    let Ok(session) = harness.service.create_target_session(&ctx, params).await else {
         panic!("expected target session creation to succeed");
     };
 
@@ -99,12 +91,11 @@ fn create_target_session_stores_session() {
     assert_eq!(session.initiated_by_handoff, Some(handoff_id));
     assert_eq!(session.agent_backend, "target-agent");
 
-    let Ok(Some(found)) = runtime.block_on(async {
-        harness
-            .session_repo
-            .find_by_id(&ctx, session.session_id)
-            .await
-    }) else {
+    let Ok(Some(found)) = harness
+        .session_repo
+        .find_by_id(&ctx, session.session_id)
+        .await
+    else {
         panic!("expected stored session to be retrievable");
     };
 
