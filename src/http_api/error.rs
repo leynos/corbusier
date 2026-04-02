@@ -2,6 +2,7 @@
 
 use super::response::{ErrorPayload, json_error};
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
+use mockable::DefaultClock;
 use std::fmt;
 use uuid::Uuid;
 
@@ -94,8 +95,24 @@ impl ApiError {
     /// This method allows handlers to provide the correlation ID from the
     /// request context so success and error responses share the same ID.
     #[must_use]
-    pub fn into_response(self, request_id: impl Into<String>) -> HttpResponse {
-        self.with_request_id(request_id).error_response()
+    pub fn into_response(
+        self,
+        clock: &(impl mockable::Clock + ?Sized),
+        request_id: impl Into<String>,
+    ) -> HttpResponse {
+        self.with_request_id(request_id).response_with_clock(clock)
+    }
+
+    #[must_use]
+    fn response_with_clock(&self, clock: &(impl mockable::Clock + ?Sized)) -> HttpResponse {
+        json_error(
+            clock,
+            self.status,
+            ErrorPayload::new(self.code, self.message.clone()),
+            self.request_id
+                .clone()
+                .unwrap_or_else(|| Uuid::new_v4().to_string()),
+        )
     }
 }
 
@@ -113,16 +130,9 @@ impl ResponseError for ApiError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        // Use the stored request_id if present, otherwise generate a fresh UUID.
-        // Handlers that have access to RequestContext should use
-        // `ApiError::with_request_id()` to maintain correlation.
-        json_error(
-            self.status,
-            ErrorPayload::new(self.code, self.message.clone()),
-            self.request_id
-                .clone()
-                .unwrap_or_else(|| Uuid::new_v4().to_string()),
-        )
+        // Fallback for Actix's ResponseError integration when no injected
+        // clock is available from the handler.
+        self.response_with_clock(&DefaultClock)
     }
 }
 

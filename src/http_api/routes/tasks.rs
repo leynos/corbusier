@@ -56,8 +56,33 @@ struct AssociatePullRequestBody {
 }
 
 #[derive(Debug, Serialize)]
+struct TaskDto {
+    id: TaskId,
+    origin: crate::task::domain::TaskOrigin,
+    branch_ref: Option<crate::task::domain::BranchRef>,
+    pull_request_ref: Option<crate::task::domain::PullRequestRef>,
+    state: crate::task::domain::TaskState,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<Task> for TaskDto {
+    fn from(task: Task) -> Self {
+        Self {
+            id: task.id(),
+            origin: task.origin().clone(),
+            branch_ref: task.branch_ref().cloned(),
+            pull_request_ref: task.pull_request_ref().cloned(),
+            state: task.state(),
+            created_at: task.created_at(),
+            updated_at: task.updated_at(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct TaskResponse {
-    task: Task,
+    task: TaskDto,
 }
 
 /// Registers the task routes under `/api/v1`.
@@ -80,8 +105,13 @@ async fn create_task(
     let request_id = auth.request_id();
     let request = build_create_task_request(body.into_inner());
     match state.tasks.create_task(auth.context(), request).await {
-        Ok(task) => json_success(StatusCode::CREATED, TaskResponse { task }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(task) => json_success(
+            &*state.clock,
+            StatusCode::CREATED,
+            TaskResponse { task: task.into() },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -93,11 +123,16 @@ async fn get_task(
     let request_id = auth.request_id();
     let task_id = match parse_task_id(&path.task_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     match state.tasks.get_task(auth.context(), task_id).await {
-        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(task) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            TaskResponse { task: task.into() },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -110,7 +145,7 @@ async fn transition_task(
     let request_id = auth.request_id();
     let task_id = match parse_task_id(&path.task_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     match state
         .tasks
@@ -120,8 +155,13 @@ async fn transition_task(
         )
         .await
     {
-        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(task) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            TaskResponse { task: task.into() },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -134,7 +174,7 @@ async fn associate_branch(
     let request_id = auth.request_id();
     let task_id = match parse_task_id(&path.task_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     let payload = body.into_inner();
     match state
@@ -150,8 +190,13 @@ async fn associate_branch(
         )
         .await
     {
-        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(task) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            TaskResponse { task: task.into() },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -164,7 +209,7 @@ async fn associate_pull_request(
     let request_id = auth.request_id();
     let task_id = match parse_task_id(&path.task_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     let payload = body.into_inner();
     match state
@@ -180,8 +225,13 @@ async fn associate_pull_request(
         )
         .await
     {
-        Ok(task) => json_success(StatusCode::OK, TaskResponse { task }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(task) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            TaskResponse { task: task.into() },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 

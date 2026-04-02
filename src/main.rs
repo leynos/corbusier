@@ -4,11 +4,13 @@
 
 use std::sync::Arc;
 
-use actix_web::{App, HttpMessage, HttpServer, web};
+use actix_web::{App, HttpServer, web};
 use corbusier::{
-    context::CorrelationId,
     health::{HealthCheck, SimpleHealthCheck, actix_adapter::health_routes},
-    http_api::{ApiConfig, ApiState, BearerTokenAuthenticator, api_routes, error::ApiError},
+    http_api::{
+        ApiConfig, ApiState, BearerTokenAuthenticator, api_routes, auth::request_correlation_id,
+        error::ApiError,
+    },
     message::{
         adapters::postgres::{PgPool, PostgresConversationRepository, PostgresMessageRepository},
         services::ConversationService,
@@ -30,7 +32,6 @@ use diesel::{
 };
 use mockable::{Clock, DefaultClock};
 use tracing::info;
-use uuid::Uuid;
 
 /// Default HTTP listen port.
 const DEFAULT_PORT: u16 = 8080;
@@ -55,29 +56,27 @@ async fn main() -> std::io::Result<()> {
 
     let health: Arc<dyn HealthCheck> = Arc::new(SimpleHealthCheck);
     let api_state = web::Data::new(build_api_state()?);
+    let api_clock = api_state.clock.clone();
 
     info!(port, "Starting Corbusier");
 
     HttpServer::new(move || {
+        let json_clock = api_clock.clone();
         App::new()
             .app_data(web::Data::from(health.clone()))
             .app_data(api_state.clone())
-            .app_data(web::JsonConfig::default().error_handler(|error, request| {
-                let error_message = error.to_string();
-                let request_id = request
-                    .extensions()
-                    .get::<CorrelationId>()
-                    .copied()
-                    .map_or_else(
-                        || Uuid::new_v4().to_string(),
-                        |correlation_id| correlation_id.to_string(),
-                    );
-                actix_web::error::InternalError::from_response(
-                    error,
-                    ApiError::bad_request("invalid_json", error_message).into_response(request_id),
-                )
-                .into()
-            }))
+            .app_data(
+                web::JsonConfig::default().error_handler(move |error, request| {
+                    let error_message = error.to_string();
+                    let request_id = request_correlation_id(request).to_string();
+                    actix_web::error::InternalError::from_response(
+                        error,
+                        ApiError::bad_request("invalid_json", error_message)
+                            .into_response(&*json_clock, request_id),
+                    )
+                    .into()
+                }),
+            )
             .configure(health_routes)
             .configure(api_routes)
     })

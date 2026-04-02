@@ -55,7 +55,7 @@ async fn created_draft_task_through_api(
         || Err(eyre::eyre!("task id should be present")),
         |body| {
             Ok(
-                required_str_field(required_field(required_field(body, "data"), "task"), "id")
+                required_str_field(required_field(required_field(body, "data")?, "task")?, "id")?
                     .to_owned(),
             )
         },

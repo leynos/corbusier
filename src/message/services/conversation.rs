@@ -26,7 +26,7 @@ impl AppendMessageRequest {
     #[must_use]
     #[expect(
         clippy::missing_const_for_fn,
-        reason = "Kept non-const per design decision to allow future non-const initialisation"
+        reason = "Kept non-const per design decision to allow future non-const initialization"
     )]
     pub fn new(conversation_id: ConversationId, role: Role, content: Vec<ContentPart>) -> Self {
         Self {

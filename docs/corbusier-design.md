@@ -8581,7 +8581,12 @@ Every response uses a stable JSON envelope:
 ```
 
 Error responses keep the same envelope shape and populate `error.code` plus
-`error.message`.
+`error.message`. For authenticated routes, handlers preserve the inbound
+`CorrelationId`, so the `request_id` in both success and error responses stays
+aligned with the value already inserted into the request extensions. Framework
+fallback errors, such as malformed JSON or failures that occur before
+authentication inserts a `CorrelationId` into the request extensions, generate
+a fresh UUID instead.
 
 ##### 6.3.1.2 Authentication Methods
 
@@ -8639,7 +8644,7 @@ service is called.
 
 | Authentication Method | Implementation                  | Token Location       | Expiration Policy              | Status       |
 | --------------------- | ------------------------------- | -------------------- | ------------------------------ | ------------ |
-| Bearer Token          | JSON Web Token (JWT) with HS256 | Authorization Header | 24 hours with refresh          | Active in v1 |
+| Bearer Token          | JSON Web Token (JWT) with HS256 | Authorization Header | 24 hours                       | Active in v1 |
 | Cookie-based          | Secure HTTP-only cookies        | Cookie header        | 7 days with sliding expiration | Future scope |
 | API Key               | Static key authentication       | X-API-Key header     | No expiration (admin only)     | Future scope |
 

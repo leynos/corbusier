@@ -55,6 +55,8 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 # HTTP server (health endpoint adapter)
 actix-web = "4.9.0"
+
+# JWT / token handling
 jsonwebtoken = "9.3.0"
 
 # Embedded PostgreSQL support (tests and tooling)

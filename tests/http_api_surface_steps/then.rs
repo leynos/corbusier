@@ -34,18 +34,18 @@ async fn response_metadata_version_is(
     expected_version: String,
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
-    let metadata = required_field(body, "metadata");
+    let metadata = required_field(body, "metadata")?;
     eyre::ensure!(
-        required_field(metadata, "version") == &expected_version,
+        required_field(metadata, "version")? == &expected_version,
         "expected metadata version {expected_version}, got {}",
-        required_field(metadata, "version")
+        required_field(metadata, "version")?
     );
     eyre::ensure!(
-        required_field(metadata, "request_id").is_string(),
+        required_field(metadata, "request_id")?.is_string(),
         "expected metadata.request_id to be a string"
     );
     eyre::ensure!(
-        required_field(metadata, "timestamp").is_string(),
+        required_field(metadata, "timestamp")?.is_string(),
         "expected metadata.timestamp to be a string"
     );
     Ok(())
@@ -58,7 +58,7 @@ async fn conversation_history_includes_messages(
     expected_count: usize,
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
-    let messages = required_field(required_field(body, "data"), "messages")
+    let messages = required_field(required_field(body, "data")?, "messages")?
         .as_array()
         .ok_or_else(|| eyre::eyre!("messages array should be present"))?;
     eyre::ensure!(
@@ -75,7 +75,7 @@ async fn task_is_returned_in_response(
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
     eyre::ensure!(
-        required_field(required_field(body, "data"), "task")
+        required_field(required_field(body, "data")?, "task")?
             .get("id")
             .is_some_and(serde_json::Value::is_string),
         "expected response data.task.id to be a string"
@@ -91,14 +91,14 @@ async fn task_state_is(
     let body = last_body(world)?;
     eyre::ensure!(
         required_field(
-            required_field(required_field(body, "data"), "task"),
+            required_field(required_field(body, "data")?, "task")?,
             "state"
-        ) == &expected_state,
+        )? == &expected_state,
         "expected task state {expected_state}, got {}",
         required_field(
-            required_field(required_field(body, "data"), "task"),
+            required_field(required_field(body, "data")?, "task")?,
             "state"
-        )
+        )?
     );
     Ok(())
 }
@@ -110,7 +110,7 @@ async fn response_includes_tool(
     expected_tools: usize,
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
-    let tools = required_field(required_field(body, "data"), "tools")
+    let tools = required_field(required_field(body, "data")?, "tools")?
         .as_array()
         .ok_or_else(|| eyre::eyre!("tools array should be present"))?;
     eyre::ensure!(
@@ -128,9 +128,9 @@ async fn tool_call_response_names_tool(
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
     eyre::ensure!(
-        required_field(required_field(body, "data"), "tool_name") == &tool_name,
+        required_field(required_field(body, "data")?, "tool_name")? == &tool_name,
         "expected tool_name {tool_name}, got {}",
-        required_field(required_field(body, "data"), "tool_name")
+        required_field(required_field(body, "data")?, "tool_name")?
     );
     Ok(())
 }

@@ -253,7 +253,6 @@ impl MessageRepository for PostgresMessageRepository {
                 .filter(conversations::id.eq(uuid))
                 .filter(conversations::tenant_id.eq(tenant_id.into_inner()))
                 .select(conversations::id)
-                .for_update()
                 .first::<uuid::Uuid>(conn)
                 .optional()
                 .map_err(RepositoryError::database)?;

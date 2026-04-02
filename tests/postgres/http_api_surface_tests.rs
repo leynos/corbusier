@@ -60,7 +60,7 @@ fn build_pool(db: &TemporaryDatabase) -> Result<PgPool, BoxError> {
         .map_err(|err| Box::new(err) as BoxError)
 }
 
-fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
+async fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
     let auth = HttpApiAuth::new(TEST_JWT_SECRET);
     let ctx = auth.request_context();
     let clock = Arc::new(DefaultClock);
@@ -75,7 +75,7 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
         Arc::new(PostgresTaskRepository::new(pool.clone())),
         clock.clone(),
     ));
-    let tool_service = build_tool_service(pool, &ctx, clock.clone())?;
+    let tool_service = build_tool_service(pool, &ctx, clock.clone()).await?;
 
     Ok((
         ApiState::new(
@@ -91,7 +91,7 @@ fn build_state(pool: PgPool) -> Result<(ApiState, HttpApiAuth), BoxError> {
     ))
 }
 
-fn build_tool_service(
+async fn build_tool_service(
     pool: PgPool,
     ctx: &corbusier::context::RequestContext,
     clock: Arc<DefaultClock>,
@@ -112,14 +112,12 @@ fn build_tool_service(
         clock,
     ));
 
-    let server = futures::executor::block_on(async {
-        lifecycle
-            .register(
-                ctx,
-                RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
-            )
-            .await
-    })?;
+    let server = lifecycle
+        .register(
+            ctx,
+            RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
+        )
+        .await?;
     host.set_tool_catalog(
         server.name().clone(),
         vec![McpToolDefinition::new(
@@ -139,16 +137,14 @@ fn build_tool_service(
         json!({"content": "hello from tool"}),
     )
     .map_err(|err| Box::new(err) as BoxError)?;
-    futures::executor::block_on(async {
-        lifecycle
-            .start(ctx, server.id())
-            .await
-            .map_err(|err| Box::new(err) as BoxError)?;
-        tool_service
-            .discover_and_persist_tools(ctx, server.id())
-            .await
-            .map_err(|err| Box::new(err) as BoxError)
-    })?;
+    lifecycle
+        .start(ctx, server.id())
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
+    tool_service
+        .discover_and_persist_tools(ctx, server.id())
+        .await
+        .map_err(|err| Box::new(err) as BoxError)?;
 
     Ok(tool_service)
 }
@@ -158,7 +154,7 @@ async fn setup_context(cluster: PostgresCluster) -> Result<PostgresHttpApiContex
         .temporary_database_from_template(&format!("http_api_{}", Uuid::new_v4()), TEMPLATE_DB)
         .await?;
     let pool = build_pool(&db)?;
-    let (state, auth) = build_state(pool)?;
+    let (state, auth) = build_state(pool).await?;
 
     Ok(PostgresHttpApiContext {
         state,
@@ -180,14 +176,9 @@ async fn context(
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_conversation_routes_round_trip(
     #[future] context: Result<PostgresHttpApiContext, BoxError>,
-) {
-    let postgres_context = context
-        .await
-        .unwrap_or_else(|err| panic!("postgres context should initialize: {err}"));
-    let token = postgres_context
-        .auth
-        .token()
-        .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+) -> Result<(), BoxError> {
+    let postgres_context = context.await?;
+    let token = postgres_context.auth.token()?;
     let app = actix_test::init_service(
         App::new()
             .app_data(web::Data::new(postgres_context.state))
@@ -247,20 +238,16 @@ async fn postgres_conversation_routes_round_trip(
             .map(Vec::len),
         Some(1)
     );
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_task_routes_round_trip(
     #[future] context: Result<PostgresHttpApiContext, BoxError>,
-) {
-    let postgres_context = context
-        .await
-        .unwrap_or_else(|err| panic!("postgres context should initialize: {err}"));
-    let token = postgres_context
-        .auth
-        .token()
-        .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+) -> Result<(), BoxError> {
+    let postgres_context = context.await?;
+    let token = postgres_context.auth.token()?;
     let app = actix_test::init_service(
         App::new()
             .app_data(web::Data::new(postgres_context.state))
@@ -313,20 +300,16 @@ async fn postgres_task_routes_round_trip(
         ),
         "in_progress"
     );
+    Ok(())
 }
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_tool_routes_round_trip(
     #[future] context: Result<PostgresHttpApiContext, BoxError>,
-) {
-    let postgres_context = context
-        .await
-        .unwrap_or_else(|err| panic!("postgres context should initialize: {err}"));
-    let token = postgres_context
-        .auth
-        .token()
-        .unwrap_or_else(|err| panic!("token encoding should succeed: {err}"));
+) -> Result<(), BoxError> {
+    let postgres_context = context.await?;
+    let token = postgres_context.auth.token()?;
     let app = actix_test::init_service(
         App::new()
             .app_data(web::Data::new(postgres_context.state))
@@ -370,4 +353,57 @@ async fn postgres_tool_routes_round_trip(
         required_field(required_field(&call_body, "data"), "tool_name"),
         "read_file"
     );
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_conversation_history_is_tenant_isolated(
+    #[future] context: Result<PostgresHttpApiContext, BoxError>,
+) -> Result<(), BoxError> {
+    let postgres_context = context.await?;
+    let owner_token = postgres_context.auth.token()?;
+    let other_token = HttpApiAuth::new(TEST_JWT_SECRET).token()?;
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(web::Data::new(postgres_context.state))
+            .configure(api_routes),
+    )
+    .await;
+
+    let create_response = actix_test::call_service(
+        &app,
+        with_bearer(
+            actix_test::TestRequest::post().uri("/api/v1/conversations"),
+            &owner_token,
+        )
+        .to_request(),
+    )
+    .await;
+    assert_eq!(create_response.status().as_u16(), 201);
+    let create_body: Value = actix_test::read_body_json(create_response).await;
+    let conversation_id = required_str_field(
+        required_field(required_field(&create_body, "data"), "conversation"),
+        "id",
+    )
+    .to_owned();
+
+    let history_response = actix_test::call_service(
+        &app,
+        with_bearer(
+            actix_test::TestRequest::get()
+                .uri(&format!("/api/v1/conversations/{conversation_id}/history")),
+            &other_token,
+        )
+        .to_request(),
+    )
+    .await;
+    assert_eq!(history_response.status().as_u16(), 404);
+    let history_body: Value = actix_test::read_body_json(history_response).await;
+    assert_v1_metadata(&history_body);
+    assert_eq!(
+        required_field(required_field(&history_body, "error"), "code"),
+        "conversation_not_found"
+    );
+    Ok(())
 }

@@ -2,6 +2,7 @@
 
 use actix_web::{HttpResponse, http::StatusCode};
 use chrono::{DateTime, Utc};
+use mockable::Clock;
 use serde::Serialize;
 
 /// Stable API version exposed by this adapter.
@@ -18,11 +19,11 @@ pub struct ResponseMetadata {
 impl ResponseMetadata {
     /// Creates metadata for a response.
     #[must_use]
-    pub fn new(request_id: String) -> Self {
+    pub fn new(clock: &(impl Clock + ?Sized), request_id: String) -> Self {
         Self {
             version: API_VERSION,
             request_id,
-            timestamp: Utc::now(),
+            timestamp: clock.utc(),
         }
     }
 }
@@ -63,38 +64,50 @@ where
 {
     /// Creates a success envelope.
     #[must_use]
-    pub fn success(data: T, request_id: String) -> Self {
+    pub fn success(clock: &(impl Clock + ?Sized), data: T, request_id: String) -> Self {
         Self {
             success: true,
             data: Some(data),
             error: None,
-            metadata: ResponseMetadata::new(request_id),
+            metadata: ResponseMetadata::new(clock, request_id),
         }
     }
 
     /// Creates an error envelope.
     #[must_use]
-    pub fn error(error: ErrorPayload, request_id: String) -> Self {
+    pub fn error(clock: &(impl Clock + ?Sized), error: ErrorPayload, request_id: String) -> Self {
         Self {
             success: false,
             data: None,
             error: Some(error),
-            metadata: ResponseMetadata::new(request_id),
+            metadata: ResponseMetadata::new(clock, request_id),
         }
     }
 }
 
 /// Builds a successful JSON response with the shared envelope.
 #[must_use]
-pub fn json_success<T>(status: StatusCode, data: T, request_id: String) -> HttpResponse
+pub fn json_success<T>(
+    clock: &(impl Clock + ?Sized),
+    status: StatusCode,
+    data: T,
+    request_id: String,
+) -> HttpResponse
 where
     T: Serialize,
 {
-    HttpResponse::build(status).json(ApiResponse::success(data, request_id))
+    HttpResponse::build(status).json(ApiResponse::success(clock, data, request_id))
 }
 
 /// Builds a failed JSON response with the shared envelope.
 #[must_use]
-pub fn json_error(status: StatusCode, error: ErrorPayload, request_id: String) -> HttpResponse {
-    HttpResponse::build(status).json(ApiResponse::<serde_json::Value>::error(error, request_id))
+pub fn json_error(
+    clock: &(impl Clock + ?Sized),
+    status: StatusCode,
+    error: ErrorPayload,
+    request_id: String,
+) -> HttpResponse {
+    HttpResponse::build(status).json(ApiResponse::<serde_json::Value>::error(
+        clock, error, request_id,
+    ))
 }

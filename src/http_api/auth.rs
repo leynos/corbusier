@@ -115,7 +115,9 @@ fn extract_bearer_token(request: &HttpRequest) -> Result<&str, ApiError> {
     Ok(trimmed_token)
 }
 
-fn request_correlation_id(request: &HttpRequest) -> CorrelationId {
+/// Returns the request correlation ID, inserting one into request extensions when absent.
+#[must_use]
+pub fn request_correlation_id(request: &HttpRequest) -> CorrelationId {
     let existing_correlation_id = {
         let extensions = request.extensions();
         extensions.get::<CorrelationId>().copied()

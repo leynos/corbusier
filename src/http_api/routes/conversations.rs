@@ -26,19 +26,63 @@ struct AppendMessageBody {
 }
 
 #[derive(Debug, Serialize)]
+struct ConversationDto {
+    id: ConversationId,
+    state: crate::message::domain::ConversationState,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<Conversation> for ConversationDto {
+    fn from(conversation: Conversation) -> Self {
+        Self {
+            id: conversation.id(),
+            state: conversation.state(),
+            created_at: conversation.created_at(),
+            updated_at: conversation.updated_at(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct MessageDto {
+    id: crate::message::domain::MessageId,
+    conversation_id: ConversationId,
+    role: Role,
+    content: Vec<ContentPart>,
+    metadata: crate::message::domain::MessageMetadata,
+    created_at: chrono::DateTime<chrono::Utc>,
+    sequence_number: crate::message::domain::SequenceNumber,
+}
+
+impl From<Message> for MessageDto {
+    fn from(message: Message) -> Self {
+        Self {
+            id: message.id(),
+            conversation_id: message.conversation_id(),
+            role: message.role(),
+            content: message.content().to_vec(),
+            metadata: message.metadata().clone(),
+            created_at: message.created_at(),
+            sequence_number: message.sequence_number(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct ConversationResponse {
-    conversation: Conversation,
+    conversation: ConversationDto,
 }
 
 #[derive(Debug, Serialize)]
 struct ConversationHistoryResponse {
     conversation_id: ConversationId,
-    messages: Vec<Message>,
+    messages: Vec<MessageDto>,
 }
 
 #[derive(Debug, Serialize)]
 struct MessageResponse {
-    message: Message,
+    message: MessageDto,
 }
 
 /// Registers the conversation routes under `/api/v1`.
@@ -65,11 +109,14 @@ async fn create_conversation(
         .await
     {
         Ok(conversation) => json_success(
+            &*state.clock,
             StatusCode::CREATED,
-            ConversationResponse { conversation },
+            ConversationResponse {
+                conversation: conversation.into(),
+            },
             request_id,
         ),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -81,7 +128,7 @@ async fn get_history(
     let request_id = auth.request_id();
     let conversation_id = match parse_conversation_id(&path.conversation_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     match state
         .conversations
@@ -89,14 +136,15 @@ async fn get_history(
         .await
     {
         Ok(messages) => json_success(
+            &*state.clock,
             StatusCode::OK,
             ConversationHistoryResponse {
                 conversation_id,
-                messages,
+                messages: messages.into_iter().map(MessageDto::from).collect(),
             },
             request_id,
         ),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -109,7 +157,7 @@ async fn append_message(
     let request_id = auth.request_id();
     let conversation_id = match parse_conversation_id(&path.conversation_id) {
         Ok(id) => id,
-        Err(err) => return err.into_response(request_id),
+        Err(err) => return err.into_response(&*state.clock, request_id),
     };
     let payload = body.into_inner();
     match state
@@ -120,8 +168,15 @@ async fn append_message(
         )
         .await
     {
-        Ok(message) => json_success(StatusCode::CREATED, MessageResponse { message }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(message) => json_success(
+            &*state.clock,
+            StatusCode::CREATED,
+            MessageResponse {
+                message: message.into(),
+            },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 

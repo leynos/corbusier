@@ -49,8 +49,13 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
 async fn list_tools(state: web::Data<ApiState>, auth: AuthenticatedRequestContext) -> HttpResponse {
     let request_id = auth.request_id();
     match state.tools.list_tools(auth.context()).await {
-        Ok(tools) => json_success(StatusCode::OK, ToolCatalogResponse { tools }, request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(tools) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            ToolCatalogResponse { tools },
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 
@@ -63,8 +68,13 @@ async fn call_tool(
     let payload = body.into_inner();
     let request = ToolCallRequest::new(payload.tool_name, payload.parameters, &*state.clock);
     match state.tools.call_tool(auth.context(), &request).await {
-        Ok(result) => json_success(StatusCode::OK, map_tool_call_result(&result), request_id),
-        Err(err) => ApiError::from(err).into_response(request_id),
+        Ok(result) => json_success(
+            &*state.clock,
+            StatusCode::OK,
+            map_tool_call_result(&result),
+            request_id,
+        ),
+        Err(err) => ApiError::from(err).into_response(&*state.clock, request_id),
     }
 }
 

@@ -154,9 +154,11 @@ Observable success means:
 - The `message` context has `ConversationId`, message persistence, and
   conversation table models, but no `ConversationRepository` or
   `ConversationService` exists yet.
-- The Postgres adapters for `message` and `task` document that tenant context
-  is prepared for RLS but not yet enforced by schema/policies, which is a real
-  production exposure risk for authenticated HTTP endpoints.
+- The Postgres adapters for `message` and `task` now persist `tenant_id`,
+  execute tenant-scoped queries, rely on tenant-aware indexes, and enforce the
+  composite foreign key on `(conversation_id, tenant_id)`, but RLS is still not
+  enforced by schema policies. That remaining gap is a real production risk for
+  authenticated HTTP endpoints.
 - The first behavioural-test implementation attempted to create a Tokio runtime
   inside Tokio-powered `rstest-bdd` scenarios. The fix was to reuse the active
   runtime with `tokio::task::block_in_place` during synchronous world setup.
@@ -194,11 +196,12 @@ Observable success means:
   enforces authentication without pulling roadmap `5.1.1` token lifecycle work
   into the HTTP-adapter milestone. Date/Author: 2026-03-30 / implementation
   author.
-- Decision: document, rather than hide, the current Postgres tenant-isolation
-  limitation for conversations and messages. Rationale: the adapter is
-  shippable for internal and trusted use now, but production-grade multi-tenant
-  isolation still depends on roadmap items `2.5.2` and `2.5.3`. Date/Author:
-  2026-03-30 / implementation author.
+- Decision: document, rather than hide, the remaining Postgres tenant-isolation
+  limitation for conversations and messages. Rationale: the adapter now has
+  `tenant_id` columns, tenant-scoped queries, supporting indexes, and the
+  composite foreign key on `(conversation_id, tenant_id)`, but production-grade
+  multi-tenant isolation still depends on RLS work tracked by roadmap items
+  `2.5.2` and `2.5.3`. Date/Author: 2026-03-30 / implementation author.
 
 ## Outcomes & Retrospective
 
@@ -234,11 +237,12 @@ Validation evidence captured during implementation:
 
 Residual limitation:
 
-- Conversation and message persistence still lack hardened PostgreSQL
-  tenant-isolation via schema columns and Row-Level Security. This remains
-  tracked by roadmap items `2.5.2` and `2.5.3`, so the HTTP API should still be
-  treated as an internal or trusted surface rather than a complete multi-tenant
-  security boundary.
+- Conversation and message persistence now includes `tenant_id` columns,
+  tenant-scoped queries, supporting indexes, and the composite foreign key for
+  `conversations` and `messages`, but PostgreSQL Row-Level Security (RLS)
+  remains outstanding. That final policy hardening is still required to
+  complete the security boundary, so the HTTP API should still be treated as an
+  internal or trusted surface rather than a fully hardened multi-tenant one.
 
 ## Context and orientation
 

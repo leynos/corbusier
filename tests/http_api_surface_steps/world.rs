@@ -81,32 +81,31 @@ impl HttpApiWorld {
     }
 }
 
-pub(super) fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
+pub(super) fn required_field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, eyre::Report> {
     value
         .get(key)
-        .unwrap_or_else(|| panic!("expected field `{key}` to be present"))
+        .ok_or_else(|| eyre::eyre!("expected field `{key}` to be present"))
 }
 
-pub(super) fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
-    required_field(value, key)
-        .as_str()
-        .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
+pub(super) fn required_str_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, eyre::Report> {
+    required_field(value, key).and_then(|field| {
+        field
+            .as_str()
+            .ok_or_else(|| eyre::eyre!("expected field `{key}` to be a string"))
+    })
 }
 
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "Panic is for unrecoverable test-runtime creation failure; the Result is for the async operation"
-)]
-fn block_on_setup<F, T, E>(future: F) -> Result<T, E>
+fn block_on_setup<F, T, E>(future: F) -> Result<T, eyre::Report>
 where
     F: Future<Output = Result<T, E>>,
+    E: Into<eyre::Report>,
 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future))
+        tokio::task::block_in_place(|| handle.block_on(future).map_err(Into::into))
     } else {
         let runtime = tokio::runtime::Runtime::new()
-            .unwrap_or_else(|err| panic!("HTTP API test runtime should be created: {err}"));
-        runtime.block_on(future)
+            .map_err(|err| eyre::eyre!("HTTP API test runtime should be created: {err}"))?;
+        runtime.block_on(future).map_err(Into::into)
     }
 }
 

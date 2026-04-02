@@ -89,18 +89,19 @@ async fn create_task_from_issue(
                 })),
         )
         .await?;
-    let task_id = current_world
-        .last_body
-        .as_ref()
-        .and_then(|body| {
-            body.get("data")
-                .and_then(|data| data.get("task"))
-                .and_then(|task| task.get("id"))
-                .and_then(serde_json::Value::as_str)
-        })
-        .map(String::from)
-        .ok_or_else(|| eyre::eyre!("task id should be present in response"))?;
-    current_world.task_id = Some(task_id);
+    let task_id = current_world.last_body.as_ref().and_then(|body| {
+        body.get("data")
+            .and_then(|data| data.get("task"))
+            .and_then(|task| task.get("id"))
+            .and_then(serde_json::Value::as_str)
+            .map(String::from)
+    });
+    if matches!(current_world.last_status, Some(code) if (200..300).contains(&code)) {
+        current_world.task_id =
+            Some(task_id.ok_or_else(|| eyre::eyre!("task id should be present in response"))?);
+    } else {
+        current_world.task_id = None;
+    }
     Ok(())
 }
 
