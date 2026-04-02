@@ -78,14 +78,17 @@ fn handoff_metadata_with_tool_calls_accumulates(
 
 #[rstest]
 fn handoff_status_serialization_uses_snake_case() {
-    assert_eq!(
-        serde_json::to_string(&HandoffStatus::Initiated).expect("serialization"),
-        "\"initiated\""
-    );
-    assert_eq!(
-        serde_json::to_string(&HandoffStatus::Completed).expect("serialization"),
-        "\"completed\""
-    );
+    let initiated_result = serde_json::to_string(&HandoffStatus::Initiated);
+    let Ok(initiated) = initiated_result else {
+        panic!("expected initiated status to serialize: {initiated_result:?}");
+    };
+    assert_eq!(initiated, "\"initiated\"");
+
+    let completed_result = serde_json::to_string(&HandoffStatus::Completed);
+    let Ok(completed) = completed_result else {
+        panic!("expected completed status to serialize: {completed_result:?}");
+    };
+    assert_eq!(completed, "\"completed\"");
 }
 
 #[rstest]

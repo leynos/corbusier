@@ -89,7 +89,7 @@ to dive into the design and roadmap:
 # Format code
 make fmt
 
-# Run linter
+# Run linter (cargo doc, Clippy, and Whitaker)
 make lint
 
 # Run tests (includes PostgreSQL integration tests)
@@ -120,9 +120,13 @@ requirements.
 The project enforces strict code quality standards:
 
 - Comprehensive Clippy linting (pedantic mode with additional deny rules)
+- Whitaker Dylint checks layered into `make lint`
 - Mandatory code formatting via `cargo fmt`
 - Full test coverage requirements
 - British English spelling in documentation
+
+For local Whitaker installation, see
+[docs/whitaker-users-guide.md](docs/whitaker-users-guide.md).
 
 ## Licence
 

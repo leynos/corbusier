@@ -278,6 +278,8 @@ impl TryFrom<&str> for SnapshotType {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for context snapshot construction and accessors.
+
     use super::*;
     use mockable::DefaultClock;
 

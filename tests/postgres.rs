@@ -26,6 +26,8 @@ mod test_helpers;
 mod worker_locator;
 
 mod postgres {
+    //! Groups the `PostgreSQL` integration suites behind a shared module root.
+
     pub mod cluster;
     pub mod helpers;
 

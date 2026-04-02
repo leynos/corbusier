@@ -56,6 +56,8 @@ fn readiness_status_to_response(status: HealthStatus) -> HttpResponse {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the Actix health-check adapter behaviour.
+
     use std::sync::Arc;
 
     use actix_web::App;

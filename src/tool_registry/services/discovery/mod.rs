@@ -1,4 +1,8 @@
 //! Service layer for tool discovery, catalog management, and call routing.
+//!
+//! [`ToolDiscoveryRoutingService`] orchestrates tool discovery, schema
+//! validation, policy enforcement, call routing, stderr capture, and
+//! audit recording.
 
 use crate::context::RequestContext;
 use crate::tool_registry::{
@@ -7,61 +11,25 @@ use crate::tool_registry::{
         ToolGovernanceDecision, ToolRegistryDomainError, validation::validate_parameters,
     },
     ports::{
-        CompletedToolCall, McpServerHost, McpServerHostError, McpServerRegistryError,
-        McpServerRegistryRepository, ToolCatalogError, ToolCatalogRepository,
-        ToolExecutionGovernance, ToolGovernanceError, ToolLogStore, ToolLogStoreError,
+        CompletedToolCall, McpServerHost, McpServerRegistryRepository, ToolCatalogError,
+        ToolCatalogRepository, ToolExecutionGovernance, ToolLogStore,
     },
 };
 use mockable::Clock;
 use std::sync::Arc;
-use thiserror::Error;
 
 mod log_and_audit;
+mod types;
 
-/// Service-level errors for tool discovery and routing operations.
-#[derive(Debug, Error)]
-pub enum ToolDiscoveryRoutingServiceError {
-    /// Domain validation failed.
-    #[error(transparent)]
-    Domain(#[from] ToolRegistryDomainError),
-    /// Catalog persistence failed.
-    #[error(transparent)]
-    Catalog(#[from] ToolCatalogError),
-    /// Registry operation failed.
-    #[error(transparent)]
-    Registry(#[from] McpServerRegistryError),
-    /// Host operation failed.
-    #[error(transparent)]
-    Host(#[from] McpServerHostError),
-    /// Tool governance returned an error.
-    #[error(transparent)]
-    Governance(#[from] ToolGovernanceError),
-    /// Log store operation failed.
-    #[error(transparent)]
-    LogStore(#[from] ToolLogStoreError),
-    /// No server exists with the given identifier.
-    #[error("MCP server {0} not found")]
-    NotFound(McpServerId),
-}
-
-/// Result type for discovery and routing service operations.
-pub type ToolDiscoveryRoutingServiceResult<T> = Result<T, ToolDiscoveryRoutingServiceError>;
-
-/// Port dependencies for [`ToolDiscoveryRoutingService`].
-pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
-    /// Catalog repository.
-    pub catalog: Arc<Cat>,
-    /// Server registry.
-    pub registry: Arc<Reg>,
-    /// Server host.
-    pub host: Arc<H>,
-    /// Tool execution governance.
-    pub governance: Arc<Gov>,
-    /// Log store.
-    pub log_store: Arc<Log>,
-}
+pub use types::{
+    ServicePorts, ToolDiscoveryRoutingServiceError, ToolDiscoveryRoutingServiceResult,
+};
 
 /// Tool discovery, catalog management, and call routing service.
+///
+/// This service is a sibling to [`super::McpServerLifecycleService`],
+/// managing tool catalog persistence and call routing as distinct
+/// responsibilities from server lifecycle state transitions.
 pub struct ToolDiscoveryRoutingService<Cat, Reg, H, Gov, Log, C>
 where
     Cat: ToolCatalogRepository,
@@ -220,6 +188,9 @@ where
         self.execute_and_audit(ctx, request, &entry).await
     }
 
+    /// Resolves a tool from the catalog, checks availability, validates
+    /// parameters, and enforces policy. On failure returns the catalog
+    /// entry (if resolved) alongside the error for audit purposes.
     async fn resolve_and_validate(
         &self,
         ctx: &RequestContext,
@@ -240,6 +211,9 @@ where
                 return Err((None, err.into()));
             }
             1 => {
+                // INVARIANT: `into_iter().next()` always yields `Some`
+                // when `len() == 1`, so the `else` branch is
+                // structurally unreachable.
                 let Some(entry) = entries.into_iter().next() else {
                     let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
                     return Err((None, err.into()));

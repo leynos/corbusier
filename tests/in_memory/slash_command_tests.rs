@@ -36,11 +36,9 @@ fn assert_expansion_parameters(
     expected_command: &str,
     expected_parameters: &[(&str, &str)],
 ) {
-    let expansion = message
-        .metadata()
-        .slash_command_expansion
-        .as_ref()
-        .unwrap_or_else(|| panic!("expected slash command expansion metadata"));
+    let Some(expansion) = message.metadata().slash_command_expansion.as_ref() else {
+        panic!("expected slash command expansion metadata");
+    };
     assert_eq!(expansion.command, expected_command);
 
     for (key, expected_value) in expected_parameters {
@@ -56,11 +54,9 @@ fn assert_expansion_parameters(
 }
 
 fn assert_tool_call_audit(message: &Message, audit_index: usize, expected: &ExpectedAudit<'_>) {
-    let audit = message
-        .metadata()
-        .tool_call_audits
-        .get(audit_index)
-        .unwrap_or_else(|| panic!("expected tool call audit at index {audit_index}"));
+    let Some(audit) = message.metadata().tool_call_audits.get(audit_index) else {
+        panic!("expected tool call audit at index {audit_index}");
+    };
     assert_eq!(audit.tool_name, expected.tool_name);
     assert_eq!(&audit.status, &expected.status);
     assert!(

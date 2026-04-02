@@ -183,6 +183,8 @@ impl UpgraderRegistry {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for message version upgrader behaviour.
+
     use super::*;
     use serde_json::json;
 

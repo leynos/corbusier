@@ -213,6 +213,8 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the in-memory tool catalog adapter.
+
     use super::InMemoryToolCatalog;
     use crate::test_support::test_request_ctx;
     use crate::tool_registry::{

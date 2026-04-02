@@ -55,6 +55,8 @@ fn redact_value(value: &Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for tool registry redaction helpers.
+
     use super::*;
     use serde_json::json;
 

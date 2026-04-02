@@ -60,6 +60,12 @@ pub(crate) struct AgentSessionInsert {
     pub is_active: bool,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum CrossTenantField {
+    Session,
+    Conversation,
+}
+
 pub(crate) fn insert_task(
     conn: &mut PgConnection,
     task_id: TaskId,
@@ -150,6 +156,47 @@ pub(crate) fn insert_agent_session(
         .bind::<diesel::sql_types::Nullable<diesel::sql_types::Timestamptz>, _>(ended_at)
         .bind::<diesel::sql_types::Text, _>(state)
         .execute(conn)
+}
+
+pub(crate) fn build_cross_tenant_prerequisites(
+    conn: &mut PgConnection,
+    tenant_a: TenantId,
+    tenant_b: TenantId,
+    mismatched: CrossTenantField,
+) -> diesel::QueryResult<(AgentSessionId, ConversationId)> {
+    let conversation_a = ConversationId::new();
+    let conversation_b = ConversationId::new();
+    insert_conversation(conn, conversation_a, tenant_a, None)?;
+    insert_conversation(conn, conversation_b, tenant_b, None)?;
+
+    match mismatched {
+        CrossTenantField::Session => {
+            let session = insert_active_session(conn, tenant_a, conversation_a)?;
+            Ok((session, conversation_b))
+        }
+        CrossTenantField::Conversation => {
+            let session = insert_active_session(conn, tenant_b, conversation_b)?;
+            Ok((session, conversation_a))
+        }
+    }
+}
+
+fn insert_active_session(
+    conn: &mut PgConnection,
+    tenant: TenantId,
+    conversation: ConversationId,
+) -> diesel::QueryResult<AgentSessionId> {
+    let session = AgentSessionId::new();
+    insert_agent_session(
+        conn,
+        AgentSessionInsert {
+            session,
+            tenant,
+            conversation,
+            is_active: true,
+        },
+    )?;
+    Ok(session)
 }
 
 pub(crate) fn insert_handoff(

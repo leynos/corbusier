@@ -66,8 +66,7 @@ async fn initiate_handoff_requires_active_session() {
     );
     let result = service.initiate(&ctx, params).await;
 
-    assert!(result.is_err());
-    let err = result.expect_err("should be error");
+    let err = result.expect_err("expected handoff initiation to fail");
     assert!(matches!(err, HandoffError::SessionNotFound(_)));
 }
 
@@ -88,18 +87,19 @@ async fn create_target_session_stores_session() {
         .service
         .create_target_session(&ctx, params)
         .await
-        .expect("should create session");
+        .expect("expected target session creation to succeed");
 
     assert_eq!(session.conversation_id, conversation_id);
     assert_eq!(session.initiated_by_handoff, Some(handoff_id));
     assert_eq!(session.agent_backend, "target-agent");
 
-    let found = harness
+    let Ok(Some(found)) = harness
         .session_repo
         .find_by_id(&ctx, session.session_id)
         .await
-        .expect("should find")
-        .expect("session should exist");
+    else {
+        panic!("expected stored session to be retrievable");
+    };
 
     assert_eq!(found.session_id, session.session_id);
 }

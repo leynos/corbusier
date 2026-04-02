@@ -84,12 +84,13 @@ impl InMemoryHookActionExecutor {
         context: &HookTriggerContext,
     ) -> serde_json::Value {
         let outputs = self.outputs.read().await;
-        outputs.get(action_id).cloned().unwrap_or_else(|| {
-            serde_json::json!({
+        let Some(output) = outputs.get(action_id).cloned() else {
+            return serde_json::json!({
                 "status": status.as_str(),
                 "trigger": context.trigger_type().as_str(),
-            })
-        })
+            });
+        };
+        output
     }
 }
 

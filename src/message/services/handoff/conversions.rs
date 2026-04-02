@@ -14,6 +14,8 @@ impl From<AgentSessionState> for HandoffStatus {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for handoff conversion helpers.
+
     use super::*;
     use rstest::rstest;
 

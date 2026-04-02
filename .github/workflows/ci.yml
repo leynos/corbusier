@@ -15,6 +15,7 @@ jobs:
       BUILD_PROFILE: debug
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
+      WHITAKER_INSTALLER_VERSION: '0.2.1'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Setup Rust
@@ -37,6 +38,22 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
+      - name: Cache Whitaker installer
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        with:
+          path: |
+            ~/.cargo/bin/whitaker-installer
+            ~/.cache/cargo-binstall
+            ~/.local/share/whitaker
+          key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
+      - name: Install Whitaker
+        run: |
+          if command -v whitaker-installer >/dev/null 2>&1; then
+            echo "whitaker-installer already present; skipping cargo binstall"
+          else
+            cargo binstall --no-confirm whitaker-installer@${{ env.WHITAKER_INSTALLER_VERSION }}
+          fi
+          whitaker-installer
       - name: Lint
         run: make lint
       - name: Cache pg_worker binary

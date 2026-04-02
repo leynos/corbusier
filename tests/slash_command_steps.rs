@@ -216,13 +216,17 @@ fn invalid_boolean_parameter_failure(world: &SlashCommandWorld) -> Result<()> {
         .as_ref()
         .ok_or_else(|| eyre!("expected error"))?;
 
-    assert!(matches!(
-        error,
-        SlashCommandError::InvalidParameterValue { command, parameter, reason }
-        if command == "review"
-            && parameter == "include_summary"
-            && reason == "expected true or false (case-insensitive)"
-    ));
+    let SlashCommandError::InvalidParameterValue {
+        command,
+        parameter,
+        reason,
+    } = error
+    else {
+        return Err(eyre!("expected invalid parameter value error"));
+    };
+    assert_eq!(command, "review");
+    assert_eq!(parameter, "include_summary");
+    assert_eq!(reason, "expected true or false (case-insensitive)");
     Ok(())
 }
 
