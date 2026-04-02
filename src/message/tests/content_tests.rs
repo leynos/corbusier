@@ -236,7 +236,7 @@ fn review_linkage_round_trip_serialization() {
     let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
         .with_file_path("src/lib.rs")
         .with_commit_sha("abc123");
-    let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+    let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
 
     let json = serde_json::to_string(&metadata).expect("serialize");
     let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
@@ -258,7 +258,7 @@ fn review_linkage_round_trip_serialization() {
 #[rstest]
 fn review_linkage_with_absent_optional_fields() {
     let linkage = ReviewLinkage::new("rc-99", "thread-root-1", "bob", "verified");
-    let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+    let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
 
     let json = serde_json::to_string(&metadata).expect("serialize");
     let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
@@ -283,7 +283,7 @@ fn review_linkage_does_not_collide_with_top_level_fields() {
         .with_commit_sha("deadbeef");
     let metadata = MessageMetadata::with_agent_backend("claude")
         .with_turn_id(turn_id)
-        .with_review_linkage(linkage);
+        .with_review_linkage(&linkage);
 
     let json = serde_json::to_string(&metadata).expect("serialize");
     let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse as Value");

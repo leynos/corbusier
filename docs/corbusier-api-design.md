@@ -461,7 +461,7 @@ pub struct ReviewWorkflowProjection {
   vocabulary in SQL and Rust: `open`, `awaiting_agent`, `awaiting_reviewer`,
   `resolved`, and `closed`.
 - Sync checkpoints must be stored as a versioned provider envelope rather than
-  an unstructured JSON blob so migrations and sync debugging can reason about
+  an unstructured JSON blob, so migrations and sync debugging can reason about
   the provider payload shape.
 - Review-linked conversation messages must preserve structured linkage under
   the reserved, versioned key `"review.linkage.v1"` inside

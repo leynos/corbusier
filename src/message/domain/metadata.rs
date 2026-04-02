@@ -166,6 +166,12 @@ impl MessageMetadata {
     /// object, preventing key collisions with top-level extension keys
     /// and making schema evolution predictable.
     ///
+    /// # Panics
+    ///
+    /// Panics if `ReviewLinkage` fails to serialize to JSON.  In practice
+    /// this cannot happen because every field is a `String` or
+    /// `Option<String>`, which are infallible under `serde_json`.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -174,34 +180,20 @@ impl MessageMetadata {
     /// let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
     ///     .with_file_path("src/lib.rs")
     ///     .with_commit_sha("abc123");
-    /// let metadata = MessageMetadata::empty().with_review_linkage(linkage);
+    /// let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
     /// let ext = metadata.extensions.get("review.linkage.v1").unwrap();
     /// assert_eq!(ext["review_comment_id"], "rc-42");
     /// assert_eq!(ext["reviewer"], "alice");
     /// ```
     #[must_use]
-    pub fn with_review_linkage(self, linkage: ReviewLinkage) -> Self {
-        let mut obj = serde_json::Map::new();
-        obj.insert(
-            "review_comment_id".to_owned(),
-            Value::String(linkage.review_comment_id),
-        );
-        obj.insert(
-            "thread_root_id".to_owned(),
-            Value::String(linkage.thread_root_id),
-        );
-        obj.insert("reviewer".to_owned(), Value::String(linkage.reviewer));
-        if let Some(path) = linkage.file_path {
-            obj.insert("file_path".to_owned(), Value::String(path));
-        }
-        if let Some(sha) = linkage.commit_sha {
-            obj.insert("commit_sha".to_owned(), Value::String(sha));
-        }
-        obj.insert(
-            "verification_status".to_owned(),
-            Value::String(linkage.verification_status),
-        );
-        self.with_extension("review.linkage.v1", Value::Object(obj))
+    #[expect(
+        clippy::expect_used,
+        reason = "ReviewLinkage contains only String/Option<String> fields; serde_json serialization is infallible"
+    )]
+    pub fn with_review_linkage(self, linkage: &ReviewLinkage) -> Self {
+        let value =
+            serde_json::to_value(linkage).expect("ReviewLinkage serializes to a JSON object");
+        self.with_extension("review.linkage.v1", value)
     }
 
     /// Sets the handoff metadata.

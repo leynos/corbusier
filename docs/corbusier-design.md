@@ -1479,7 +1479,7 @@ erDiagram
 <!-- markdownlint-enable MD031 -->
 
 For screen readers: The following sequence diagram shows how a tool call is
-resolved through catalog lookup, policy evaluation, host execution, and log
+resolved through catalogue lookup, policy evaluation, host execution, and log
 capture.
 
 <!-- markdownlint-disable MD031 -->
@@ -2722,7 +2722,7 @@ flowing through Corbusier's MCP multiplexer to a tool server and back with a
 workspace execution result.
 
 <!-- markdownlint-disable MD031 -->
-Table 4.1.1.2a: MCP tool orchestration flow across Corbusier, the MCP
+Table 4.1.1.2: MCP tool orchestration flow across Corbusier, the MCP
 multiplexer, and a tool workspace.
 ```mermaid
 sequenceDiagram
@@ -2983,8 +2983,8 @@ operations flowing through the VCS adapter, followed by a pull-request review
 event synchronized through Frankie.
 
 <!-- markdownlint-disable MD031 -->
-Table 4.1.2.2a: VCS integration API flow for task metadata, branch creation,
-and review-thread synchronization.
+Table 4.1.2.2: VCS integration API flow for task metadata, branch creation, and
+review-thread synchronization.
 ```mermaid
 sequenceDiagram
     participant Corbusier as Corbusier Core
@@ -3022,7 +3022,7 @@ For screen readers: The following sequence diagram shows an MCP client opening
 JSON-RPC communication with a server, listing tools, and invoking a tool call.
 
 <!-- markdownlint-disable MD031 -->
-Table 4.1.2.2b: MCP server communication over JSON-RPC 2.0.
+Table 4.1.2.3: MCP server communication over JSON-RPC 2.0.
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
@@ -5377,7 +5377,7 @@ events being published to an event bus and streamed to a subscribed client over
 SSE.
 
 <!-- markdownlint-disable MD031 -->
-Table 6.1.1.2a: Real-time event distribution through the conversation event
+Table 6.1.1.2: Real-time event distribution through the conversation event
 stream.
 ```mermaid
 sequenceDiagram
@@ -5604,7 +5604,7 @@ CREATE TABLE review_threads (
     pull_request_ref VARCHAR(255) NOT NULL,
     provider VARCHAR(50) NOT NULL,
     external_root_comment_id VARCHAR(255) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'open',
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
     anchor JSONB,
     review_state JSONB NOT NULL DEFAULT '{}',
     -- Versioned provider envelope: {version, provider, payload}.
@@ -5843,7 +5843,7 @@ review comments, and verification results, and how those records relate back to
 tasks and conversations.
 
 <!-- markdownlint-disable MD031 -->
-Table 6.2.1.2b: Review workflow entity-relationship model for tenant-owned
+Table 6.2.1.3: Review workflow entity-relationship model for tenant-owned
 review threads, comments, and verification state.
 ```mermaid
 erDiagram
@@ -6853,7 +6853,7 @@ collaboration across conversation, task, agent, tool, and governance modules in
 the modular monolith.
 
 <!-- markdownlint-disable MD031 -->
-Table 6.1.2.2a: Modular monolith module interaction during a user request.
+Table 6.1.2.2: Modular monolith module interaction during a user request.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -7324,9 +7324,8 @@ message domain model, showing the Message aggregate root and its related value
 objects, including content parts, metadata, and identity types.
 
 <!-- markdownlint-disable MD031 -->
-Table 6.2.1.2a: Canonical message domain model class diagram showing the
-Message aggregate root with its value objects, content parts, and identity
-types.
+Table 6.2.1.4: Canonical message domain model class diagram showing the Message
+aggregate root with its value objects, content parts, and identity types.
 ```mermaid
 classDiagram
     class Message {
@@ -7550,6 +7549,8 @@ classDiagram
 
 JSONB provides a wide array of options to index your JSON data. At a high
 level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
+
+Table 6.2.1.5: Primary indexes for tenant-scoped query paths.
 
 | Table                       | Index Type | Columns                                            | Purpose                             |
 | --------------------------- | ---------- | -------------------------------------------------- | ----------------------------------- |
