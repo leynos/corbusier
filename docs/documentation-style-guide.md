@@ -112,8 +112,8 @@ this means operators, end users, or integrators.
 - Introduce the primary workflow early, with a minimal working example that a
   reader can adapt immediately.
 - Put public-facing reference material here when users need it to succeed, for
-  example CLI usage, configuration keys, file-format rules, or API surface
-  summaries.
+  example command-line interface (CLI) usage, configuration keys, file-format
+  rules, or API surface summaries.
 - Present rules, constraints, defaults, and error behaviour near the feature
   they affect, rather than scattering them across the document.
 - Use tables where they clarify field sets, command options, or compatibility
@@ -151,7 +151,7 @@ the existing system, not as the place for the project's primary design document.
 - Keep the document synchronized with decision records, roadmap items, and the
   codebase. A stale developer's guide is worse than a shorter one.
 
-### Design document, ADR, and RFC
+### Design document, Architecture Decision Record (ADR), and Request for Comments (RFC)
 
 Use these document types for different jobs. Do not collapse them into one
 catch-all "design note".
@@ -175,10 +175,10 @@ decision, and an RFC to propose a change.
 ### Design document
 
 Use a dedicated design document, conventionally named
-`docs/<product-or-topic>-design.md`, to explain the architecture,
-constraints, rationale, and intended evolution of a system or subsystem. This
-document is the correct location for design intent; that material must not be
-buried in the user's guide or developer's guide.
+`docs/<product-or-topic>-design.md`, to explain the architecture, constraints,
+rationale, and intended evolution of a system or subsystem. This document is
+the correct location for design intent; that material must not be buried in the
+user's guide or developer's guide.
 
 - Start with a concise front matter section that states status, scope, primary
   audience, and the decision records or other documents that take precedence.
