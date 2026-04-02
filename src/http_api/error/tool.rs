@@ -25,7 +25,7 @@ pub(crate) fn map_tool_service_error(error: ToolDiscoveryRoutingServiceError) ->
     }
 }
 
-pub(crate) fn map_tool_service_client_error(error: ToolDiscoveryRoutingServiceError) -> ApiError {
+fn map_tool_service_client_error(error: ToolDiscoveryRoutingServiceError) -> ApiError {
     match error {
         ToolDiscoveryRoutingServiceError::Domain(domain_error) => {
             map_tool_domain_error(domain_error)
@@ -54,14 +54,12 @@ pub(crate) fn map_tool_service_client_error(error: ToolDiscoveryRoutingServiceEr
 }
 
 #[derive(Debug)]
-pub(crate) enum ToolServiceInfrastructureError {
+enum ToolServiceInfrastructureError {
     Registry(McpServerRegistryError),
     Host(McpServerHostError),
 }
 
-pub(crate) fn map_tool_service_infrastructure_error(
-    error: ToolServiceInfrastructureError,
-) -> ApiError {
+fn map_tool_service_infrastructure_error(error: ToolServiceInfrastructureError) -> ApiError {
     match error {
         ToolServiceInfrastructureError::Registry(registry_error) => {
             log_tool_registry_error(&registry_error);
