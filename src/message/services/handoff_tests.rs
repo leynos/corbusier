@@ -83,9 +83,11 @@ async fn create_target_session_stores_session() {
         SequenceNumber::new(10),
         handoff_id,
     );
-    let Ok(session) = harness.service.create_target_session(&ctx, params).await else {
-        panic!("expected target session creation to succeed");
-    };
+    let session = harness
+        .service
+        .create_target_session(&ctx, params)
+        .await
+        .expect("expected target session creation to succeed");
 
     assert_eq!(session.conversation_id, conversation_id);
     assert_eq!(session.initiated_by_handoff, Some(handoff_id));

@@ -13,19 +13,33 @@ fn assert_last_error_matches(
     predicate: fn(&ToolRegistryDomainError) -> bool,
     message: &str,
 ) -> eyre::Result<()> {
-    let err = world
+    let service_error = world
         .last_error
         .as_ref()
         .ok_or_else(|| eyre!("expected an error in world.last_error, found None"))?;
-    match err {
+    match service_error {
         ToolDiscoveryRoutingServiceError::Domain(domain) if predicate(domain) => Ok(()),
         ToolDiscoveryRoutingServiceError::Domain(other) => {
             eyre::bail!("{message}; got Domain({other:?})")
         }
+        ToolDiscoveryRoutingServiceError::Catalog(catalog_error) => {
+            eyre::bail!("{message}; got Catalog error: {catalog_error:?}")
+        }
+        ToolDiscoveryRoutingServiceError::Registry(registry_error) => {
+            eyre::bail!("{message}; got Registry error: {registry_error:?}")
+        }
+        ToolDiscoveryRoutingServiceError::Host(host_error) => {
+            eyre::bail!("{message}; got Host error: {host_error:?}")
+        }
+        ToolDiscoveryRoutingServiceError::Governance(governance_error) => {
+            eyre::bail!("{message}; got Governance error: {governance_error:?}")
+        }
+        ToolDiscoveryRoutingServiceError::LogStore(log_store_error) => {
+            eyre::bail!("{message}; got LogStore error: {log_store_error:?}")
+        }
         ToolDiscoveryRoutingServiceError::NotFound(server_id) => {
             eyre::bail!("{message}; got NotFound({server_id:?})")
         }
-        other => eyre::bail!("{message}; got non-domain error: {other:?}"),
     }
 }
 

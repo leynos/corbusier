@@ -304,6 +304,9 @@ operations without triggering diagnostics. This is useful for:
 
 > **Note:** Use Rust crate names (underscores), not Cargo package names
 > (hyphens). For example, use `my_cli_app` rather than `my-cli-app`.
+> Dylint resolves exclusions at compile time using the Rust crate identifier,
+> so rules must target the crate name with underscores rather than the
+> hyphenated `Cargo.toml` package name.
 
 **How to fix:** Replace `std::fs` with `cap_std`:
 
