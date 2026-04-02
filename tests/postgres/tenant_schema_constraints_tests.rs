@@ -18,9 +18,9 @@ use crate::postgres::helpers::{
     test_request_ctx,
 };
 use helpers::{
-    AgentSessionInsert, ContextSnapshotId, ContextSnapshotInsert, HandoffInsert,
-    insert_agent_session, insert_context_snapshot, insert_conversation, insert_handoff,
-    insert_message, insert_task,
+    AgentSessionInsert, ContextSnapshotId, ContextSnapshotInsert, CrossTenantField, HandoffInsert,
+    build_cross_tenant_prerequisites, insert_agent_session, insert_context_snapshot,
+    insert_conversation, insert_handoff, insert_message, insert_task,
 };
 
 struct TenantConstraintContext {
@@ -317,53 +317,6 @@ fn insert_handoff_target_session_case(
             target_session: Some(target_session_a),
         },
     )
-}
-
-#[derive(Clone, Copy)]
-enum CrossTenantField {
-    Session,
-    Conversation,
-}
-
-fn build_cross_tenant_prerequisites(
-    tx: &mut PgConnection,
-    tenant_a: TenantId,
-    tenant_b: TenantId,
-    mismatched: CrossTenantField,
-) -> diesel::QueryResult<(AgentSessionId, ConversationId)> {
-    let conversation_a = ConversationId::new();
-    let conversation_b = ConversationId::new();
-    insert_conversation(tx, conversation_a, tenant_a, None)?;
-    insert_conversation(tx, conversation_b, tenant_b, None)?;
-
-    match mismatched {
-        CrossTenantField::Session => {
-            let session_a = AgentSessionId::new();
-            insert_agent_session(
-                tx,
-                AgentSessionInsert {
-                    session: session_a,
-                    tenant: tenant_a,
-                    conversation: conversation_a,
-                    is_active: true,
-                },
-            )?;
-            Ok((session_a, conversation_b))
-        }
-        CrossTenantField::Conversation => {
-            let session_b = AgentSessionId::new();
-            insert_agent_session(
-                tx,
-                AgentSessionInsert {
-                    session: session_b,
-                    tenant: tenant_b,
-                    conversation: conversation_b,
-                    is_active: true,
-                },
-            )?;
-            Ok((session_b, conversation_a))
-        }
-    }
 }
 
 fn insert_context_snapshot_session_case(

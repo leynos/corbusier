@@ -3,8 +3,8 @@
 use crate::tool_registry::{
     domain::{McpServerId, ToolRegistryDomainError},
     ports::{
-        McpServerHostError, McpServerRegistryError, ToolCatalogError, ToolLogStoreError,
-        ToolGovernanceError,
+        McpServerHostError, McpServerRegistryError, ToolCatalogError, ToolGovernanceError,
+        ToolLogStoreError,
     },
 };
 use std::sync::Arc;
@@ -45,15 +45,11 @@ pub struct ServicePorts<Cat, Reg, H, Gov, Log> {
     /// Catalog repository.
     pub catalog: Arc<Cat>,
     /// Server registry.
-
     pub registry: Arc<Reg>,
     /// Server host.
-
     pub host: Arc<H>,
     /// Tool execution governance.
-
     pub governance: Arc<Gov>,
     /// Log store.
-
     pub log_store: Arc<Log>,
 }
