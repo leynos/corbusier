@@ -8655,7 +8655,8 @@ release supports `tenant_kind = user`; team and organization tenants are
 deferred.
 
 The initial implementation materializes request context directly from these
-claims and issues a fresh correlation ID per HTTP request.
+claims and preserves an inbound correlation ID when present; otherwise it
+issues a fresh correlation ID for the request.
 
 ###### Initial tenant-isolation limitation
 
