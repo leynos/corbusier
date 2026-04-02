@@ -29,7 +29,10 @@ use crate::task::{
 };
 use crate::tool_registry::{
     domain::ToolRegistryDomainError,
-    ports::{ToolCatalogError, ToolGovernanceError, ToolLogStoreError},
+    ports::{
+        McpServerHostError, McpServerRegistryError, ToolCatalogError, ToolGovernanceError,
+        ToolLogStoreError,
+    },
     services::ToolDiscoveryRoutingServiceError,
 };
 
@@ -191,38 +194,79 @@ impl From<TaskLifecycleError> for ApiError {
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "Simple match arms on error variants"
-)]
 impl From<ToolDiscoveryRoutingServiceError> for ApiError {
     fn from(error: ToolDiscoveryRoutingServiceError) -> Self {
-        match error {
-            ToolDiscoveryRoutingServiceError::Domain(domain_error) => {
-                map_tool_domain_error(domain_error)
-            }
-            ToolDiscoveryRoutingServiceError::Catalog(catalog_error) => {
-                map_tool_catalog_error(catalog_error)
-            }
-            ToolDiscoveryRoutingServiceError::Registry(registry_error) => {
-                tracing::error!(error = %registry_error, "registry error");
-                Self::internal()
-            }
-            ToolDiscoveryRoutingServiceError::Host(host_error) => {
-                tracing::error!(error = %host_error, "host error");
-                Self::internal()
-            }
-            ToolDiscoveryRoutingServiceError::Governance(governance_error) => {
-                map_tool_governance_error(&governance_error)
-            }
-            ToolDiscoveryRoutingServiceError::LogStore(log_store_error) => {
-                map_tool_log_store_error(&log_store_error)
-            }
-            ToolDiscoveryRoutingServiceError::NotFound(server_id) => {
-                Self::not_found("mcp_server_not_found", server_id.to_string())
-            }
+        map_tool_service_error(error)
+    }
+}
+
+#[derive(Debug)]
+enum ToolServiceInfrastructureError {
+    Registry(McpServerRegistryError),
+    Host(McpServerHostError),
+}
+
+fn map_tool_service_error(error: ToolDiscoveryRoutingServiceError) -> ApiError {
+    match error {
+        ToolDiscoveryRoutingServiceError::Registry(registry_error) => {
+            map_tool_service_infrastructure_error(ToolServiceInfrastructureError::Registry(
+                registry_error,
+            ))
+        }
+        ToolDiscoveryRoutingServiceError::Host(host_error) => {
+            map_tool_service_infrastructure_error(ToolServiceInfrastructureError::Host(host_error))
+        }
+        other => map_tool_service_client_error(other),
+    }
+}
+
+fn map_tool_service_client_error(error: ToolDiscoveryRoutingServiceError) -> ApiError {
+    match error {
+        ToolDiscoveryRoutingServiceError::Domain(domain_error) => {
+            map_tool_domain_error(domain_error)
+        }
+        ToolDiscoveryRoutingServiceError::Catalog(catalog_error) => {
+            map_tool_catalog_error(catalog_error)
+        }
+        ToolDiscoveryRoutingServiceError::Governance(governance_error) => {
+            map_tool_governance_error(&governance_error)
+        }
+        ToolDiscoveryRoutingServiceError::LogStore(log_store_error) => {
+            map_tool_log_store_error(&log_store_error)
+        }
+        ToolDiscoveryRoutingServiceError::NotFound(server_id) => {
+            ApiError::not_found("mcp_server_not_found", server_id.to_string())
+        }
+        ToolDiscoveryRoutingServiceError::Registry(_)
+        | ToolDiscoveryRoutingServiceError::Host(_) => {
+            debug_assert!(
+                false,
+                "infrastructure errors should be handled before client error mapping"
+            );
+            ApiError::internal()
         }
     }
+}
+
+fn map_tool_service_infrastructure_error(error: ToolServiceInfrastructureError) -> ApiError {
+    match error {
+        ToolServiceInfrastructureError::Registry(registry_error) => {
+            log_tool_registry_error(&registry_error);
+            ApiError::internal()
+        }
+        ToolServiceInfrastructureError::Host(host_error) => {
+            log_tool_host_error(&host_error);
+            ApiError::internal()
+        }
+    }
+}
+
+fn log_tool_registry_error(error: &McpServerRegistryError) {
+    tracing::error!(error = %error, "registry error");
+}
+
+fn log_tool_host_error(error: &McpServerHostError) {
+    tracing::error!(error = %error, "host error");
 }
 
 fn map_conversation_repository_error(

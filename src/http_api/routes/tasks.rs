@@ -246,8 +246,7 @@ fn build_create_task_request(body: CreateTaskBody) -> CreateTaskFromIssueRequest
         assignees,
         milestone,
     } = body;
-    let base_request = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
-    let mut req = base_request;
+    let mut req = CreateTaskFromIssueRequest::new(provider, repository, issue_number, title);
     if let Some(value) = description {
         req = req.with_description(value);
     }

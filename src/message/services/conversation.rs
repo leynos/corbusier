@@ -9,7 +9,7 @@
 //! allocates the next sequence number, validates the message, and retries on
 //! transient duplicate-sequence conflicts before surfacing an error. This is
 //! the boundary where repository failures, validation failures, and
-//! conversation existence checks are normalised for callers.
+//! conversation existence checks are normalized for callers.
 
 use crate::context::RequestContext;
 use crate::message::{
@@ -169,6 +169,7 @@ where
         self.require_conversation(ctx, conversation_id).await?;
 
         let mut last_error = None;
+        let mut pending_content = content;
 
         for _ in 0..MAX_RETRIES {
             let next_sequence = self
@@ -176,7 +177,7 @@ where
                 .next_sequence_number(ctx, conversation_id)
                 .await?;
             let message = Message::builder(conversation_id, role, next_sequence)
-                .with_content_parts(content.clone())
+                .with_content_parts(pending_content)
                 .build(&*self.clock)
                 .map_err(|error| Self::builder_error_to_validation(&error))?;
             self.validator.validate(&message)?;
@@ -184,6 +185,7 @@ where
             match self.message_repository.store(ctx, &message).await {
                 Ok(()) => return Ok(message),
                 Err(RepositoryError::DuplicateSequence { .. }) => {
+                    pending_content = message.content().to_vec();
                     last_error = Some(RepositoryError::DuplicateSequence {
                         conversation_id,
                         sequence: next_sequence,

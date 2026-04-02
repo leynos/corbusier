@@ -248,7 +248,7 @@ impl MessageRepository for PostgresMessageRepository {
         let tenant_id = ctx.tenant_id();
         let uuid = conversation_id.into_inner();
 
-        self.execute_query(tenant_id, move |conn| {
+        self.execute_read_query(tenant_id, move |conn| {
             let conversation_exists = conversations::table
                 .filter(conversations::id.eq(uuid))
                 .filter(conversations::tenant_id.eq(tenant_id.into_inner()))
