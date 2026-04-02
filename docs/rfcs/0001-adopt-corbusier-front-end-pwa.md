@@ -6,7 +6,7 @@
 - **Status:** Proposed
 - **Created:** 2026-04-01
 
-## Summary
+## 1. Summary
 
 Corbusier should adopt a production Progressive Web App (PWA) frontend based on
 the proved-out user-interface and interaction model in
@@ -27,7 +27,7 @@ experience while aligning with Corbusier's backend architecture, its API and
 data-model work, and the Nile Valley deployment model already used elsewhere in
 df12 Productions systems.
 
-## Problem
+## 2. Problem
 
 Corbusier currently has a backend design, roadmap, and API extension proposal
 that collectively describe the data and orchestration model needed by a rich
@@ -48,7 +48,7 @@ That gap creates several risks:
   v2a patterns are portable, which are Corbusier-specific, and which remain
   deliberately out of scope.
 
-## Current state
+## 3. Current state
 
 Corbusier already has several strong architectural anchors:
 
@@ -66,7 +66,7 @@ The proved-out frontend sits outside this repository in
 [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup). That
 mockup already establishes:
 
-- the shared v2a stack for df12 Productions PWAs,
+- the shared version 2a (v2a) stack for df12 Productions PWAs,
 - the data-model-driven card architecture used by both Wildside and Corbusier,
 - the screen inventory for Corbusier's dashboard, tasks, projects,
   conversations, directives, suggestions, and system pages, and
@@ -85,7 +85,22 @@ stack. Wildside already documents:
 The missing piece is the adoption strategy that connects those assets into a
 single implementation direction for Corbusier.
 
-## Goals and non-goals
+### 3.1. Referenced projects and systems
+
+- [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup):
+  fixture-driven proving ground for the Corbusier frontend screens, component
+  composition, and v2a stack choices.
+- [`leynos/wildside`](https://github.com/leynos/wildside): closest production
+  precedent for the shared Progressive Web App (PWA) patterns reused here,
+  especially pagination, idempotency, and frontend-backend contract design.
+- [`leynos/nile-valley`](https://github.com/leynos/nile-valley): platform and
+  deployment model that hosts df12 Productions web workloads and informs the
+  same-origin serving assumptions in this RFC.
+- **Version 2a (v2a)**: df12 Productions' shared frontend application pattern
+  covering the React, routing, styling, localization, testing, and optional
+  local-first state stack used across Corbusier and Wildside mockups.
+
+## 4. Goals and non-goals
 
 - Goals:
   - Adopt a Corbusier-owned PWA workspace derived from the proved-out mockup.
@@ -111,9 +126,9 @@ single implementation direction for Corbusier.
   - Introduce a separate frontend deployment origin distinct from Corbusier's
     main Nile Valley-served application surface.
 
-## Proposed design
+## 5. Proposed design
 
-### Adopt the mockup as the UX and contract proving ground
+### 5.1. Adopt the mockup as the user experience (UX) and contract proving ground
 
 Corbusier should treat
 [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) as the
@@ -129,7 +144,7 @@ The production frontend should not start from a blank directory. It should
 start by importing, adapting, and then progressively replacing the mockup's
 fixture-driven modules inside a repository-owned `frontend-pwa/` workspace.
 
-### Create a repository-owned `frontend-pwa/` workspace
+### 5.2. Create a repository-owned `frontend-pwa/` workspace
 
 Corbusier should adopt a dedicated frontend workspace in the main repository,
 using the same broad toolchain already validated in
@@ -148,7 +163,7 @@ using the same broad toolchain already validated in
 This workspace should be the production target. The mockup remains the faster
 experimentation environment until each feature is promoted.
 
-### Preserve the v2a data-model-driven card architecture
+### 5.3. Preserve the v2a data-model-driven card architecture
 
 Corbusier should adopt the v2a rule that entities own their localizable names,
 descriptions, badges, and semantic descriptors, while translation bundles keep
@@ -166,7 +181,7 @@ That means:
 This is already consistent with `docs/corbusier-api-design.md`, which proposes
 projection Data Transfer Objects (DTOs) designed to match the mockup cards.
 
-### Reuse Wildside patterns where the problem is the same
+### 5.4. Reuse Wildside patterns where the problem is the same
 
 Corbusier should reuse Wildside's approach for cross-cutting application
 concerns that are not domain-specific:
@@ -183,7 +198,7 @@ Wildside-specific product concepts must not be imported where they do not fit.
 Map workflows, offline route bundles, and walk-session models are not part of
 this adoption unless a later Corbusier requirement makes them relevant.
 
-### Follow the v2a state-management escalation model
+### 5.5. Follow the v2a state-management escalation model
 
 The default state model should stay narrow and explicit:
 
@@ -197,7 +212,7 @@ The default state model should stay narrow and explicit:
 This prevents premature state-framework sprawl while keeping the architecture
 compatible with the fuller v2a model already documented in the mockup.
 
-### Adopt Nile Valley's same-origin deployment model
+### 5.6. Adopt Nile Valley's same-origin deployment model
 
 The Corbusier PWA should be deployed as a Nile Valley-served web workload that
 uses the same origin and platform surface as the backend API.
@@ -214,7 +229,7 @@ That implies:
 This is the lowest-friction path for auth, caching, ingress, and preview
 environments.
 
-### Migrate screen by screen rather than with a flag day
+### 5.7. Migrate screen by screen rather than with a flag day
 
 The production adoption should proceed in layers:
 
@@ -230,9 +245,9 @@ The production adoption should proceed in layers:
 This allows backend and frontend work to advance in parallel without forcing a
 single cut-over event.
 
-## Requirements
+## 6. Requirements
 
-### Functional requirements
+### 6.1. Functional requirements
 
 - The adopted PWA must cover the screen families already proven in
   [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup):
@@ -249,7 +264,7 @@ single cut-over event.
   backend events, particularly dashboard, conversation, task, and system
   monitoring views.
 
-### Technical requirements
+### 6.2. Technical requirements
 
 - The production PWA must use a repository-owned workspace rather than relying
   on [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) as
@@ -267,7 +282,7 @@ single cut-over event.
 - The frontend deployment topology must remain compatible with Nile Valley's
   same-origin hosting and ingress assumptions.
 
-## Compatibility and migration
+## 7. Compatibility and migration
 
 This proposal is intentionally additive and migration-friendly.
 
@@ -297,9 +312,9 @@ The migration is compatible with parallel work on backend read models, OpenAPI,
 and roadmap tasks. It does not require a one-time switch from mockup to
 production UI.
 
-## Alternatives considered
+## 8. Alternatives considered
 
-### Option A: Treat the mockup as disposable and build a new frontend in Corbusier
+### 8.1. Option A: Treat the mockup as disposable and build a new frontend in Corbusier
 
 This would keep all production code inside one repository from the start, but
 it discards the value of the mockup as a proven user-interface and interaction
@@ -307,7 +322,7 @@ model. It also invites accidental drift from the validated card schemas and
 screen flows already documented. This option was rejected because it pays the
 cost of product discovery twice.
 
-### Option B: Keep using `leynos/corbusier-mockup` as the effective production frontend
+### 8.2. Option B: Keep using `leynos/corbusier-mockup` as the effective production frontend
 
 This would minimize short-term migration effort, but it keeps the production
 frontend outside the repository that owns the backend contracts, roadmap, and
@@ -315,7 +330,7 @@ release workflow. It would make cross-repository versioning, CI, Nile Valley
 packaging, and production change control harder than necessary. This option was
 rejected because it weakens ownership and makes coupling implicit.
 
-### Option C: Copy Wildside's PWA architecture wholesale
+### 8.3. Option C: Copy Wildside's PWA architecture wholesale
 
 Wildside offers strong precedents for cross-cutting concerns, but its product
 model is map-centric and offline-bundle-heavy. Corbusier's orchestration
@@ -323,7 +338,7 @@ product has different feature priorities and does not need those product
 concepts as-is. This option was rejected because it would import unrelated
 complexity and obscure the real reuse boundaries.
 
-## Open questions
+## 9. Open questions
 
 - Should Corbusier adopt TanStack Query cache persistence immediately, or wait
   until the first live data screens demonstrate a concrete offline or reload
@@ -338,7 +353,7 @@ complexity and obscure the real reuse boundaries.
   production PWA release, or is resilient online-first caching sufficient for
   the initial milestone?
 
-## Recommendation
+## 10. Recommendation
 
 Adopt the Corbusier frontend PWA by creating a Corbusier-owned `frontend-pwa/`
 workspace that imports the proved-out mockup design, preserves the shared v2a
