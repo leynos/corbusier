@@ -186,6 +186,8 @@ projection Data Transfer Objects (DTOs) designed to match the mockup cards.
 Corbusier should reuse Wildside's approach for cross-cutting application
 concerns that are not domain-specific:
 
+Table 5.4.1: Shared Wildside patterns reused by Corbusier.
+
 | Concern        | Wildside pattern to reuse                                                                                               | Corbusier application                                                                                                              |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Pagination     | Opaque keyset cursors, envelope responses, hypermedia `next`/`prev` links, and no total-count dependency                | Task lists, project lists, activity feeds, conversations, registries, and audit views                                              |

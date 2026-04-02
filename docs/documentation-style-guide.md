@@ -399,7 +399,9 @@ Include these sections as appropriate to the decision's complexity:
 - Use second-level headings (`##`) for major sections.
 - Use third-level headings (`###`) for subsections (e.g. phases, option names).
 - Use tables to compare options when multiple dimensions are relevant. Include
-  a caption below the table (e.g. “_Table 1: Trade-offs between X and Y._”).
+  a caption immediately above the table (e.g.
+  `Table 1.1.1: Trade-offs between X and Y.`) and leave exactly one blank line
+  between the caption and the table header row.
 - Include code snippets with language identifiers when illustrating technical
   approaches. Use `no_run` for illustrative Rust code that should not be
   executed.
@@ -450,11 +452,11 @@ YYYY-MM-DD.
 
 <Description, consequences, and trade-offs.>
 
+Table 1.1.1: Comparison of options.
+
 | Topic     | Option A | Option B |
 | --------- | -------- | -------- |
 | <Factor>  | <Value>  | <Value>  |
-
-_Table 1: Comparison of options._
 
 ## Decision outcome / proposed direction
 
