@@ -2338,8 +2338,10 @@ graph TB
 
 - **Conversation Data**: JSONB storage for flexible message formats
 - **Task Data**: Relational tables for structured workflow state
-- **Review Data**: Relational tables for review threads, comments, anchors,
-  sync checkpoints, outbound replies, and verification results
+- **Review Data**: Relational tables for review threads and comments; anchors,
+  sync checkpoints, and outbound replies are stored as fields within the
+  `review_threads` record and its sibling projection state rather than as
+  standalone tables
 - **Tenancy Partitioning**: `tenant_id` on tenant-owned tables with tenant-aware
   indexes and constraints
 - **Audit Data**: Append-only event tables with immutable records
@@ -5666,7 +5668,8 @@ CREATE TABLE review_verification_results (
     evidence JSONB NOT NULL DEFAULT '{}',
     verified_against_commit_sha VARCHAR(64),
     verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    FOREIGN KEY (review_thread_id, tenant_id) REFERENCES review_threads(id, tenant_id)
+    FOREIGN KEY (review_thread_id, tenant_id) REFERENCES review_threads(id, tenant_id),
+    UNIQUE (tenant_id, external_comment_id)
 );
 
 -- Event sourcing for audit trails with tenant attribution
@@ -6502,9 +6505,9 @@ pub struct HookExecutionResult {
 }
 ```
 
-Earlier sections of this document use legacy trigger names from the planning
-phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
-`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` -> `PostToolUse`.
+The legacy-to-runtime trigger name mapping and per-event payload schemas, ack
+semantics, and timeout rules are documented in section 6.4.2.4 "Hook Event
+Contract Reference".
 
 ### 6.4 Component Integration Patterns
 
@@ -10135,6 +10138,94 @@ The execution path carries workflow correlation through a dedicated execution
 scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
 `TaskId`, `ConversationId`, and non-indexed metadata while keeping
 `RequestContext` focused on tenant and identity concerns.
+
+###### Hook Event Contract Reference
+
+Every hook trigger delivers a `HookTriggerContext` to the hook engine
+containing a `TriggerContextId`, `HookTriggerType`, `HookExecutionScope`
+(optional `TaskId`, optional `ConversationId`, and a free-form JSON `metadata`
+value), and a `DateTime<Utc>` timestamp. The `metadata` value carries
+trigger-specific fields described per event below.
+
+Earlier sections of this document use legacy planning-phase names. The runtime
+mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
+`PreToolUse`, and `PostToolCall` -> `PostToolUse`. The remaining triggers
+(`PreCommit`, `PostCommit`, `PreMerge`, `PostMerge`, `PrePull`, `PostPull`,
+`PrePush`, `PostPush`, `PreDeploy`, `PostDeploy`) retain their names unchanged.
+
+**`TurnStart` (contract name `PreTurn`)**
+
+- **Payload fields:** `backend_id: String`, `conversation_id: UUID`,
+  `turn_id: UUID`, `model: String` (optional).
+- **Ack semantics:** The hook engine returns `HookExecutionStatus`. A
+  `Succeeded` status allows the turn to proceed; `Failed` aborts the turn
+  before the agent backend processes input.
+- **Timeout:** 5 s default. On timeout the trigger is treated as
+  `Succeeded` (fail-open) and the turn proceeds. No retry.
+
+**`TurnEnd` (contract name `PostTurn`)**
+
+- **Payload fields:** `backend_id: String`, `conversation_id: UUID`,
+  `turn_id: UUID`, `duration_ms: u64`, `message_count: u32`.
+- **Ack semantics:** Observational — the execution result is recorded but
+  does not block further processing. Any status is accepted.
+- **Timeout:** 5 s default. On timeout the result is logged and
+  discarded. No retry.
+
+**`PreToolUse` (contract name `PreToolCall`)**
+
+- **Payload fields:** `tool_name: String`, `server_id: UUID`,
+  `call_id: UUID`, `parameters: Value` (tool input JSON), `task_id: UUID`
+  (optional), `conversation_id: UUID` (optional).
+- **Ack semantics:** `Succeeded` permits the tool call; `Failed` blocks
+  execution and the denial is recorded in `hook_policy_audit_events`.
+  `PartialFailure` is treated as `Failed`.
+- **Timeout:** 10 s default. On timeout the trigger is treated as
+  `Failed` (fail-closed) and the tool call is denied. No retry; the caller
+  receives a governance-denied error.
+
+**`PostToolUse` (contract name `PostToolCall`)**
+
+- **Payload fields:** `tool_name: String`, `server_id: UUID`,
+  `call_id: UUID`, `parameters: Value`, `result: Value` (tool output JSON),
+  `duration_ms: u64`, `is_error: bool`.
+- **Ack semantics:** Observational — the execution result is persisted to
+  the audit trail. Any status is accepted.
+- **Timeout:** 10 s default. On timeout the result is logged and
+  discarded. No retry.
+
+**`PreCommit`**
+
+- **Payload fields:** `branch: String`, `commit_sha: String` (staging
+  SHA), `file_paths: Vec<String>`, `diff_stat: Value` (optional summary).
+- **Ack semantics:** `Succeeded` permits the commit; `Failed` aborts it.
+  A quality-gate action may attach violation details in the action result
+  `output` field.
+- **Timeout:** 30 s default. On timeout the trigger is treated as
+  `Failed` (fail-closed). No automatic retry; the operator may re-run the
+  commit.
+
+**`PreMerge`**
+
+- **Payload fields:** `source_branch: String`,
+  `target_branch: String`, `pull_request_ref: String` (optional),
+  `commit_sha: String`.
+- **Ack semantics:** `Succeeded` permits the merge; `Failed` blocks it.
+- **Timeout:** 30 s default, fail-closed on timeout. No retry.
+
+**`PreDeploy`**
+
+- **Payload fields:** `environment: String`, `artifact_ref: String`,
+  `commit_sha: String`, `deployer: String` (identity of the requesting agent or
+  user).
+- **Ack semantics:** `Succeeded` permits the deployment; `Failed` blocks
+  it.
+- **Timeout:** 60 s default, fail-closed on timeout. No retry.
+
+Post-event triggers (`PostCommit`, `PostMerge`, `PostPull`, `PostPush`,
+`PostDeploy`) are observational: they share the same payload shape as their
+pre-event counterpart plus an `outcome: String` field and do not gate workflow
+progression. A 5 s default timeout applies; on timeout the result is discarded.
 
 ###### Multi-Layer Policy Enforcement
 

@@ -166,11 +166,11 @@ impl MessageMetadata {
     /// object, preventing key collisions with top-level extension keys
     /// and making schema evolution predictable.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `ReviewLinkage` fails to serialize to JSON.  In practice
-    /// this cannot happen because every field is a `String` or
-    /// `Option<String>`, which are infallible under `serde_json`.
+    /// Returns `serde_json::Error` if the `ReviewLinkage` fails to
+    /// serialize.  In practice this cannot happen because every field is
+    /// a `String` or `Option<String>`.
     ///
     /// # Examples
     ///
@@ -180,20 +180,16 @@ impl MessageMetadata {
     /// let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
     ///     .with_file_path("src/lib.rs")
     ///     .with_commit_sha("abc123");
-    /// let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
+    /// let metadata = MessageMetadata::empty()
+    ///     .with_review_linkage(&linkage)
+    ///     .unwrap();
     /// let ext = metadata.extensions.get("review.linkage.v1").unwrap();
     /// assert_eq!(ext["review_comment_id"], "rc-42");
     /// assert_eq!(ext["reviewer"], "alice");
     /// ```
-    #[must_use]
-    #[expect(
-        clippy::expect_used,
-        reason = "ReviewLinkage contains only String/Option<String> fields; serde_json serialization is infallible"
-    )]
-    pub fn with_review_linkage(self, linkage: &ReviewLinkage) -> Self {
-        let value =
-            serde_json::to_value(linkage).expect("ReviewLinkage serializes to a JSON object");
-        self.with_extension("review.linkage.v1", value)
+    pub fn with_review_linkage(self, linkage: &ReviewLinkage) -> Result<Self, serde_json::Error> {
+        let value = serde_json::to_value(linkage)?;
+        Ok(self.with_extension("review.linkage.v1", value))
     }
 
     /// Sets the handoff metadata.

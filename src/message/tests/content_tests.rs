@@ -232,11 +232,17 @@ fn agent_response_audit_builders() {
 // ============================================================================
 
 #[rstest]
-fn review_linkage_round_trip_serialization() {
-    let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
+#[case::with_optional_fields(
+    ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
         .with_file_path("src/lib.rs")
-        .with_commit_sha("abc123");
-    let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
+        .with_commit_sha("abc123"),
+)]
+#[case::absent_optional_fields(ReviewLinkage::new("rc-99", "thread-root-1", "bob", "verified"))]
+fn review_linkage_round_trip_serialization(#[case] linkage: ReviewLinkage) {
+    let expected = linkage.clone();
+    let metadata = MessageMetadata::empty()
+        .with_review_linkage(&linkage)
+        .expect("serialize linkage");
 
     let json = serde_json::to_string(&metadata).expect("serialize");
     let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
@@ -247,32 +253,7 @@ fn review_linkage_round_trip_serialization() {
         .expect("review.linkage.v1 key present");
     let recovered: ReviewLinkage =
         serde_json::from_value(ext.clone()).expect("deserialize linkage");
-    assert_eq!(recovered.review_comment_id, "rc-42");
-    assert_eq!(recovered.thread_root_id, "thread-root-7");
-    assert_eq!(recovered.reviewer, "alice");
-    assert_eq!(recovered.file_path.as_deref(), Some("src/lib.rs"));
-    assert_eq!(recovered.commit_sha.as_deref(), Some("abc123"));
-    assert_eq!(recovered.verification_status, "pending");
-}
-
-#[rstest]
-fn review_linkage_with_absent_optional_fields() {
-    let linkage = ReviewLinkage::new("rc-99", "thread-root-1", "bob", "verified");
-    let metadata = MessageMetadata::empty().with_review_linkage(&linkage);
-
-    let json = serde_json::to_string(&metadata).expect("serialize");
-    let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
-
-    let ext = deserialized
-        .extensions
-        .get("review.linkage.v1")
-        .expect("review.linkage.v1 key present");
-    let recovered: ReviewLinkage =
-        serde_json::from_value(ext.clone()).expect("deserialize linkage");
-    assert_eq!(recovered.review_comment_id, "rc-99");
-    assert!(recovered.file_path.is_none());
-    assert!(recovered.commit_sha.is_none());
-    assert_eq!(recovered.verification_status, "verified");
+    assert_eq!(recovered, expected);
 }
 
 #[rstest]
@@ -283,7 +264,8 @@ fn review_linkage_does_not_collide_with_top_level_fields() {
         .with_commit_sha("deadbeef");
     let metadata = MessageMetadata::with_agent_backend("claude")
         .with_turn_id(turn_id)
-        .with_review_linkage(&linkage);
+        .with_review_linkage(&linkage)
+        .expect("serialize linkage");
 
     let json = serde_json::to_string(&metadata).expect("serialize");
     let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse as Value");
