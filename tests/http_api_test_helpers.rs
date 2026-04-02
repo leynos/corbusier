@@ -142,9 +142,10 @@ impl HttpApiAuth {
 /// Panics when `value` does not contain `key`.
 #[must_use]
 pub fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
-    value
-        .get(key)
-        .unwrap_or_else(|| panic!("expected field `{key}` to be present"))
+    let Some(field) = value.get(key) else {
+        panic!("expected field `{key}` to be present");
+    };
+    field
 }
 
 /// Returns the named string field from a JSON object used in HTTP API tests.
@@ -154,9 +155,10 @@ pub fn required_field<'a>(value: &'a Value, key: &str) -> &'a Value {
 /// Panics when `value` does not contain `key` or the field is not a string.
 #[must_use]
 pub fn required_str_field<'a>(value: &'a Value, key: &str) -> &'a str {
-    required_field(value, key)
-        .as_str()
-        .unwrap_or_else(|| panic!("expected field `{key}` to be a string"))
+    let Some(field) = required_field(value, key).as_str() else {
+        panic!("expected field `{key}` to be a string");
+    };
+    field
 }
 
 /// Adds a bearer token to a test request.
@@ -193,6 +195,8 @@ struct CustomJwtClaims {
 
 #[cfg(test)]
 mod tests {
+    //! Smoke tests for the shared HTTP API helper surface.
+
     use super::{HttpApiAuth, assert_v1_metadata, required_field, required_str_field, with_bearer};
     use actix_web::test as actix_test;
     use serde_json::json;
