@@ -10,9 +10,10 @@
 
 Corbusier should adopt a production Progressive Web App (PWA) frontend based on
 the proved-out user-interface and interaction model in
-`../../corbusier-mockup`, implemented as a first-class workspace inside the
-Corbusier repository and integrated with the existing backend through stable
-HTTP and Server-Sent Events (SSE) contracts.
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup),
+implemented as a first-class workspace inside the Corbusier repository and
+integrated with the existing backend through stable HTTP and Server-Sent Events
+(SSE) contracts.
 
 The proposal does not recommend copying the mockup wholesale into production.
 Instead, it recommends adopting the shared v2a frontend stack, carrying over
@@ -39,7 +40,7 @@ That gap creates several risks:
   converging on.
 - A later frontend implementation could regress into a second system design
   exercise instead of reusing the validated work already carried out in
-  `corbusier-mockup`.
+  [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup).
 - Shared Nile Valley concerns such as session identity, relative API routing,
   pagination envelopes, and deterministic retry semantics could be solved
   differently in Corbusier and Wildside, increasing maintenance cost.
@@ -54,13 +55,16 @@ Corbusier already has several strong architectural anchors:
 - `docs/corbusier-design.md` defines the orchestration-first backend and its
   domain boundaries.
 - `docs/corbusier-api-design.md` already derives a backend-facing frontend
-  contract from `corbusier-mockup`, including projects, tasks, conversations,
-  directives, suggestions, governance, identity, pagination, and SSE.
+  contract from
+  [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup),
+  including projects, tasks, conversations, directives, suggestions,
+  governance, identity, pagination, and SSE.
 - `docs/roadmap.md` already contains backend work items for OpenAPI, reusable
   pagination, and read-model projections aligned with the mockup.
 
 The proved-out frontend sits outside this repository in
-`../../corbusier-mockup`. That mockup already establishes:
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup). That
+mockup already establishes:
 
 - the shared v2a stack for df12 Productions PWAs,
 - the data-model-driven card architecture used by both Wildside and Corbusier,
@@ -86,7 +90,7 @@ single implementation direction for Corbusier.
 - Goals:
   - Adopt a Corbusier-owned PWA workspace derived from the proved-out mockup.
   - Standardize on the shared v2a frontend stack already validated in
-    `corbusier-mockup`.
+    [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup).
   - Reuse Wildside's established patterns for pagination, idempotency,
     identity, and event-stream contracts where those concerns are the same.
   - Preserve Corbusier-specific domain behaviour and information architecture
@@ -111,7 +115,9 @@ single implementation direction for Corbusier.
 
 ### Adopt the mockup as the UX and contract proving ground
 
-Corbusier should treat `../../corbusier-mockup` as the proving ground for:
+Corbusier should treat
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) as the
+proving ground for:
 
 - route and screen structure,
 - visual language and component composition,
@@ -126,7 +132,8 @@ fixture-driven modules inside a repository-owned `frontend-pwa/` workspace.
 ### Create a repository-owned `frontend-pwa/` workspace
 
 Corbusier should adopt a dedicated frontend workspace in the main repository,
-using the same broad toolchain already validated in `corbusier-mockup`:
+using the same broad toolchain already validated in
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup):
 
 - Bun for package management and scripts,
 - Vite for bundling and development,
@@ -228,8 +235,9 @@ single cut-over event.
 ### Functional requirements
 
 - The adopted PWA must cover the screen families already proven in
-  `corbusier-mockup`: dashboard, tasks, projects, conversations, directives, AI
-  suggestions, system pages, and settings/global interactions.
+  [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup):
+  dashboard, tasks, projects, conversations, directives, AI suggestions, system
+  pages, and settings/global interactions.
 - The frontend must consume backend projections that preserve the mockup's card
   and detail-view semantics rather than flattening them into generic transport
   models.
@@ -244,7 +252,8 @@ single cut-over event.
 ### Technical requirements
 
 - The production PWA must use a repository-owned workspace rather than relying
-  on `corbusier-mockup` as a runtime dependency.
+  on [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) as
+  a runtime dependency.
 - The frontend stack must stay aligned with the shared v2a stack unless a later
   RFC or ADR deliberately diverges.
 - API list endpoints must follow the same pagination contract across Corbusier
@@ -262,11 +271,12 @@ single cut-over event.
 
 This proposal is intentionally additive and migration-friendly.
 
-`corbusier-mockup` remains the proving ground until features are promoted into
-Corbusier's own `frontend-pwa/` workspace. No immediate rewrite of existing
-backend code is required merely to stand up the workspace shell. The backend
-changes already proposed in `docs/corbusier-api-design.md` remain the source of
-truth for live data contracts.
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) remains
+the proving ground until features are promoted into Corbusier's own
+`frontend-pwa/` workspace. No immediate rewrite of existing backend code is
+required merely to stand up the workspace shell. The backend changes already
+proposed in `docs/corbusier-api-design.md` remain the source of truth for live
+data contracts.
 
 Migration should happen in the following order:
 
@@ -297,7 +307,7 @@ model. It also invites accidental drift from the validated card schemas and
 screen flows already documented. This option was rejected because it pays the
 cost of product discovery twice.
 
-### Option B: Keep using `corbusier-mockup` as the effective production frontend
+### Option B: Keep using `leynos/corbusier-mockup` as the effective production frontend
 
 This would minimize short-term migration effort, but it keeps the production
 frontend outside the repository that owns the backend contracts, roadmap, and
