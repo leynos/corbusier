@@ -1,4 +1,15 @@
-//! Conversation workflow service.
+//! Application service for conversation lifecycle and message workflows.
+//!
+//! This module implements the service-layer orchestration for conversations in
+//! the hexagonal architecture. [`ConversationService`] creates and loads
+//! conversations, appends messages, coordinates validation and persistence
+//! through repository traits, and keeps transport concerns out of the domain.
+//!
+//! A key behaviour is optimistic retry when appending messages: the service
+//! allocates the next sequence number, validates the message, and retries on
+//! transient duplicate-sequence conflicts before surfacing an error. This is
+//! the boundary where repository failures, validation failures, and
+//! conversation existence checks are normalised for callers.
 
 use crate::context::RequestContext;
 use crate::message::{
@@ -182,7 +193,8 @@ where
             }
         }
 
-        // After MAX_RETRIES, return the last duplicate sequence error
+        // Defensive fallback for MAX_RETRIES == 0; with the current value we
+        // always record a duplicate-sequence error before the loop exits.
         Err(last_error.map_or_else(
             || ConversationServiceError::RetryExhausted,
             ConversationServiceError::MessageRepository,

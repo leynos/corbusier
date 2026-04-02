@@ -67,11 +67,14 @@ pub trait MessageRepository: Send + Sync {
 
     /// Returns the next sequence number for a conversation.
     ///
-    /// For a new conversation with no messages, returns `SequenceNumber::new(1)`.
+    /// For an existing conversation with no messages, returns
+    /// `SequenceNumber::new(1)`.
     ///
     /// # Errors
     ///
-    /// Returns `RepositoryError` if the query fails.
+    /// Returns [`RepositoryError::ConversationNotFound`] when the conversation
+    /// does not exist in implementations that can verify conversation
+    /// existence, or another `RepositoryError` if the query fails.
     async fn next_sequence_number(
         &self,
         ctx: &RequestContext,

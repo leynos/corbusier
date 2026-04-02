@@ -258,7 +258,9 @@ impl MessageRepository for PostgresMessageRepository {
                 .map_err(RepositoryError::database)?;
 
             if conversation_exists.is_none() {
-                return Ok(SequenceNumber::new(1));
+                return Err(RepositoryError::ConversationNotFound(
+                    ConversationId::from_uuid(uuid),
+                ));
             }
 
             let max_seq: Option<i64> = messages::table

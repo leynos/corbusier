@@ -1,4 +1,18 @@
-//! Shared HTTP error mapping.
+//! HTTP error mapping and serialization for the API surface.
+//!
+//! This module translates domain and service-layer failures into the versioned
+//! HTTP error envelope returned by the API. Helpers such as
+//! `map_task_domain_error`, `map_tool_domain_error`, and
+//! `map_tool_catalog_error` map typed failures onto stable status codes and
+//! response bodies, for example validation failures to `400 Bad Request`,
+//! missing resources to `404 Not Found`, and unexpected infrastructure
+//! failures to `500 Internal Server Error`.
+//!
+//! Correlation IDs are threaded through [`ApiError`] so handlers can preserve
+//! request identifiers in both logs and serialized error payloads. The key
+//! invariant is that handler-supplied request IDs are reused when available,
+//! while fallback responses generate a fresh identifier only when no
+//! correlation ID was attached earlier in the request lifecycle.
 
 use super::response::{ErrorPayload, json_error};
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
@@ -231,6 +245,9 @@ fn map_conversation_repository_error(
 )]
 fn map_message_repository_error(error: RepositoryError) -> ApiError {
     match error {
+        RepositoryError::ConversationNotFound(conversation_id) => {
+            ApiError::not_found("conversation_not_found", conversation_id.to_string())
+        }
         RepositoryError::NotFound(message_id) => {
             ApiError::not_found("message_not_found", message_id.to_string())
         }
@@ -260,6 +277,17 @@ fn map_message_repository_error(error: RepositoryError) -> ApiError {
 
 fn map_task_domain_error(error: &TaskDomainError) -> ApiError {
     match error {
+        TaskDomainError::InvalidIssueProvider(_)
+        | TaskDomainError::InvalidRepository(_)
+        | TaskDomainError::InvalidIssueNumber(_)
+        | TaskDomainError::EmptyIssueTitle
+        | TaskDomainError::InvalidBranchName(_)
+        | TaskDomainError::InvalidPullRequestNumber(_)
+        | TaskDomainError::InvalidBranchRefFormat(_)
+        | TaskDomainError::InvalidPullRequestRefFormat(_)
+        | TaskDomainError::CanonicalRefTooLong(_) => {
+            ApiError::bad_request("task_validation_failed", error.to_string())
+        }
         TaskDomainError::BranchAlreadyAssociated(task_id) => {
             ApiError::conflict("branch_already_associated", task_id.to_string())
         }
@@ -269,7 +297,6 @@ fn map_task_domain_error(error: &TaskDomainError) -> ApiError {
         TaskDomainError::InvalidStateTransition { .. } => {
             ApiError::conflict("invalid_task_transition", error.to_string())
         }
-        _ => ApiError::bad_request("task_validation_failed", error.to_string()),
     }
 }
 
@@ -293,6 +320,23 @@ fn map_task_repository_error(error: TaskRepositoryError) -> ApiError {
 
 fn map_tool_domain_error(error: ToolRegistryDomainError) -> ApiError {
     match error {
+        ToolRegistryDomainError::EmptyServerName
+        | ToolRegistryDomainError::InvalidServerName(_)
+        | ToolRegistryDomainError::ServerNameTooLong(_)
+        | ToolRegistryDomainError::EmptyStdioCommand
+        | ToolRegistryDomainError::EmptyWorkingDirectory
+        | ToolRegistryDomainError::EmptyHttpSseBaseUrl
+        | ToolRegistryDomainError::InvalidHttpSseBaseUrl(_)
+        | ToolRegistryDomainError::EmptyToolName
+        | ToolRegistryDomainError::EmptyToolDescription => {
+            ApiError::bad_request("tool_request_failed", error.to_string())
+        }
+        ToolRegistryDomainError::InvalidLifecycleTransition { .. } => {
+            ApiError::conflict("invalid_mcp_server_transition", error.to_string())
+        }
+        ToolRegistryDomainError::ToolQueryRequiresRunning { server_id, .. } => {
+            ApiError::conflict("mcp_server_not_running", server_id.to_string())
+        }
         ToolRegistryDomainError::ToolNotFound(tool_name) => {
             ApiError::not_found("tool_not_found", tool_name)
         }
@@ -311,7 +355,6 @@ fn map_tool_domain_error(error: ToolRegistryDomainError) -> ApiError {
         ToolRegistryDomainError::ToolCallTimeout { tool_name, .. } => {
             ApiError::new(StatusCode::GATEWAY_TIMEOUT, "tool_call_timeout", tool_name)
         }
-        _ => ApiError::bad_request("tool_request_failed", error.to_string()),
     }
 }
 
@@ -321,7 +364,13 @@ fn map_tool_catalog_error(error: ToolCatalogError) -> ApiError {
         | ToolCatalogError::DuplicateWithinBatch { tool_name, .. } => {
             ApiError::conflict("duplicate_tool_catalog_entry", tool_name)
         }
-        _ => {
+        ToolCatalogError::NotFound(name) => {
+            ApiError::not_found("tool_catalog_entry_not_found", name)
+        }
+        ToolCatalogError::MixedServerBatch { reason } => {
+            ApiError::bad_request("mixed_tool_server_batch", reason)
+        }
+        ToolCatalogError::InvalidPersistedData { .. } | ToolCatalogError::Persistence { .. } => {
             tracing::error!(error = %error, "tool catalog error");
             ApiError::internal()
         }

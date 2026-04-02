@@ -32,6 +32,7 @@ mod postgres {
 
     pub mod cluster;
     pub mod helpers;
+    pub mod http_api_surface_common;
 
     mod agent_session_tests;
     mod agent_turn_orchestration_tests;

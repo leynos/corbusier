@@ -17,13 +17,36 @@ async fn next_sequence_number_returns_one_for_empty(
 ) -> Result<(), BoxError> {
     let cluster = postgres_cluster?;
     ensure_template(cluster).await?;
+    let (temp_db, repo) = setup_repository(cluster).await?;
+
+    let ctx = test_request_context;
+    let conv_id = ConversationId::new();
+    insert_conversation(cluster, temp_db.name(), conv_id, &ctx).await?;
+    let next = repo.next_sequence_number(&ctx, conv_id).await?;
+
+    assert_eq!(next.value(), 1);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+async fn next_sequence_number_returns_conversation_not_found_for_missing_conversation(
+    postgres_cluster: Result<PostgresCluster, BoxError>,
+    test_request_context: RequestContext,
+) -> Result<(), BoxError> {
+    let cluster = postgres_cluster?;
+    ensure_template(cluster).await?;
     let (_temp_db, repo) = setup_repository(cluster).await?;
 
     let ctx = test_request_context;
     let conv_id = ConversationId::new();
-    let next = repo.next_sequence_number(&ctx, conv_id).await?;
+    let result = repo.next_sequence_number(&ctx, conv_id).await;
 
-    assert_eq!(next.value(), 1);
+    assert!(matches!(
+        result,
+        Err(corbusier::message::error::RepositoryError::ConversationNotFound(id))
+            if id == conv_id
+    ));
     Ok(())
 }
 

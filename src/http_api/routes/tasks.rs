@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::task::{
-    domain::{Task, TaskId},
+    domain::{BranchRef, PullRequestRef, Task, TaskId, TaskOrigin, TaskState},
     services::{
         AssociateBranchRequest, AssociatePullRequestRequest, CreateTaskFromIssueRequest,
         TransitionTaskRequest,
@@ -58,10 +58,10 @@ struct AssociatePullRequestBody {
 #[derive(Debug, Serialize)]
 struct TaskDto {
     id: TaskId,
-    origin: crate::task::domain::TaskOrigin,
-    branch_ref: Option<crate::task::domain::BranchRef>,
-    pull_request_ref: Option<crate::task::domain::PullRequestRef>,
-    state: crate::task::domain::TaskState,
+    origin: TaskOrigin,
+    branch_ref: Option<BranchRef>,
+    pull_request_ref: Option<PullRequestRef>,
+    state: TaskState,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
