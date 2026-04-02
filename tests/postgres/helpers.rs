@@ -15,7 +15,6 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use mockable::DefaultClock;
 use rstest::fixture;
-use std::fmt;
 use uuid::Uuid;
 
 /// SQL to create the base schema for tests.
@@ -145,22 +144,12 @@ fn map_box<T, E: std::error::Error + Send + Sync + 'static>(
     result.map_err(|err| Box::new(err) as BoxError)
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("migration {label} failed")]
 struct MigrationError {
     label: &'static str,
+    #[source]
     source: BoxError,
-}
-
-impl fmt::Display for MigrationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "migration {} failed", self.label)
-    }
-}
-
-impl std::error::Error for MigrationError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(self.source.as_ref())
-    }
 }
 
 fn execute_migration(
