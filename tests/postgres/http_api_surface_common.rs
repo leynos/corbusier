@@ -111,27 +111,30 @@ pub(crate) async fn build_tool_service(
     let register_lifecycle = lifecycle.clone();
     let start_lifecycle = lifecycle;
     let discover_service = tool_service.clone();
+    let register_ctx = ctx.clone();
+    let start_ctx = ctx.clone();
+    let discover_ctx = ctx.clone();
 
     bootstrap_file_tools_server(
         host.as_ref(),
         |request| async move {
             register_lifecycle
                 .as_ref()
-                .register(ctx, request)
+                .register(&register_ctx, request)
                 .await
                 .map_err(eyre::Report::from)
         },
         |server_id| async move {
             start_lifecycle
                 .as_ref()
-                .start(ctx, server_id)
+                .start(&start_ctx, server_id)
                 .await
                 .map(|_| ())
                 .map_err(eyre::Report::from)
         },
         |server_id| async move {
             discover_service
-                .discover_and_persist_tools(ctx, server_id)
+                .discover_and_persist_tools(&discover_ctx, server_id)
                 .await
                 .map(|_| ())
                 .map_err(eyre::Report::from)

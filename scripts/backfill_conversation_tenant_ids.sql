@@ -36,3 +36,7 @@ WHERE messages.conversation_id = conversations.id
 SELECT id, task_id
 FROM conversations
 WHERE tenant_id = '00000000-0000-0000-0000-000000000000';
+
+SELECT id, conversation_id
+FROM messages
+WHERE tenant_id = '00000000-0000-0000-0000-000000000000';
