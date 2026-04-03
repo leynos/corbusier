@@ -109,8 +109,8 @@ When writing a roadmap step, make it function as a real workstream:
   sequencing or design choices.
 - Group only tasks that serve the same delivery objective. If the tasks do not
   share one operational purpose, split the step.
-- Sequence steps so each workstream either unlocks the next one or reduces a
-  specific class of delivery risk.
+- Sequence steps so that each workstream either unlocks the next one or reduces
+  a specific class of delivery risk.
 
 Avoid using steps as passive document structure. Headings such as “Backend
 changes”, “Frontend work”, or “Other tasks” are not sufficient unless they are
