@@ -43,8 +43,8 @@ async fn created_draft_task_through_api(
         .await?;
     let status = current_world.last_status;
     eyre::ensure!(
-        matches!(status, Some(code) if (200..300).contains(&code)),
-        "expected task creation to succeed, got status {:?} with body {}",
+        status == Some(201),
+        "expected task creation to return 201, got status {:?} with body {}",
         status,
         current_world
             .last_body

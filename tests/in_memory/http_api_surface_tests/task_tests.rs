@@ -38,7 +38,7 @@ where
     Ok(required_str_field(required_field(required_field(&body, "data"), "task"), "id").to_owned())
 }
 
-async fn get_task<F, Fut, B>(send: F, token: &str, task_id: &str) -> Result<(), eyre::Report>
+async fn get_task<F, Fut, B>(send: F, token: &str, task_id: &str) -> Result<String, eyre::Report>
 where
     F: FnOnce(actix_web::test::TestRequest) -> Fut,
     Fut: std::future::Future<Output = actix_web::dev::ServiceResponse<B>>,
@@ -60,7 +60,11 @@ where
         required_str_field(required_field(required_field(&body, "data"), "task"), "id") == task_id,
         "expected returned task id to equal requested task id"
     );
-    Ok(())
+    Ok(required_field(required_field(&body, "data"), "task")
+        .get("state")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| eyre::eyre!("expected returned task state to be present"))?
+        .to_owned())
 }
 
 async fn transition_task<F, Fut, B>(send: F, token: &str, task_id: &str) -> Result<(), eyre::Report>
@@ -113,7 +117,7 @@ fn task_routes_support_create_get_and_transition(
             &token,
         )
         .await?;
-        get_task(
+        let _initial_state = get_task(
             |request| actix_web::test::call_service(&app, request.to_request()),
             &token,
             &task_id,
@@ -125,6 +129,16 @@ fn task_routes_support_create_get_and_transition(
             &task_id,
         )
         .await?;
+        let updated_state = get_task(
+            |request| actix_web::test::call_service(&app, request.to_request()),
+            &token,
+            &task_id,
+        )
+        .await?;
+        eyre::ensure!(
+            updated_state == "in_progress",
+            "expected persisted task state to be in_progress, got {updated_state}"
+        );
 
         Ok(())
     })

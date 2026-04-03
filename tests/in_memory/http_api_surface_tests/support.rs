@@ -1,6 +1,6 @@
 //! Shared support for in-memory HTTP API surface tests.
 
-use crate::http_api_test_helpers::HttpApiAuth;
+use crate::http_api_test_helpers::{HttpApiAuth, bootstrap_file_tools_server};
 use actix_web::test as actix_test;
 use corbusier::{
     http_api::{ApiConfig, ApiState, BearerTokenAuthenticator},
@@ -15,15 +15,12 @@ use corbusier::{
             AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
             memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
         },
-        domain::{LogRetentionPolicy, McpToolDefinition, McpTransport},
-        services::{
-            McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
-            ToolDiscoveryRoutingService,
-        },
+        domain::LogRetentionPolicy,
+        services::{McpServerLifecycleService, ServicePorts, ToolDiscoveryRoutingService},
     },
 };
 use mockable::{Clock, DefaultClock};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::sync::Arc;
 
 pub const TEST_JWT_SECRET: &str = "test-http-api-secret";
@@ -33,6 +30,78 @@ pub use crate::http_api_test_helpers::{assert_v1_metadata, with_bearer};
 pub struct TestBundle {
     pub state: ApiState,
     pub auth: HttpApiAuth,
+}
+
+async fn build_tool_service(
+    ctx: &corbusier::context::RequestContext,
+    clock: Arc<DefaultClock>,
+) -> Result<
+    Arc<
+        ToolDiscoveryRoutingService<
+            InMemoryToolCatalog,
+            InMemoryMcpServerRegistry,
+            InMemoryMcpServerHost,
+            AllowAllPolicy,
+            ObjectStoreLogAdapter,
+            DefaultClock,
+        >,
+    >,
+    eyre::Report,
+> {
+    let registry = Arc::new(InMemoryMcpServerRegistry::new());
+    let catalog = Arc::new(InMemoryToolCatalog::new());
+    let host = Arc::new(InMemoryMcpServerHost::new());
+    let lifecycle = Arc::new(McpServerLifecycleService::new(
+        registry.clone(),
+        host.clone(),
+        clock.clone(),
+    ));
+    let tool_service = Arc::new(ToolDiscoveryRoutingService::new(
+        ServicePorts {
+            catalog,
+            registry: registry.clone(),
+            host: host.clone(),
+            governance: Arc::new(AllowAllPolicy::new()),
+            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
+        },
+        LogRetentionPolicy::default(),
+        clock.clone(),
+    ));
+    let register_ctx = ctx.clone();
+    let start_ctx = ctx.clone();
+    let discover_ctx = ctx.clone();
+    let register_lifecycle = lifecycle.clone();
+    let start_lifecycle = lifecycle;
+    let discover_service = tool_service.clone();
+
+    bootstrap_file_tools_server(
+        host.as_ref(),
+        |request| async move {
+            register_lifecycle
+                .as_ref()
+                .register(&register_ctx, request)
+                .await
+                .map_err(eyre::Report::from)
+        },
+        |server_id| async move {
+            start_lifecycle
+                .as_ref()
+                .start(&start_ctx, server_id)
+                .await
+                .map(|_| ())
+                .map_err(eyre::Report::from)
+        },
+        |server_id| async move {
+            discover_service
+                .discover_and_persist_tools(&discover_ctx, server_id)
+                .await
+                .map(|_| ())
+                .map_err(eyre::Report::from)
+        },
+    )
+    .await?;
+
+    Ok(tool_service)
 }
 
 pub async fn build_bundle() -> Result<TestBundle, eyre::Report> {
@@ -51,50 +120,7 @@ pub async fn build_bundle() -> Result<TestBundle, eyre::Report> {
         Arc::new(InMemoryTaskRepository::new()),
         clock.clone(),
     ));
-
-    let registry = Arc::new(InMemoryMcpServerRegistry::new());
-    let catalog = Arc::new(InMemoryToolCatalog::new());
-    let host = Arc::new(InMemoryMcpServerHost::new());
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
-    let tool_service = Arc::new(ToolDiscoveryRoutingService::new(
-        ServicePorts {
-            catalog,
-            registry: registry.clone(),
-            host: host.clone(),
-            governance: Arc::new(AllowAllPolicy::new()),
-            log_store: Arc::new(ObjectStoreLogAdapter::in_memory()),
-        },
-        LogRetentionPolicy::default(),
-        clock.clone(),
-    ));
-
-    let server = lifecycle
-        .register(
-            &ctx,
-            RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
-        )
-        .await?;
-    host.set_tool_catalog(
-        server.name().clone(),
-        vec![McpToolDefinition::new(
-            "read_file",
-            "Read a file from disk",
-            json!({
-                "type": "object",
-                "properties": { "path": { "type": "string" } },
-                "required": ["path"]
-            }),
-        )?],
-    )?;
-    host.set_tool_call_result(
-        server.name().clone(),
-        "read_file",
-        json!({"content": "hello from tool"}),
-    )?;
-    lifecycle.start(&ctx, server.id()).await?;
-    tool_service
-        .discover_and_persist_tools(&ctx, server.id())
-        .await?;
+    let tool_service = build_tool_service(&ctx, clock.clone()).await?;
 
     Ok(TestBundle {
         state: ApiState::new(

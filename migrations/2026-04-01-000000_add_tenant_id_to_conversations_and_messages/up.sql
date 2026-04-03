@@ -1,4 +1,8 @@
 -- Add tenant_id to conversations and messages for tenant isolation.
+--
+-- Deploy note:
+-- Resolve any nil UUID backfill rows with `scripts/backfill_conversation_tenant_ids.sql`
+-- before enabling tenant-scoped application queries in production.
 
 -- 1. conversations
 ALTER TABLE conversations

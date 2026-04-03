@@ -11,7 +11,10 @@ use actix_web::{HttpResponse, http::StatusCode, web};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::message::domain::{ContentPart, Conversation, ConversationId, Message, Role};
+use crate::message::domain::{
+    ContentPart, Conversation, ConversationId, ConversationState, Message, MessageId,
+    MessageMetadata, Role, SequenceNumber,
+};
 use crate::message::services::AppendMessageRequest;
 
 #[derive(Debug, Deserialize)]
@@ -28,7 +31,7 @@ struct AppendMessageBody {
 #[derive(Debug, Serialize)]
 struct ConversationDto {
     id: ConversationId,
-    state: crate::message::domain::ConversationState,
+    state: ConversationState,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -46,13 +49,13 @@ impl From<Conversation> for ConversationDto {
 
 #[derive(Debug, Serialize)]
 struct MessageDto {
-    id: crate::message::domain::MessageId,
+    id: MessageId,
     conversation_id: ConversationId,
     role: Role,
     content: Vec<ContentPart>,
-    metadata: crate::message::domain::MessageMetadata,
+    metadata: MessageMetadata,
     created_at: chrono::DateTime<chrono::Utc>,
-    sequence_number: crate::message::domain::SequenceNumber,
+    sequence_number: SequenceNumber,
 }
 
 impl From<Message> for MessageDto {

@@ -15,20 +15,17 @@ use corbusier::{
             AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
             memory::{InMemoryMcpServerRegistry, InMemoryToolCatalog},
         },
-        domain::{LogRetentionPolicy, McpToolDefinition, McpTransport},
-        services::{
-            McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
-            ToolDiscoveryRoutingService,
-        },
+        domain::LogRetentionPolicy,
+        services::{McpServerLifecycleService, ServicePorts, ToolDiscoveryRoutingService},
     },
 };
 use mockable::{Clock, DefaultClock};
 use rstest::fixture;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::future::Future;
 use std::sync::Arc;
 
-use crate::http_api_test_helpers::HttpApiAuth;
+use crate::http_api_test_helpers::{HttpApiAuth, bootstrap_file_tools_server};
 
 const TEST_JWT_SECRET: &str = "test-http-api-secret";
 
@@ -95,17 +92,43 @@ pub(super) fn required_str_field<'a>(value: &'a Value, key: &str) -> Result<&'a 
     })
 }
 
-fn block_on_setup<F, T, E>(future: F) -> Result<T, eyre::Report>
+fn send_runtime_result<T>(
+    sender: &std::sync::mpsc::SyncSender<Result<T, eyre::Report>>,
+    result: Result<T, eyre::Report>,
+) {
+    drop(sender.send(result));
+}
+
+fn block_on_setup<F, Fut, T, E>(build_future: F) -> Result<T, eyre::Report>
 where
-    F: Future<Output = Result<T, E>>,
-    E: Into<eyre::Report>,
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: Future<Output = Result<T, E>> + 'static,
+    T: Send + 'static,
+    E: Into<eyre::Report> + Send + 'static,
 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future).map_err(Into::into))
+        let is_multi_thread = matches!(
+            handle.runtime_flavor(),
+            tokio::runtime::RuntimeFlavor::MultiThread
+        ) && handle.metrics().num_workers() > 0;
+        if is_multi_thread {
+            tokio::task::block_in_place(|| handle.block_on(build_future()).map_err(Into::into))
+        } else {
+            let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+            std::thread::spawn(move || {
+                let result = tokio::runtime::Runtime::new()
+                    .map_err(|err| eyre::eyre!("HTTP API test runtime should be created: {err}"))
+                    .and_then(|runtime| runtime.block_on(build_future()).map_err(Into::into));
+                send_runtime_result(&sender, result);
+            });
+            receiver
+                .recv()
+                .map_err(|err| eyre::eyre!("HTTP API test runtime thread should return: {err}"))?
+        }
     } else {
         let runtime = tokio::runtime::Runtime::new()
             .map_err(|err| eyre::eyre!("HTTP API test runtime should be created: {err}"))?;
-        runtime.block_on(future).map_err(Into::into)
+        runtime.block_on(build_future()).map_err(Into::into)
     }
 }
 
@@ -148,8 +171,9 @@ struct ToolInfrastructure {
             DefaultClock,
         >,
     >,
-    lifecycle:
+    lifecycle: Arc<
         McpServerLifecycleService<InMemoryMcpServerRegistry, InMemoryMcpServerHost, DefaultClock>,
+    >,
     host: Arc<InMemoryMcpServerHost>,
 }
 
@@ -157,7 +181,11 @@ fn build_tool_infrastructure(clock: Arc<DefaultClock>) -> ToolInfrastructure {
     let registry = Arc::new(InMemoryMcpServerRegistry::new());
     let catalog = Arc::new(InMemoryToolCatalog::new());
     let host = Arc::new(InMemoryMcpServerHost::new());
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
+    let lifecycle = Arc::new(McpServerLifecycleService::new(
+        registry.clone(),
+        host.clone(),
+        clock.clone(),
+    ));
     let tool_service = Arc::new(ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog,
@@ -180,46 +208,43 @@ fn setup_file_tools_server(
     ctx: &RequestContext,
     infrastructure: &ToolInfrastructure,
 ) -> Result<(), eyre::Report> {
-    let server = block_on_setup(async {
-        infrastructure
-            .lifecycle
-            .register(
-                ctx,
-                RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
-            )
-            .await
-    })?;
-    infrastructure
-        .host
-        .set_tool_catalog(
-            server.name().clone(),
-            vec![McpToolDefinition::new(
-                "read_file",
-                "Read a file from disk",
-                json!({
-                    "type": "object",
-                    "properties": { "path": { "type": "string" } },
-                    "required": ["path"]
-                }),
-            )?],
+    let request_ctx = ctx.clone();
+    let host = infrastructure.host.clone();
+    let lifecycle = infrastructure.lifecycle.clone();
+    let tool_service = infrastructure.tool_service.clone();
+    let register_ctx = request_ctx.clone();
+    let start_ctx = request_ctx.clone();
+    let discover_ctx = request_ctx;
+    let register_lifecycle = lifecycle.clone();
+    let start_lifecycle = lifecycle;
+    let discover_service = tool_service;
+    block_on_setup(move || async move {
+        bootstrap_file_tools_server(
+            host.as_ref(),
+            |request| async move {
+                register_lifecycle
+                    .register(&register_ctx, request)
+                    .await
+                    .map_err(eyre::Report::from)
+            },
+            |server_id| async move {
+                start_lifecycle
+                    .start(&start_ctx, server_id)
+                    .await
+                    .map(|_| ())
+                    .map_err(eyre::Report::from)
+            },
+            |server_id| async move {
+                discover_service
+                    .as_ref()
+                    .discover_and_persist_tools(&discover_ctx, server_id)
+                    .await
+                    .map(|_| ())
+                    .map_err(eyre::Report::from)
+            },
         )
-        .map_err(|error| eyre::eyre!("tool catalog should be set: {error}"))?;
-    infrastructure
-        .host
-        .set_tool_call_result(
-            server.name().clone(),
-            "read_file",
-            json!({"content": "hello from tool"}),
-        )
-        .map_err(|error| eyre::eyre!("tool call result should be set: {error}"))?;
-    block_on_setup(async { infrastructure.lifecycle.start(ctx, server.id()).await })?;
-    block_on_setup(async {
-        infrastructure
-            .tool_service
-            .discover_and_persist_tools(ctx, server.id())
-            .await
-    })?;
-    Ok(())
+        .await
+    })
 }
 
 fn build_world() -> Result<HttpApiWorld, eyre::Report> {

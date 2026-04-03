@@ -69,9 +69,8 @@ impl PostgresConversationRepository {
 }
 
 fn row_to_conversation(row: &ConversationRow) -> ConversationRepositoryResult<Conversation> {
-    let state = ConversationState::try_from(row.state.as_str()).map_err(|err| {
-        ConversationRepositoryError::persistence(std::io::Error::other(err.to_string()))
-    })?;
+    let state = ConversationState::try_from(row.state.as_str())
+        .map_err(|err| ConversationRepositoryError::persistence(std::io::Error::other(err)))?;
     Ok(Conversation::from_persisted(
         ConversationId::from_uuid(row.id),
         state,

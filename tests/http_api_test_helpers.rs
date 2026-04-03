@@ -4,11 +4,18 @@ use actix_web::{http::header, test as actix_test};
 use corbusier::{
     context::{CorrelationId, RequestContext, SessionId, TenantId, UserId},
     http_api::JwtClaims,
+    tool_registry::{
+        adapters::InMemoryMcpServerHost,
+        domain::{McpServerId, McpServerRegistration, McpToolDefinition, McpTransport},
+        services::RegisterMcpServerRequest,
+    },
 };
 use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
+
+const JWT_TTL_SECONDS: i64 = 86_400;
 
 /// Consistent JWT and request-context fixture for HTTP API tests.
 pub struct HttpApiAuth {
@@ -42,7 +49,9 @@ impl HttpApiAuth {
                 self.user_id,
                 self.tenant_id,
                 self.session_id,
-                chrono::Utc::now().timestamp().saturating_add(3600),
+                chrono::Utc::now()
+                    .timestamp()
+                    .saturating_add(JWT_TTL_SECONDS),
             ),
             &EncodingKey::from_secret(self.secret.as_bytes()),
         )
@@ -96,7 +105,9 @@ impl HttpApiAuth {
             sub: self.user_id.to_string(),
             tenant_id: self.tenant_id.to_string(),
             session_id: self.session_id.to_string(),
-            exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            exp: chrono::Utc::now()
+                .timestamp()
+                .saturating_add(JWT_TTL_SECONDS),
             role: None,
             tenant_kind: Some(tenant_kind.into()),
         })
@@ -112,7 +123,9 @@ impl HttpApiAuth {
             sub: "not-a-uuid".to_owned(),
             tenant_id: "also-not-a-uuid".to_owned(),
             session_id: "still-not-a-uuid".to_owned(),
-            exp: chrono::Utc::now().timestamp().saturating_add(3600),
+            exp: chrono::Utc::now()
+                .timestamp()
+                .saturating_add(JWT_TTL_SECONDS),
             role: None,
             tenant_kind: Some("user".to_owned()),
         })
@@ -180,6 +193,61 @@ pub fn assert_v1_metadata(body: &Value) {
     assert_eq!(required_field(metadata, "version"), "v1");
     assert!(required_field(metadata, "request_id").is_string());
     assert!(required_field(metadata, "timestamp").is_string());
+}
+
+/// Registers and starts the standard `file_tools` MCP server used by HTTP API tests.
+///
+/// # Errors
+///
+/// Returns an error if server registration, startup, discovery, or host seeding fails.
+pub async fn bootstrap_file_tools_server<
+    RegisterF,
+    RegisterFut,
+    StartF,
+    StartFut,
+    DiscoverF,
+    DiscoverFut,
+>(
+    host: &InMemoryMcpServerHost,
+    register: RegisterF,
+    start: StartF,
+    discover: DiscoverF,
+) -> Result<(), eyre::Report>
+where
+    RegisterF: FnOnce(RegisterMcpServerRequest) -> RegisterFut,
+    RegisterFut: std::future::Future<Output = Result<McpServerRegistration, eyre::Report>>,
+    StartF: FnOnce(McpServerId) -> StartFut,
+    StartFut: std::future::Future<Output = Result<(), eyre::Report>>,
+    DiscoverF: FnOnce(McpServerId) -> DiscoverFut,
+    DiscoverFut: std::future::Future<Output = Result<(), eyre::Report>>,
+{
+    let server = register(RegisterMcpServerRequest::new(
+        "file_tools",
+        McpTransport::stdio("echo")?,
+    ))
+    .await?;
+    host.set_tool_catalog(
+        server.name().clone(),
+        vec![McpToolDefinition::new(
+            "read_file",
+            "Read a file from disk",
+            json!({
+                "type": "object",
+                "properties": { "path": { "type": "string" } },
+                "required": ["path"]
+            }),
+        )?],
+    )
+    .map_err(|error| eyre::eyre!("tool catalog should be set: {error}"))?;
+    host.set_tool_call_result(
+        server.name().clone(),
+        "read_file",
+        json!({"content": "hello from tool"}),
+    )
+    .map_err(|error| eyre::eyre!("tool call result should be set: {error}"))?;
+    start(server.id()).await?;
+    discover(server.id()).await?;
+    Ok(())
 }
 
 /// Custom JWT claims for constructing edge-case tokens.

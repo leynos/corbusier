@@ -171,8 +171,8 @@ impl FromRequest for AuthenticatedRequestContext {
     }
 }
 
-/// Returns a short-lived expiration timestamp for tests or examples.
+/// Returns the default expiration timestamp for tests or examples.
 #[must_use]
 pub fn default_test_expiry() -> i64 {
-    Utc::now().timestamp().saturating_add(3600)
+    Utc::now().timestamp().saturating_add(86_400)
 }

@@ -460,7 +460,7 @@ Go/no-go checkpoint:
 After the code path is complete:
 
 - update `docs/corbusier-design.md` with the dated implementation decisions;
-- update `docs/users-guide.md` with:
+- update `docs/users-guide.md` with
   - the endpoint list;
   - required authentication header;
   - example request and response envelopes;

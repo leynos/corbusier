@@ -49,7 +49,9 @@ navigability:
 This hierarchy should align with the Goals, Ideas, Steps, and Tasks (GIST)
 framework:
 
-- Phases correspond to strategic themes or milestones.
+- Phases correspond to strategic Goals and their associated Ideas. A phase is
+  the strategic umbrella that groups related Steps and Tasks under one shared
+  intent, rather than a delivery bucket without a higher-level objective.
 - Steps correspond to GIST-style workstreams. A step must describe a coherent
   body of delivery work with one clear objective, explicit sequencing value,
   and a practical learning loop. A step is not just a heading used to group

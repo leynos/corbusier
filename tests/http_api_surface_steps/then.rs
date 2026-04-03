@@ -89,16 +89,14 @@ async fn task_state_is(
     expected_state: String,
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
+    let task_state = required_field(
+        required_field(required_field(body, "data")?, "task")?,
+        "state",
+    )?;
     eyre::ensure!(
-        required_field(
-            required_field(required_field(body, "data")?, "task")?,
-            "state"
-        )? == &expected_state,
+        task_state == &expected_state,
         "expected task state {expected_state}, got {}",
-        required_field(
-            required_field(required_field(body, "data")?, "task")?,
-            "state"
-        )?
+        task_state
     );
     Ok(())
 }
@@ -127,10 +125,11 @@ async fn tool_call_response_names_tool(
     tool_name: String,
 ) -> Result<(), eyre::Report> {
     let body = last_body(world)?;
+    let actual_tool_name = required_field(required_field(body, "data")?, "tool_name")?;
     eyre::ensure!(
-        required_field(required_field(body, "data")?, "tool_name")? == &tool_name,
+        actual_tool_name == &tool_name,
         "expected tool_name {tool_name}, got {}",
-        required_field(required_field(body, "data")?, "tool_name")?
+        actual_tool_name
     );
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Shared `PostgreSQL` HTTP API integration-test setup.
 
-use crate::http_api_test_helpers::HttpApiAuth;
+use crate::http_api_test_helpers::{HttpApiAuth, bootstrap_file_tools_server};
 use crate::postgres::cluster::TemporaryDatabase;
 use crate::postgres::helpers::{
     BoxError, PostgresCluster, TEMPLATE_DB, ensure_template, postgres_cluster,
@@ -18,17 +18,13 @@ use corbusier::{
             AllowAllPolicy, InMemoryMcpServerHost, ObjectStoreLogAdapter,
             postgres::{PostgresMcpServerRegistry, PostgresToolCatalog},
         },
-        domain::{LogRetentionPolicy, McpToolDefinition, McpTransport},
-        services::{
-            McpServerLifecycleService, RegisterMcpServerRequest, ServicePorts,
-            ToolDiscoveryRoutingService,
-        },
+        domain::LogRetentionPolicy,
+        services::{McpServerLifecycleService, ServicePorts, ToolDiscoveryRoutingService},
     },
 };
 use diesel::{PgConnection, r2d2::ConnectionManager};
 use mockable::{Clock, DefaultClock};
 use rstest::fixture;
-use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -96,7 +92,11 @@ pub(crate) async fn build_tool_service(
     let registry = Arc::new(PostgresMcpServerRegistry::new(pool.clone()));
     let catalog = Arc::new(PostgresToolCatalog::new(pool));
     let host = Arc::new(InMemoryMcpServerHost::new());
-    let lifecycle = McpServerLifecycleService::new(registry.clone(), host.clone(), clock.clone());
+    let lifecycle = Arc::new(McpServerLifecycleService::new(
+        registry.clone(),
+        host.clone(),
+        clock.clone(),
+    ));
     let tool_service = Arc::new(ToolDiscoveryRoutingService::new(
         ServicePorts {
             catalog,
@@ -108,40 +108,37 @@ pub(crate) async fn build_tool_service(
         LogRetentionPolicy::default(),
         clock,
     ));
+    let register_lifecycle = lifecycle.clone();
+    let start_lifecycle = lifecycle;
+    let discover_service = tool_service.clone();
 
-    let server = lifecycle
-        .register(
-            ctx,
-            RegisterMcpServerRequest::new("file_tools", McpTransport::stdio("echo")?),
-        )
-        .await?;
-    host.set_tool_catalog(
-        server.name().clone(),
-        vec![McpToolDefinition::new(
-            "read_file",
-            "Read a file from disk",
-            json!({
-                "type": "object",
-                "properties": { "path": { "type": "string" } },
-                "required": ["path"]
-            }),
-        )?],
+    bootstrap_file_tools_server(
+        host.as_ref(),
+        |request| async move {
+            register_lifecycle
+                .as_ref()
+                .register(ctx, request)
+                .await
+                .map_err(eyre::Report::from)
+        },
+        |server_id| async move {
+            start_lifecycle
+                .as_ref()
+                .start(ctx, server_id)
+                .await
+                .map(|_| ())
+                .map_err(eyre::Report::from)
+        },
+        |server_id| async move {
+            discover_service
+                .discover_and_persist_tools(ctx, server_id)
+                .await
+                .map(|_| ())
+                .map_err(eyre::Report::from)
+        },
     )
-    .map_err(|err| Box::new(err) as BoxError)?;
-    host.set_tool_call_result(
-        server.name().clone(),
-        "read_file",
-        json!({"content": "hello from tool"}),
-    )
-    .map_err(|err| Box::new(err) as BoxError)?;
-    lifecycle
-        .start(ctx, server.id())
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
-    tool_service
-        .discover_and_persist_tools(ctx, server.id())
-        .await
-        .map_err(|err| Box::new(err) as BoxError)?;
+    .await
+    .map_err(|err| Box::new(std::io::Error::other(err.to_string())) as BoxError)?;
 
     Ok(tool_service)
 }
