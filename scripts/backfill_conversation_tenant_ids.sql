@@ -11,9 +11,19 @@ BEGIN;
 LOCK TABLE conversations, messages IN ACCESS EXCLUSIVE MODE;
 
 -- Verify unresolved conversations before backfill:
-SELECT id, task_id
-FROM conversations
-WHERE tenant_id = '00000000-0000-0000-0000-000000000000';
+DO $$
+DECLARE
+    unresolved_conversation_count bigint;
+BEGIN
+    SELECT COUNT(*)
+    INTO unresolved_conversation_count
+    FROM conversations
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000000';
+
+    RAISE NOTICE
+        'conversations with nil tenant_id before backfill: %',
+        unresolved_conversation_count;
+END $$;
 
 -- Apply deterministic backfill for task-linked conversations.
 WITH resolved_conversations AS (
@@ -28,22 +38,11 @@ FROM resolved_conversations
 WHERE conversations.id = resolved_conversations.id;
 
 -- Propagate corrected conversation tenant IDs to messages.
-WITH resolved_conversations AS (
-    SELECT conversations.id, tasks.tenant_id
-    FROM conversations
-    JOIN tasks ON tasks.id = conversations.task_id
-    WHERE conversations.tenant_id IS DISTINCT FROM tasks.tenant_id
-)
 UPDATE messages
 SET tenant_id = conversations.tenant_id
 FROM conversations
-LEFT JOIN resolved_conversations ON resolved_conversations.id = conversations.id
 WHERE messages.conversation_id = conversations.id
-  AND messages.tenant_id IS DISTINCT FROM conversations.tenant_id
-  AND (
-      resolved_conversations.id IS NULL
-      OR messages.tenant_id IS DISTINCT FROM resolved_conversations.tenant_id
-  );
+  AND messages.tenant_id IS DISTINCT FROM conversations.tenant_id;
 
 -- Final verification. This must return zero rows before tenant-scoped
 -- application queries are enabled.
@@ -71,13 +70,20 @@ BEGIN
     END IF;
 END $$;
 
-SELECT messages.id,
-       messages.conversation_id,
-       messages.tenant_id,
-       conversations.tenant_id AS conversation_tenant_id
-FROM messages
-JOIN conversations ON conversations.id = messages.conversation_id
-WHERE messages.tenant_id IS DISTINCT FROM conversations.tenant_id;
+DO $$
+DECLARE
+    mismatched_message_count bigint;
+BEGIN
+    SELECT COUNT(*)
+    INTO mismatched_message_count
+    FROM messages
+    JOIN conversations ON conversations.id = messages.conversation_id
+    WHERE messages.tenant_id IS DISTINCT FROM conversations.tenant_id;
+
+    RAISE NOTICE
+        'messages with tenant_id mismatch after backfill: %',
+        mismatched_message_count;
+END $$;
 
 DO $$
 BEGIN
