@@ -7599,12 +7599,8 @@ CREATE INDEX idx_tasks_tenant_pull_request_ref
     ON tasks (tenant_id, pull_request_ref) WHERE pull_request_ref IS NOT NULL;
 CREATE INDEX idx_review_threads_tenant_pr_status
     ON review_threads (tenant_id, pull_request_ref, status);
-CREATE INDEX idx_review_comments_tenant_external_comment
-    ON review_comments (tenant_id, external_comment_id);
 CREATE INDEX idx_review_verification_results_tenant_thread_status_time
     ON review_verification_results (tenant_id, review_thread_id, status, verified_at);
-CREATE INDEX idx_review_verification_results_tenant_external_comment
-    ON review_verification_results (tenant_id, external_comment_id);
 CREATE INDEX idx_review_verification_results_evidence_gin
     ON review_verification_results USING GIN (evidence);
 

@@ -257,6 +257,59 @@ fn review_linkage_round_trip_serialization(#[case] linkage: ReviewLinkage) {
 }
 
 #[rstest]
+fn legacy_flat_extensions_merged_on_deserialize() {
+    // Simulate the old flat layout where extension keys lived at the top level
+    // alongside known struct fields, rather than nested under "extensions".
+    let legacy_json = json!({
+        "agent_backend": "claude",
+        "review.linkage.v1": { "review_comment_id": "rc-42" },
+        "custom.workflow": "some-value"
+    });
+    let metadata: MessageMetadata =
+        serde_json::from_value(legacy_json).expect("deserialize legacy flat layout");
+
+    assert_eq!(metadata.agent_backend, Some("claude".to_owned()));
+    // Legacy top-level keys should be collected into extensions.
+    assert_eq!(
+        metadata
+            .extensions
+            .get("review.linkage.v1")
+            .and_then(|v| v.get("review_comment_id"))
+            .and_then(serde_json::Value::as_str),
+        Some("rc-42"),
+    );
+    assert_eq!(
+        metadata
+            .extensions
+            .get("custom.workflow")
+            .and_then(serde_json::Value::as_str),
+        Some("some-value"),
+    );
+}
+
+#[rstest]
+fn legacy_flat_extensions_do_not_overwrite_namespaced() {
+    // When both a legacy top-level key and a namespaced key exist,
+    // the namespaced version (under "extensions") takes precedence.
+    let json_with_both = json!({
+        "extensions": { "review.linkage.v1": { "review_comment_id": "new" } },
+        "review.linkage.v1": { "review_comment_id": "old-flat" }
+    });
+    let metadata: MessageMetadata =
+        serde_json::from_value(json_with_both).expect("deserialize mixed layout");
+
+    assert_eq!(
+        metadata
+            .extensions
+            .get("review.linkage.v1")
+            .and_then(|v| v.get("review_comment_id"))
+            .and_then(serde_json::Value::as_str),
+        Some("new"),
+        "namespaced key should win over legacy flat key"
+    );
+}
+
+#[rstest]
 fn review_linkage_does_not_collide_with_top_level_fields() {
     let turn_id = TurnId::new();
     let linkage = ReviewLinkage::new("rc-1", "thread-1", "reviewer", "pending")
