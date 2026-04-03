@@ -400,6 +400,8 @@ sibling review bounded context and its projections.
 #### Proposed write-side model
 
 ```rust,no_run
+use std::path::PathBuf;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -422,6 +424,17 @@ pub struct ReviewSyncCheckpointEnvelope {
     pub payload: Value,
 }
 
+/// Anchor metadata derived from review-comment file position.
+/// Definitive field-level documentation: corbusier-design.md §6.3.2
+/// (Review Comment Processing, `ReviewAnchor` struct).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewAnchor {
+    pub commit_sha: String,
+    pub file_path: PathBuf,
+    pub original_line: u32,
+    pub diff_hunk: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewThreadAggregate {
     pub id: Uuid,
@@ -436,7 +449,7 @@ pub struct ReviewThreadAggregate {
     pub verification_status: String,
     pub pending_outbound_reply: Option<String>,
     pub last_reviewer_action: Option<String>,
-    pub last_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
+    pub last_synced_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

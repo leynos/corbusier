@@ -6262,7 +6262,7 @@ classDiagram
         +String verification_status
         +Option~String~ pending_outbound_reply
         +Option~String~ last_reviewer_action
-        +Option~ReviewSyncCheckpointEnvelope~ last_checkpoint
+        +Option~ReviewSyncCheckpointEnvelope~ last_synced_checkpoint
         +DateTime_Utc created_at
         +DateTime_Utc updated_at
     }
