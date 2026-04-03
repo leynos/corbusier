@@ -7,6 +7,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Reserved extension key namespace prefix for review linkage data.
+const RESERVED_REVIEW_PREFIX: &str = "review.linkage.";
+
+/// Error returned when a caller attempts to set a reserved extension key
+/// via [`MessageMetadata::with_extension`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("extension key {key:?} is reserved; use the dedicated builder method instead")]
+pub struct ReservedExtensionKeyError {
+    key: String,
+}
+
 /// Metadata associated with a message.
 ///
 /// Captures information about the message's origin, processing context,
@@ -208,10 +219,23 @@ impl MessageMetadata {
     }
 
     /// Adds an extension field.
-    #[must_use]
-    pub fn with_extension(mut self, key: impl Into<String>, value: Value) -> Self {
-        self.extensions.insert(key.into(), value);
-        self
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReservedExtensionKeyError`] if `key` starts with the
+    /// reserved `"review.linkage."` namespace.  Use
+    /// [`with_review_linkage`](Self::with_review_linkage) for review data.
+    pub fn with_extension(
+        mut self,
+        key: impl Into<String>,
+        value: Value,
+    ) -> Result<Self, ReservedExtensionKeyError> {
+        let owned_key = key.into();
+        if owned_key.starts_with(RESERVED_REVIEW_PREFIX) {
+            return Err(ReservedExtensionKeyError { key: owned_key });
+        }
+        self.extensions.insert(owned_key, value);
+        Ok(self)
     }
 
     /// Adds structured review linkage data under the reserved, versioned
@@ -243,9 +267,14 @@ impl MessageMetadata {
     /// assert_eq!(ext["review_comment_id"], "rc-42");
     /// assert_eq!(ext["reviewer"], "alice");
     /// ```
-    pub fn with_review_linkage(self, linkage: &ReviewLinkage) -> Result<Self, serde_json::Error> {
+    pub fn with_review_linkage(
+        mut self,
+        linkage: &ReviewLinkage,
+    ) -> Result<Self, serde_json::Error> {
         let value = serde_json::to_value(linkage)?;
-        Ok(self.with_extension("review.linkage.v1", value))
+        self.extensions
+            .insert("review.linkage.v1".to_owned(), value);
+        Ok(self)
     }
 
     /// Sets the handoff metadata.

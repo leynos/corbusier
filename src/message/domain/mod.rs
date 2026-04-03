@@ -33,7 +33,9 @@ pub use handoff::{
 };
 pub use ids::{AgentSessionId, ConversationId, HandoffId, MessageId, SequenceNumber, TurnId};
 pub use message::{Message, MessageBuilder, MessageBuilderError};
-pub use metadata::{MessageMetadata, ReviewLinkage, SlashCommandExpansion};
+pub use metadata::{
+    MessageMetadata, ReservedExtensionKeyError, ReviewLinkage, SlashCommandExpansion,
+};
 pub use role::{ParseRoleError, Role};
 pub use slash_command::{
     CommandParameterSpec, CommandParameterType, PlannedToolCall, SlashCommandDefinition,

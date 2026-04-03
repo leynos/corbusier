@@ -432,19 +432,13 @@ pub struct ReviewThreadAggregate {
     pub provider: String,
     pub external_root_comment_id: String,
     pub status: ReviewThreadStatus,
-    pub anchor: Option<ReviewAnchorDto>,
-    pub projection: ReviewWorkflowProjection,
-    pub last_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReviewWorkflowProjection {
-    pub open_thread_count: u32,
+    pub anchor: Option<ReviewAnchor>,
     pub verification_status: String,
     pub pending_outbound_reply: Option<String>,
     pub last_reviewer_action: Option<String>,
+    pub last_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 ```
 
@@ -474,8 +468,10 @@ pub struct ReviewWorkflowProjection {
 
 - `ReviewThreadDto` for task and PR detail screens: root comment, replies,
   reviewer identity, anchor, verification state, and pending reply status.
+  Returned by `GET /api/v1/reviews/threads/{thread_id}`.
 - `ReviewInboxDto` for review queues: open-thread counts, unresolved anchors,
-  and last sync checkpoint per pull request.
+  and last sync checkpoint per pull request.  Returned by
+  `GET /api/v1/reviews/inbox`.
 
 ### Project domain
 
@@ -1176,6 +1172,16 @@ returns a projection DTO (not raw persistence rows).
 - `POST /api/v1/suggestions/{id}/accept` (idempotent) -- creates a draft task
   in backlog.
 - `POST /api/v1/suggestions/{id}/dismiss` (idempotent).
+
+#### Reviews
+
+- `GET /api/v1/reviews/threads/{thread_id}` -- `ReviewThreadDto`.  Requires
+  tenant-scoped auth.  Returns the root comment, replies, reviewer identity,
+  anchor, verification state, and pending reply status for a single review
+  thread.
+- `GET /api/v1/reviews/inbox?user={user_id}&limit=&cursor=` -- paginated
+  `ReviewInboxDto[]`.  Requires tenant-scoped auth.  Returns open-thread
+  counts, unresolved anchors, and last sync checkpoint grouped by pull request.
 
 #### System
 

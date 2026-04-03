@@ -582,8 +582,16 @@ enforcement.
   - [ ] Make review threads, not flat comments, the primary orchestration unit,
     deriving a stable thread root from reply metadata when the adapter does not
     yet expose one directly. See corbusier-design.md §6.3.2.
-  - [ ] Success criteria: Corbusier can ingest review-thread deltas through
-    Frankie without expanding the generic VCS adapter contract.
+  - [ ] Success criteria:
+    - `ReviewIntakePort`, `ReviewContextPort`, and `ReviewActionPort` are
+      defined as public traits with Rustdoc documentation and at least one
+      adapter (Frankie) implements `ReviewActionPort` for reply submission.
+    - Existing generic VCS port traits (`VcsPort`, `BranchPort`,
+      `PullRequestPort`) have zero new methods or type parameters added for
+      review concerns.
+    - A compile-gate integration test demonstrates `ReviewIntakePort`
+      thread-delta ingestion through the Frankie adapter without importing
+      any generic VCS port.
 - [ ] 4.1.3 Persist review threads, anchors, checkpoints, and message linkage.
   Requires 4.1.2. See corbusier-design.md §3.5.2, §6.2.1, and §6.3.2.
   - [ ] Persist tenant-scoped review threads, raw comments, sync checkpoints,
@@ -598,9 +606,18 @@ enforcement.
   - [ ] Store structured review linkage in `MessageMetadata.extensions` for
     review-linked conversation messages rather than flattening anchors into
     plain text. See corbusier-design.md §6.2.1.2.
-  - [ ] Success criteria: review state survives restart, supports idempotent
-    sync, and links review threads to tasks and conversations without losing
-    anchor metadata.
+  - [ ] Success criteria:
+    - An automated restart test (`review_thread_survives_restart`) proves
+      that persisted tenant-scoped review threads, raw payloads stored in
+      `MessageMetadata.extensions` under `"review.linkage.v1"`, and sync
+      checkpoints survive service restart and are recoverable by
+      `(tenant_id, provider, pull_request_ref, external_root_comment_id)`.
+    - An idempotency test (`review_sync_idempotent`) proves that
+      re-ingesting the same sync delta does not duplicate review threads
+      and that uniqueness is enforced by the composite key
+      `(pull_request_ref, external_root_comment_id)`.
+    - A storage assertion verifies that `review_comments.raw_payload`
+      round-trips the original Frankie JSON without data loss.
 - [ ] 4.1.4 Wire Frankie context, verification, and reply execution into the
   governance loop. Requires 4.1.3 and 3.3.2. See corbusier-design.md §6.3.2 and
   §6.3.3.
@@ -613,9 +630,16 @@ enforcement.
   - [ ] Add outbound reply draft and submission flows that use Frankie as the
     review action adapter while Corbusier remains the canonical owner of review
     workflow state. See corbusier-design.md §6.3.2.
-  - [ ] Success criteria: Corbusier can verify a proposed fix, update review
-    state, and either queue or submit a reply without handing workflow
-    ownership to Frankie.
+  - [ ] Success criteria:
+    - An integration test (`frankie_diff_replay_deterministic`) shows that
+      Frankie-driven diff-replay verification produces deterministic
+      `VerificationResult` values for a fixed diff and review anchor.
+    - An integration test (`outbound_reply_via_review_action_port`) proves
+      that outbound reply flows are exercised through `ReviewActionPort`
+      (not a direct Frankie client) and that the reply round-trip (draft,
+      submit, posted confirmation) completes successfully.
+    - Verification-to-submission round-trips achieve a pass rate of at
+      least 95% across the integration test suite.
 
 ### 4.2. HTTP API surface
 

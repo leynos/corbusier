@@ -186,7 +186,8 @@ fn message_metadata_builder_chain() {
         .with_turn_id(turn_id)
         .with_tool_call_audit(tool_call)
         .with_agent_response_audit(response)
-        .with_extension("custom", json!({"key": "value"}));
+        .with_extension("custom", json!({"key": "value"}))
+        .expect("non-reserved key should succeed");
 
     assert_eq!(metadata.agent_backend, Some("claude".to_owned()));
     assert_eq!(metadata.turn_id, Some(turn_id));
@@ -347,4 +348,20 @@ fn review_linkage_does_not_collide_with_top_level_fields() {
         nested.is_some(),
         "review_comment_id nested under extensions"
     );
+}
+
+#[rstest]
+fn with_extension_rejects_reserved_review_linkage_key() {
+    let result =
+        MessageMetadata::empty().with_extension("review.linkage.v1", json!({"rogue": true}));
+    assert!(
+        result.is_err(),
+        "reserved review.linkage.* key should be rejected"
+    );
+}
+
+#[rstest]
+fn with_extension_allows_non_reserved_key() {
+    let result = MessageMetadata::empty().with_extension("custom.workflow", json!("ok"));
+    assert!(result.is_ok(), "non-reserved key should be accepted");
 }

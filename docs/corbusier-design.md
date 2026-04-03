@@ -5379,7 +5379,7 @@ events being published to an event bus and streamed to a subscribed client over
 SSE.
 
 <!-- markdownlint-disable MD031 -->
-Table 6.1.1.2: Real-time event distribution through the conversation event
+Table 6.2.2.1: Real-time event distribution through the conversation event
 stream.
 ```mermaid
 sequenceDiagram
@@ -6258,8 +6258,10 @@ classDiagram
         +String provider
         +String external_root_comment_id
         +ReviewThreadStatus status
-        +Option~ReviewAnchorDto~ anchor
-        +ReviewWorkflowProjection projection
+        +Option~ReviewAnchor~ anchor
+        +String verification_status
+        +Option~String~ pending_outbound_reply
+        +Option~String~ last_reviewer_action
         +Option~ReviewSyncCheckpointEnvelope~ last_checkpoint
         +DateTime_Utc created_at
         +DateTime_Utc updated_at
@@ -6328,7 +6330,6 @@ classDiagram
         +start_verification_and_reply(thread)
     }
 
-    ReviewThreadAggregate --> ReviewWorkflowProjection : embeds
     ReviewThreadAggregate --> ReviewAnchor : anchors
     ReviewThreadAggregate --> ReviewThread : materializes
 
@@ -7564,9 +7565,7 @@ Table 6.2.1.5: Primary indexes for tenant-scoped query paths.
 | tasks                       | B-tree     | (tenant_id, branch_ref)                            | Branch association lookup           |
 | tasks                       | B-tree     | (tenant_id, pull_request_ref)                      | Pull request lookup                 |
 | review_threads              | B-tree     | (tenant_id, pull_request_ref, status)              | Open-thread lookup per pull request |
-| review_comments             | B-tree     | (tenant_id, external_comment_id)                   | Idempotent sync and reply mapping   |
 | review_verification_results | B-tree     | (tenant_id, review_thread_id, status, verified_at) | Verification projection lookup      |
-| review_verification_results | B-tree     | (tenant_id, external_comment_id)                   | Verification idempotency lookup     |
 | review_verification_results | GIN        | evidence                                           | Evidence inspection and filtering   |
 | backend_registrations       | B-tree     | (tenant_id, name)                                  | Per-tenant backend uniqueness       |
 
@@ -10141,7 +10140,10 @@ Every hook trigger delivers a `HookTriggerContext` to the hook engine
 containing a `TriggerContextId`, `HookTriggerType`, `HookExecutionScope`
 (optional `TaskId`, optional `ConversationId`, and a free-form JSON `metadata`
 value), and a `DateTime<Utc>` timestamp. The `metadata` value carries
-trigger-specific fields described per event below.
+trigger-specific fields described per event below. No hook trigger currently
+issues a resume token; on timeout or failure, gate-keeping triggers require the
+caller to restart the gated operation (which generates a fresh
+`TriggerContextId`), while observational triggers simply discard the result.
 
 Earlier sections of this document use legacy planning-phase names. The runtime
 mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
@@ -10158,6 +10160,8 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   before the agent backend processes input.
 - **Timeout:** 5 s default. On timeout the trigger is treated as
   `Succeeded` (fail-open) and the turn proceeds. No retry.
+- **Resume:** Unsupported.  A timed-out or failed `TurnStart` does not
+  produce a resume token; the caller must re-initiate the turn.
 
 **`TurnEnd` (contract name `PostTurn`)**
 
@@ -10167,6 +10171,8 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   does not block further processing. Any status is accepted.
 - **Timeout:** 5 s default. On timeout the result is logged and
   discarded. No retry.
+- **Resume:** Unsupported.  Observational triggers do not gate workflow
+  progression and require no resume mechanism.
 
 **`PreToolUse` (contract name `PreToolCall`)**
 
@@ -10179,6 +10185,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Timeout:** 10 s default. On timeout the trigger is treated as
   `Failed` (fail-closed) and the tool call is denied. No retry; the caller
   receives a governance-denied error.
+- **Resume:** Restart-only.  On timeout or failure the tool call is
+  denied; the agent backend may re-issue the call with a new
+  `TriggerContextId`.  No resume token is issued.
 
 **`PostToolUse` (contract name `PostToolCall`)**
 
@@ -10189,6 +10198,8 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   the audit trail. Any status is accepted.
 - **Timeout:** 10 s default. On timeout the result is logged and
   discarded. No retry.
+- **Resume:** Unsupported.  Observational triggers do not gate workflow
+  progression and require no resume mechanism.
 
 **`PreCommit`**
 
@@ -10200,6 +10211,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Timeout:** 30 s default. On timeout the trigger is treated as
   `Failed` (fail-closed). No automatic retry; the operator may re-run the
   commit.
+- **Resume:** Restart-only.  On timeout or failure the commit is aborted;
+  the operator must re-run the commit, which issues a fresh
+  `TriggerContextId`.  No resume token is issued.
 
 **`PreMerge`**
 
@@ -10208,6 +10222,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   `commit_sha: String`.
 - **Ack semantics:** `Succeeded` permits the merge; `Failed` blocks it.
 - **Timeout:** 30 s default, fail-closed on timeout. No retry.
+- **Resume:** Restart-only.  On timeout or failure the merge is blocked;
+  the operator must re-attempt the merge, generating a new `TriggerContextId`.  
+  No resume token is issued.
 
 **`PreDeploy`**
 
@@ -10217,11 +10234,16 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Ack semantics:** `Succeeded` permits the deployment; `Failed` blocks
   it.
 - **Timeout:** 60 s default, fail-closed on timeout. No retry.
+- **Resume:** Restart-only.  On timeout or failure the deployment is
+  blocked; the operator must re-initiate the deployment with a new
+  `TriggerContextId`.  No resume token is issued.
 
 Post-event triggers (`PostCommit`, `PostMerge`, `PostPull`, `PostPush`,
 `PostDeploy`) are observational: they share the same payload shape as their
 pre-event counterpart plus an `outcome: String` field and do not gate workflow
-progression. A 5 s default timeout applies; on timeout the result is discarded.
+progression. A 5 s default timeout applies; on timeout the result is
+discarded.  Resume is unsupported for all post-event triggers because they do
+not gate workflow progression.
 
 ###### Multi-Layer Policy Enforcement
 
@@ -10835,7 +10857,7 @@ moving through HTTP handling, conversation orchestration, agent execution, and
 tool invocation with spans across each boundary.
 
 <!-- markdownlint-disable MD031 -->
-Table 9.4.2.1: Distributed tracing architecture across Corbusier request
+Table 6.5.1.3.1: Distributed tracing architecture across Corbusier request
 handling and tool execution.
 ```mermaid
 sequenceDiagram
@@ -11546,8 +11568,8 @@ setting up mocks and a test database, executing a workflow through Corbusier,
 and verifying persisted results.
 
 <!-- markdownlint-disable MD031 -->
-Table 10.3.2.1: Service integration test flow with mock dependencies and a test
-database.
+Table 6.6.1.2.1: Service integration test flow with mock dependencies and a
+test database.
 ```mermaid
 sequenceDiagram
     participant Test as Integration Test
