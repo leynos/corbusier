@@ -5669,7 +5669,8 @@ CREATE TABLE review_verification_results (
     verified_against_commit_sha VARCHAR(64),
     verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     FOREIGN KEY (review_thread_id, tenant_id) REFERENCES review_threads(id, tenant_id),
-    UNIQUE (tenant_id, external_comment_id)
+    UNIQUE (tenant_id, external_comment_id),
+    CONSTRAINT review_verification_status_check CHECK (status IN ('pending', 'verified', 'rejected', 'error'))
 );
 
 -- Event sourcing for audit trails with tenant attribution
@@ -7317,7 +7318,7 @@ Status values are standardized:
 
 Review-linked messages must store structured review fields under the reserved,
 versioned key `"review.linkage.v1"` inside `MessageMetadata.extensions` rather
-than flattening them into the top-level JSON object or into free text.  The
+than flattening them into the top-level JSON object or into free text. The
 value stored at that key should contain `review_comment_id`, `thread_root_id`,
 `reviewer`, `file_path`, `commit_sha`, and `verification_status`.
 
@@ -7565,6 +7566,7 @@ Table 6.2.1.5: Primary indexes for tenant-scoped query paths.
 | tasks                       | B-tree     | (tenant_id, branch_ref)                            | Branch association lookup           |
 | tasks                       | B-tree     | (tenant_id, pull_request_ref)                      | Pull request lookup                 |
 | review_threads              | B-tree     | (tenant_id, pull_request_ref, status)              | Open-thread lookup per pull request |
+| review_comments             | B-tree     | (tenant_id, review_thread_id)                      | Thread-scoped comment lookup        |
 | review_verification_results | B-tree     | (tenant_id, review_thread_id, status, verified_at) | Verification projection lookup      |
 | review_verification_results | GIN        | evidence                                           | Evidence inspection and filtering   |
 | backend_registrations       | B-tree     | (tenant_id, name)                                  | Per-tenant backend uniqueness       |

@@ -484,7 +484,8 @@ pub struct ReviewThreadAggregate {
   Returned by `GET /api/v1/reviews/threads/{thread_id}`.
 - `ReviewInboxDto` for review queues: open-thread counts, unresolved anchors,
   and last sync checkpoint per pull request.  Returned by
-  `GET /api/v1/reviews/inbox`.
+  `GET /api/v1/reviews/inbox?user={user_id}&limit=&cursor=` (paginated,
+  user-scoped).
 
 ### Project domain
 
