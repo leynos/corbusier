@@ -1208,9 +1208,14 @@ returns a projection DTO (not raw persistence rows).
   tenant-scoped auth.  Returns the root comment, replies, reviewer identity,
   anchor, verification state, and pending reply status for a single review
   thread.
-- `GET /api/v1/reviews/inbox?user={user_id}&limit=&cursor=` -- paginated
-  `ReviewInboxDto[]`.  Requires tenant-scoped auth.  Returns open-thread
-  counts, unresolved anchors, and last sync checkpoint grouped by pull request.
+- `GET /api/v1/reviews/inbox?limit=&cursor=` -- paginated `ReviewInboxDto[]`.
+  Requires tenant-scoped auth.  The inbox is implicitly scoped to
+  `RequestContext.user_id` (the authenticated principal); the server enforces
+  this binding.  Returns open-thread counts, unresolved anchors, and last sync
+  checkpoint grouped by pull request.  Admin-only override: users with the
+  `review-admin` role may supply `user={user_id}` to view another user's inbox;
+  all other users receive 403 Forbidden if they attempt to supply a `user`
+  parameter.
 
 #### System
 

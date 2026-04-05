@@ -4403,10 +4403,10 @@ reply execution against the task workspace.
   GitHub/GitLab integration and coordinates with Podbot for workspace
   encapsulation.
 - **Key Interfaces and APIs:** Provides task management endpoints
-  (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through the
-  VcsHostPort trait. Implements webhook handlers for external VCS events, while
-  delegating review-specific ingestion and reply handling to the Frankie-backed
-  review ports.
+  (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through
+  VcsProvider (type alias for IssueProvider). Implements webhook handlers for
+  external VCS events, while delegating review-specific ingestion and reply
+  handling to the Frankie-backed review ports.
 - **Data Persistence Requirements:** Stores task metadata, state transition
   history, and VCS association mappings. Maintains branch naming policies and
   workspace configuration with support for task archival and recovery.
@@ -6262,7 +6262,7 @@ classDiagram
         +String external_root_comment_id
         +ReviewThreadStatus status
         +Option~ReviewAnchor~ anchor
-        +String verification_status
+        +VerificationStatus verification_status
         +Option~String~ pending_outbound_reply
         +Option~String~ last_reviewer_action
         +Option~ReviewSyncCheckpointEnvelope~ last_synced_checkpoint
@@ -6272,7 +6272,7 @@ classDiagram
 
     class ReviewWorkflowProjection {
         +u32 open_thread_count
-        +String verification_status
+        +VerificationStatus verification_status
         +Option~String~ pending_outbound_reply
         +Option~String~ last_reviewer_action
     }
