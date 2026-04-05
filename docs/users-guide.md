@@ -456,6 +456,101 @@ fn create_tenant() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## HTTP API surface
+
+Corbusier now exposes an initial authenticated HTTP API under `/api/v1`. The
+routes are:
+
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/history`
+- `POST /api/v1/conversations/{conversation_id}/messages`
+- `POST /api/v1/tasks`
+- `GET /api/v1/tasks/{task_id}`
+- `PUT /api/v1/tasks/{task_id}/state`
+- `PUT /api/v1/tasks/{task_id}/branch`
+- `PUT /api/v1/tasks/{task_id}/pull-request`
+- `GET /api/v1/tools`
+- `POST /api/v1/tools/calls`
+
+Every request must send `Authorization: Bearer <JSON Web Token (JWT)>`. The
+accepted JWT claims are `sub`, `tenant_id`, `session_id`, `exp`, and optional
+`role` plus `tenant_kind`. The current release only accepts
+`tenant_kind = user`.
+
+Every response, including errors, uses the same envelope shape:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null,
+  "metadata": {
+    "version": "v1",
+    "request_id": "<correlation-id>",
+    "timestamp": "<RFC3339 timestamp>"
+  }
+}
+```
+
+Example conversation flow:
+
+```text
+POST /api/v1/conversations
+Authorization: Bearer <jwt>
+```
+
+```text
+POST /api/v1/conversations/<conversation_id>/messages
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "role": "user",
+  "content": [
+    { "type": "text", "text": "Hello over HTTP" }
+  ]
+}
+```
+
+Example task creation:
+
+```text
+POST /api/v1/tasks
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "provider": "github",
+  "repository": "acme/widgets",
+  "issue_number": 42,
+  "title": "Fix login flow",
+  "description": "Triage the failing callback",
+  "labels": ["bug", "p1"],
+  "assignees": ["alice"],
+  "milestone": "sprint-12"
+}
+```
+
+Example tool call:
+
+```text
+POST /api/v1/tools/calls
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "tool_name": "read_file",
+  "parameters": {
+    "path": "/tmp/example.txt"
+  }
+}
+```
+
+The current HTTP surface is versioned and authenticated, but it does not yet
+provide hardened PostgreSQL tenant isolation for conversation and message
+storage. Do not treat it as a complete multi-tenant security boundary until
+roadmap items `2.5.2` and `2.5.3` land.
+
 ## Model Context Protocol (MCP) server lifecycle management
 
 The `tool_registry` module can register Model Context Protocol (MCP) servers,

@@ -233,7 +233,6 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(messages -> conversations (conversation_id));
 diesel::joinable!(agent_sessions -> conversations (conversation_id));
 diesel::joinable!(context_snapshots -> conversations (conversation_id));
 diesel::joinable!(context_snapshots -> agent_sessions (session_id));

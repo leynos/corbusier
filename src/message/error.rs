@@ -3,7 +3,7 @@
 //! Uses `thiserror` for ergonomic error handling with typed variants
 //! that can be inspected by callers.
 
-use super::domain::{MessageId, SequenceNumber};
+use super::domain::{ConversationId, MessageId, SequenceNumber};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -154,6 +154,10 @@ impl ValidationError {
 /// Errors that can occur during message persistence.
 #[derive(Debug, Error)]
 pub enum RepositoryError {
+    /// The conversation was not found.
+    #[error("conversation not found: {0}")]
+    ConversationNotFound(ConversationId),
+
     /// The message was not found.
     #[error("message not found: {0}")]
     NotFound(MessageId),

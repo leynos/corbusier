@@ -8540,12 +8540,53 @@ Actix Web provides middleware support for authentication, with
 actix_web_httpauth providing middleware that makes it simple to add
 authentication to any actix-based API:
 
-| Endpoint Category | Base Path               | Methods                | Authentication   | Rate Limiting  |
-| ----------------- | ----------------------- | ---------------------- | ---------------- | -------------- |
-| Conversations     | `/api/v1/conversations` | GET, POST, PUT         | JWT Bearer Token | 100 req/min    |
-| Tasks             | `/api/v1/tasks`         | GET, POST, PUT, DELETE | JWT Bearer Token | 50 req/min     |
-| Tools             | `/api/v1/tools`         | GET, POST              | JWT Bearer Token | 200 req/min    |
-| Events            | `/api/v1/events`        | GET (SSE)              | JWT Bearer Token | 10 connections |
+Table 6.3.1: API endpoints summary, including base paths, methods,
+authentication, and rate limits.
+
+| Endpoint Category | Base Path               | Methods               | Authentication   | Rate Limiting |
+| ----------------- | ----------------------- | --------------------- | ---------------- | ------------- |
+| Conversations     | `/api/v1/conversations` | POST, nested GET/POST | JWT Bearer Token | 100 req/min   |
+| Tasks             | `/api/v1/tasks`         | POST, nested GET/PUT  | JWT Bearer Token | 50 req/min    |
+| Tools             | `/api/v1/tools`         | GET, nested POST      | JWT Bearer Token | 200 req/min   |
+
+###### Initial v1 implementation status
+
+The initial shipped HTTP surface is narrower than the long-term inventory in
+this section. `v1` currently exposes:
+
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/history`
+- `POST /api/v1/conversations/{conversation_id}/messages`
+- `POST /api/v1/tasks`
+- `GET /api/v1/tasks/{task_id}`
+- `PUT /api/v1/tasks/{task_id}/state`
+- `PUT /api/v1/tasks/{task_id}/branch`
+- `PUT /api/v1/tasks/{task_id}/pull-request`
+- `GET /api/v1/tools`
+- `POST /api/v1/tools/calls`
+
+Every response uses a stable JSON envelope:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null,
+  "metadata": {
+    "version": "v1",
+    "request_id": "<correlation-id>",
+    "timestamp": "<RFC3339 timestamp>"
+  }
+}
+```
+
+Error responses keep the same envelope shape and populate `error.code` plus
+`error.message`. For authenticated routes, handlers preserve the inbound
+`CorrelationId`, so the `request_id` in both success and error responses stays
+aligned with the value already inserted into the request extensions. Framework
+fallback errors, such as malformed JSON or failures that occur before
+authentication inserts a `CorrelationId` into the request extensions, generate
+a fresh UUID instead.
 
 ##### 6.3.1.2 Authentication Methods
 
@@ -8596,22 +8637,36 @@ graph TB
 
 ###### Authentication Implementation
 
-JWT middleware attempts to obtain the token from the Authorization header
-first, and if the token is not present, it will then look in the Cookies
-object, with a 401 Unauthorized error sent to the client if the token cannot be
-found in either location:
+The initial `v1` implementation accepts only
+`Authorization: Bearer <JSON Web Token (JWT)>` credentials. Missing, malformed,
+or invalid tokens are rejected with `401 Unauthorized` before any domain
+service is called.
 
-| Authentication Method | Implementation            | Token Location       | Expiration Policy              |
-| --------------------- | ------------------------- | -------------------- | ------------------------------ |
-| Bearer Token          | JWT with HS256            | Authorization Header | 24 hours with refresh          |
-| Cookie-based          | Secure HTTP-only cookies  | Cookie header        | 7 days with sliding expiration |
-| API Key               | Static key authentication | X-API-Key header     | No expiration (admin only)     |
+| Authentication Method | Implementation                  | Token Location       | Expiration Policy              | Status       |
+| --------------------- | ------------------------------- | -------------------- | ------------------------------ | ------------ |
+| Bearer Token          | JSON Web Token (JWT) with HS256 | Authorization Header | 24 hours                       | Active in v1 |
+| Cookie-based          | Secure HTTP-only cookies        | Cookie header        | 7 days with sliding expiration | Future scope |
+| API Key               | Static key authentication       | X-API-Key header     | No expiration (admin only)     | Future scope |
 
 Authentication claims include both user and tenant identifiers so downstream
 services can construct request context consistently:
 `{ sub: user_id, tenant_id, session_id, role, tenant_kind }`. The initial
 release supports `tenant_kind = user`; team and organization tenants are
 deferred.
+
+The initial implementation materializes request context directly from these
+claims and preserves an inbound correlation ID when present; otherwise it
+issues a fresh correlation ID for the request.
+
+###### Initial tenant-isolation limitation
+
+The HTTP adapter is authenticated and tenant-aware at the application layer,
+and schema-level tenant scoping for conversation and message persistence has
+been implemented. The remaining caveat is database-enforced policy hardening:
+roadmap item `1.5.2` shipped the schema and constraint work, while `1.5.3`
+still needs to land PostgreSQL Row-Level Security and related policies. Until
+those database policies are enforced, the HTTP API should be treated as an
+internal or trusted surface rather than a hardened multi-tenant boundary.
 
 ###### MCP Authentication Integration
 

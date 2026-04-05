@@ -7,6 +7,7 @@
 mod agent_session;
 pub(crate) mod blocking_helpers;
 mod context_snapshot;
+mod conversation;
 mod conversion_helpers;
 mod handoff;
 mod sql_helpers;
@@ -14,6 +15,7 @@ pub(crate) mod tenant_tx;
 
 pub use agent_session::PostgresAgentSessionRepository;
 pub use context_snapshot::PostgresContextSnapshotAdapter;
+pub use conversation::PostgresConversationRepository;
 pub use handoff::PostgresHandoffAdapter;
 
 use async_trait::async_trait;
@@ -22,7 +24,7 @@ use diesel::prelude::*;
 
 use super::audit_context::AuditContext;
 use super::models::{MessageRow, NewMessage};
-use super::schema::messages;
+use super::schema::{conversations, messages};
 use crate::context::{RequestContext, TenantId};
 use crate::message::{
     domain::{ConversationId, Message, MessageId, SequenceNumber},
@@ -184,37 +186,6 @@ impl MessageRepository for PostgresMessageRepository {
         let seq_num = message.sequence_number();
 
         self.execute_query(tenant_id, move |conn| {
-            // Pre-check for duplicate message ID to provide semantic error
-            let id_exists: i64 = messages::table
-                .filter(messages::id.eq(msg_id.into_inner()))
-                .filter(messages::tenant_id.eq(tenant_id.into_inner()))
-                .count()
-                .get_result(conn)
-                .map_err(RepositoryError::database)?;
-
-            if id_exists > 0 {
-                return Err(RepositoryError::DuplicateMessage(msg_id));
-            }
-
-            // Pre-check for duplicate sequence number in conversation
-            let seq_exists: i64 = messages::table
-                .filter(messages::tenant_id.eq(tenant_id.into_inner()))
-                .filter(messages::conversation_id.eq(conv_id.into_inner()))
-                .filter(
-                    messages::sequence_number.eq(i64::try_from(seq_num.value())
-                        .map_err(|e| RepositoryError::serialization(e.to_string()))?),
-                )
-                .count()
-                .get_result(conn)
-                .map_err(RepositoryError::database)?;
-
-            if seq_exists > 0 {
-                return Err(RepositoryError::DuplicateSequence {
-                    conversation_id: conv_id,
-                    sequence: seq_num,
-                });
-            }
-
             let ids = InsertIds {
                 msg_id,
                 conv_id,
@@ -278,6 +249,20 @@ impl MessageRepository for PostgresMessageRepository {
         let uuid = conversation_id.into_inner();
 
         self.execute_read_query(tenant_id, move |conn| {
+            let conversation_exists = conversations::table
+                .filter(conversations::id.eq(uuid))
+                .filter(conversations::tenant_id.eq(tenant_id.into_inner()))
+                .select(conversations::id)
+                .first::<uuid::Uuid>(conn)
+                .optional()
+                .map_err(RepositoryError::database)?;
+
+            if conversation_exists.is_none() {
+                return Err(RepositoryError::ConversationNotFound(
+                    ConversationId::from_uuid(uuid),
+                ));
+            }
+
             let max_seq: Option<i64> = messages::table
                 .filter(messages::tenant_id.eq(tenant_id.into_inner()))
                 .filter(messages::conversation_id.eq(uuid))

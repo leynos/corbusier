@@ -1,0 +1,11 @@
+{
+  "setup_instructions": {
+    "enable": "droid plugin install core@factory-plugins",
+    "disable": "droid plugin uninstall core@factory-plugins",
+    "initialize": "automatic - no CLI command required",
+    "run_api_tests": "cargo test --test in_memory http_api"
+  },
+  "enabledPlugins": {
+    "core@factory-plugins": true
+  }
+}

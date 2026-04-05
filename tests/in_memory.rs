@@ -11,6 +11,9 @@
 //! - `tool_discovery_routing_tests`: Tool discovery, catalog, and call routing
 //! - `hook_engine_tests`: Hook execution and persistence
 //! - `agent_turn_orchestration_tests`: Turn execution and session continuity
+//! - `http_api_surface_tests`: HTTP API surface tests
+
+mod http_api_test_helpers;
 
 mod in_memory {
     //! Groups the in-memory integration suites behind a shared module root.
@@ -23,6 +26,7 @@ mod in_memory {
     mod conversation_flow_tests;
     mod handoff_tests;
     mod hook_engine_tests;
+    mod http_api_surface_tests;
     mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod slash_command_tests;

@@ -8,6 +8,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use super::super::schema::conversations;
+use crate::message::domain::ConversationState;
 
 /// Database row representation of a conversation.
 #[derive(Debug, Clone, Queryable, Selectable)]
@@ -16,7 +17,7 @@ use super::super::schema::conversations;
 pub struct ConversationRow {
     /// Unique conversation identifier.
     pub id: Uuid,
-    /// Owning tenant identifier.
+    /// Tenant that owns this conversation.
     pub tenant_id: Uuid,
     /// Optional reference to the associated task.
     pub task_id: Option<Uuid>,
@@ -36,7 +37,7 @@ pub struct ConversationRow {
 pub struct NewConversation {
     /// Unique conversation identifier.
     pub id: Uuid,
-    /// Owning tenant identifier.
+    /// Tenant that owns this conversation.
     pub tenant_id: Uuid,
     /// Optional reference to the associated task.
     pub task_id: Option<Uuid>,
@@ -59,7 +60,7 @@ impl NewConversation {
             tenant_id,
             task_id: None,
             context: Value::Object(serde_json::Map::new()),
-            state: "active".to_owned(),
+            state: ConversationState::Active.as_str().to_owned(),
             created_at: now,
             updated_at: now,
         }

@@ -16,7 +16,7 @@ use super::super::schema::messages;
 pub struct MessageRow {
     /// Unique message identifier.
     pub id: Uuid,
-    /// Owning tenant identifier.
+    /// Tenant that owns this message.
     pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
@@ -38,7 +38,7 @@ pub struct MessageRow {
 pub struct NewMessage {
     /// Unique message identifier.
     pub id: Uuid,
-    /// Owning tenant identifier.
+    /// Tenant that owns this message.
     pub tenant_id: Uuid,
     /// Reference to the containing conversation.
     pub conversation_id: Uuid,
@@ -72,10 +72,10 @@ impl NewMessage {
         use crate::message::error::RepositoryError;
 
         let content = serde_json::to_value(message.content())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+            .map_err(|error| RepositoryError::serialization(error.to_string()))?;
 
         let metadata = serde_json::to_value(message.metadata())
-            .map_err(|e| RepositoryError::serialization(e.to_string()))?;
+            .map_err(|error| RepositoryError::serialization(error.to_string()))?;
 
         let raw_sequence = message.sequence_number().value();
         let sequence_number = i64::try_from(raw_sequence).map_err(|_| {

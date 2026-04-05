@@ -99,6 +99,24 @@ make test
 make build
 ```
 
+#### Factory Droid Configuration
+
+The `.factory/settings.json` file configures the local Factory Droid plugin
+used for development support. `core@factory-plugins` provides local development
+servers, scaffolding, and CI helpers. For the HTTP API integration tests, it
+supplies fixtures and mock services, but it does not affect the runtime HTTP
+logic.
+
+Setup and teardown commands:
+
+```bash
+droid plugin install core@factory-plugins
+cargo test --test in_memory http_api
+droid plugin uninstall core@factory-plugins
+```
+
+Project initialization is automatic and does not require a separate CLI step.
+
 Note: The implementation is still in its early stages. Many features are
 designed but not yet implemented.
 
