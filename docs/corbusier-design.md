@@ -12,9 +12,10 @@ multiple specialized AI agents to accomplish complex workflows that single
 agents struggle with, enabling teams of intelligent agents to work together
 seamlessly and transforming complex workflows into coordinated, outcome-driven
 processes. Built on hexagonal architecture principles, Corbusier owns the
-workflow, conversations, tool surface, hooks, and version control system (VCS)
-primitives while hosting pluggable agent engines such as Codex CLI App Server
-and Claude Code via SDK as backend adapters.
+workflow, conversations, tool surface, hooks, canonical review workflow state,
+and version control system (VCS) primitives while hosting pluggable agent
+engines such as Codex CLI App Server and Claude Code via SDK as backend
+adapters.
 
 #### 1.1.2 Core Business Problem Being Solved
 
@@ -696,24 +697,28 @@ Corbusier implements this through:
 
 ##### F-014: Review Ingestion
 
-- **Description:** Integrates with review tools like Frankie to ingest and
-  normalize review comments, enabling interactive review workflows and
-  automated response to feedback.
+- **Description:** Maintains canonical review workflow state inside Corbusier
+  while delegating GitHub review intake, thread context, time-travel material,
+  verification, and reply execution to Frankie as a specialized adapter.
 - **Business Value:**
-  - Automates review feedback processing and response
+  - Automates review feedback processing without fragmenting workflow state
   - Reduces manual overhead in review workflows
   - Enables consistent review handling across projects
 - **User Benefits:**
-  - Automated processing of review feedback
+  - Thread-aware processing of review feedback
   - Consistent review workflow integration
   - Reduced manual review management overhead
-- **Technical Context:** Browser-based review integration with comment ingestion
-  and normalization through Frankie adapter.
+- **Technical Context:** Dedicated review bounded context with review intake,
+  review context, and review action ports. Frankie implements the GitHub review
+  adapter and context engine, while Corbusier persists review threads,
+  checkpoints, projections, and conversation linkage.
 - **Dependencies:**
   - Prerequisite Features: F-013 (VCS Integration)
-  - System Dependencies: Comment parsing, normalization engine
+  - System Dependencies: Review-thread persistence, sync checkpoints,
+    verification projection, conversation metadata linkage
   - External Dependencies: Frankie review platform
-  - Integration Requirements: Review platform APIs, comment threading
+  - Integration Requirements: GitHub review APIs, comment threading,
+    time-travel context, reply templating, and verification
 
 ##### F-015: HTTP API Surface
 
@@ -1273,8 +1278,7 @@ server and querying tools flows through the lifecycle service, host adapter,
 and persistence port.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.1: MCP server start and `tools/list` lifecycle interaction
-sequence.
+Table 2.2.4.1: MCP server start and `tools/list` lifecycle interaction sequence.
 ```mermaid
 sequenceDiagram
     actor Operator
@@ -1415,7 +1419,7 @@ _Recorded 2026-03-05 during roadmap 2.1.2 implementation._
   `RequestContext` scoping and `SET LOCAL app.tenant_id`.
 
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.2: Entity-relationship diagram showing the tool registry
+Table 2.2.4.2: Entity-relationship diagram showing the tool registry
 persistence model.
 ```mermaid
 erDiagram
@@ -1474,8 +1478,12 @@ erDiagram
 ```
 <!-- markdownlint-enable MD031 -->
 
+For screen readers: The following sequence diagram shows how a tool call is
+resolved through catalogue lookup, policy evaluation, host execution, and log
+capture.
+
 <!-- markdownlint-disable MD031 -->
-Figure 2.2.4.3: Sequence diagram for the `call_tool` flow within
+Table 2.2.4.3: Sequence diagram for the `call_tool` flow within
 `ToolDiscoveryRoutingService`.
 ```mermaid
 sequenceDiagram
@@ -1937,7 +1945,7 @@ F012 --> F015
 | Conversation-Task Binding     | F-001, F-002, F-004 | Task context management                  | State synchronization   |
 | Tenant-Identity Enforcement   | F-017, F-001, F-002 | Request context, tenant session settings | RLS policy evaluation   |
 | Governance-Execution Pipeline | F-009, F-010, F-006 | Hook execution engine                    | Policy evaluation       |
-| VCS-Review Integration        | F-013, F-014, F-002 | Comment normalization                    | Review state management |
+| VCS-Review Integration        | F-013, F-014, F-002 | Review thread sync, anchors, checkpoints | Review state management |
 
 #### 2.3.3 Shared Components
 
@@ -2243,12 +2251,11 @@ Foundation[^2].
 
 #### 3.4.4 External Tool Integration
 
-| Tool Category      | Examples                       | Integration Method                     |
-| ------------------ | ------------------------------ | -------------------------------------- |
-| Review Tools       | Frankie                        | Browser automation adapter             |
-| Encapsulation      | Podbot                         | Container runtime API                  |
-| File Editing       | Weaver                         | MCP server integration                 |
-| Testing Frameworks | Language-specific test runners | Process execution within encapsulation |
+- Review tools: Frankie via a GitHub review adapter and context engine.
+- Encapsulation: Podbot via container runtime APIs.
+- File editing: Weaver via MCP server integration.
+- Testing frameworks: language-specific test runners executed within
+  encapsulation boundaries.
 
 #### 3.4.5 Service Reliability Requirements
 
@@ -2331,6 +2338,10 @@ graph TB
 
 - **Conversation Data**: JSONB storage for flexible message formats
 - **Task Data**: Relational tables for structured workflow state
+- **Review Data**: Relational tables for review threads and comments; anchors,
+  sync checkpoints, and outbound replies are stored as fields within the
+  `review_threads` record and its sibling projection state rather than as
+  standalone tables
 - **Tenancy Partitioning**: `tenant_id` on tenant-owned tables with tenant-aware
   indexes and constraints
 - **Audit Data**: Append-only event tables with immutable records
@@ -2708,6 +2719,13 @@ The protocol uses JSON-RPC 2.0 messages to establish communication between
 servers that provide context and capabilities, enabling standardized tool
 integration across different agent backends.
 
+For screen readers: The following sequence diagram shows an agent tool request
+flowing through Corbusier's MCP multiplexer to a tool server and back with a
+workspace execution result.
+
+<!-- markdownlint-disable MD031 -->
+Table 4.1.1.2: MCP tool orchestration flow across Corbusier, the MCP
+multiplexer, and a tool workspace.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -2725,6 +2743,7 @@ sequenceDiagram
     MCP-->>Corbusier: Formatted Result
     Corbusier-->>Agent: Tool Execution Complete
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 4.1.1.3 Decision Points
 
@@ -2961,11 +2980,19 @@ flowchart TD
 
 ###### VCS Integration API Flow
 
+For screen readers: The following sequence diagram shows task and branch
+operations flowing through the VCS adapter, followed by a pull-request review
+event synchronized through Frankie.
+
+<!-- markdownlint-disable MD031 -->
+Table 4.1.2.2: VCS integration API flow for task metadata, branch creation, and
+review-thread synchronization.
 ```mermaid
 sequenceDiagram
     participant Corbusier as Corbusier Core
     participant VCS as VCS Adapter
     participant GitHub as GitHub API
+    participant Frankie as Frankie Adapter
     participant Webhook as Webhook Handler
     
     Corbusier->>VCS: Create Task from Issue
@@ -2980,11 +3007,12 @@ sequenceDiagram
     
     GitHub->>Webhook: PR Review Event
     Webhook->>Corbusier: Review Notification
-    Corbusier->>VCS: Fetch Review Comments
-    VCS->>GitHub: GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews
-    GitHub-->>VCS: Review Data
-    VCS-->>Corbusier: Normalized Comments
+    Corbusier->>Frankie: Sync review threads
+    Frankie->>GitHub: Read review comments and thread metadata
+    GitHub-->>Frankie: Review thread delta
+    Frankie-->>Corbusier: Threads, anchors, and checkpoint
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### MCP Server Communication
 
@@ -2992,6 +3020,11 @@ The protocol uses JSON-RPC 2.0 messages to establish communication between
 servers that provide context and capabilities, ensuring standardized
 communication across all tool integrations.
 
+For screen readers: The following sequence diagram shows an MCP client opening
+JSON-RPC communication with a server, listing tools, and invoking a tool call.
+
+<!-- markdownlint-disable MD031 -->
+Table 4.1.2.3: MCP server communication over JSON-RPC 2.0.
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
@@ -3013,6 +3046,7 @@ sequenceDiagram
     Client->>Server: notifications/cancelled
     Server->>Tool: Cancel execution
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 4.1.2.3 Event Processing Flows
 
@@ -4235,6 +4269,7 @@ domain logic and infrastructure code.
 | Agent Orchestrator        | Pluggable agent backend hosting and turn execution          | Tool Registry, Hook Engine         | Claude Code SDK, Codex CLI App Server     |
 | Tool Registry & Router    | MCP server hosting and tool execution routing               | MCP Multiplexer, Workspace Manager | Weaver, Battery Tools, Custom MCP Servers |
 | Task Service              | Issue-to-branch-to-PR workflow automation                   | VCS Adapters, Workspace Manager    | GitHub/GitLab APIs, Encapsulation Layer   |
+| Review Workflow Service   | Canonical review-thread state and governance loop           | Frankie Adapter, Persistence Layer | GitHub review APIs, Conversation Service  |
 
 #### 5.1.3 Data Flow Description
 
@@ -4260,15 +4295,22 @@ back into the conversation context for agent awareness.
 Task lifecycle data flows from VCS issue creation through branch management to
 pull request completion, with state transitions managed by the Task Service and
 synchronized across all system components through the event bus architecture.
+Review workflow data flows through a separate bounded context: Corbusier keeps
+canonical review-thread state, checkpoints, and conversation linkage, while
+Frankie supplies GitHub review intake, time-travel context, verification, and
+reply execution against the task workspace.
 
 #### 5.1.4 External Integration Points
 
-| System Name     | Integration Type       | Data Exchange Pattern   | Protocol/Format                 |
-| --------------- | ---------------------- | ----------------------- | ------------------------------- |
-| Claude Code SDK | Agent Backend Adapter  | Bidirectional streaming | Native SDK API                  |
-| GitHub/GitLab   | VCS Provider Adapter   | REST API + Webhooks     | JSON over HTTPS                 |
-| Weaver          | File Editing Tool      | MCP Server Integration  | JSON-RPC 2.0 over STDIO         |
-| Podbot          | Encapsulation Provider | Container Runtime API   | Docker API / Process Management |
+- Claude Code SDK: agent backend adapter using bidirectional streaming over
+  the native SDK API.
+- GitHub and GitLab: VCS provider adapters using REST APIs and webhooks over
+  JSON and HTTPS.
+- Frankie: review adapter using library calls, GitHub APIs, and local git for
+  thread sync and context materialization.
+- Weaver: file-editing tool integrated as an MCP server over JSON-RPC 2.0 and
+  stdio.
+- Podbot: encapsulation provider integrated through container runtime APIs.
 
 ### 5.2 Component Details
 
@@ -4353,15 +4395,18 @@ synchronized across all system components through the event bus architecture.
 - **Purpose and Responsibilities:** Manages the complete task lifecycle from VCS
   issue creation through branch management to pull request completion.
   Coordinates workspace setup, maintains task-branch-PR associations, and
-  handles state transitions with comprehensive audit logging.
+  handles coarse state transitions with comprehensive audit logging. Review
+  thread intake, verification status, and reply workflows live in a separate
+  review bounded context.
 - **Technologies and Frameworks:** Implements domain-driven design with Task
   aggregate managing state transitions. Uses VCS adapter pattern for
   GitHub/GitLab integration and coordinates with Podbot for workspace
   encapsulation.
 - **Key Interfaces and APIs:** Provides task management endpoints
-  (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through the
-  VcsHostPort trait. Implements webhook handlers for external VCS events and
-  review comment ingestion.
+  (`POST /tasks`, `PUT /tasks/{id}/state`) and VCS integration through
+  VcsProvider (type alias for IssueProvider). Implements webhook handlers for
+  external VCS events, while delegating review-specific ingestion and reply
+  handling to the Frankie-backed review ports.
 - **Data Persistence Requirements:** Stores task metadata, state transition
   history, and VCS association mappings. Maintains branch naming policies and
   workspace configuration with support for task archival and recovery.
@@ -4372,6 +4417,12 @@ synchronized across all system components through the event bus architecture.
 
 #### 5.2.5 Component Interaction Diagrams
 
+For screen readers: The following sequence diagram shows a conversation turn
+flowing from the user through the conversation and agent orchestrators to tool
+execution and post-turn hooks.
+
+<!-- markdownlint-disable MD031 -->
+Table 5.2.5.1: Conversation turn, tool call, and hook interaction flow.
 ```mermaid
 sequenceDiagram
     participant User as User Client
@@ -4392,6 +4443,7 @@ sequenceDiagram
     Agent-->>Conv: Turn Complete
     Conv-->>User: SSE Event Stream
 ```
+<!-- markdownlint-enable MD031 -->
 
 #### 5.2.6 State Transition Diagrams
 
@@ -5322,6 +5374,13 @@ The event streaming infrastructure provides real-time visibility into system
 operations through WebSocket and Server-Sent Events, enabling responsive user
 interfaces and external integrations.
 
+For screen readers: The following sequence diagram shows conversation and tool
+events being published to an event bus and streamed to a subscribed client over
+SSE.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.2.2.1: Real-time event distribution through the conversation event
+stream.
 ```mermaid
 sequenceDiagram
     participant Client as Web Client
@@ -5350,6 +5409,7 @@ sequenceDiagram
     EventBus->>SSE: Forward event
     SSE->>Client: Send turn_completed event
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### Event Types and Schemas
 
@@ -5537,6 +5597,82 @@ CREATE TABLE backend_registrations (
     UNIQUE (tenant_id, name)
 );
 
+-- Review threads are first-class orchestration records.
+CREATE TABLE review_threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    task_id UUID NOT NULL,
+    conversation_id UUID,
+    pull_request_ref VARCHAR(255) NOT NULL,
+    provider VARCHAR(50) NOT NULL,
+    external_root_comment_id VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    anchor JSONB,
+    review_state JSONB NOT NULL DEFAULT '{}',
+    -- Versioned provider envelope: {version, provider, payload}.
+    last_synced_checkpoint JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT review_threads_status_check CHECK (
+        status IN (
+            'open',
+            'awaiting_agent',
+            'awaiting_reviewer',
+            'resolved',
+            'closed'
+        )
+    ),
+    CONSTRAINT review_threads_checkpoint_shape_check CHECK (
+        last_synced_checkpoint IS NULL
+        OR (
+            jsonb_typeof(last_synced_checkpoint) = 'object'
+            AND last_synced_checkpoint ? 'version'
+            AND last_synced_checkpoint ? 'provider'
+            AND last_synced_checkpoint ? 'payload'
+        )
+    ),
+    -- Supports composite FKs from child rows while keeping `id` as PK.
+    UNIQUE (id, tenant_id),
+    -- Idempotent sync identity: provider-scoped thread root within a PR.
+    UNIQUE (tenant_id, provider, pull_request_ref, external_root_comment_id),
+    FOREIGN KEY (task_id, tenant_id) REFERENCES tasks(id, tenant_id),
+    FOREIGN KEY (conversation_id, tenant_id) REFERENCES conversations(id, tenant_id)
+);
+
+CREATE TABLE review_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    review_thread_id UUID NOT NULL,
+    external_comment_id VARCHAR(255) NOT NULL,
+    raw_payload JSONB NOT NULL,
+    body TEXT NOT NULL,
+    author JSONB NOT NULL,
+    file_path VARCHAR(1024),
+    line_number INTEGER,
+    original_line_number INTEGER,
+    commit_sha VARCHAR(64),
+    diff_hunk TEXT,
+    in_reply_to_external_comment_id VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
+    FOREIGN KEY (review_thread_id, tenant_id) REFERENCES review_threads(id, tenant_id),
+    UNIQUE (tenant_id, external_comment_id)
+);
+
+CREATE TABLE review_verification_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    review_thread_id UUID NOT NULL,
+    external_comment_id VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    evidence JSONB NOT NULL DEFAULT '{}',
+    verified_against_commit_sha VARCHAR(64),
+    verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    FOREIGN KEY (review_thread_id, tenant_id) REFERENCES review_threads(id, tenant_id),
+    UNIQUE (tenant_id, external_comment_id),
+    CONSTRAINT review_verification_status_check CHECK (status IN ('pending', 'verified', 'rejected', 'error'))
+);
+
 -- Event sourcing for audit trails with tenant attribution
 CREATE TABLE domain_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -5566,9 +5702,13 @@ CREATE TABLE audit_logs (
 ```
 
 For screen readers: The following entity-relationship diagram shows tenant
-ownership and key foreign-key paths for tasks, conversations, messages, backend
-registrations, domain events, and audit logs.
+ownership and key foreign-key paths for tasks, conversations, messages, review
+threads, review comments, backend registrations, domain events, and audit logs.
 
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.2: Multi-tenant entity-relationship model for tenant-owned tasks,
+conversations, messages, review threads, review comments, backend
+registrations, domain events, and audit logs.
 ```mermaid
 erDiagram
     TENANTS {
@@ -5624,6 +5764,40 @@ erDiagram
         timestamptz updated_at
     }
 
+    REVIEW_THREADS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid task_id FK
+        uuid conversation_id FK
+        varchar pull_request_ref
+        varchar provider
+        varchar external_root_comment_id
+        varchar status
+        jsonb anchor
+        jsonb review_state
+        jsonb last_synced_checkpoint
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REVIEW_COMMENTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid review_thread_id FK
+        varchar external_comment_id
+        jsonb raw_payload
+        text body
+        jsonb author
+        varchar file_path
+        integer line_number
+        integer original_line_number
+        varchar commit_sha
+        text diff_hunk
+        varchar in_reply_to_external_comment_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     DOMAIN_EVENTS {
         uuid id PK
         uuid tenant_id FK
@@ -5653,16 +5827,102 @@ erDiagram
     TENANTS ||--o{ TASKS : owns
     TENANTS ||--o{ CONVERSATIONS : owns
     TENANTS ||--o{ MESSAGES : owns
+    TENANTS ||--o{ REVIEW_THREADS : owns
+    TENANTS ||--o{ REVIEW_COMMENTS : owns
     TENANTS ||--o{ BACKEND_REGISTRATIONS : owns
     TENANTS ||--o{ DOMAIN_EVENTS : owns
     TENANTS ||--o{ AUDIT_LOGS : owns
 
     TASKS ||--o{ CONVERSATIONS : has
     CONVERSATIONS ||--o{ MESSAGES : has
+    TASKS ||--o{ REVIEW_THREADS : has
+    CONVERSATIONS ||--o{ REVIEW_THREADS : links
+    REVIEW_THREADS ||--o{ REVIEW_COMMENTS : contains
 ```
+<!-- markdownlint-enable MD031 -->
 
-_Figure: Multi-tenant entity-relationship model for tenant-owned persistence
-tables._
+For screen readers: The following entity-relationship diagram focuses on the
+review workflow persistence model, showing how tenants own review threads,
+review comments, and verification results, and how those records relate back to
+tasks and conversations.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.3: Review workflow entity-relationship model for tenant-owned
+review threads, comments, and verification state.
+```mermaid
+erDiagram
+    TENANTS {
+        uuid id PK
+    }
+
+    TASKS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar pull_request_ref
+    }
+
+    CONVERSATIONS {
+        uuid id PK
+        uuid tenant_id FK
+    }
+
+    REVIEW_THREADS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid task_id FK
+        uuid conversation_id FK
+        varchar pull_request_ref
+        varchar provider
+        varchar external_root_comment_id
+        varchar status
+        jsonb anchor
+        jsonb review_state
+        jsonb last_synced_checkpoint
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REVIEW_COMMENTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid review_thread_id FK
+        varchar external_comment_id
+        jsonb raw_payload
+        text body
+        jsonb author
+        varchar file_path
+        integer line_number
+        integer original_line_number
+        varchar commit_sha
+        text diff_hunk
+        varchar in_reply_to_external_comment_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REVIEW_VERIFICATION_RESULTS {
+        uuid id PK
+        uuid tenant_id FK
+        uuid review_thread_id FK
+        varchar external_comment_id
+        varchar status
+        jsonb evidence
+        varchar verified_against_commit_sha
+        timestamptz verified_at
+    }
+
+    TENANTS ||--o{ TASKS : owns
+    TENANTS ||--o{ CONVERSATIONS : owns
+    TENANTS ||--o{ REVIEW_THREADS : owns
+    TENANTS ||--o{ REVIEW_COMMENTS : owns
+    TENANTS ||--o{ REVIEW_VERIFICATION_RESULTS : owns
+
+    TASKS ||--o{ REVIEW_THREADS : has
+    CONVERSATIONS ||--o{ REVIEW_THREADS : links
+    REVIEW_THREADS ||--o{ REVIEW_COMMENTS : contains
+    REVIEW_THREADS ||--o{ REVIEW_VERIFICATION_RESULTS : verifies
+```
+<!-- markdownlint-enable MD031 -->
 
 #### 6.2.4 Encapsulation and Workspace Management
 
@@ -5792,7 +6052,6 @@ graph TB
         ISSUE_MGR[Issue Manager]
         BRANCH_MGR[Branch Manager]
         PR_MGR[Pull Request Manager]
-        REVIEW_MGR[Review Manager]
     end
     
     subgraph "Webhook Processing"
@@ -5814,7 +6073,6 @@ graph TB
     GH_ADAPTER --> ISSUE_MGR
     GH_ADAPTER --> BRANCH_MGR
     GH_ADAPTER --> PR_MGR
-    GH_ADAPTER --> REVIEW_MGR
     
     WEBHOOK_HAND --> EVENT_PARSER
     EVENT_PARSER --> EVENT_ROUTER
@@ -5830,8 +6088,6 @@ pub trait VcsProvider: Send + Sync {
     async fn get_issue(&self, issue_ref: IssueRef) -> Result<Issue>;
     async fn create_branch(&self, base_ref: BranchRef, branch_name: String) -> Result<BranchRef>;
     async fn create_pull_request(&self, request: CreatePullRequestRequest) -> Result<PullRequest>;
-    async fn get_pull_request_reviews(&self, pr_ref: PullRequestRef) -> Result<Vec<Review>>;
-    async fn post_review_comment(&self, pr_ref: PullRequestRef, comment: ReviewComment) -> Result<()>;
     async fn update_pull_request_status(&self, pr_ref: PullRequestRef, status: PrStatus) -> Result<()>;
     fn get_provider_info(&self) -> VcsProviderInfo;
 }
@@ -5857,7 +6113,6 @@ pub struct PullRequest {
     pub source_branch: BranchRef,
     pub target_branch: BranchRef,
     pub state: PrState,
-    pub reviews: Vec<Review>,
     pub checks: Vec<StatusCheck>,
     pub mergeable: bool,
 }
@@ -5867,74 +6122,252 @@ pub struct PullRequest {
 
 ##### Frankie Adapter Integration
 
-The review integration component leverages Frankie for browser-based review
-comment ingestion and normalization, enabling interactive review workflows and
-automated response to feedback.
+The review integration component treats Frankie as a GitHub review adapter and
+context engine, not as the owner of canonical workflow state. Corbusier owns
+review-thread persistence, sync checkpoints, conversation linkage, verification
+status, and outbound reply decisions. Frankie supplies incremental thread sync,
+time-travel context, diff-based verification, and reply rendering or posting.
 
+For screen readers: The following sequence diagram shows the review-event flow
+from a GitHub pull-request review event through Corbusier's review workflow
+service, Frankie synchronization, conversation updates, agent reply drafting,
+and the final verification or reply action.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.3.2.1: Review workflow event handling from GitHub webhook ingestion
+through Frankie synchronization, agent reply drafting, and verification or
+reply submission.
 ```mermaid
 sequenceDiagram
-    participant VCS as VCS Provider
-    participant Webhook as Webhook Handler
-    participant Frankie as Frankie Adapter
-    participant ReviewSvc as Review Service
-    participant ConvSvc as Conversation Service
-    participant Agent as Agent Orchestrator
-    
-    VCS->>Webhook: PR Review Event
-    Webhook->>ReviewSvc: Process Review Event
-    ReviewSvc->>Frankie: Fetch Review Comments
-    Frankie->>VCS: Browser Automation
-    VCS-->>Frankie: Raw Review Data
-    Frankie-->>ReviewSvc: Normalized Comments
-    ReviewSvc->>ConvSvc: Append Review Messages
-    ConvSvc->>Agent: Trigger Review Response Turn
-    Agent-->>ConvSvc: Generate Response
-    ConvSvc-->>ReviewSvc: Review Response
-    ReviewSvc->>VCS: Post Response Comment
+    participant GitHub as GitHub_API
+    participant Webhook as Webhook_Handler
+    participant ReviewSvc as ReviewWorkflowService
+    participant Frankie as FrankieAdapter
+    participant ConvSvc as ConversationService
+    participant Agent as AgentOrchestrator
+
+    GitHub->>Webhook: PR_review_event
+    Webhook->>ReviewSvc: handle_review_event
+    ReviewSvc->>Frankie: sync_threads(pull_request_ref, checkpoint)
+    Frankie->>GitHub: fetch_review_thread_delta
+    GitHub-->>Frankie: review_comments_and_metadata
+    Frankie-->>ReviewSvc: threads_anchors_checkpoint
+    ReviewSvc->>ConvSvc: append_review_linked_messages
+    ConvSvc->>Agent: trigger_review_response_turn
+    Agent-->>ConvSvc: generate_reply_draft
+    ConvSvc-->>ReviewSvc: reply_draft_with_verification_intent
+    ReviewSvc->>Frankie: verify_reply
+    Frankie-->>ReviewSvc: verification_result
+    ReviewSvc->>Frankie: submit_reply
+    Frankie-->>ReviewSvc: posted_reply
+    ReviewSvc->>ConvSvc: update_review_projection_and_conversation
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### Review Comment Processing
 
 ```rust
-pub struct ReviewComment {
-    pub id: CommentId,
-    pub review_id: ReviewId,
+pub struct ReviewCommentRecord {
+    pub external_comment_id: ExternalCommentId,
+    pub raw_payload: serde_json::Value,
+    pub body: String,
     pub file_path: Option<PathBuf>,
     pub line_number: Option<u32>,
-    pub content: String,
     pub author: User,
+    pub original_line_number: Option<u32>,
+    pub commit_sha: Option<String>,
+    pub diff_hunk: Option<String>,
+    pub in_reply_to_id: Option<ExternalCommentId>,
     pub created_at: DateTime<Utc>,
-    pub comment_type: CommentType,
-    pub thread_id: Option<ThreadId>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone)]
-pub enum CommentType {
-    General,
-    FileLevel,
-    LineLevel { start_line: u32, end_line: Option<u32> },
-    Suggestion { original: String, suggested: String },
+pub struct ReviewAnchor {
+    pub commit_sha: String,
+    pub file_path: PathBuf,
+    pub original_line: u32,
+    pub diff_hunk: Option<String>,
 }
 
-pub struct NormalizedReview {
-    pub review_id: ReviewId,
+pub struct ReviewSyncCheckpointEnvelope {
+    pub version: u16,
+    pub provider: String,
+    pub payload: serde_json::Value,
+}
+
+pub struct ReviewThread {
+    pub thread_root_id: ExternalCommentId,
     pub pull_request_ref: PullRequestRef,
-    pub reviewer: User,
-    pub overall_state: ReviewState,
-    pub comments: Vec<ReviewComment>,
-    pub themes: Vec<ReviewTheme>,
-    pub action_items: Vec<ActionItem>,
-    pub processed_at: DateTime<Utc>,
+    pub comments: Vec<ReviewCommentRecord>,
+    pub anchor: Option<ReviewAnchor>,
+    pub verification_status: VerificationStatus,
+    pub pending_reply: Option<ReplyDraft>,
+    pub last_synced_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
 }
 
 #[async_trait::async_trait]
-pub trait ReviewProcessor: Send + Sync {
-    async fn process_review_event(&self, event: ReviewEvent) -> Result<NormalizedReview>;
-    async fn cluster_comments(&self, comments: Vec<ReviewComment>) -> Result<Vec<CommentCluster>>;
-    async fn extract_action_items(&self, review: &NormalizedReview) -> Result<Vec<ActionItem>>;
-    async fn generate_review_summary(&self, review: &NormalizedReview) -> Result<ReviewSummary>;
+pub trait ReviewIntakePort: Send + Sync {
+    async fn sync_threads(
+        &self,
+        pull_request: PullRequestRef,
+        checkpoint: Option<ReviewSyncCheckpointEnvelope>,
+    ) -> Result<ReviewSyncDelta>;
+}
+
+#[async_trait::async_trait]
+pub trait ReviewContextPort: Send + Sync {
+    async fn materialize_context(
+        &self,
+        anchor: ReviewAnchor,
+        workspace_id: WorkspaceId,
+    ) -> Result<TimeTravelBundle>;
+
+    async fn verify_resolution(
+        &self,
+        comment: ReviewCommentRecord,
+        target_commit: String,
+    ) -> Result<VerificationResult>;
+}
+
+#[async_trait::async_trait]
+pub trait ReviewActionPort: Send + Sync {
+    async fn render_reply(
+        &self,
+        thread: ReviewThread,
+        template_id: String,
+    ) -> Result<ReplyDraft>;
+
+    async fn submit_reply(&self, draft: ReplyDraft) -> Result<PostedReply>;
 }
 ```
+
+For screen readers: The following class diagram shows the review workflow model
+and service boundary, including the review aggregate, its projection and anchor
+types, the materialized review thread view, and the three Frankie-backed review
+ports used by the review workflow service.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.3.2.2: Review workflow class model showing the persistent aggregate,
+materialized thread view, and the review intake, context, and action ports used
+by the review workflow service.
+```mermaid
+classDiagram
+    class ReviewThreadAggregate {
+        +Uuid id
+        +Uuid tenant_id
+        +Uuid task_id
+        +Option~Uuid~ conversation_id
+        +String pull_request_ref
+        +String provider
+        +String external_root_comment_id
+        +ReviewThreadStatus status
+        +Option~ReviewAnchor~ anchor
+        +VerificationStatus verification_status
+        +Option~String~ pending_outbound_reply
+        +Option~String~ last_reviewer_action
+        +Option~ReviewSyncCheckpointEnvelope~ last_synced_checkpoint
+        +DateTime_Utc created_at
+        +DateTime_Utc updated_at
+    }
+
+    class ReviewWorkflowProjection {
+        +u32 open_thread_count
+        +VerificationStatus verification_status
+        +Option~String~ pending_outbound_reply
+        +Option~String~ last_reviewer_action
+    }
+
+    class ReviewCommentRecord {
+        +ExternalCommentId external_comment_id
+        +Value raw_payload
+        +String body
+        +Option~PathBuf~ file_path
+        +Option~u32~ line_number
+        +User author
+        +Option~u32~ original_line_number
+        +Option~String~ commit_sha
+        +Option~String~ diff_hunk
+        +Option~ExternalCommentId~ in_reply_to_id
+        +DateTime_Utc created_at
+        +Option~DateTime_Utc~ updated_at
+    }
+
+    class ReviewAnchor {
+        +String commit_sha
+        +PathBuf file_path
+        +u32 original_line
+        +Option~String~ diff_hunk
+    }
+
+    class ReviewThread {
+        +ExternalCommentId thread_root_id
+        +PullRequestRef pull_request_ref
+        +Vec~ReviewCommentRecord~ comments
+        +Option~ReviewAnchor~ anchor
+        +VerificationStatus verification_status
+        +Option~ReplyDraft~ pending_reply
+        +Option~ReviewSyncCheckpointEnvelope~ last_synced_checkpoint
+    }
+
+    class ReviewIntakePort {
+        <<interface>>
+        +sync_threads(pull_request, checkpoint) Result_ReviewSyncDelta
+    }
+
+    class ReviewContextPort {
+        <<interface>>
+        +materialize_context(anchor, workspace_id) Result_TimeTravelBundle
+        +verify_resolution(comment, target_commit) Result_VerificationResult
+    }
+
+    class ReviewActionPort {
+        <<interface>>
+        +render_reply(thread, template_id) Result_ReplyDraft
+        +submit_reply(draft) Result_PostedReply
+    }
+
+    class ReviewWorkflowService {
+        +handle_review_event(event)
+        +update_projections_from_sync(delta)
+        +append_review_linked_messages(thread)
+        +start_verification_and_reply(thread)
+    }
+
+    ReviewThreadAggregate --> ReviewAnchor : anchors
+    ReviewThreadAggregate --> ReviewThread : materializes
+
+    ReviewThread --> ReviewCommentRecord : contains
+    ReviewThread --> ReviewAnchor : uses
+
+    ReviewWorkflowService ..> ReviewIntakePort : uses
+    ReviewWorkflowService ..> ReviewContextPort : uses
+    ReviewWorkflowService ..> ReviewActionPort : uses
+```
+<!-- markdownlint-enable MD031 -->
+
+Review threads are the primary orchestration unit. Corbusier should preserve
+Frankie's raw comment payload losslessly, derive anchors only when metadata is
+complete enough to support time travel or verification, and treat
+`in_reply_to_id.unwrap_or(external_comment_id)` as the stable thread root when
+Frankie does not yet expose a richer thread aggregate directly.
+
+The durable storage contract should align SQL and Rust terminology around
+`status`. The database should enforce the same snake_case values used by
+`ReviewThreadStatus`, and the review-thread root should remain unique within a
+tenant, provider, and pull request. `UNIQUE (id, tenant_id)` stays in place as
+the composite foreign-key target for tenant-safe child tables, while
+`UNIQUE (tenant_id, provider, pull_request_ref, external_root_comment_id)`
+captures the domain identity of a synchronized review thread.
+
+Sync checkpoints should not remain an opaque blob. Corbusier should persist a
+versioned provider envelope such as `{version, provider, payload}` in
+`last_synced_checkpoint`, letting Frankie evolve its internal checkpoint
+payload without losing migration safety or debuggability.
+
+Task state remains intentionally coarse. `TaskState::InReview` signals that a
+task is in the review phase, while a sibling review projection keyed by tenant,
+pull request, and thread root tracks open-thread counts, verification status,
+last reviewer action, pending outbound reply, and sync checkpoints.
 
 #### 6.3.3 Hook Engine Component
 
@@ -6076,9 +6509,9 @@ pub struct HookExecutionResult {
 }
 ```
 
-Earlier sections of this document use legacy trigger names from the planning
-phase. The runtime mapping is `PreTurn` -> `TurnStart`, `PostTurn` ->
-`TurnEnd`, `PreToolCall` -> `PreToolUse`, and `PostToolCall` -> `PostToolUse`.
+The legacy-to-runtime trigger name mapping and per-event payload schemas, ack
+semantics, and timeout rules are documented in section 6.4.2.4 "Hook Event
+Contract Reference".
 
 ### 6.4 Component Integration Patterns
 
@@ -6422,6 +6855,12 @@ similarly interact with the Payment Settings Domain or Module through a similar
 communication occurs over a network, whereas within a Modular Monolith,
 communication is direct within the same process."
 
+For screen readers: The following sequence diagram shows in-process module
+collaboration across conversation, task, agent, tool, and governance modules in
+the modular monolith.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.1.2.2: Modular monolith module interaction during a user request.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -6442,6 +6881,7 @@ sequenceDiagram
     Agent-->>Conv: Turn Complete
     Conv-->>User: HTTP Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 #### 6.1.3 Scalability Design Within Monolith
 
@@ -6878,12 +7318,21 @@ Status values are standardized:
 - Tool call statuses: `queued`, `running`, `succeeded`, `failed`.
 - Agent response statuses: `completed`, `failed`, `cancelled`.
 
+Review-linked messages must store structured review fields under the reserved,
+versioned key `"review.linkage.v1"` inside `MessageMetadata.extensions` rather
+than flattening them into the top-level JSON object or into free text. The
+value stored at that key should contain `review_comment_id`, `thread_root_id`,
+`reviewer`, `file_path`, `commit_sha`, and `verification_status`.
+
 ###### Canonical Message Domain Model
 
 For screen readers: The following class diagram illustrates the canonical
 message domain model, showing the Message aggregate root and its related value
 objects, including content parts, metadata, and identity types.
 
+<!-- markdownlint-disable MD031 -->
+Table 6.2.1.4: Canonical message domain model class diagram showing the Message
+aggregate root with its value objects, content parts, and identity types.
 ```mermaid
 classDiagram
     class Message {
@@ -7099,10 +7548,7 @@ classDiagram
 
     SequenceNumber ..> Message
 ```
-
-_Figure 6.2.1.2a: Canonical message domain model class diagram showing the
-Message aggregate root with its value objects, content parts, and identity
-types._
+<!-- markdownlint-enable MD031 -->
 
 ##### 6.2.1.3 Indexing Strategy
 
@@ -7111,15 +7557,21 @@ types._
 JSONB provides a wide array of options to index your JSON data. At a high
 level, we will dig into 3 different types of indexes – GIN, BTREE, and HASH.
 
-| Table                 | Index Type | Columns                                       | Purpose                             |
-| --------------------- | ---------- | --------------------------------------------- | ----------------------------------- |
-| messages              | B-tree     | (tenant_id, conversation_id, sequence_number) | Message ordering and pagination     |
-| messages              | GIN        | content                                       | Full-text search in message content |
-| conversations         | B-tree     | (tenant_id, task_id)                          | Task-conversation lookup            |
-| tasks                 | B-tree     | (tenant_id, state, created_at)                | Task filtering and sorting          |
-| tasks                 | B-tree     | (tenant_id, branch_ref)                       | Branch association lookup           |
-| tasks                 | B-tree     | (tenant_id, pull_request_ref)                 | Pull request lookup                 |
-| backend_registrations | B-tree     | (tenant_id, name)                             | Per-tenant backend uniqueness       |
+Table 6.2.1.5: Primary indexes for tenant-scoped query paths.
+
+| Table                       | Index Type | Columns                                            | Purpose                             |
+| --------------------------- | ---------- | -------------------------------------------------- | ----------------------------------- |
+| messages                    | B-tree     | (tenant_id, conversation_id, sequence_number)      | Message ordering and pagination     |
+| messages                    | GIN        | content                                            | Full-text search in message content |
+| conversations               | B-tree     | (tenant_id, task_id)                               | Task-conversation lookup            |
+| tasks                       | B-tree     | (tenant_id, state, created_at)                     | Task filtering and sorting          |
+| tasks                       | B-tree     | (tenant_id, branch_ref)                            | Branch association lookup           |
+| tasks                       | B-tree     | (tenant_id, pull_request_ref)                      | Pull request lookup                 |
+| review_threads              | B-tree     | (tenant_id, pull_request_ref, status)              | Open-thread lookup per pull request |
+| review_comments             | B-tree     | (tenant_id, review_thread_id)                      | Thread-scoped comment lookup        |
+| review_verification_results | B-tree     | (tenant_id, review_thread_id, status, verified_at) | Verification projection lookup      |
+| review_verification_results | GIN        | evidence                                           | Evidence inspection and filtering   |
+| backend_registrations       | B-tree     | (tenant_id, name)                                  | Per-tenant backend uniqueness       |
 
 ###### JSONB Indexing Strategy
 
@@ -7148,6 +7600,14 @@ CREATE INDEX idx_tasks_tenant_branch_ref
     ON tasks (tenant_id, branch_ref) WHERE branch_ref IS NOT NULL;
 CREATE INDEX idx_tasks_tenant_pull_request_ref
     ON tasks (tenant_id, pull_request_ref) WHERE pull_request_ref IS NOT NULL;
+CREATE INDEX idx_review_threads_tenant_pr_status
+    ON review_threads (tenant_id, pull_request_ref, status);
+CREATE INDEX idx_review_comments_tenant_thread
+    ON review_comments (tenant_id, review_thread_id);
+CREATE INDEX idx_review_verification_results_tenant_thread_status_time
+    ON review_verification_results (tenant_id, review_thread_id, status, verified_at);
+CREATE INDEX idx_review_verification_results_evidence_gin
+    ON review_verification_results USING GIN (evidence);
 
 -- Tenant-scoped uniqueness guards
 CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
@@ -8041,6 +8501,9 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE backend_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_verification_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
@@ -8049,6 +8512,9 @@ ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
 ALTER TABLE messages FORCE ROW LEVEL SECURITY;
 ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
 ALTER TABLE backend_registrations FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_threads FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_comments FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_verification_results FORCE ROW LEVEL SECURITY;
 ALTER TABLE domain_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 
@@ -8069,6 +8535,21 @@ CREATE POLICY tasks_access_policy ON tasks
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
 CREATE POLICY backend_registrations_access_policy ON backend_registrations
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_threads_access_policy ON review_threads
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_comments_access_policy ON review_comments
+    FOR ALL TO authenticated_users
+    USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
+    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
+
+CREATE POLICY review_verification_results_access_policy ON review_verification_results
     FOR ALL TO authenticated_users
     USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
@@ -8517,6 +8998,12 @@ MCP takes inspiration from the Language Server Protocol, standardizing how to
 integrate additional context and tools into the ecosystem of AI applications.
 Corbusier implements MCP as the backbone for tool orchestration:
 
+For screen readers: The following sequence diagram shows an agent requesting a
+tool call that Corbusier routes through MCP to a tool server and back as a
+formatted result.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.3.1.1: MCP tool orchestration through Corbusier and a tool server.
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Backend
@@ -8533,6 +9020,7 @@ sequenceDiagram
     MCP-->>Corbusier: Formatted Response
     Corbusier-->>Agent: Tool Execution Complete
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### HTTP API Specification
 
@@ -9156,6 +9644,12 @@ graph TB
 Corbusier integrates with Podbot for secure workspace encapsulation, with
 extensibility for future encapsulation technologies:
 
+For screen readers: The following sequence diagram shows task workspace
+provisioning and command execution flowing through the encapsulation adapter to
+Podbot and the workspace container.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.3.3.1: Encapsulation provider integration with Podbot.
 ```mermaid
 sequenceDiagram
     participant Task as Task Service
@@ -9177,15 +9671,18 @@ sequenceDiagram
     Podbot-->>Encap: Execution Response
     Encap-->>Task: Tool Result
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### Review Integration (Frankie)
 
-| Integration Component | Technology         | Data Flow                                | Processing Method            |
-| --------------------- | ------------------ | ---------------------------------------- | ---------------------------- |
-| Comment Extraction    | Browser automation | VCS → Frankie → Corbusier                | Real-time webhook processing |
-| Comment Normalization | Text processing    | Raw comments → Structured data           | Async batch processing       |
-| Thread Management     | State tracking     | Comment threads → Conversation context   | Event-driven updates         |
-| Response Generation   | AI integration     | Structured feedback → Agent prompts      | Streaming response           |
+- Thread synchronization: GitHub API plus local git, flowing from GitHub to
+  Frankie to Corbusier through incremental checkpoint sync.
+- Anchor materialization: time-travel services turning stored anchors into
+  task-workspace context on demand.
+- Thread management: Corbusier review-state projections flowing into
+  conversation context through event-driven updates.
+- Verification and reply: AI drafting and diff replay operating inside the
+  governance loop to produce either queued or posted responses.
 
 ##### 6.3.3.3 API Gateway Configuration
 
@@ -9458,6 +9955,13 @@ in security requirements.
 
 ###### Token Validation Pipeline
 
+For screen readers: The following sequence diagram shows bearer-token
+validation moving through middleware, token verification, session checks, and
+user lookup before authorization succeeds.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.4.1.1: Token validation pipeline across middleware and identity
+services.
 ```mermaid
 sequenceDiagram
     participant Client as Client Application
@@ -9477,6 +9981,7 @@ sequenceDiagram
     TokenSvc-->>Middleware: Validation Result
     Middleware-->>Client: Authorized Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 ##### 6.4.1.5 Password Policies
 
@@ -9689,6 +10194,117 @@ The execution path carries workflow correlation through a dedicated execution
 scope on `ToolCallRequest` and `HookTriggerContext`. This scope can include
 `TaskId`, `ConversationId`, and non-indexed metadata while keeping
 `RequestContext` focused on tenant and identity concerns.
+
+###### Hook Event Contract Reference
+
+Every hook trigger delivers a `HookTriggerContext` to the hook engine
+containing a `TriggerContextId`, `HookTriggerType`, `HookExecutionScope`
+(optional `TaskId`, optional `ConversationId`, and a free-form JSON `metadata`
+value), and a `DateTime<Utc>` timestamp. The `metadata` value carries
+trigger-specific fields described per event below. No hook trigger currently
+issues a resume token; on timeout or failure, gate-keeping triggers require the
+caller to restart the gated operation (which generates a fresh
+`TriggerContextId`), while observational triggers simply discard the result.
+
+Earlier sections of this document use legacy planning-phase names. The runtime
+mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
+`PreToolUse`, and `PostToolCall` -> `PostToolUse`. The remaining triggers
+(`PreCommit`, `PostCommit`, `PreMerge`, `PostMerge`, `PrePull`, `PostPull`,
+`PrePush`, `PostPush`, `PreDeploy`, `PostDeploy`) retain their names unchanged.
+
+**`TurnStart` (contract name `PreTurn`)**
+
+- **Payload fields:** `backend_id: String`, `conversation_id: UUID`,
+  `turn_id: UUID`, `model: String` (optional).
+- **Ack semantics:** The hook engine returns `HookExecutionStatus`. A
+  `Succeeded` status allows the turn to proceed; `Failed` aborts the turn
+  before the agent backend processes input.
+- **Timeout:** 5 s default. On timeout the trigger is treated as
+  `Succeeded` (fail-open) and the turn proceeds. No retry.
+- **Resume:** Unsupported. A timed-out or failed `TurnStart` does not
+  produce a resume token; the caller must re-initiate the turn.
+
+**`TurnEnd` (contract name `PostTurn`)**
+
+- **Payload fields:** `backend_id: String`, `conversation_id: UUID`,
+  `turn_id: UUID`, `duration_ms: u64`, `message_count: u32`.
+- **Ack semantics:** Observational — the execution result is recorded but
+  does not block further processing. Any status is accepted.
+- **Timeout:** 5 s default. On timeout the result is logged and
+  discarded. No retry.
+- **Resume:** Unsupported. Observational triggers do not gate workflow
+  progression and require no resume mechanism.
+
+**`PreToolUse` (contract name `PreToolCall`)**
+
+- **Payload fields:** `tool_name: String`, `server_id: UUID`,
+  `call_id: UUID`, `parameters: Value` (tool input JSON), `task_id: UUID`
+  (optional), `conversation_id: UUID` (optional).
+- **Ack semantics:** `Succeeded` permits the tool call; `Failed` blocks
+  execution and the denial is recorded in `hook_policy_audit_events`.
+  `PartialFailure` is treated as `Failed`.
+- **Timeout:** 10 s default. On timeout the trigger is treated as
+  `Failed` (fail-closed) and the tool call is denied. No retry; the caller
+  receives a governance-denied error.
+- **Resume:** Restart-only. On timeout or failure the tool call is denied;
+  the agent backend may re-issue the call with a new `TriggerContextId`. No
+  resume token is issued.
+
+**`PostToolUse` (contract name `PostToolCall`)**
+
+- **Payload fields:** `tool_name: String`, `server_id: UUID`,
+  `call_id: UUID`, `parameters: Value`, `result: Value` (tool output JSON),
+  `duration_ms: u64`, `is_error: bool`.
+- **Ack semantics:** Observational — the execution result is persisted to
+  the audit trail. Any status is accepted.
+- **Timeout:** 10 s default. On timeout the result is logged and
+  discarded. No retry.
+- **Resume:** Unsupported. Observational triggers do not gate workflow
+  progression and require no resume mechanism.
+
+**`PreCommit`**
+
+- **Payload fields:** `branch: String`, `commit_sha: String` (staging
+  SHA), `file_paths: Vec<String>`, `diff_stat: Value` (optional summary).
+- **Ack semantics:** `Succeeded` permits the commit; `Failed` aborts it.
+  A quality-gate action may attach violation details in the action result
+  `output` field.
+- **Timeout:** 30 s default. On timeout the trigger is treated as
+  `Failed` (fail-closed). No automatic retry; the operator may re-run the
+  commit.
+- **Resume:** Restart-only. On timeout or failure the commit is aborted; the
+  operator must re-run the commit, which issues a fresh `TriggerContextId`. No
+  resume token is issued.
+
+**`PreMerge`**
+
+- **Payload fields:** `source_branch: String`,
+  `target_branch: String`, `pull_request_ref: String` (optional),
+  `commit_sha: String`.
+- **Ack semantics:** `Succeeded` permits the merge; `Failed` blocks it.
+- **Timeout:** 30 s default, fail-closed on timeout. No retry.
+- **Resume:** Restart-only. On timeout or failure the merge is blocked; the
+  operator must re-attempt the merge, generating a new `TriggerContextId`. No
+  resume token is issued.
+
+**`PreDeploy`**
+
+- **Payload fields:** `environment: String`, `artifact_ref: String`,
+  `commit_sha: String`, `deployer: String` (identity of the requesting agent or
+  user).
+- **Ack semantics:** `Succeeded` permits the deployment; `Failed` blocks
+  it.
+- **Timeout:** 60 s default, fail-closed on timeout. No retry.
+- **Resume:** Restart-only. On timeout or failure the deployment is blocked;
+  the operator must re-initiate the deployment with a new `TriggerContextId`.
+  No resume token is issued.
+
+Post-event triggers (`PostCommit`, `PostMerge`, `PostPull`, `PostPush`,
+`PostDeploy`) are observational: they share the same payload shape as their
+pre-event counterpart plus an `outcome: String` field and do not gate workflow
+progression. A 5 s default timeout applies; on timeout the result is
+discarded. Resume is unsupported for all post-event triggers because they do
+not gate workflow progression.
 
 ###### Multi-Layer Policy Enforcement
 
@@ -10297,6 +10913,13 @@ executions, and VCS operations.
 
 ###### Tracing Architecture
 
+For screen readers: The following sequence diagram shows a traced user request
+moving through HTTP handling, conversation orchestration, agent execution, and
+tool invocation with spans across each boundary.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.5.1.3.1: Distributed tracing architecture across Corbusier request
+handling and tool execution.
 ```mermaid
 sequenceDiagram
     participant User as User Request
@@ -10322,6 +10945,7 @@ sequenceDiagram
     Conv-->>HTTP: Response Ready
     HTTP-->>User: HTTP Response
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### Trace Context Propagation
 
@@ -11000,6 +11624,13 @@ Integration testing uses mock servers (e.g., wiremock) and binds test servers
 to ephemeral ports to eliminate non-deterministic failures caused by network
 I/O or backoff.
 
+For screen readers: The following sequence diagram shows an integration test
+setting up mocks and a test database, executing a workflow through Corbusier,
+and verifying persisted results.
+
+<!-- markdownlint-disable MD031 -->
+Table 6.6.1.2.1: Service integration test flow with mock dependencies and a
+test database.
 ```mermaid
 sequenceDiagram
     participant Test as Integration Test
@@ -11021,6 +11652,7 @@ sequenceDiagram
     Corbusier-->>Test: Workflow complete
     Test->>Test: Verify end-to-end behavior
 ```
+<!-- markdownlint-enable MD031 -->
 
 ###### API Testing Strategy
 

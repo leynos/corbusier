@@ -2,9 +2,21 @@
 
 use super::handoff::HandoffMetadata;
 use super::{AgentSessionId, TurnId, audit::AgentResponseAudit, audit::ToolCallAudit};
+use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+
+/// Reserved extension key namespace prefix for review linkage data.
+const RESERVED_REVIEW_PREFIX: &str = "review.linkage.";
+
+/// Error returned when a caller attempts to set a reserved extension key
+/// via [`MessageMetadata::with_extension`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("extension key {key:?} is reserved; use the dedicated builder method instead")]
+pub struct ReservedExtensionKeyError {
+    key: String,
+}
 
 /// Metadata associated with a message.
 ///
@@ -20,7 +32,7 @@ use std::collections::HashMap;
 ///     .with_turn_id(TurnId::new());
 /// assert_eq!(metadata.agent_backend, Some("claude_code_sdk".to_string()));
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MessageMetadata {
     /// The agent backend that produced this message (if applicable).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,14 +64,67 @@ pub struct MessageMetadata {
 
     /// Extension data for custom metadata fields.
     ///
-    /// **Warning:** Due to `#[serde(flatten)]`, any JSON keys not matching known
-    /// fields during deserialisation will be captured here. This can cause
-    /// unexpected behaviour if an extension key collides with a future field name.
-    /// Avoid using keys like `agent_backend`, `turn_id`, `slash_command_expansion`,
-    /// `tool_call_audits`, `agent_response_audit`, `handoff_metadata`, or
-    /// `agent_session_id`.
-    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    /// Extensions are serialized under an explicit `"extensions"` key rather
+    /// than being flattened into the top-level JSON object, preventing key
+    /// collisions with known struct fields.  Workflow-specific data should
+    /// use a reserved, versioned namespace key such as `"review.linkage.v1"`
+    /// so that schema evolution and deserialization remain predictable.
+    ///
+    /// A compatibility deserializer merges legacy top-level extension keys
+    /// (those not matching any known struct field) into this map, so older
+    /// flattened rows deserialize correctly without data loss.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub extensions: HashMap<String, Value>,
+}
+
+/// Internal mirror used by the compatibility deserializer.
+///
+/// `#[serde(flatten)]` on `legacy_extras` captures any JSON keys that do
+/// not match a known struct field.  After deserialization, those entries
+/// are merged into `extensions` so that both the old (flat) and new
+/// (namespaced) serialization layouts produce identical `MessageMetadata`
+/// values.
+#[derive(Deserialize)]
+struct MessageMetadataCompat {
+    #[serde(default)]
+    agent_backend: Option<String>,
+    #[serde(default)]
+    turn_id: Option<TurnId>,
+    #[serde(default)]
+    slash_command_expansion: Option<SlashCommandExpansion>,
+    #[serde(default)]
+    tool_call_audits: Vec<ToolCallAudit>,
+    #[serde(default)]
+    agent_response_audit: Option<AgentResponseAudit>,
+    #[serde(default)]
+    handoff_metadata: Option<HandoffMetadata>,
+    #[serde(default)]
+    agent_session_id: Option<AgentSessionId>,
+    #[serde(default)]
+    extensions: HashMap<String, Value>,
+    /// Catch-all for unrecognised top-level keys (legacy flat layout).
+    #[serde(flatten)]
+    legacy_extras: HashMap<String, Value>,
+}
+
+impl<'de> Deserialize<'de> for MessageMetadata {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut compat = MessageMetadataCompat::deserialize(deserializer)?;
+        // Merge legacy top-level keys into extensions (existing keys win).
+        for (key, value) in compat.legacy_extras.drain() {
+            compat.extensions.entry(key).or_insert(value);
+        }
+        Ok(Self {
+            agent_backend: compat.agent_backend,
+            turn_id: compat.turn_id,
+            slash_command_expansion: compat.slash_command_expansion,
+            tool_call_audits: compat.tool_call_audits,
+            agent_response_audit: compat.agent_response_audit,
+            handoff_metadata: compat.handoff_metadata,
+            agent_session_id: compat.agent_session_id,
+            extensions: compat.extensions,
+        })
+    }
 }
 
 impl MessageMetadata {
@@ -154,10 +219,62 @@ impl MessageMetadata {
     }
 
     /// Adds an extension field.
-    #[must_use]
-    pub fn with_extension(mut self, key: impl Into<String>, value: Value) -> Self {
-        self.extensions.insert(key.into(), value);
-        self
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReservedExtensionKeyError`] if `key` starts with the
+    /// reserved `"review.linkage."` namespace.  Use
+    /// [`with_review_linkage`](Self::with_review_linkage) for review data.
+    pub fn with_extension(
+        mut self,
+        key: impl Into<String>,
+        value: Value,
+    ) -> Result<Self, ReservedExtensionKeyError> {
+        let owned_key = key.into();
+        if owned_key.starts_with(RESERVED_REVIEW_PREFIX) {
+            return Err(ReservedExtensionKeyError { key: owned_key });
+        }
+        self.extensions.insert(owned_key, value);
+        Ok(self)
+    }
+
+    /// Adds structured review linkage data under the reserved, versioned
+    /// namespace key `"review.linkage.v1"`.
+    ///
+    /// This groups all review-specific anchor fields into a single JSON
+    /// object, preventing key collisions with top-level extension keys
+    /// and making schema evolution predictable.
+    ///
+    /// # Errors
+    ///
+    /// Returns `serde_json::Error` if the `ReviewLinkage` fails to
+    /// serialize.  In practice this cannot happen because every field is
+    /// a `String` or `Option<String>`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use corbusier::message::domain::{MessageMetadata, ReviewLinkage};
+    ///
+    /// let linkage = ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
+    ///     .with_file_path("src/lib.rs")
+    ///     .with_commit_sha("abc123");
+    /// let metadata = MessageMetadata::empty()
+    ///     .with_review_linkage(&linkage)
+    ///     .expect("with_review_linkage failed");
+    /// let ext = metadata.extensions.get("review.linkage.v1")
+    ///     .expect("extension review.linkage.v1 missing");
+    /// assert_eq!(ext["review_comment_id"], "rc-42");
+    /// assert_eq!(ext["reviewer"], "alice");
+    /// ```
+    pub fn with_review_linkage(
+        mut self,
+        linkage: &ReviewLinkage,
+    ) -> Result<Self, serde_json::Error> {
+        let value = serde_json::to_value(linkage)?;
+        self.extensions
+            .insert("review.linkage.v1".to_owned(), value);
+        Ok(self)
     }
 
     /// Sets the handoff metadata.
@@ -219,6 +336,63 @@ impl SlashCommandExpansion {
     #[must_use]
     pub fn with_parameter(mut self, key: impl Into<String>, value: Value) -> Self {
         self.parameters.insert(key.into(), value);
+        self
+    }
+}
+
+/// Structured review linkage data stored under the reserved, versioned
+/// namespace key `"review.linkage.v1"` inside `MessageMetadata.extensions`.
+///
+/// Groups review-comment anchoring fields into a single typed object so
+/// that schema evolution and deserialization remain predictable.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReviewLinkage {
+    /// Identifier of the review comment in the external VCS provider.
+    pub review_comment_id: String,
+    /// Root comment identifier that anchors the review thread.
+    pub thread_root_id: String,
+    /// Login or display name of the reviewer.
+    pub reviewer: String,
+    /// Source file path the comment is anchored to (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    /// Commit SHA the comment is anchored to (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit_sha: Option<String>,
+    /// Current verification status of the review linkage.
+    pub verification_status: String,
+}
+
+impl ReviewLinkage {
+    /// Creates a new review linkage with the required fields.
+    #[must_use]
+    pub fn new(
+        review_comment_id: impl Into<String>,
+        thread_root_id: impl Into<String>,
+        reviewer: impl Into<String>,
+        verification_status: impl Into<String>,
+    ) -> Self {
+        Self {
+            review_comment_id: review_comment_id.into(),
+            thread_root_id: thread_root_id.into(),
+            reviewer: reviewer.into(),
+            file_path: None,
+            commit_sha: None,
+            verification_status: verification_status.into(),
+        }
+    }
+
+    /// Sets the file path anchor.
+    #[must_use]
+    pub fn with_file_path(mut self, path: impl Into<String>) -> Self {
+        self.file_path = Some(path.into());
+        self
+    }
+
+    /// Sets the commit SHA anchor.
+    #[must_use]
+    pub fn with_commit_sha(mut self, sha: impl Into<String>) -> Self {
+        self.commit_sha = Some(sha.into());
         self
     }
 }

@@ -6,8 +6,8 @@
 )]
 
 use crate::message::domain::{
-    AgentResponseAudit, AgentResponseStatus, AttachmentPart, MessageMetadata, Role, TextPart,
-    ToolCallAudit, ToolCallPart, ToolCallStatus, ToolResultPart, TurnId,
+    AgentResponseAudit, AgentResponseStatus, AttachmentPart, MessageMetadata, ReviewLinkage, Role,
+    TextPart, ToolCallAudit, ToolCallPart, ToolCallStatus, ToolResultPart, TurnId,
 };
 use rstest::rstest;
 use serde_json::json;
@@ -186,7 +186,8 @@ fn message_metadata_builder_chain() {
         .with_turn_id(turn_id)
         .with_tool_call_audit(tool_call)
         .with_agent_response_audit(response)
-        .with_extension("custom", json!({"key": "value"}));
+        .with_extension("custom", json!({"key": "value"}))
+        .expect("non-reserved key should succeed");
 
     assert_eq!(metadata.agent_backend, Some("claude".to_owned()));
     assert_eq!(metadata.turn_id, Some(turn_id));
@@ -225,4 +226,142 @@ fn agent_response_audit_builders() {
     assert_eq!(audit.response_id, Some("resp-1".to_owned()));
     assert_eq!(audit.model, Some("claude-3-opus".to_owned()));
     assert_eq!(audit.error, Some("none".to_owned()));
+}
+
+// ============================================================================
+// Review linkage extension tests
+// ============================================================================
+
+#[rstest]
+#[case::with_optional_fields(
+    ReviewLinkage::new("rc-42", "thread-root-7", "alice", "pending")
+        .with_file_path("src/lib.rs")
+        .with_commit_sha("abc123"),
+)]
+#[case::absent_optional_fields(ReviewLinkage::new("rc-99", "thread-root-1", "bob", "verified"))]
+fn review_linkage_round_trip_serialization(#[case] linkage: ReviewLinkage) {
+    let expected = linkage.clone();
+    let metadata = MessageMetadata::empty()
+        .with_review_linkage(&linkage)
+        .expect("serialize linkage");
+
+    let json = serde_json::to_string(&metadata).expect("serialize");
+    let deserialized: MessageMetadata = serde_json::from_str(&json).expect("deserialize");
+
+    let ext = deserialized
+        .extensions
+        .get("review.linkage.v1")
+        .expect("review.linkage.v1 key present");
+    let recovered: ReviewLinkage =
+        serde_json::from_value(ext.clone()).expect("deserialize linkage");
+    assert_eq!(recovered, expected);
+}
+
+#[rstest]
+fn legacy_flat_extensions_merged_on_deserialize() {
+    // Simulate the old flat layout where extension keys lived at the top level
+    // alongside known struct fields, rather than nested under "extensions".
+    let legacy_json = json!({
+        "agent_backend": "claude",
+        "review.linkage.v1": { "review_comment_id": "rc-42" },
+        "custom.workflow": "some-value"
+    });
+    let metadata: MessageMetadata =
+        serde_json::from_value(legacy_json).expect("deserialize legacy flat layout");
+
+    assert_eq!(metadata.agent_backend, Some("claude".to_owned()));
+    // Legacy top-level keys should be collected into extensions.
+    assert_eq!(
+        metadata
+            .extensions
+            .get("review.linkage.v1")
+            .and_then(|v| v.get("review_comment_id"))
+            .and_then(serde_json::Value::as_str),
+        Some("rc-42"),
+    );
+    assert_eq!(
+        metadata
+            .extensions
+            .get("custom.workflow")
+            .and_then(serde_json::Value::as_str),
+        Some("some-value"),
+    );
+}
+
+#[rstest]
+fn legacy_flat_extensions_do_not_overwrite_namespaced() {
+    // When both a legacy top-level key and a namespaced key exist,
+    // the namespaced version (under "extensions") takes precedence.
+    let json_with_both = json!({
+        "extensions": { "review.linkage.v1": { "review_comment_id": "new" } },
+        "review.linkage.v1": { "review_comment_id": "old-flat" }
+    });
+    let metadata: MessageMetadata =
+        serde_json::from_value(json_with_both).expect("deserialize mixed layout");
+
+    assert_eq!(
+        metadata
+            .extensions
+            .get("review.linkage.v1")
+            .and_then(|v| v.get("review_comment_id"))
+            .and_then(serde_json::Value::as_str),
+        Some("new"),
+        "namespaced key should win over legacy flat key"
+    );
+}
+
+#[rstest]
+fn review_linkage_does_not_collide_with_top_level_fields() {
+    let turn_id = TurnId::new();
+    let linkage = ReviewLinkage::new("rc-1", "thread-1", "reviewer", "pending")
+        .with_file_path("path.rs")
+        .with_commit_sha("deadbeef");
+    let metadata = MessageMetadata::with_agent_backend("claude")
+        .with_turn_id(turn_id)
+        .with_review_linkage(&linkage)
+        .expect("serialize linkage");
+
+    let json = serde_json::to_string(&metadata).expect("serialize");
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse as Value");
+
+    // Top-level fields remain intact.
+    assert_eq!(
+        parsed
+            .get("agent_backend")
+            .and_then(serde_json::Value::as_str),
+        Some("claude"),
+    );
+    assert!(
+        parsed
+            .get("turn_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
+    );
+
+    // Review linkage lives under extensions, not at top level.
+    assert!(parsed.get("review_comment_id").is_none());
+    let nested = parsed
+        .get("extensions")
+        .and_then(|e| e.get("review.linkage.v1"))
+        .and_then(|l| l.get("review_comment_id"));
+    assert!(
+        nested.is_some(),
+        "review_comment_id nested under extensions"
+    );
+}
+
+#[rstest]
+fn with_extension_rejects_reserved_review_linkage_key() {
+    let result =
+        MessageMetadata::empty().with_extension("review.linkage.v1", json!({"rogue": true}));
+    assert!(
+        result.is_err(),
+        "reserved review.linkage.* key should be rejected"
+    );
+}
+
+#[rstest]
+fn with_extension_allows_non_reserved_key() {
+    let result = MessageMetadata::empty().with_extension("custom.workflow", json!("ok"));
+    assert!(result.is_ok(), "non-reserved key should be accepted");
 }

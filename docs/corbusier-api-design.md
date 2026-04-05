@@ -153,6 +153,9 @@ The proposed additions are:
   grouping.
 - **plan** -- planning artefacts: plan documents, plan steps, plan reviews,
   plan execution binding to tasks.
+- **review** -- canonical review threads, anchors, sync checkpoints,
+  verification state, and outbound reply workflows backed by Frankie adapter
+  services.
 - **projections** -- read models and DTOs optimized for mockup screens and card
   rendering.
 - **governance** -- hooks, policies, policy decisions, and compliance/audit
@@ -190,7 +193,7 @@ The mockup's Kanban expects a "Planned" column distinct from "To-Do (draft)"
 and also expects hierarchy, subtasks, dependencies, priority, labels, assignee,
 due date, estimate, and an activity log.
 
-#### Proposed write-side model
+#### Task aggregate model
 
 ```rust,no_run
 use chrono::{DateTime, Utc};
@@ -289,7 +292,7 @@ pub struct TaskAggregateV2 {
 }
 ```
 
-#### Key invariants
+#### Task invariants
 
 - `project_slug` is required and immutable once a task becomes `Planned` or
   later.
@@ -388,6 +391,119 @@ _Table 1.1.1: Current versus proposed task states._
   `Abandoned` to `TaskStateV2` directly; introduce `Planned` only for tasks
   that receive scheduling data. Until then, the Kanban "Planned" column can be
   empty without breaking old tasks.
+
+### Review domain
+
+#### Guiding rule
+
+Keep `TaskState` coarse. The task aggregate should continue to signal broad
+workflow status such as `InReview`, while review-specific detail lives in a
+sibling review bounded context and its projections.
+
+#### Proposed write-side model
+
+```rust,no_run
+use std::path::PathBuf;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewThreadStatus {
+    Open,
+    AwaitingAgent,
+    AwaitingReviewer,
+    Resolved,
+    Closed,
+}
+
+/// Verification status for a review comment or thread.
+/// Maps to the `review_verification_results.status` column CHECK constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewVerificationStatus {
+    Pending,
+    Verified,
+    Rejected,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewSyncCheckpointEnvelope {
+    pub version: u16,
+    pub provider: String,
+    pub payload: Value,
+}
+
+/// Anchor metadata derived from review-comment file position.
+/// Definitive field-level documentation: corbusier-design.md §6.3.2
+/// (Review Comment Processing, `ReviewAnchor` struct).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewAnchor {
+    pub commit_sha: String,
+    pub file_path: PathBuf,
+    pub original_line: u32,
+    pub diff_hunk: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewThreadAggregate {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub task_id: Uuid,
+    pub conversation_id: Option<Uuid>,
+    pub pull_request_ref: String,
+    pub provider: String,
+    pub external_root_comment_id: String,
+    pub status: ReviewThreadStatus,
+    pub anchor: Option<ReviewAnchor>,
+    pub verification_status: ReviewVerificationStatus,
+    pub pending_outbound_reply: Option<String>,
+    pub last_reviewer_action: Option<String>,
+    pub last_synced_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+```
+
+#### Key invariants
+
+- Corbusier owns the canonical review workflow projection and its durability.
+- Frankie remains an adapter for GitHub review sync, context materialization,
+  verification, and reply submission.
+- The durable thread identity is tenant-scoped and provider-scoped:
+  `(tenant_id, provider, pull_request_ref, external_root_comment_id)` must be
+  unique even though the storage model also keeps `(id, tenant_id)` available
+  for composite foreign keys.
+- Persistent review-thread status values must use the same snake_case enum
+  vocabulary in SQL and Rust: `open`, `awaiting_agent`, `awaiting_reviewer`,
+  `resolved`, and `closed`.
+- Sync checkpoints must be stored as a versioned provider envelope rather than
+  an unstructured JSON blob, so migrations and sync debugging can reason about
+  the provider payload shape.
+- Review-linked conversation messages must preserve structured linkage under
+  the reserved, versioned key `"review.linkage.v1"` inside
+  `MessageMetadata.extensions` rather than flattening anchor metadata into the
+  top-level JSON object or into free text.  The extensions map must be
+  serialized as an explicit `"extensions"` field (not via `serde(flatten)`) so
+  that workflow-specific keys never collide with known struct fields.
+
+#### Projection DTOs
+
+- `ReviewThreadDto` for task and PR detail screens: root comment, replies,
+  reviewer identity, anchor, verification state, and pending reply status.
+  Returned by `GET /api/v1/reviews/threads/{thread_id}`.
+- `ReviewInboxDto` for review queues: open-thread counts, unresolved anchors,
+  and last sync checkpoint per pull request.  Returned by
+  `GET /api/v1/reviews/inbox?limit=&cursor=` (paginated, user-scoped).  The
+  inbox is implicitly scoped to `RequestContext.user_id` (the authenticated
+  principal); the server enforces that the query reflects the principal's
+  review queue.  Admin-only override: users with the `review-admin` role may
+  specify `user={user_id}` to view another user's inbox; regular users receive
+  a 403 Forbidden if they attempt to supply a `user` parameter.
 
 ### Project domain
 
@@ -1088,6 +1204,21 @@ returns a projection DTO (not raw persistence rows).
 - `POST /api/v1/suggestions/{id}/accept` (idempotent) -- creates a draft task
   in backlog.
 - `POST /api/v1/suggestions/{id}/dismiss` (idempotent).
+
+#### Reviews
+
+- `GET /api/v1/reviews/threads/{thread_id}` -- `ReviewThreadDto`.  Requires
+  tenant-scoped auth.  Returns the root comment, replies, reviewer identity,
+  anchor, verification state, and pending reply status for a single review
+  thread.
+- `GET /api/v1/reviews/inbox?limit=&cursor=` -- paginated `ReviewInboxDto[]`.
+  Requires tenant-scoped auth.  The inbox is implicitly scoped to
+  `RequestContext.user_id` (the authenticated principal); the server enforces
+  this binding.  Returns open-thread counts, unresolved anchors, and last sync
+  checkpoint grouped by pull request.  Admin-only override: users with the
+  `review-admin` role may supply `user={user_id}` to view another user's inbox;
+  all other users receive 403 Forbidden if they attempt to supply a `user`
+  parameter.
 
 #### System
 
