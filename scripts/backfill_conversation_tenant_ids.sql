@@ -44,8 +44,10 @@ FROM conversations
 WHERE messages.conversation_id = conversations.id
   AND messages.tenant_id IS DISTINCT FROM conversations.tenant_id;
 
--- Final verification. This must return zero rows before tenant-scoped
--- application queries are enabled.
+-- Final verification. Run the following DO blocks and resolve any raised
+-- exceptions before enabling tenant-scoped application queries; they hard-fail
+-- if conversations or messages still contain nil tenant IDs or mismatched
+-- tenant IDs.
 DO $$
 BEGIN
     IF EXISTS (
