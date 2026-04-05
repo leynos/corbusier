@@ -6156,8 +6156,10 @@ sequenceDiagram
     ConvSvc->>Agent: trigger_review_response_turn
     Agent-->>ConvSvc: generate_reply_draft
     ConvSvc-->>ReviewSvc: reply_draft_with_verification_intent
-    ReviewSvc->>Frankie: verify_or_submit_reply
-    Frankie-->>ReviewSvc: verification_result_or_posted_reply
+    ReviewSvc->>Frankie: verify_reply
+    Frankie-->>ReviewSvc: verification_result
+    ReviewSvc->>Frankie: submit_reply
+    Frankie-->>ReviewSvc: posted_reply
     ReviewSvc->>ConvSvc: update_review_projection_and_conversation
 ```
 <!-- markdownlint-enable MD031 -->
@@ -7600,6 +7602,8 @@ CREATE INDEX idx_tasks_tenant_pull_request_ref
     ON tasks (tenant_id, pull_request_ref) WHERE pull_request_ref IS NOT NULL;
 CREATE INDEX idx_review_threads_tenant_pr_status
     ON review_threads (tenant_id, pull_request_ref, status);
+CREATE INDEX idx_review_comments_tenant_thread
+    ON review_comments (tenant_id, review_thread_id);
 CREATE INDEX idx_review_verification_results_tenant_thread_status_time
     ON review_verification_results (tenant_id, review_thread_id, status, verified_at);
 CREATE INDEX idx_review_verification_results_evidence_gin
@@ -10162,7 +10166,7 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   before the agent backend processes input.
 - **Timeout:** 5 s default. On timeout the trigger is treated as
   `Succeeded` (fail-open) and the turn proceeds. No retry.
-- **Resume:** Unsupported.  A timed-out or failed `TurnStart` does not
+- **Resume:** Unsupported. A timed-out or failed `TurnStart` does not
   produce a resume token; the caller must re-initiate the turn.
 
 **`TurnEnd` (contract name `PostTurn`)**
@@ -10173,7 +10177,7 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   does not block further processing. Any status is accepted.
 - **Timeout:** 5 s default. On timeout the result is logged and
   discarded. No retry.
-- **Resume:** Unsupported.  Observational triggers do not gate workflow
+- **Resume:** Unsupported. Observational triggers do not gate workflow
   progression and require no resume mechanism.
 
 **`PreToolUse` (contract name `PreToolCall`)**
@@ -10187,9 +10191,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Timeout:** 10 s default. On timeout the trigger is treated as
   `Failed` (fail-closed) and the tool call is denied. No retry; the caller
   receives a governance-denied error.
-- **Resume:** Restart-only.  On timeout or failure the tool call is
-  denied; the agent backend may re-issue the call with a new
-  `TriggerContextId`.  No resume token is issued.
+- **Resume:** Restart-only. On timeout or failure the tool call is denied;
+  the agent backend may re-issue the call with a new `TriggerContextId`. No
+  resume token is issued.
 
 **`PostToolUse` (contract name `PostToolCall`)**
 
@@ -10200,7 +10204,7 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   the audit trail. Any status is accepted.
 - **Timeout:** 10 s default. On timeout the result is logged and
   discarded. No retry.
-- **Resume:** Unsupported.  Observational triggers do not gate workflow
+- **Resume:** Unsupported. Observational triggers do not gate workflow
   progression and require no resume mechanism.
 
 **`PreCommit`**
@@ -10213,9 +10217,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Timeout:** 30 s default. On timeout the trigger is treated as
   `Failed` (fail-closed). No automatic retry; the operator may re-run the
   commit.
-- **Resume:** Restart-only.  On timeout or failure the commit is aborted;
-  the operator must re-run the commit, which issues a fresh
-  `TriggerContextId`.  No resume token is issued.
+- **Resume:** Restart-only. On timeout or failure the commit is aborted; the
+  operator must re-run the commit, which issues a fresh `TriggerContextId`. No
+  resume token is issued.
 
 **`PreMerge`**
 
@@ -10224,9 +10228,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
   `commit_sha: String`.
 - **Ack semantics:** `Succeeded` permits the merge; `Failed` blocks it.
 - **Timeout:** 30 s default, fail-closed on timeout. No retry.
-- **Resume:** Restart-only.  On timeout or failure the merge is blocked;
-  the operator must re-attempt the merge, generating a new `TriggerContextId`.  
-  No resume token is issued.
+- **Resume:** Restart-only. On timeout or failure the merge is blocked; the
+  operator must re-attempt the merge, generating a new `TriggerContextId`. No
+  resume token is issued.
 
 **`PreDeploy`**
 
@@ -10236,15 +10240,15 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 - **Ack semantics:** `Succeeded` permits the deployment; `Failed` blocks
   it.
 - **Timeout:** 60 s default, fail-closed on timeout. No retry.
-- **Resume:** Restart-only.  On timeout or failure the deployment is
-  blocked; the operator must re-initiate the deployment with a new
-  `TriggerContextId`.  No resume token is issued.
+- **Resume:** Restart-only. On timeout or failure the deployment is blocked;
+  the operator must re-initiate the deployment with a new `TriggerContextId`.
+  No resume token is issued.
 
 Post-event triggers (`PostCommit`, `PostMerge`, `PostPull`, `PostPush`,
 `PostDeploy`) are observational: they share the same payload shape as their
 pre-event counterpart plus an `outcome: String` field and do not gate workflow
 progression. A 5 s default timeout applies; on timeout the result is
-discarded.  Resume is unsupported for all post-event triggers because they do
+discarded. Resume is unsupported for all post-event triggers because they do
 not gate workflow progression.
 
 ###### Multi-Layer Policy Enforcement

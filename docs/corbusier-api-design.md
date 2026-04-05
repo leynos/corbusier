@@ -417,6 +417,17 @@ pub enum ReviewThreadStatus {
     Closed,
 }
 
+/// Verification status for a review comment or thread.
+/// Maps to the `review_verification_results.status` column CHECK constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewVerificationStatus {
+    Pending,
+    Verified,
+    Rejected,
+    Error,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewSyncCheckpointEnvelope {
     pub version: u16,
@@ -446,7 +457,7 @@ pub struct ReviewThreadAggregate {
     pub external_root_comment_id: String,
     pub status: ReviewThreadStatus,
     pub anchor: Option<ReviewAnchor>,
-    pub verification_status: String,
+    pub verification_status: ReviewVerificationStatus,
     pub pending_outbound_reply: Option<String>,
     pub last_reviewer_action: Option<String>,
     pub last_synced_checkpoint: Option<ReviewSyncCheckpointEnvelope>,
@@ -484,8 +495,12 @@ pub struct ReviewThreadAggregate {
   Returned by `GET /api/v1/reviews/threads/{thread_id}`.
 - `ReviewInboxDto` for review queues: open-thread counts, unresolved anchors,
   and last sync checkpoint per pull request.  Returned by
-  `GET /api/v1/reviews/inbox?user={user_id}&limit=&cursor=` (paginated,
-  user-scoped).
+  `GET /api/v1/reviews/inbox?limit=&cursor=` (paginated, user-scoped).  The
+  inbox is implicitly scoped to `RequestContext.user_id` (the authenticated
+  principal); the server enforces that the query reflects the principal's
+  review queue.  Admin-only override: users with the `review-admin` role may
+  specify `user={user_id}` to view another user's inbox; regular users receive
+  a 403 Forbidden if they attempt to supply a `user` parameter.
 
 ### Project domain
 
