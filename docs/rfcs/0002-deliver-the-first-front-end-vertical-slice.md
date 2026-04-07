@@ -407,7 +407,7 @@ Use the shared dependency labels below to keep this step readable:
 
 - [ ] **4.4.1. Create the repository-owned `frontend-pwa/` workspace and narrow
   task route shell.** Requires 4.2.1. See
-  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7.
+  [RFC 0001](docs/rfcs/0001-adopt-corbusier-front-end-pwa.md) §5.1–§5.7.
 
   - Import only the task create and task detail screens, shared providers,
     localization runtime, and design tokens needed for this slice.
@@ -420,7 +420,7 @@ Use the shared dependency labels below to keep this step readable:
 
 - [ ] **4.4.2. Stabilize the slice transport contract and development auth
   seam.** Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract
-  dependency. See `docs/corbusier-api-design.md` §HTTP API surface,
+  dependency. See [API Design](docs/corbusier-api-design.md) §HTTP API surface,
   pagination, SSE, and error contracts.
 
   - Adopt shared `actix-v2a` error envelope, idempotency handling, and reusable
@@ -445,7 +445,7 @@ Use the shared dependency labels below to keep this step readable:
 
 - [ ] **4.4.4. Add task branch and pull-request association actions to the
   detail view when the current HTTP surface supports them.** Requires
-  4.4.3. See `docs/corbusier-api-design.md` §Endpoint inventory — Tasks.
+  4.4.3. See [API Design](docs/corbusier-api-design.md) §Endpoint inventory — Tasks.
 
   - Reuse the existing task-detail screen rather than creating a second
     workflow entry point.
