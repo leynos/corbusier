@@ -218,7 +218,7 @@ Solid arrows show required dependencies. Dashed arrows show services that are
 related to the slice but intentionally excluded as runtime requirements.
 
 <!-- markdownlint-disable MD031 -->
-Table 5.7.1: Vertical slice and follow-on roadmap dependency graph.
+Figure 1: Vertical slice and follow-on roadmap dependency graph.
 ```mermaid
 flowchart TD
   subgraph Workspace
