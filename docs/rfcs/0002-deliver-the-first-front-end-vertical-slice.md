@@ -217,6 +217,8 @@ workspace, backend contracts, optional services, and follow-on roadmap steps.
 Solid arrows show required dependencies. Dashed arrows show services that are
 related to the slice but intentionally excluded as runtime requirements.
 
+<!-- markdownlint-disable MD031 -->
+Table 5.7.1: Vertical slice and follow-on roadmap dependency graph.
 ```mermaid
 flowchart TD
   subgraph Workspace
@@ -286,13 +288,7 @@ flowchart TD
   P84 --> P85
   P85 --> P86
 ```
-
-**Figure 1. Dependency graph for the first front-end vertical slice and its
-follow-on roadmap steps.** The first slice depends on the `frontend-pwa/`
-workspace, the Corbusier HTTP API, and shared `actix-v2a` HTTP primitives.
-Podbot and Frankie are shown as explicitly non-runtime dependencies for this
-slice, while the Phase 8 steps build on the slice foundation as live browser
-capabilities expand.
+<!-- markdownlint-enable MD031 -->
 
 ## 6. Requirements
 
