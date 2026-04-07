@@ -9,7 +9,7 @@
 ## 1. Summary
 
 Corbusier should deliver a deliberately narrow repository-owned `frontend-pwa/`
-vertical slice centred on task intake and lifecycle.
+vertical slice centered on task intake and lifecycle.
 
 The first slice should let a user:
 
@@ -26,9 +26,9 @@ project list views, Kanban, Server-Sent Events (SSE), hosted agent sessions,
 and review-adapter workflows.
 
 The purpose of the slice is not feature breadth. The purpose is to validate the
-production PWA workspace, the minimum browser-to-API contract, the mutation and
-detail-view pattern, and the local preview and testing path before broader UI
-and read-model work begins.
+production progressive web app (PWA) workspace, the minimum
+browser-to-API contract, the mutation and detail-view pattern, and the local
+preview and testing path before broader UI and read-model work begins.
 
 ## 2. Problem
 
@@ -48,7 +48,7 @@ Without a narrow first slice, several risks accumulate:
 - Podbot and Frankie can become accidental gatekeepers for the first browser
   proof even though neither is required for task intake and state change.
 
-A first slice must therefore optimise for realness, not breadth.
+A first slice must therefore optimize for realness, not breadth.
 
 ## 3. Current state
 
@@ -99,14 +99,18 @@ That combination makes a detail-first task slice the most practical first cut.
 
 The first slice consists of one coherent browser workflow:
 
+<!-- markdownlint-disable MD029 -->
+
 1. Enter issue metadata and create a task.
-2. Navigate immediately to the created task’s detail screen.
-3. Render task state, issue origin, timestamps, and branch or pull-request
+1. Navigate immediately to the created task’s detail screen.
+1. Render task state, issue origin, timestamps, and branch or pull-request
    references.
-4. Offer valid task state transition actions.
-5. Reflect the updated task after mutation.
-6. Where supported by the live API, allow branch and pull-request association
+1. Offer valid task state transition actions.
+1. Reflect the updated task after mutation.
+1. Where supported by the live API, allow branch and pull-request association
    from the same detail screen.
+
+<!-- markdownlint-enable MD029 -->
 
 This is intentionally a detail-first slice. It does not attempt backlog
 browsing, filtering, milestone views, or project-level aggregation.
@@ -114,7 +118,7 @@ browsing, filtering, milestone views, or project-level aggregation.
 ### 5.2. Front-end workspace and stack shape
 
 Corbusier should create a repository-owned `frontend-pwa/` workspace and
-promote only the shell, providers, localisation runtime, design tokens, and
+promote only the shell, providers, localization runtime, design tokens, and
 task-related screens needed for this first slice.
 
 The first slice should inherit the narrow state-management rule:
@@ -125,7 +129,7 @@ The first slice should inherit the narrow state-management rule:
 - no Dexie, XState, service worker, or offline persistence unless the first
   implementation proves a concrete need.
 
-The first slice should optimise for legibility and low moving-part count.
+The first slice should optimize for legibility and low moving-part count.
 
 ### 5.3. HTTP contract for the slice
 
@@ -165,7 +169,7 @@ repeatable local run path.
 
 **Dependency status:** narrow and conditional.
 
-This slice should consume existing shared HTTP primitives where they stabilise
+This slice should consume existing shared HTTP primitives where they stabilize
 the contract, especially shared error, idempotency, and OpenAPI fragments.
 
 This slice must **not** wait for `actix-v2a`’s shared SSE helper work, because
@@ -206,6 +210,90 @@ The first slice should leave clean extension points for later work on:
 The first slice should teach those later steps what is genuinely needed, rather
 than speculating up front.
 
+### 5.7. Dependency graph
+
+Figure 1 maps the slice's dependency relationships across the frontend
+workspace, backend contracts, optional services, and follow-on roadmap steps.
+Solid arrows show required dependencies. Dashed arrows show services that are
+related to the slice but intentionally excluded as runtime requirements.
+
+```mermaid
+flowchart TD
+  subgraph Workspace
+    FP[frontend_pwa_workspace]
+    Mockup[corbusier_mockup_repo]
+  end
+
+  subgraph Backend
+    API[corbusier_http_api]
+    Actix[actix_v2a_shared_http_primitives]
+  end
+
+  subgraph OptionalServices
+    Podbot[podbot_hosted_sessions]
+    Frankie[frankie_review_adapter]
+  end
+
+  subgraph RoadmapPhase4
+    P44[Step_4_4_first_frontend_vertical_slice]
+    P45[Step_4_5_operator_and_developer_interfaces]
+  end
+
+  subgraph RoadmapPhase8
+    P81[Step_8_1_fixture_backed_screen_promotion]
+    P82[Step_8_2_task_and_project_live_projections]
+    P83[Step_8_3_conversation_surface]
+    P84[Step_8_4_directives_suggestions_governance]
+    P85[Step_8_5_sse_live_invalidation]
+    P86[Step_8_6_settings_identity_personnel]
+  end
+
+  Mockup --> FP
+  FP --> API
+  API --> Actix
+
+  FP -.no_runtime_dependency .-> Podbot
+  FP -.no_runtime_dependency .-> Frankie
+
+  P44 --> FP
+  P44 --> API
+  P44 --> Actix
+
+  P44 --> P45
+
+  P81 --> FP
+  P82 --> FP
+  P82 --> API
+  P82 --> Actix
+
+  P83 --> FP
+  P83 --> API
+
+  P84 --> FP
+  P84 --> API
+
+  P85 --> FP
+  P85 --> API
+  P85 --> Actix
+
+  P86 --> FP
+  P86 --> API
+
+  P44 --> P81
+  P81 --> P82
+  P82 --> P83
+  P83 --> P84
+  P84 --> P85
+  P85 --> P86
+```
+
+**Figure 1. Dependency graph for the first front-end vertical slice and its
+follow-on roadmap steps.** The first slice depends on the `frontend-pwa/`
+workspace, the Corbusier HTTP API, and shared `actix-v2a` HTTP primitives.
+Podbot and Frankie are shown as explicitly non-runtime dependencies for this
+slice, while the Phase 8 steps build on the slice foundation as live browser
+capabilities expand.
+
 ## 6. Requirements
 
 ### 6.1. Functional requirements
@@ -236,11 +324,15 @@ delivery unit inside that strategy.
 
 The recommended order is:
 
+<!-- markdownlint-disable MD029 -->
+
 1. Create `frontend-pwa/` shell and task routes with temporary fixtures.
-2. Stabilise the slice contract and shared transport conventions.
-3. Replace fixtures with live task create/detail/transition calls.
-4. Add browser-path regression coverage.
-5. Record explicit deferrals and feed the learning into later UI and API steps.
+1. Stabilize the slice contract and shared transport conventions.
+1. Replace fixtures with live task create/detail/transition calls.
+1. Add browser-path regression coverage.
+1. Record explicit deferrals and feed the learning into later UI and API steps.
+
+<!-- markdownlint-enable MD029 -->
 
 ## 8. Alternatives considered
 
@@ -285,11 +377,11 @@ contract, and live task interaction with the least dependency surface, while
 preserving clear seams for later work on projections, SSE, Podbot-backed hosted
 execution, and Frankie-backed review context.
 
-## Draft roadmap step
+## Roadmap step placement
 
-I’d insert this as a **new Phase 4 step 4.4** under “External integrations and
-interfaces”, then renumber the current “Operator and developer user interfaces”
-block from `4.4` to `4.5`.
+The roadmap should place this work as a **new Phase 4 step 4.4** under
+“External integrations and interfaces”, then renumber the current “Operator
+and developer user interfaces” block from `4.4` to `4.5`.
 
 ### 4.4. First front-end vertical slice: task intake and lifecycle loop
 
@@ -318,22 +410,22 @@ Use the shared dependency labels below to keep this step readable:
   3.2.7, and 4.1.3. **Not required for this step.**
 
 - [ ] **4.4.1. Create the repository-owned `frontend-pwa/` workspace and narrow
-      task route shell.** Requires 4.2.1. See
-      `rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7.
+  task route shell.** Requires 4.2.1. See
+  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7.
 
   - Import only the task create and task detail screens, shared providers,
-    localisation runtime, and design tokens needed for this slice.
+    localization runtime, and design tokens needed for this slice.
   - Keep state management to route-local state plus TanStack Query; do not add
-    Dexie, XState, service-worker caching, dashboard widgets, or conversation
+    Dexie, XState, service worker caching, dashboard widgets, or conversation
     surfaces here.
   - **Success criteria:** `frontend-pwa/` boots locally, renders task create
     and task detail routes, and can run against fixture adapters without
     backend changes.
 
-- [ ] **4.4.2. Stabilise the slice transport contract and development auth
-      seam.** Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract
-      dependency. See `docs/corbusier-api-design.md` §HTTP API surface,
-      pagination, SSE, and error contracts.
+- [ ] **4.4.2. Stabilize the slice transport contract and development auth
+  seam.** Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract
+  dependency. See `docs/corbusier-api-design.md` §HTTP API surface,
+  pagination, SSE, and error contracts.
 
   - Adopt shared `actix-v2a` error envelope, idempotency handling, and reusable
     OpenAPI fragments where they touch the slice.
@@ -345,7 +437,7 @@ Use the shared dependency labels below to keep this step readable:
     and the browser auth seam is documented and repeatable.
 
 - [ ] **4.4.3. Implement the live task create → detail → transition path in the
-      PWA.** Requires 4.4.1 and 4.4.2.
+  PWA.** Requires 4.4.1 and 4.4.2.
 
   - Create a task from issue metadata via the live API.
   - Navigate to task detail from the create response and render origin, state,
@@ -356,8 +448,8 @@ Use the shared dependency labels below to keep this step readable:
     navigate, transition, and reload against the running Corbusier API.
 
 - [ ] **4.4.4. Add task branch and pull-request association actions to the
-      detail view when the current HTTP surface supports them.** Requires
-      4.4.3. See `docs/corbusier-api-design.md` §Endpoint inventory — Tasks.
+  detail view when the current HTTP surface supports them.** Requires
+  4.4.3. See `docs/corbusier-api-design.md` §Endpoint inventory — Tasks.
 
   - Reuse the existing task-detail screen rather than creating a second
     workflow entry point.
@@ -367,7 +459,7 @@ Use the shared dependency labels below to keep this step readable:
     integration-tested and visible on task detail after reload.
 
 - [ ] **4.4.5. Prove the slice is independent of hosted-session and
-      review-adapter services.** Requires 4.4.3 and 4.4.4.
+  review-adapter services.** Requires 4.4.3 and 4.4.4.
 
   - Ensure local preview, CI, and browser-path tests do not require Podbot
     services, hosted workspaces, MCP wires, Frankie sync, or review write
@@ -379,7 +471,7 @@ Use the shared dependency labels below to keep this step readable:
     rather than hidden in TODO comments.
 
 - [ ] **4.4.6. Capture the lessons of the first slice before broadening the
-      interface surface.** Requires 4.4.5.
+  interface surface.** Requires 4.4.5.
 
   - Update RFC and roadmap notes with what the slice proved about contract
     stability, browser auth, and task-detail composition.
@@ -388,15 +480,3 @@ Use the shared dependency labels below to keep this step readable:
   - **Success criteria:** downstream work has explicit follow-on tasks for list
     views, richer projections, SSE, and hosted-session or review-adapter
     integrations.
-
-The dependency treatment in that draft is grounded in the neighbouring repo
-state: `actix-v2a` already exports shared `error`, `idempotency`, `openapi`,
-and `pagination` primitives, while its shared SSE helper work remains a
-separate unfinished step  ; Podbot still has substantial unchecked work around
-workspace strategy, hosted session control, wire provisioning, and end-to-end
-orchestration  ; and Frankie explicitly positions itself as the GitHub review
-adapter/context engine, with the host-safe review sync and durable write-intent
-surfaces still later-roadmap work rather than today’s baseline  .
-
-The next most sensible move would be to turn this into ready-to-commit file
-contents with the exact renamed phase headings and numbering.

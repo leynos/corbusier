@@ -11,20 +11,20 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
- It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
+It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
 Table 1.0.0: Phase 1 subphases and delivery goals.
 
-| Subphase | Goal                                                                                          |
+| Subphase | Goal |
 | -------- | --------------------------------------------------------------------------------------------- |
-| 1.1      | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam.          |
-| 1.2      | Introduce the canonical workspace runtime model and source-policy controls.                   |
-| 1.3      | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts.          |
-| 1.4      | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
-| 1.5      | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults.       |
-| 1.6      | Run staged migration gates and declare the evidence needed to retire legacy paths.            |
+| 1.1 | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam. |
+| 1.2 | Introduce the canonical workspace runtime model and source-policy controls. |
+| 1.3 | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts. |
+| 1.4 | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
+| 1.5 | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults. |
+| 1.6 | Run staged migration gates and declare the evidence needed to retire legacy paths. |
 
 Use the shared dependency labels below to keep phase 1 task text readable:
 
@@ -661,100 +661,57 @@ enforcement.
 
 ### 4.4. First front-end vertical slice: task intake and lifecycle loop
 
-This step delivers the first repository-owned PWA workstream for Corbusier. Its
-outcome is a live browser path that can create a task from issue metadata, land
-on task detail, transition task state, and show branch or pull-request
-association against the current HTTP API surface.
-
-The learning objective for this step is to validate the minimum browser,
-contract, auth, and preview shape required for a real Corbusier screen before
-broader list views, dashboard work, SSE, hosted-session controls, or
-review-adapter integrations are introduced.
+This step delivers the first repository-owned `frontend-pwa/` vertical slice
+for Corbusier. Its outcome is a live browser path that can create a task from
+issue metadata, land on task detail, transition task state, and show branch or
+pull-request association against the current HTTP API surface. Detailed scope,
+acceptance criteria, and dependency rationale live in
+`docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`.
 
 Use the shared dependency labels below to keep this step readable:
 
 - Phase 4 actix-v2a core HTTP contract dependency: shared `error`,
   `idempotency`, and `openapi` primitives from `actix-v2a`.
+
 - Phase 4 actix-v2a SSE dependency: `actix-v2a` roadmap section 1.1–1.2, "Shared
   SSE helpers from ADR 001". Not required for this step.
+
 - Phase 4 Podbot hosted-session dependency: Podbot steps 4.5, 4.6, 4.7, 4.9, and
   4.11. Not required for this step.
+
 - Phase 4 Frankie review-adapter dependency: Frankie steps 2.1.3–2.1.5, 3.2.7,
   and 4.1.3. Not required for this step.
 
 - [ ] 4.4.1 Create the repository-owned `frontend-pwa/` workspace and narrow
-      task
-  route shell. Requires 4.2.1. See rfcs/0001-adopt-corbusier-front-end-pwa.md
-  §5.1 through §5.7 and rfcs/0002-deliver-the-first-front-end-vertical-slice.md
-  §5.2.
-  - [ ] Import only the task create and task detail screens, shared providers,
-    localisation runtime, and design tokens needed for this slice.
-  - [ ] Keep state management to route-local state plus TanStack Query; do not
-        add
-    Dexie, XState, service-worker caching, dashboard widgets, or conversation
-    surfaces at this stage.
-  - [ ] Success criteria: `frontend-pwa/` boots locally, renders task create and
-    task detail routes, and can run against fixture adapters without backend changes.
+  task route shell. Requires 4.2.1. See
+  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
+
 - [ ] 4.4.2 Stabilise the slice transport contract and development auth seam.
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
-  docs/corbusier-api-design.md §HTTP API surface, pagination, SSE, and error
-  contracts and rfcs/0002-deliver-the-first-front-end-vertical-slice.md §5.3
-  and §5.4.
-  - [ ] Adopt shared `actix-v2a` error envelope, idempotency handling, and
-        reusable
-    OpenAPI fragments where they touch the slice.
-  - [ ] Document a development-only browser auth path for the current HTTP API
-    surface without freezing the long-term production auth model.
-  - [ ] Exclude the phase 4 actix-v2a SSE dependency from done criteria.
-  - [ ] Success criteria: task create, task detail, and task transition
-        endpoints
-    have stable golden fixtures, error responses are contract-tested, and the browser
-    auth seam is documented and repeatable.
+  `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
+  contracts and
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.3–§5.4.
+
 - [ ] 4.4.3 Implement the live task create → detail → transition path in the
-      PWA.
-  Requires 4.4.1 and 4.4.2.
-  - [ ] Create a task from issue metadata via the live API.
-  - [ ] Navigate to task detail from the create response and render origin,
-        state,
-    timestamps, and task references.
-  - [ ] Surface valid task state transition actions and refresh the detail view
-        on
-    completion.
-  - [ ] Success criteria: an end-to-end happy-path browser test proves create,
-    navigate, transition, and reload against the running Corbusier API.
+  progressive web app (PWA). Requires 4.4.1 and 4.4.2. See
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and
+  §6.1.
+
 - [ ] 4.4.4 Add task branch and pull-request association actions to the detail
-      view
-  when the current HTTP surface supports them. Requires 4.4.3. See
-  docs/corbusier-api-design.md §Endpoint inventory — Tasks.
-  - [ ] Reuse the existing task-detail screen rather than creating a second
-        workflow
-    entry point.
-  - [ ] Keep review-thread, review-comment, and code-review context explicitly
-        out
-    of scope pending the phase 4 Frankie review-adapter dependency.
-  - [ ] Success criteria: branch and pull-request association mutations are
-    integration-tested and visible on task detail after reload.
+  view when the current HTTP surface supports them. Requires 4.4.3. See
+  `docs/corbusier-api-design.md` §Endpoint inventory — Tasks and
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §6.1.
+
 - [ ] 4.4.5 Prove the slice is independent of hosted-session and review-adapter
-  services. Requires 4.4.3 and 4.4.4.
-  - [ ] Ensure local preview, CI, and browser-path tests do not require Podbot
-    services, hosted workspaces, MCP wires, Frankie sync, or review write queues.
-  - [ ] Record explicit follow-on seams for Podbot-backed "start work session"
-    actions and Frankie-backed review context or review actions.
-  - [ ] Success criteria: the slice passes in CI with Corbusier alone, and
-        deferred
-    Podbot and Frankie integrations are listed in roadmap or RFC notes rather than
-    hidden in TODO comments.
+  services. Requires 4.4.3 and 4.4.4. See
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6
+  and §6.2.
+
 - [ ] 4.4.6 Capture the lessons of the first slice before broadening the
-      interface
-  surface. Requires 4.4.5.
-  - [ ] Update RFC and roadmap notes with what the slice proved about contract
-    stability, browser auth, and task-detail composition.
-  - [ ] Feed resulting follow-on work into the later task-management,
-        conversation,
-    and front-end API/read-model steps rather than expanding this step in place.
-  - [ ] Success criteria: downstream work has explicit follow-on tasks for list
-    views, richer projections, SSE, and hosted-session or review-adapter
-    integrations.
+  interface surface. Requires 4.4.5. See
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7,
+  and §10.
 
 ### 4.5. Operator and developer user interfaces
 
@@ -1035,109 +992,100 @@ This phase extends the first vertical slice delivered in §4.4 by promoting the
 remaining Corbusier screen families from
 [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) into
 the `frontend-pwa/` workspace, replacing fixtures with live backend projections
-one family at a time. See rfcs/0001-adopt-corbusier-front-end-pwa.md §5.7 and
-§7.
+one family at a time. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md`
+§5.7 and §7.
 
 Table 8.0.0: Phase 8 subphases and delivery goals.
 
-| Subphase | Goal                                                                             |
-| -------- | -------------------------------------------------------------------------------- |
-| 8.1      | Promote fixture-backed screens for all Corbusier screen families.                |
-| 8.2      | Connect task and project screens to live backend projections and list endpoints. |
-| 8.3      | Add conversation surface and message paging.                                     |
-| 8.4      | Deliver directives, suggestions, and governance screens.                         |
-| 8.5      | Introduce SSE live invalidation across streaming screens.                        |
-| 8.6      | Add settings, identity, and personnel screens.                                   |
+| Subphase | Goal | Phase 4 prerequisite map |
+| -------- | ---- | ------------------------ |
+| 8.1 | Promote fixture-backed screens for all Corbusier screen families. | 4.4.1 and 4.4.6 |
+| 8.2 | Connect task and project screens to live backend projections and list endpoints. | 4.4.2, 4.4.3, and 4.4.4 |
+| 8.3 | Add conversation surface and message paging. | 4.4.6 |
+| 8.4 | Deliver directives, suggestions, and governance screens. | 4.4.5 and 4.4.6 |
+| 8.5 | Introduce SSE live invalidation across streaming screens. | 4.4.2 and 4.4.6 |
+| 8.6 | Add settings, identity, and personnel screens. | 4.4.6 |
 
 ### 8.1. Fixture-backed screen promotion
 
 - [ ] 8.1.1 Promote all screen families from the mockup into `frontend-pwa/`
-      with
-  fixture adapters. Requires 4.4.1. See
-  rfcs/0001-adopt-corbusier-front-end-pwa.md §5.1 through §5.3 and §5.7.
+  with fixture adapters. Requires 4.4.1 and 4.4.6. See
+  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.3 and §5.7.
   - [ ] Promote dashboard, task list, project, conversation, directive,
-        suggestion,
-    system, and settings screen skeletons with fixture-backed data using the
-    data-model-driven card architecture described in
-    rfcs/0001-adopt-corbusier-front-end-pwa.md §5.3.
+    suggestion, system, and settings screen skeletons with fixture-backed data
+    using the data-model-driven card architecture described in
+    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.3.
   - [ ] Verify that each promoted screen meets the accessibility and Playwright
     end-to-end coverage requirements from
-    rfcs/0001-adopt-corbusier-front-end-pwa.md §6.2.
+    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §6.2.
   - [ ] Success criteria: all screen routes render without backend services;
-        axe-core
-    accessibility checks pass for each screen family.
+    axe-core accessibility checks pass for each screen family.
 
 ### 8.2. Task and project live projections
 
-- [ ] 8.2.1 Connect task list views to live backend projections. Requires 8.1.1,
-  6.2.3, and 6.1.2. See rfcs/0001-adopt-corbusier-front-end-pwa.md §5.4 and
-  corbusier-api-design.md §Task domain.
+- [ ] 8.2.1 Connect task list views to live backend projections. Requires
+  8.1.1, 4.4.2, 4.4.3, 6.2.3, and 6.1.2. See
+  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
+  `docs/corbusier-api-design.md` §Task domain.
   - [ ] Replace task list fixture with live paginated `TaskCardDto` projections
     using opaque keyset cursors and TanStack Query infinite loading. See
-    rfcs/0001-adopt-corbusier-front-end-pwa.md §5.4.
+    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4.
   - [ ] Add task creation mutation with `Idempotency-Key` header, deterministic
     replay for identical retries, and explicit conflict reporting on payload
-    mismatch. See rfcs/0001-adopt-corbusier-front-end-pwa.md §5.4.
+    mismatch. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4.
   - [ ] Success criteria: task list pagination is end-to-end tested; idempotent
-    mutations replay deterministically; absence of `next` link correctly signals
-    end-of-list.
-- [ ] 8.2.2 Connect project screens to live backend projections. Requires 8.2.1
-      and
-  6.2.3. See corbusier-api-design.md §Project domain.
+    mutations replay deterministically; absence of `next` link correctly
+    signals end-of-list.
+- [ ] 8.2.2 Connect project screens to live backend projections. Requires
+  8.2.1, 4.4.4, and 6.2.3. See `docs/corbusier-api-design.md` §Project domain.
   - [ ] Replace project list, landing, and Kanban fixtures with live
     `ProjectCardDto`, `ProjectLandingDto`, and `ProjectKanbanDto` projections.
-  - [ ] Success criteria: project screens render tenant-scoped live data; Kanban
-    board reflects current task state distribution.
+  - [ ] Success criteria: project screens render tenant-scoped live data;
+    Kanban board reflects current task state distribution.
 
 ### 8.3. Conversation surface
 
 - [ ] 8.3.1 Deliver conversation list and message paging against live data.
-      Requires
-  8.1.1 and 6.3.1. See corbusier-api-design.md §Conversation domain.
+  Requires 8.1.1, 4.4.6, and 6.3.1. See
+  `docs/corbusier-api-design.md` §Conversation domain.
   - [ ] Replace conversation list and thread fixtures with live
     `ConversationListItemDto` and `ConversationDetailDto` projections.
   - [ ] Render message content parts, tool call metadata, and agent handoff
     annotations using existing serialization.
-  - [ ] Success criteria: conversation list and thread views paginate correctly
-        and
-    render complete message history with tool call details.
+  - [ ] Success criteria: conversation list and thread views paginate
+    correctly and render complete message history with tool call details.
 
 ### 8.4. Directives, suggestions, and governance screens
 
 - [ ] 8.4.1 Deliver directive registry and suggestion screens against live data.
-  Requires 8.1.1, 6.3.2, and 6.4.2. See corbusier-api-design.md §Directives
-  domain and §Suggestions domain.
+  Requires 8.1.1, 4.4.5, 4.4.6, 6.3.2, and 6.4.2. See
+  `docs/corbusier-api-design.md` §Directives domain and §Suggestions domain.
   - [ ] Replace directive and suggestion fixtures with live projection
-        endpoints.
+    endpoints.
   - [ ] Implement suggestion accept and dismiss mutations that produce or
-        discard
-    draft tasks.
+    discard draft tasks.
   - [ ] Success criteria: directive registry lists tenant-scoped directives;
     accepted suggestions produce visible backlog tasks.
 - [ ] 8.4.2 Deliver governance policy and hook management screens. Requires
-      8.4.1
-  and 6.4.3. See corbusier-api-design.md §Governance domain.
+  8.4.1 and 6.4.3. See `docs/corbusier-api-design.md` §Governance domain.
   - [ ] Replace governance fixture screens with live `PolicyAggregate` and
     `HookAggregate` projections.
   - [ ] Success criteria: policies and hooks can be listed, enabled, and
-        disabled
-    through the governance screens.
+    disabled through the governance screens.
 
 ### 8.5. SSE live invalidation
 
 - [ ] 8.5.1 Add SSE-backed cache invalidation to streaming screens. Requires
-      8.2.1,
-  6.3.3, and 4.3.1. See rfcs/0001-adopt-corbusier-front-end-pwa.md §5.4 and
-  corbusier-api-design.md §SSE event stream and replay semantics.
+  8.2.1, 4.4.2, 4.4.6, 6.3.3, and 4.3.1. See
+  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
+  `docs/corbusier-api-design.md` §SSE event stream and replay semantics.
   - [ ] Connect dashboard, task detail, and conversation screens to SSE streams
-        with
-    TanStack Query invalidation on relevant events.
+    with TanStack Query invalidation on relevant events.
   - [ ] Implement `Last-Event-ID` replay behaviour so reconnecting clients
-        recover
-    missed events without a full refetch.
+    recover missed events without a full refetch.
   - [ ] Emit `stream_reset` when events are no longer retained and fall back to
-        a
-    full refetch. See corbusier-api-design.md §SSE event stream and replay semantics.
+    a full refetch. See `docs/corbusier-api-design.md`
+    §SSE event stream and replay semantics.
   - [ ] Success criteria: deterministic replay is verified in streaming tests;
     reconnecting clients receive missed events; `stream_reset` triggers a clean
     refetch.
@@ -1145,16 +1093,16 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 ### 8.6. Settings, identity, and personnel screens
 
 - [ ] 8.6.1 Deliver settings, identity, and personnel screens against live data.
-  Requires 8.1.1 and 6.4.1. See corbusier-api-design.md §Identity domain.
+  Requires 8.1.1, 4.4.6, and 6.4.1. See
+  `docs/corbusier-api-design.md` §Identity domain.
   - [ ] Replace personnel directory fixture with live `UserAggregate`
-        projections.
+    projections.
   - [ ] Implement API key creation and revocation flows in settings screens. See
-    corbusier-api-design.md §Identity domain -- Write-side model.
+    `docs/corbusier-api-design.md` §Identity domain -- Write-side model.
   - [ ] Success criteria: personnel directory lists tenant users; API keys can
-        be
-    created, listed, and revoked through the settings screens.
+    be created, listed, and revoked through the settings screens.
 
-[^1]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
-  §4.4.1.1.
-[^2]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
-[^3]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
+\[^1\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
+§4.4.1.1.
+\[^2\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
+\[^3\]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
