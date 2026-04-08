@@ -57,6 +57,8 @@ Observable success means:
   - use Bun, Vite, React 19, TypeScript, TanStack Router, Tailwind CSS v4, and
     DaisyUI v5 as the baseline stack unless the implementation discovers a
     concrete blocker;
+  - prefer adapting Wildside's `packages/tokens` build and runtime approach
+    over inventing a Corbusier-specific token pipeline from scratch;
   - keep state management to route-local state plus TanStack Query;
   - do not add Dexie, XState, service workers, offline persistence, or
     Zustand-backed cross-cutting state unless a documented blocker appears.
@@ -159,6 +161,15 @@ Observable success means:
 - The root `Makefile` currently only covers Rust and documentation gates, so
   `4.4.1` must introduce a repository-native way to run frontend quality checks
   without bypassing `make`.
+- Comparative review outcome:
+  - Wildside's token package already matches the planned frontend stack: it
+    builds CSS variables through Style Dictionary, derives Tailwind and DaisyUI
+    presets, ships token-resolution helpers for Node and browser contexts, and
+    enforces theme contrast in-package.
+  - `figtok` is better understood as a Figma Tokens Studio ingestion CLI and
+    token parser. It can emit CSS variables and JSON, but it is not already
+    aligned with Bun, Vite, Tailwind, DaisyUI, or the repository's existing
+    TypeScript build tooling.
 
 ## Decision Log
 
@@ -184,6 +195,20 @@ Observable success means:
   relying on undocumented direct Bun commands. Rationale: follows repository
   command policy and keeps CI or local workflows reviewable. Date/Author:
   2026-04-08 / plan author.
+- Decision: prefer Wildside's token-management approach as the default reuse
+  target for `frontend-pwa/`, and do not introduce a new Corbusier-local token
+  compiler unless adaptation proves infeasible. Rationale: Wildside already
+  produces the concrete outputs this slice needs (CSS variables, Tailwind
+  preset, DaisyUI theme, runtime token helpers, and contrast validation),
+  whereas `figtok` is a generic Figma Tokens Studio serializer better suited to
+  a future design-ingestion workflow than to the immediate `4.4.1` workspace
+  shell. Date/Author: 2026-04-08 / plan author.
+- Decision: treat `figtok` as a conditional fallback only if Corbusier later
+  chooses Figma Tokens Studio export files as the canonical token source.
+  Rationale: it already handles standard, composition, and shadow tokens plus
+  CSS-variable output, but it would still need extra adaptation for the
+  Tailwind, DaisyUI, Bun, and browser-runtime needs already solved in
+  Wildside's package. Date/Author: 2026-04-08 / plan author.
 
 ## Outcomes & Retrospective
 
@@ -260,6 +285,14 @@ Create the repository-owned PWA workspace and baseline tooling:
   scaffolding.
 - Add Tailwind CSS v4, DaisyUI v5, and the minimum design-token scaffolding
   needed to render the task routes.
+- Start from Wildside's token package conventions where feasible:
+  - CSS variables generated from source tokens;
+  - derived Tailwind preset and DaisyUI theme outputs;
+  - token-resolution helpers for runtime use;
+  - built-in contrast validation for theme safety.
+- Only evaluate `figtok` in this stage if the design source of truth is pushed
+  towards Figma Tokens Studio exports and Wildside's package cannot consume the
+  same source material with modest adaptation.
 - Add baseline i18n runtime and an English locale bundle for UI chrome.
 - Add root-level integration points:
   - `.gitignore` entries for frontend artefacts;
