@@ -1,0 +1,59 @@
+@import '../design/tokens.css';
+@import 'tailwindcss';
+@plugin "daisyui";
+
+:root {
+  color: var(--corbusier-ink);
+  background:
+    radial-gradient(circle at top left, rgb(213 236 231 / 60%), transparent 35%),
+    linear-gradient(180deg, var(--corbusier-canvas), #f0ebe0 100%);
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  color: var(--corbusier-ink);
+}
+
+.app-header {
+  border-bottom: 1px solid rgb(216 203 181 / 70%);
+  backdrop-filter: blur(10px);
+  background: rgb(247 244 237 / 80%);
+}
+
+.hero-panel,
+.surface-panel {
+  border: 1px solid rgb(216 203 181 / 80%);
+  background: rgb(255 253 248 / 92%);
+  box-shadow: 0 1rem 3rem -2rem var(--corbusier-shadow);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-pill[data-tone='steady'] {
+  background: var(--corbusier-accent-soft);
+  color: var(--corbusier-accent);
+}
+
+.status-pill[data-tone='warning'] {
+  background: var(--corbusier-warn-soft);
+  color: var(--corbusier-warn);
+}

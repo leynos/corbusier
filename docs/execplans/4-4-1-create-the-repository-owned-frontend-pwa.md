@@ -5,12 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETED
 
 Current roadmap numbering places this work at `4.4.1` in
 [docs/roadmap.md](../roadmap.md).
 
-Execution phase does not begin until this draft is explicitly approved.
+Execution began after user approval on 2026-04-08.
 
 ## Purpose / big picture
 
@@ -144,7 +144,16 @@ Observable success means:
   ground fixture contracts in the current `POST /api/v1/tasks` and
   `GET /api/v1/tasks/{task_id}` shapes.
 - [x] (2026-04-08 12:05Z) Authored the initial ExecPlan draft in this file.
-- [ ] Await user approval before execution.
+- [x] (2026-04-08 20:30Z) User approved execution of the plan.
+- [x] (2026-04-08 20:40Z) Bootstrapped `frontend-pwa/` with Bun, Vite, React
+  19, TypeScript, Tailwind CSS v4, DaisyUI v5, Playwright, Vitest, and
+  repository-owned `make` targets.
+- [x] (2026-04-08 20:48Z) Implemented the fixture-backed task-slice domain,
+  ports, adapters, app providers, and task create/detail routes.
+- [x] (2026-04-08 20:58Z) Added unit/component coverage and browser-path tests
+  for create success, invalid create input, and task-detail not-found states.
+- [x] (2026-04-08 21:00Z) Updated design and user docs, marked roadmap item
+  `4.4.1` complete, and reran the planned frontend/documentation gates.
 
 ## Surprises & Discoveries
 
@@ -215,6 +224,20 @@ Observable success means:
 Planning outcome: the `4.4.1` implementation sequence, boundaries, and quality
 gates are now captured in one execution document. Delivery outcomes,
 deviations, and lessons learned will be added after execution.
+
+Delivery outcome: Corbusier now has a repository-owned `frontend-pwa/`
+workspace with a fixture-backed task create route, task detail route, route
+shell providers, design tokens, localization runtime, and explicit `make`
+targets for install, lint, type-check, unit tests, and browser-path tests.
+
+Retrospective:
+
+- Keeping the task gateway behind a slice-owned port made the fixture adapter
+  and stub HTTP adapter additive instead of forcing route rewrites.
+- Vitest configuration needed an explicit include list so Playwright specs did
+  not get treated as unit tests.
+- TanStack Router tests were stable once the memory-history router was loaded
+  inside the test harness before assertions ran.
 
 ## Context and orientation
 

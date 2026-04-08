@@ -1,0 +1,14 @@
+:root {
+  --corbusier-canvas: #f7f4ed;
+  --corbusier-surface: #fffdf8;
+  --corbusier-surface-strong: #efe5d2;
+  --corbusier-ink: #1b1712;
+  --corbusier-muted: #60574c;
+  --corbusier-border: #d8cbb5;
+  --corbusier-accent: #005a59;
+  --corbusier-accent-soft: #d5ece7;
+  --corbusier-warn: #9d3a0f;
+  --corbusier-warn-soft: #f9dfd2;
+  --corbusier-shadow: color-mix(in srgb, var(--corbusier-ink) 15%, transparent);
+  --corbusier-radius: 1.2rem;
+}

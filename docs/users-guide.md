@@ -551,6 +551,46 @@ provide hardened PostgreSQL tenant isolation for conversation and message
 storage. Do not treat it as a complete multi-tenant security boundary until
 roadmap items `2.5.2` and `2.5.3` land.
 
+## Frontend PWA preview
+
+Corbusier now ships a repository-owned `frontend-pwa/` workspace for the first
+browser-facing task slice. The current slice is intentionally fixture-backed:
+it renders task creation and task detail screens without depending on the live
+HTTP auth seam or backend mutations beyond the contract shape.
+
+Run the workspace from the repository root:
+
+```text
+make frontend-install
+make frontend-dev
+```
+
+The development server listens on `http://127.0.0.1:4173`.
+
+Current routes:
+
+- `/tasks/new` renders the issue-to-task create form.
+- `/tasks/<task_id>` renders task detail with origin, state, timestamps, and
+  branch or pull-request placeholders.
+
+Quality gates for the workspace are also exposed through `make`:
+
+- `make frontend-lint`
+- `make frontend-typecheck`
+- `make frontend-test`
+- `make frontend-e2e`
+
+Current behaviour and limits:
+
+- Successful task creation stays inside the fixture adapter and then navigates
+  directly to the task detail route.
+- Invalid create input shows client-side validation feedback before any
+  adapter call is made.
+- Unknown task ids render a not-found state.
+- Live HTTP transport, browser auth, task state mutation, and branch or
+  pull-request association remain deferred to roadmap items `4.4.2` through
+  `4.4.4`.
+
 ## Model Context Protocol (MCP) server lifecycle management
 
 The `tool_registry` module can register Model Context Protocol (MCP) servers,

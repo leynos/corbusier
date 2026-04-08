@@ -1,9 +1,10 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-e2e
 
 
 TARGET ?= corbusier
 
 CARGO ?= cargo
+BUN ?= bun
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 RUSTDOC_FLAGS ?=
@@ -12,6 +13,7 @@ CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
+FRONTEND_DIR ?= frontend-pwa
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
@@ -37,7 +39,21 @@ lint: ## Run Clippy with warnings denied
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
-	mdformat-all
+	if command -v fd >/dev/null 2>&1; then \
+		fd --print0 --type f --extension md --extension markdown --extension mdx . | \
+			xargs -0 mdtablefix --wrap --renumber --breaks --ellipsis --fences --in-place; \
+		fd --print0 --type f --extension md --extension markdown --extension mdx . | \
+			xargs -0 markdownlint --fix; \
+	else \
+		find . \
+			\( -path '*/node_modules/*' -o -path '*/.venv/*' -o -path '*/target/*' \) -prune -o \
+			-type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdx' \) -print0 | \
+			xargs -0 mdtablefix --wrap --renumber --breaks --ellipsis --fences --in-place; \
+		find . \
+			\( -path '*/node_modules/*' -o -path '*/.venv/*' -o -path '*/target/*' \) -prune -o \
+			-type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdx' \) -print0 | \
+			xargs -0 markdownlint --fix; \
+	fi
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
@@ -59,6 +75,25 @@ local-k8s-status: ## Show local preview environment status
 
 local-k8s-logs: ## Tail application logs from preview environment
 	uv run scripts/local_k8s.py logs
+
+frontend-install: ## Install frontend workspace dependencies and browser tooling
+	cd $(FRONTEND_DIR) && $(BUN) install
+	cd $(FRONTEND_DIR) && $(BUN) x playwright install chromium
+
+frontend-dev: ## Run the frontend development server
+	cd $(FRONTEND_DIR) && $(BUN) run dev --host 127.0.0.1 --port 4173
+
+frontend-lint: ## Lint the frontend workspace
+	cd $(FRONTEND_DIR) && $(BUN) run lint
+
+frontend-typecheck: ## Type-check the frontend workspace
+	cd $(FRONTEND_DIR) && $(BUN) run typecheck
+
+frontend-test: ## Run frontend unit and component tests
+	cd $(FRONTEND_DIR) && $(BUN) run test
+
+frontend-e2e: ## Run frontend browser-path tests
+	cd $(FRONTEND_DIR) && $(BUN) run e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

@@ -682,7 +682,7 @@ Use the shared dependency labels below to keep this step readable:
 - Phase 4 Frankie review-adapter dependency: Frankie steps 2.1.3–2.1.5, 3.2.7,
   and 4.1.3. Not required for this step.
 
-- [ ] 4.4.1 Create the repository-owned `frontend-pwa/` workspace and narrow
+- [x] 4.4.1 Create the repository-owned `frontend-pwa/` workspace and narrow
   task route shell. Requires 4.2.1. See
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
