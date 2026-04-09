@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-e2e
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-e2e frontend-audit
 
 
 TARGET ?= corbusier
@@ -94,6 +94,9 @@ frontend-test: ## Run frontend unit and component tests
 
 frontend-e2e: ## Run frontend browser-path tests
 	cd $(FRONTEND_DIR) && $(BUN) run e2e
+
+frontend-audit: ## Audit frontend dependencies for known vulnerabilities
+	cd $(FRONTEND_DIR) && $(BUN) run audit
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "lint": "biome check src/**/*.ts src/**/*.tsx tests/**/*.ts *.json *.ts",
+    "audit": "bun run scripts/run-audit.mjs",
+    "lint": "biome check src/**/*.ts src/**/*.tsx tests/**/*.ts security/audit-utils.js scripts/run-audit.mjs *.json *.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test"
