@@ -391,8 +391,8 @@ Add three new methods to the `TaskRepository` trait:
 - `async fn update(&self, task: &Task) -> TaskRepositoryResult<()>` — persists
   changes to an existing task.
 - `async fn find_by_branch_ref(&self, branch_ref: &BranchRef) ->
-  TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the branch
-  (may be multiple due to many-to-many).
+  TaskRepositoryResult<Vec<Task>>
+  ` — returns all tasks linked to the branch (may be multiple due to many-to-many).
 - `async fn find_by_pull_request_ref(&self, pr_ref: &PullRequestRef) ->
   TaskRepositoryResult<Vec<Task>>` — returns all tasks linked to the PR.
 

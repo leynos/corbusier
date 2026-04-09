@@ -1,0 +1,4 @@
+`<section className=$class>$body</section>` as $node where {
+  $class <: contains "btn",
+  register_diagnostic(span=$class, message="[daisyui/semantic-btn] Apply DaisyUI 'btn' to a <button> or <a>, not a <section>.")
+}

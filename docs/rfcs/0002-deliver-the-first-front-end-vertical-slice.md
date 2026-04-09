@@ -26,9 +26,9 @@ project list views, Kanban, Server-Sent Events (SSE), hosted agent sessions,
 and review-adapter workflows.
 
 The purpose of the slice is not feature breadth. The purpose is to validate the
-production progressive web app (PWA) workspace, the minimum
-browser-to-API contract, the mutation and detail-view pattern, and the local
-preview and testing path before broader UI and read-model work begins.
+production progressive web app (PWA) workspace, the minimum browser-to-API
+contract, the mutation and detail-view pattern, and the local preview and
+testing path before broader UI and read-model work begins.
 
 ## 2. Problem
 
@@ -102,12 +102,12 @@ The first slice consists of one coherent browser workflow:
 <!-- markdownlint-disable MD029 -->
 
 1. Enter issue metadata and create a task.
-1. Navigate immediately to the created task’s detail screen.
-1. Render task state, issue origin, timestamps, and branch or pull-request
+2. Navigate immediately to the created task’s detail screen.
+3. Render task state, issue origin, timestamps, and branch or pull-request
    references.
-1. Offer valid task state transition actions.
-1. Reflect the updated task after mutation.
-1. Where supported by the live API, allow branch and pull-request association
+4. Offer valid task state transition actions.
+5. Reflect the updated task after mutation.
+6. Where supported by the live API, allow branch and pull-request association
    from the same detail screen.
 
 <!-- markdownlint-enable MD029 -->
@@ -323,10 +323,10 @@ The recommended order is:
 <!-- markdownlint-disable MD029 -->
 
 1. Create `frontend-pwa/` shell and task routes with temporary fixtures.
-1. Stabilize the slice contract and shared transport conventions.
-1. Replace fixtures with live task create/detail/transition calls.
-1. Add browser-path regression coverage.
-1. Record explicit deferrals and feed the learning into later UI and API steps.
+2. Stabilize the slice contract and shared transport conventions.
+3. Replace fixtures with live task create/detail/transition calls.
+4. Add browser-path regression coverage.
+5. Record explicit deferrals and feed the learning into later UI and API steps.
 
 <!-- markdownlint-enable MD029 -->
 
@@ -376,8 +376,8 @@ execution, and Frankie-backed review context.
 ## Roadmap step placement
 
 The roadmap should place this work as a **new Phase 4 step 4.4** under
-“External integrations and interfaces”, then renumber the current “Operator
-and developer user interfaces” block from `4.4` to `4.5`.
+“External integrations and interfaces”, then renumber the current “Operator and
+developer user interfaces” block from `4.4` to `4.5`.
 
 ### 4.4. First front-end vertical slice: task intake and lifecycle loop
 
@@ -444,8 +444,8 @@ Use the shared dependency labels below to keep this step readable:
     navigate, transition, and reload against the running Corbusier API.
 
 - [ ] **4.4.4. Add task branch and pull-request association actions to the
-  detail view when the current HTTP surface supports them.** Requires
-  4.4.3. See [API Design](docs/corbusier-api-design.md) §Endpoint inventory — Tasks.
+  detail view when the current HTTP surface supports them.** Requires 4.4.3.
+  See [API Design](docs/corbusier-api-design.md) §Endpoint inventory — Tasks.
 
   - Reuse the existing task-detail screen rather than creating a second
     workflow entry point.

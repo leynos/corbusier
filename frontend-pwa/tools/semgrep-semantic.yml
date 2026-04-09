@@ -1,0 +1,42 @@
+rules:
+  - id: tailwind-raw-color-class
+    pattern-regex: "\\b(text|bg|border)-(red|blue|green|gray|slate|zinc|stone|amber|rose)-[0-9]{2,3}\\b"
+    message: "Prefer semantic or DaisyUI role classes over raw Tailwind color scales."
+    languages: [javascript, typescript, html]
+    severity: WARNING
+
+  - id: daisyui-dynamic-token
+    pattern-regex: "`[^`]*\\b(btn|badge|alert|tab)-\\${[^}]+}[^`]*`"
+    message: "Avoid dynamic DaisyUI token names because Tailwind cannot statically include them."
+    languages: [javascript, typescript]
+    severity: WARNING
+
+  - id: classlist-too-long
+    pattern-regex: "class(Name)?=\\{?['\"][^'\"]{120,}['\"]\\}?"
+    message: "Class list is long. Extract a semantic class with @apply."
+    languages: [javascript, typescript, html]
+    severity: WARNING
+
+  - id: class-token-uppercase
+    pattern-regex: "class(Name)?=\\{?['\"][^'\"]*[A-Z][^'\"]*['\"]\\}?"
+    message: "Class tokens should stay lowercase or use project semantic prefixes."
+    languages: [javascript, typescript, html]
+    severity: WARNING
+
+  - id: testing-library-no-testids
+    message: "Avoid test IDs. Prefer accessible queries such as getByRole or getByLabelText."
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: $SCREEN.getByTestId($ARG)
+      - pattern: $SCREEN.queryByTestId($ARG)
+      - pattern: $SCREEN.findByTestId($ARG)
+      - pattern: const { ..., getByTestId, ... } = $RENDER($ARGS)
+      - pattern: const { ..., queryByTestId, ... } = $RENDER($ARGS)
+      - pattern: const { ..., findByTestId, ... } = $RENDER($ARGS)
+
+  - id: testing-no-data-testid-attr
+    message: "Avoid data-testid attributes. Prefer accessible roles, names, or labels."
+    languages: [javascript, typescript, html]
+    severity: ERROR
+    pattern-regex: "data-testid"

@@ -1,5 +1,5 @@
-import { createFixtureTaskGateway } from './fixture-task-gateway';
 import { TaskGatewayError } from '../../ports/task-slice-gateway';
+import { createFixtureTaskGateway } from './fixture-task-gateway';
 
 describe('fixture task gateway', () => {
   it('creates a draft task from issue metadata', async () => {

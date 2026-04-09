@@ -575,9 +575,13 @@ Current routes:
 
 Quality gates for the workspace are also exposed through `make`:
 
+- `make frontend-audit`
 - `make frontend-lint`
 - `make frontend-typecheck`
 - `make frontend-test`
+- `make frontend-test-a11y`
+- `make frontend-localizability`
+- `make frontend-semantic`
 - `make frontend-e2e`
 
 Current behaviour and limits:

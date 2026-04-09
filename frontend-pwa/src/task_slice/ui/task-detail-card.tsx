@@ -13,39 +13,57 @@ export function TaskDetailCard({ task }: { task: Task }) {
   const state = formatTaskState(task.state);
 
   return (
-    <section className="surface-panel rounded-[var(--corbusier-radius)] p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.2em] text-[var(--corbusier-muted)]">
-            {t('task.detail.title')}
+    <section className="task-detail surface-panel">
+      <div className="task-detail__header">
+        <div className="task-detail__summary">
+          <p className="task-detail__eyebrow">{t('task.detail.title')}</p>
+          <h2 className="task-detail__title">{task.origin.metadata.title}</h2>
+          <p className="task-detail__origin">
+            {formatIssueOrigin(task.origin)}
           </p>
-          <h2 className="text-3xl font-semibold">{task.origin.metadata.title}</h2>
-          <p className="text-sm text-[var(--corbusier-muted)]">{formatIssueOrigin(task.origin)}</p>
         </div>
         <span className="status-pill" data-tone={state.tone}>
           {state.label}
         </span>
       </div>
 
-      <dl className="mt-6 grid gap-4 md:grid-cols-2">
-        <DetailItem label="Task ID" value={task.id} />
-        <DetailItem label="Origin" value={formatIssueOrigin(task.origin)} />
-        <DetailItem label="Created" value={formatTimestamp(task.created_at, locale)} />
-        <DetailItem label="Updated" value={formatTimestamp(task.updated_at, locale)} />
+      <dl className="task-detail__meta-grid">
+        <DetailItem label={t('task.detail.taskId')} value={task.id} />
         <DetailItem
-          label="Branch reference"
-          value={formatBranchRef(task.branch_ref) ?? t('task.refs.branch.empty')}
+          label={t('task.detail.origin')}
+          value={formatIssueOrigin(task.origin)}
         />
         <DetailItem
-          label="Pull request reference"
-          value={formatPullRequestRef(task.pull_request_ref) ?? t('task.refs.pr.empty')}
+          label={t('task.detail.created')}
+          value={formatTimestamp(task.created_at, locale)}
+        />
+        <DetailItem
+          label={t('task.detail.updated')}
+          value={formatTimestamp(task.updated_at, locale)}
+        />
+        <DetailItem
+          label={t('task.detail.branchRef')}
+          value={
+            formatBranchRef(task.branch_ref) ?? t('task.refs.branch.empty')
+          }
+        />
+        <DetailItem
+          label={t('task.detail.pullRequestRef')}
+          value={
+            formatPullRequestRef(task.pull_request_ref) ??
+            t('task.refs.pr.empty')
+          }
         />
       </dl>
 
       {task.origin.metadata.description ? (
-        <div className="mt-6 rounded-box bg-[var(--corbusier-accent-soft)]/60 p-4">
-          <h3 className="font-semibold">Description</h3>
-          <p className="mt-2 text-sm leading-6">{task.origin.metadata.description}</p>
+        <div className="task-detail__description">
+          <h3 className="task-detail__description-title">
+            {t('task.detail.description')}
+          </h3>
+          <p className="task-detail__description-body">
+            {task.origin.metadata.description}
+          </p>
         </div>
       ) : null}
     </section>
@@ -54,11 +72,9 @@ export function TaskDetailCard({ task }: { task: Task }) {
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-box border border-[var(--corbusier-border)] bg-[var(--corbusier-surface-strong)]/30 p-4">
-      <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--corbusier-muted)]">
-        {label}
-      </dt>
-      <dd className="mt-2 break-all text-sm leading-6">{value}</dd>
+    <div className="task-detail__meta-item">
+      <dt className="task-detail__meta-label">{label}</dt>
+      <dd className="task-detail__meta-value">{value}</dd>
     </div>
   );
 }

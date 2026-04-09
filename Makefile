@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-e2e frontend-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e frontend-audit
 
 
 TARGET ?= corbusier
@@ -91,6 +91,15 @@ frontend-typecheck: ## Type-check the frontend workspace
 
 frontend-test: ## Run frontend unit and component tests
 	cd $(FRONTEND_DIR) && $(BUN) run test
+
+frontend-test-a11y: ## Run frontend accessibility-focused component tests
+	cd $(FRONTEND_DIR) && $(BUN) run test:a11y
+
+frontend-localizability: ## Run frontend heuristic localizability checks
+	cd $(FRONTEND_DIR) && $(BUN) run localizability:lint
+
+frontend-semantic: ## Run semantic frontend linting and styling checks
+	cd $(FRONTEND_DIR) && $(BUN) run semantic:lint
 
 frontend-e2e: ## Run frontend browser-path tests
 	cd $(FRONTEND_DIR) && $(BUN) run e2e

@@ -1,0 +1,3 @@
+`<h3 className="$class" $attrs>$body</h3>` as $node where {
+  register_diagnostic(span=$node, message="Heading uses inline utilities. Extract a semantic heading class and reuse it.")
+}

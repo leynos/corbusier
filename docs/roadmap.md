@@ -11,20 +11,20 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
-It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
+ It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
 Table 1.0.0: Phase 1 subphases and delivery goals.
 
-| Subphase | Goal |
+| Subphase | Goal                                                                                          |
 | -------- | --------------------------------------------------------------------------------------------- |
-| 1.1 | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam. |
-| 1.2 | Introduce the canonical workspace runtime model and source-policy controls. |
-| 1.3 | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts. |
-| 1.4 | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
-| 1.5 | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults. |
-| 1.6 | Run staged migration gates and declare the evidence needed to retire legacy paths. |
+| 1.1      | Ratify the migration boundary and move hosted execution behind a Podbot-facing seam.          |
+| 1.2      | Introduce the canonical workspace runtime model and source-policy controls.                   |
+| 1.3      | Shift hosted wire attachment and hook execution onto Podbot control-plane contracts.          |
+| 1.4      | Persist durable hosted runtime entities, audit links, retention rules, and conformance gates. |
+| 1.5      | Define prompt and bundle artefacts, validation semantics, and least-privilege defaults.       |
+| 1.6      | Run staged migration gates and declare the evidence needed to retire legacy paths.            |
 
 Use the shared dependency labels below to keep phase 1 task text readable:
 
@@ -690,13 +690,12 @@ Use the shared dependency labels below to keep this step readable:
 - [ ] 4.4.2 Stabilize the slice transport contract and development auth seam.
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
   `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
-  contracts and
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.3–§5.4.
+  contracts and `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`
+  §5.3–§5.4.
 
 - [ ] 4.4.3 Implement the live task create → detail → transition path in the
   progressive web app (PWA). Requires 4.4.1 and 4.4.2. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and
-  §6.1.
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and §6.1.
 
 - [ ] 4.4.4 Add task branch and pull-request association actions to the detail
   view when the current HTTP surface supports them. Requires 4.4.3. See
@@ -705,13 +704,13 @@ Use the shared dependency labels below to keep this step readable:
 
 - [ ] 4.4.5 Prove the slice is independent of hosted-session and review-adapter
   services. Requires 4.4.3 and 4.4.4. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6
-  and §6.2.
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6 and
+  §6.2.
 
 - [ ] 4.4.6 Capture the lessons of the first slice before broadening the
   interface surface. Requires 4.4.5. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7,
-  and §10.
+  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7, and
+  §10.
 
 ### 4.5. Operator and developer user interfaces
 
@@ -997,14 +996,14 @@ one family at a time. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md`
 
 Table 8.0.0: Phase 8 subphases and delivery goals.
 
-| Subphase | Goal | Phase 4 prerequisite map |
-| -------- | ---- | ------------------------ |
-| 8.1 | Promote fixture-backed screens for all Corbusier screen families. | 4.4.1 and 4.4.6 |
-| 8.2 | Connect task and project screens to live backend projections and list endpoints. | 4.4.2, 4.4.3, and 4.4.4 |
-| 8.3 | Add conversation surface and message paging. | 4.4.6 |
-| 8.4 | Deliver directives, suggestions, and governance screens. | 4.4.5 and 4.4.6 |
-| 8.5 | Introduce SSE live invalidation across streaming screens. | 4.4.2 and 4.4.6 |
-| 8.6 | Add settings, identity, and personnel screens. | 4.4.6 |
+| Subphase | Goal                                                                             | Phase 4 prerequisite map |
+| -------- | -------------------------------------------------------------------------------- | ------------------------ |
+| 8.1      | Promote fixture-backed screens for all Corbusier screen families.                | 4.4.1 and 4.4.6          |
+| 8.2      | Connect task and project screens to live backend projections and list endpoints. | 4.4.2, 4.4.3, and 4.4.4  |
+| 8.3      | Add conversation surface and message paging.                                     | 4.4.6                    |
+| 8.4      | Deliver directives, suggestions, and governance screens.                         | 4.4.5 and 4.4.6          |
+| 8.5      | Introduce SSE live invalidation across streaming screens.                        | 4.4.2 and 4.4.6          |
+| 8.6      | Add settings, identity, and personnel screens.                                   | 4.4.6                    |
 
 ### 8.1. Fixture-backed screen promotion
 
@@ -1046,8 +1045,8 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 ### 8.3. Conversation surface
 
 - [ ] 8.3.1 Deliver conversation list and message paging against live data.
-  Requires 8.1.1, 4.4.6, and 6.3.1. See
-  `docs/corbusier-api-design.md` §Conversation domain.
+  Requires 8.1.1, 4.4.6, and 6.3.1. See `docs/corbusier-api-design.md`
+  §Conversation domain.
   - [ ] Replace conversation list and thread fixtures with live
     `ConversationListItemDto` and `ConversationDetailDto` projections.
   - [ ] Render message content parts, tool call metadata, and agent handoff
@@ -1093,8 +1092,8 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 ### 8.6. Settings, identity, and personnel screens
 
 - [ ] 8.6.1 Deliver settings, identity, and personnel screens against live data.
-  Requires 8.1.1, 4.4.6, and 6.4.1. See
-  `docs/corbusier-api-design.md` §Identity domain.
+  Requires 8.1.1, 4.4.6, and 6.4.1. See `docs/corbusier-api-design.md`
+  §Identity domain.
   - [ ] Replace personnel directory fixture with live `UserAggregate`
     projections.
   - [ ] Implement API key creation and revocation flows in settings screens. See

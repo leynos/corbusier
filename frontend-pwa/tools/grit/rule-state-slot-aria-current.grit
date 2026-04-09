@@ -1,0 +1,3 @@
+`<$_ className="$class" aria-current=$state $attrs>$body</$_>` as $node where {
+  register_diagnostic(span=$node, message="Stateful slot detected. Extract a semantic class with explicit state styling.")
+}

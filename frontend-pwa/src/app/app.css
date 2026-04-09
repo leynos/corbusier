@@ -1,13 +1,13 @@
-@import '../design/tokens.css';
-@import 'tailwindcss';
+@import "../design/tokens.css";
+@import "tailwindcss";
 @plugin "daisyui";
 
 :root {
   color: var(--corbusier-ink);
   background:
     radial-gradient(circle at top left, rgb(213 236 231 / 60%), transparent 35%),
-    linear-gradient(180deg, var(--corbusier-canvas), #f0ebe0 100%);
-  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+    linear-gradient(180deg, var(--corbusier-canvas), rgb(240 235 224) 100%);
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
 }
 
 body {
@@ -22,6 +22,30 @@ body {
 .app-shell {
   min-height: 100vh;
   color: var(--corbusier-ink);
+}
+
+.app-shell__header-inner {
+  @apply mx-auto flex max-w-6xl items-center justify-between px-6 py-4;
+}
+
+.app-shell__eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.25em] text-[var(--corbusier-muted)];
+}
+
+.app-shell__title {
+  @apply text-2xl font-semibold;
+}
+
+.app-shell__nav {
+  @apply flex items-center gap-3;
+}
+
+.app-shell__nav-link {
+  @apply btn btn-ghost btn-sm;
+}
+
+.app-shell__main {
+  @apply mx-auto max-w-6xl px-6 py-10;
 }
 
 .app-header {
@@ -48,12 +72,106 @@ body {
   text-transform: uppercase;
 }
 
-.status-pill[data-tone='steady'] {
+.status-pill[data-tone="steady"] {
   background: var(--corbusier-accent-soft);
   color: var(--corbusier-accent);
 }
 
-.status-pill[data-tone='warning'] {
+.status-pill[data-tone="warning"] {
   background: var(--corbusier-warn-soft);
   color: var(--corbusier-warn);
+}
+
+.task-create__layout {
+  @apply grid gap-6 lg:grid-cols-[1.1fr_0.9fr];
+}
+
+.task-create__hero,
+.task-create__form-panel,
+.task-detail,
+.task-not-found {
+  @apply rounded-[var(--corbusier-radius)] p-6;
+}
+
+.task-create__hero {
+  @apply p-8;
+}
+
+.task-create__eyebrow,
+.task-detail__eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.25em] text-[var(--corbusier-muted)];
+}
+
+.task-create__title {
+  @apply mt-2 text-4xl font-semibold;
+}
+
+.task-create__body,
+.task-not-found__body {
+  @apply mt-4 max-w-2xl text-sm leading-7 text-[var(--corbusier-muted)];
+}
+
+.task-create-form {
+  @apply space-y-4;
+}
+
+.task-create-form__row {
+  @apply grid gap-4 md:grid-cols-2;
+}
+
+.task-detail__header {
+  @apply flex flex-col gap-4 md:flex-row md:items-start md:justify-between;
+}
+
+.task-detail__summary {
+  @apply space-y-2;
+}
+
+.task-detail__eyebrow {
+  @apply text-sm uppercase tracking-[0.2em] text-[var(--corbusier-muted)];
+}
+
+.task-detail__title,
+.task-not-found__title {
+  @apply text-3xl font-semibold;
+}
+
+.task-detail__origin {
+  @apply text-sm text-[var(--corbusier-muted)];
+}
+
+.task-detail__meta-grid {
+  @apply mt-6 grid gap-4 md:grid-cols-2;
+}
+
+.task-detail__meta-item {
+  @apply rounded-box border border-[var(--corbusier-border)] bg-[var(--corbusier-surface-strong)]/30 p-4;
+}
+
+.task-detail__meta-label {
+  @apply text-xs font-semibold uppercase tracking-[0.2em] text-[var(--corbusier-muted)];
+}
+
+.task-detail__meta-value {
+  @apply mt-2 break-all text-sm leading-6;
+}
+
+.task-detail__description {
+  @apply mt-6 rounded-box bg-[var(--corbusier-accent-soft)]/60 p-4;
+}
+
+.task-detail__description-title {
+  @apply font-semibold;
+}
+
+.task-detail__description-body {
+  @apply mt-2 text-sm leading-6;
+}
+
+.task-not-found__title {
+  @apply text-2xl;
+}
+
+.task-not-found__body {
+  @apply mt-3 leading-6;
 }

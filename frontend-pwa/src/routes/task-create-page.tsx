@@ -41,19 +41,13 @@ export function TaskCreatePage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="hero-panel rounded-[var(--corbusier-radius)] p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--corbusier-muted)]">
-          Task intake
-        </p>
-        <h2 className="mt-2 text-4xl font-semibold">
-          {t('task.create.title')}
-        </h2>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--corbusier-muted)]">
-          {t('task.create.description')}
-        </p>
+    <div className="task-create__layout">
+      <section className="task-create__hero hero-panel">
+        <p className="task-create__eyebrow">{t('task.intake.kicker')}</p>
+        <h2 className="task-create__title">{t('task.create.title')}</h2>
+        <p className="task-create__body">{t('task.create.description')}</p>
       </section>
-      <aside className="surface-panel rounded-[var(--corbusier-radius)] p-6">
+      <aside className="task-create__form-panel surface-panel">
         <TaskCreateForm
           draft={draft}
           errors={errors}

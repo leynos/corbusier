@@ -1,0 +1,3 @@
+`$page.getByText($label).click()` as $node where {
+  register_diagnostic($node, message="[test/prefer-byrole-for-actions] Prefer page.getByRole for interactions.")
+}

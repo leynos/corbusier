@@ -1,0 +1,3 @@
+`fireEvent.$evt($target.$byText($label))` as $node where { $byText <: `getByText`,
+  register_diagnostic($node, message="[test/prefer-byrole-for-actions] Prefer ByRole when interacting with action elements.")
+}

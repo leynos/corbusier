@@ -1,0 +1,4 @@
+`<p className=$class>$body</p>` as $node where {
+  $class <: contains "input",
+  register_diagnostic(span=$class, message="[daisyui/semantic-input] Apply DaisyUI 'input' to an <input>, not a <p>.")
+}

@@ -1,0 +1,3 @@
+`<div className="$classA" $attrsA><div className="$classB" $attrsB>$body</div></div>` as $node where {
+  register_diagnostic(span=$node, message="Nested utility-only wrappers detected. Extract a named container class via @apply.")
+}

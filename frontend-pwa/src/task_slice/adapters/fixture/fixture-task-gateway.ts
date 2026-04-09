@@ -1,12 +1,14 @@
-import type { CreateTaskRequest, Task } from "../../domain/task";
+import type { CreateTaskRequest, Task } from '../../domain/task';
 import {
   TaskGatewayError,
   type TaskSliceGateway,
-} from "../../ports/task-slice-gateway";
+} from '../../ports/task-slice-gateway';
 
 const notFoundTaskId = '11111111-1111-1111-1111-111111111111';
 
-export function createFixtureTaskGateway(seedTasks: Task[] = [buildSeedTask()]): TaskSliceGateway {
+export function createFixtureTaskGateway(
+  seedTasks: Task[] = [buildSeedTask()],
+): TaskSliceGateway {
   const tasks = new Map(seedTasks.map((task) => [task.id, task]));
 
   return {
@@ -26,7 +28,10 @@ export function createFixtureTaskGateway(seedTasks: Task[] = [buildSeedTask()]):
     async getTask(taskId) {
       await delay();
       if (taskId === notFoundTaskId || !tasks.has(taskId)) {
-        throw new TaskGatewayError('not_found', `Task ${taskId} was not found.`);
+        throw new TaskGatewayError(
+          'not_found',
+          `Task ${taskId} was not found.`,
+        );
       }
 
       return tasks.get(taskId) as Task;
@@ -74,7 +79,8 @@ function buildSeedTask(): Task {
       },
       metadata: {
         title: 'Stabilise fixture-backed task slice',
-        description: 'Carry the narrow task detail contract into the PWA shell.',
+        description:
+          'Carry the narrow task detail contract into the PWA shell.',
         labels: ['frontend', 'roadmap-4.4.1'],
         assignees: ['alice'],
         milestone: 'sprint-12',

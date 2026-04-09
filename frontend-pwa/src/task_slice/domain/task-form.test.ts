@@ -25,7 +25,11 @@ describe('task form helpers', () => {
   });
 
   it('normalizes optional lists and strings', () => {
-    expect(splitDelimitedValues(' bug, p1, , backend ')).toEqual(['bug', 'p1', 'backend']);
+    expect(splitDelimitedValues(' bug, p1, , backend ')).toEqual([
+      'bug',
+      'p1',
+      'backend',
+    ]);
     expect(
       toCreateTaskRequest({
         provider: 'github',

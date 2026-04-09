@@ -1,0 +1,3 @@
+`<nav $navAttrs>...<a className="$class" $attrs>$inner</a>...</nav>` as $node where {
+  register_diagnostic(span=$node, message="Navigation link candidate found. Extract a semantic class instead of repeating inline utilities.")
+}

@@ -1,0 +1,3 @@
+`<section className="grid $rest" $attrs>$body</section>` as $node where {
+  register_diagnostic(span=$node, message="Layout-only wrapper detected. Extract a named layout class such as `.stack` or `.cluster`.")
+}

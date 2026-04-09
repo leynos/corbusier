@@ -32,7 +32,9 @@ export function splitDelimitedValues(raw: string) {
     .filter(Boolean);
 }
 
-export function validateTaskCreateDraft(draft: TaskCreateDraft): TaskCreateErrors {
+export function validateTaskCreateDraft(
+  draft: TaskCreateDraft,
+): TaskCreateErrors {
   const errors: TaskCreateErrors = {};
 
   if (!['github', 'gitlab'].includes(draft.provider)) {

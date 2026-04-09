@@ -8,28 +8,26 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header sticky top-0 z-10">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="app-shell__header-inner">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--corbusier-muted)]">
-              {t('app.subtitle')}
-            </p>
-            <h1 className="text-2xl font-semibold">{t('app.title')}</h1>
+            <p className="app-shell__eyebrow">{t('app.subtitle')}</p>
+            <h1 className="app-shell__title">{t('app.title')}</h1>
           </div>
-          <nav className="flex items-center gap-3">
-            <Link className="btn btn-ghost btn-sm" to="/tasks/new">
-              New task
+          <nav className="app-shell__nav">
+            <Link className="app-shell__nav-link" to="/tasks/new">
+              {t('app.nav.newTask')}
             </Link>
             <Link
-              className="btn btn-ghost btn-sm"
+              className="app-shell__nav-link"
               to="/tasks/$taskId"
               params={{ taskId: '9f6adf0b-4908-47f5-a1fd-27d65f7d84bf' }}
             >
-              Seed detail
+              {t('app.nav.seedDetail')}
             </Link>
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="app-shell__main">
         <Outlet />
       </main>
     </div>

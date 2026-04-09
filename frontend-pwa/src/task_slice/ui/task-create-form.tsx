@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 
+import { useI18n } from '../../i18n/runtime';
 import type {
   TaskCreateDraft,
   TaskCreateErrors,
@@ -23,89 +24,97 @@ export function TaskCreateForm({
   onChange,
   onSubmit,
 }: TaskCreateFormProps) {
+  const { t } = useI18n();
+
   return (
-    <form className="space-y-4" onSubmit={onSubmit}>
+    <form className="task-create-form" onSubmit={onSubmit}>
       {submitError ? (
         <div className="alert alert-error" role="alert">
           <span>{submitError}</span>
         </div>
       ) : null}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="task-create-form__row">
         <label className="form-control w-full">
-          <span className="label-text mb-2 font-semibold">Provider</span>
+          <span className="label-text mb-2 font-semibold">
+            {t('task.form.provider')}
+          </span>
           <select
             className="select select-bordered"
             name="provider"
             value={draft.provider}
             onChange={(event) => onChange('provider', event.target.value)}
           >
-            <option value="github">GitHub</option>
-            <option value="gitlab">GitLab</option>
+            <option value="github">{t('task.form.provider.github')}</option>
+            <option value="gitlab">{t('task.form.provider.gitlab')}</option>
           </select>
-          {errors.provider ? <span className="label-text-alt text-error">{errors.provider}</span> : null}
+          {errors.provider ? (
+            <span className="label-text-alt text-error">{errors.provider}</span>
+          ) : null}
         </label>
         <Field
           error={errors.repository}
-          label="Repository"
+          label={t('task.form.repository')}
           name="repository"
-          placeholder="owner/repository"
+          placeholder={t('task.form.repository.placeholder')}
           value={draft.repository}
           onChange={onChange}
         />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="task-create-form__row">
         <Field
           error={errors.issueNumber}
-          label="Issue number"
+          label={t('task.form.issueNumber')}
           name="issueNumber"
-          placeholder="42"
+          placeholder={t('task.form.issueNumber.placeholder')}
           value={draft.issueNumber}
           onChange={onChange}
         />
         <Field
           error={errors.title}
-          label="Title"
+          label={t('task.form.title')}
           name="title"
-          placeholder="Fix login flow"
+          placeholder={t('task.form.title.placeholder')}
           value={draft.title}
           onChange={onChange}
         />
       </div>
       <label className="form-control">
-        <span className="label-text mb-2 font-semibold">Description</span>
+        <span className="label-text mb-2 font-semibold">
+          {t('task.form.description')}
+        </span>
         <textarea
           className="textarea textarea-bordered min-h-28"
           name="description"
-          placeholder="Optional issue synopsis"
+          placeholder={t('task.form.description.placeholder')}
           value={draft.description}
           onChange={(event) => onChange('description', event.target.value)}
         />
       </label>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="task-create-form__row">
         <Field
-          label="Labels"
+          label={t('task.form.labels')}
           name="labels"
-          placeholder="bug, p1"
+          placeholder={t('task.form.labels.placeholder')}
           value={draft.labels}
           onChange={onChange}
         />
         <Field
-          label="Assignees"
+          label={t('task.form.assignees')}
           name="assignees"
-          placeholder="alice, bob"
+          placeholder={t('task.form.assignees.placeholder')}
           value={draft.assignees}
           onChange={onChange}
         />
       </div>
       <Field
-        label="Milestone"
+        label={t('task.form.milestone')}
         name="milestone"
-        placeholder="sprint-12"
+        placeholder={t('task.form.milestone.placeholder')}
         value={draft.milestone}
         onChange={onChange}
       />
       <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Creating task…' : 'Create task'}
+        {isSubmitting ? t('task.form.submitting') : t('task.form.submit')}
       </button>
     </form>
   );
@@ -120,7 +129,14 @@ interface FieldProps {
   onChange(field: TaskCreateField, value: string): void;
 }
 
-function Field({ error, label, name, placeholder, value, onChange }: FieldProps) {
+function Field({
+  error,
+  label,
+  name,
+  placeholder,
+  value,
+  onChange,
+}: FieldProps) {
   return (
     <label className="form-control w-full">
       <span className="label-text mb-2 font-semibold">{label}</span>
@@ -131,7 +147,9 @@ function Field({ error, label, name, placeholder, value, onChange }: FieldProps)
         value={value}
         onChange={(event) => onChange(name, event.target.value)}
       />
-      {error ? <span className="label-text-alt text-error">{error}</span> : null}
+      {error ? (
+        <span className="label-text-alt text-error">{error}</span>
+      ) : null}
     </label>
   );
 }

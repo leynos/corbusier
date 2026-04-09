@@ -1,14 +1,83 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
+  "plugins": [
+    "./tools/grit/rule-a11y.grit",
+    "./tools/grit/rule-a11y-trailing.grit",
+    "./tools/grit/rule-a11y-leading.grit",
+    "./tools/grit/rule-a11y-span.grit",
+    "./tools/grit/rule-a11y-span-trailing.grit",
+    "./tools/grit/rule-a11y-span-leading.grit",
+    "./tools/grit/rule-daisyui-btn-div.grit",
+    "./tools/grit/rule-daisyui-btn-span.grit",
+    "./tools/grit/rule-daisyui-btn-section.grit",
+    "./tools/grit/rule-daisyui-btn-article.grit",
+    "./tools/grit/rule-daisyui-btn-li.grit",
+    "./tools/grit/rule-daisyui-btn-p.grit",
+    "./tools/grit/rule-daisyui-input-div.grit",
+    "./tools/grit/rule-daisyui-input-span.grit",
+    "./tools/grit/rule-daisyui-input-section.grit",
+    "./tools/grit/rule-daisyui-input-article.grit",
+    "./tools/grit/rule-daisyui-input-li.grit",
+    "./tools/grit/rule-daisyui-input-p.grit",
+    "./tools/grit/rule-testing-no-getbytestid.grit",
+    "./tools/grit/rule-testing-no-findbytestid.grit",
+    "./tools/grit/rule-testing-no-querybytestid.grit",
+    "./tools/grit/rule-testing-no-queryselector.grit",
+    "./tools/grit/rule-testing-no-queryselectorall.grit",
+    "./tools/grit/rule-testing-no-getelementbyid.grit",
+    "./tools/grit/rule-testing-no-getelementsbyclassname.grit",
+    "./tools/grit/rule-heading-semantic-h1.grit",
+    "./tools/grit/rule-heading-semantic-h2.grit",
+    "./tools/grit/rule-heading-semantic-h3.grit",
+    "./tools/grit/rule-heading-semantic-h4.grit",
+    "./tools/grit/rule-landmark-slot.grit",
+    "./tools/grit/rule-layout-wrapper-div-flex.grit",
+    "./tools/grit/rule-layout-wrapper-div-grid.grit",
+    "./tools/grit/rule-layout-wrapper-section-flex.grit",
+    "./tools/grit/rule-layout-wrapper-section-grid.grit",
+    "./tools/grit/rule-state-slot-aria-current.grit",
+    "./tools/grit/rule-state-slot-aria-selected.grit",
+    "./tools/grit/rule-state-slot-data-state.grit",
+    "./tools/grit/rule-state-slot-role-tab.grit",
+    "./tools/grit/rule-testing-no-cypress-get-single.grit",
+    "./tools/grit/rule-testing-no-cypress-get-double.grit",
+    "./tools/grit/rule-testing-no-page-locator-single.grit",
+    "./tools/grit/rule-testing-no-page-locator-double.grit",
+    "./tools/grit/rule-testing-fire-event-text-click.grit",
+    "./tools/grit/rule-testing-playwright-text-click.grit",
+    "./tools/grit/rule-testing-user-event-text-click.grit",
+    "./tools/grit/rule-utility-wrapper.grit"
+  ],
+  "files": {
+    "includes": [
+      "biome.json",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "vitest.config.ts",
+      "vitest.a11y.config.ts",
+      "playwright.config.ts",
+      "src/**/*",
+      "tests/**/*",
+      "tools/**/*.json",
+      "tools/**/*.yml",
+      "tools/**/*.cjs",
+      "scripts/**/*",
+      "security/**/*"
+    ],
+    "ignoreUnknown": true
+  },
+  "vcs": {
+    "useIgnoreFile": true
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
   },
   "javascript": {
     "formatter": {
@@ -16,5 +85,34 @@
       "semicolons": "always",
       "trailingCommas": "all"
     }
-  }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noConsole": "off"
+      },
+      "style": {
+        "useForOf": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.css"],
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["tools/**/*.cjs"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
 }

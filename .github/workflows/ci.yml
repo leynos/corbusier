@@ -26,6 +26,8 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@aebb3f5b831102e2a10ef909c83d7d50ea86c332
       - name: Install frontend dependencies
         run: cd frontend-pwa && bun install --frozen-lockfile
+      - name: Install Playwright browser
+        run: cd frontend-pwa && bunx playwright install chromium
       - name: Refresh apt package index
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -46,6 +48,20 @@ jobs:
             !**/dist/**
       - name: Frontend audit
         run: make frontend-audit
+      - name: Frontend lint
+        run: make frontend-lint
+      - name: Frontend typecheck
+        run: make frontend-typecheck
+      - name: Frontend tests
+        run: make frontend-test
+      - name: Frontend accessibility tests
+        run: make frontend-test-a11y
+      - name: Frontend localizability lint
+        run: make frontend-localizability
+      - name: Frontend semantic lint
+        run: make frontend-semantic
+      - name: Frontend e2e
+        run: make frontend-e2e
       - name: Cache Whitaker installer
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:

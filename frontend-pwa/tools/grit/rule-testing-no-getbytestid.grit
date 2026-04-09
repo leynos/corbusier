@@ -1,0 +1,4 @@
+`$recv.$method($arg)` as $node where {
+  $method <: `getByTestId`,
+  register_diagnostic($method, message="[test/no-testid-selectors] Prefer accessible queries (getByRole/Label/Placeholder/Alt/Title). Hint: reach for getByRole('button', { name: 'Save' }) or getByLabelText('Email') before falling back to data-testid. Using *ByTestId requires an ACCESSIBILITY justification.")
+}
