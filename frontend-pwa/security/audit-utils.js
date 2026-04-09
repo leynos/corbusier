@@ -82,13 +82,23 @@ export function runAuditJson() {
  * });
  * console.log(entries[0][0]);
  */
-function resolveAdvisoryEntries(auditJson) {
-  if (
-    auditJson &&
+/**
+ * Return true when the audit JSON exposes an advisories object map.
+ *
+ * @param {unknown} auditJson Candidate audit JSON payload.
+ * @returns {boolean}
+ */
+function hasAdvisoryMap(auditJson) {
+  return (
+    auditJson != null &&
     typeof auditJson === 'object' &&
-    auditJson.advisories &&
+    auditJson.advisories != null &&
     typeof auditJson.advisories === 'object'
-  ) {
+  );
+}
+
+function resolveAdvisoryEntries(auditJson) {
+  if (hasAdvisoryMap(auditJson)) {
     return Object.entries(auditJson.advisories);
   }
 

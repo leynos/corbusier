@@ -37,6 +37,16 @@ interface LintDirectives {
   readonly fileLevelDisabled: boolean;
 }
 
+/** Shared state for a single-file analysis pass. */
+interface VisitContext {
+  filePath: string;
+  wordRegex: RegExp;
+  attrSet: Set<string>;
+  source: ts.SourceFile;
+  directives: LintDirectives;
+  results: Violation[];
+}
+
 const CONFIG_PATH = 'tools/semantic-lint.config.json';
 const PROJECT_ROOT = process.cwd();
 
@@ -201,7 +211,27 @@ function shouldSkipNode(
   return directives.disabledLines.has(line);
 }
 
-/** Extract text content from a supported JSX attribute initializer. */
+/**
+ * Return true when the expression is an inline string literal form.
+ *
+ * @param expr Candidate JSX expression payload.
+ * @returns {expr is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral}
+ */
+function isInlineStringExpression(
+  expr: ts.Expression | undefined,
+): expr is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral {
+  return (
+    expr !== undefined &&
+    (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr))
+  );
+}
+
+/**
+ * Extract text content from a supported JSX attribute initializer.
+ *
+ * @param initializer Supported JSX attribute initializer node.
+ * @returns {string | undefined} Extracted text when the initializer is static.
+ */
 function extractAttributeText(
   initializer: ts.StringLiteral | ts.JsxExpression,
 ): string | undefined {
@@ -209,40 +239,38 @@ function extractAttributeText(
     return initializer.text;
   }
 
-  if (
-    ts.isJsxExpression(initializer) &&
-    initializer.expression !== undefined &&
-    (ts.isStringLiteral(initializer.expression) ||
-      ts.isNoSubstitutionTemplateLiteral(initializer.expression))
-  ) {
+  // initializer is narrowed to ts.JsxExpression by the union type
+  if (isInlineStringExpression(initializer.expression)) {
     return initializer.expression.text;
   }
 
   return undefined;
 }
 
-/** Visit JSX text nodes and record violations when they contain user-facing text. */
-function visitJsxText(
-  node: ts.JsxText,
-  filePath: string,
-  wordRegex: RegExp,
-  source: ts.SourceFile,
-  directives: LintDirectives,
-  results: Violation[],
-): void {
-  if (!wordRegex.test(node.text)) {
+/** Shared state for a single-file analysis pass. */
+interface AnalysisContext extends VisitContext {}
+
+/**
+ * Visit JSX text nodes and record hard-coded user-facing text violations.
+ *
+ * @param node JSX text node under analysis.
+ * @param ctx Shared single-file analysis context.
+ * @returns {void}
+ */
+function visitJsxText(node: ts.JsxText, ctx: AnalysisContext): void {
+  if (!ctx.wordRegex.test(node.text)) {
     return;
   }
 
-  if (isInsideTCall(node) || shouldSkipNode(node, source, directives)) {
+  if (isInsideTCall(node) || shouldSkipNode(node, ctx.source, ctx.directives)) {
     return;
   }
 
-  const { line, character } = source.getLineAndCharacterOfPosition(
+  const { line, character } = ctx.source.getLineAndCharacterOfPosition(
     node.getStart(),
   );
-  results.push({
-    file: filePath,
+  ctx.results.push({
+    file: ctx.filePath,
     line: line + 1,
     column: character + 1,
     text: node.text.trim().slice(0, 40),
@@ -250,16 +278,14 @@ function visitJsxText(
   });
 }
 
-/** Visit JSX attributes and record violations for hard-coded user-facing values. */
-function visitJsxAttribute(
-  node: ts.JsxAttribute,
-  filePath: string,
-  wordRegex: RegExp,
-  attrSet: Set<string>,
-  source: ts.SourceFile,
-  directives: LintDirectives,
-  results: Violation[],
-): void {
+/**
+ * Visit JSX attributes and record hard-coded user-facing attribute violations.
+ *
+ * @param node JSX attribute node under analysis.
+ * @param ctx Shared single-file analysis context.
+ * @returns {void}
+ */
+function visitJsxAttribute(node: ts.JsxAttribute, ctx: AnalysisContext): void {
   if (!node.initializer) {
     return;
   }
@@ -267,24 +293,24 @@ function visitJsxAttribute(
   const attrName = ts.isIdentifier(node.name)
     ? node.name.text
     : node.name.getText();
-  if (!attrSet.has(attrName)) {
+  if (!ctx.attrSet.has(attrName)) {
     return;
   }
 
   const text = extractAttributeText(node.initializer);
-  if (text === undefined || !wordRegex.test(text)) {
+  if (text === undefined || !ctx.wordRegex.test(text)) {
     return;
   }
 
-  if (isInsideTCall(node) || shouldSkipNode(node, source, directives)) {
+  if (isInsideTCall(node) || shouldSkipNode(node, ctx.source, ctx.directives)) {
     return;
   }
 
-  const { line, character } = source.getLineAndCharacterOfPosition(
+  const { line, character } = ctx.source.getLineAndCharacterOfPosition(
     node.getStart(),
   );
-  results.push({
-    file: filePath,
+  ctx.results.push({
+    file: ctx.filePath,
     line: line + 1,
     column: character + 1,
     text: text.slice(0, 40),
@@ -307,22 +333,22 @@ export function analyseFile(
     ts.ScriptKind.TSX,
   );
   const directives = collectLintDirectives(sourceText, source);
+  const ctx: VisitContext = {
+    filePath,
+    wordRegex,
+    attrSet,
+    source,
+    directives,
+    results,
+  };
 
   const visit = (node: ts.Node) => {
     if (isIgnoredJsxElement(node)) return;
     if (ts.isJsxText(node)) {
-      visitJsxText(node, filePath, wordRegex, source, directives, results);
+      visitJsxText(node, ctx);
     }
     if (ts.isJsxAttribute(node)) {
-      visitJsxAttribute(
-        node,
-        filePath,
-        wordRegex,
-        attrSet,
-        source,
-        directives,
-        results,
-      );
+      visitJsxAttribute(node, ctx);
     }
     ts.forEachChild(node, visit);
   };

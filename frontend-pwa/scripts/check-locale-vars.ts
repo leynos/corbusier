@@ -71,12 +71,19 @@ function collectPlaceholders(
   );
 }
 
-function compareMessageKeys(
-  baseLocale: string,
-  locale: string,
-  baseMessages: MessageMap,
-  localeMessages: MessageMap,
-): boolean {
+export type LocaleComparison = {
+  /** Base locale identifier used for comparisons. */
+  baseLocale: string;
+  /** Locale identifier currently being compared. */
+  locale: string;
+  /** Message catalogue loaded from the base locale. */
+  baseMessages: MessageMap;
+  /** Message catalogue loaded from the locale under test. */
+  localeMessages: MessageMap;
+};
+
+function compareMessageKeys(comparison: LocaleComparison): boolean {
+  const { baseLocale, locale, baseMessages, localeMessages } = comparison;
   const baseKeys = new Set(Object.keys(baseMessages));
   const localeKeys = new Set(Object.keys(localeMessages));
   const missingKeys = [...baseKeys].filter((key) => !localeKeys.has(key));
@@ -98,12 +105,8 @@ function compareMessageKeys(
   return true;
 }
 
-function comparePlaceholders(
-  baseLocale: string,
-  locale: string,
-  baseMessages: MessageMap,
-  localeMessages: MessageMap,
-): boolean {
+function comparePlaceholders(comparison: LocaleComparison): boolean {
+  const { baseLocale, locale, baseMessages, localeMessages } = comparison;
   const baseReports = collectPlaceholders(baseMessages);
   const localeReports = collectPlaceholders(localeMessages);
   let hasMismatch = false;
@@ -200,12 +203,14 @@ async function validateLocales(
   for (const filePath of comparisonFiles) {
     const locale = path.basename(filePath, '.ts');
     const localeMessages = await loadMessages(filePath);
-    hasMismatch =
-      compareMessageKeys(BASE_LOCALE, locale, baseMessages, localeMessages) ||
-      hasMismatch;
-    hasMismatch =
-      comparePlaceholders(BASE_LOCALE, locale, baseMessages, localeMessages) ||
-      hasMismatch;
+    const comparison: LocaleComparison = {
+      baseLocale: BASE_LOCALE,
+      locale,
+      baseMessages,
+      localeMessages,
+    };
+    hasMismatch = compareMessageKeys(comparison) || hasMismatch;
+    hasMismatch = comparePlaceholders(comparison) || hasMismatch;
   }
 
   return hasMismatch;
@@ -236,12 +241,14 @@ async function checkAllLocales(
   for (const filePath of comparisonFiles) {
     const locale = path.basename(filePath, '.ts');
     const localeMessages = await loadMessages(filePath);
-    hasMismatch =
-      compareMessageKeys(BASE_LOCALE, locale, baseMessages, localeMessages) ||
-      hasMismatch;
-    hasMismatch =
-      comparePlaceholders(BASE_LOCALE, locale, baseMessages, localeMessages) ||
-      hasMismatch;
+    const comparison: LocaleComparison = {
+      baseLocale: BASE_LOCALE,
+      locale,
+      baseMessages,
+      localeMessages,
+    };
+    hasMismatch = compareMessageKeys(comparison) || hasMismatch;
+    hasMismatch = comparePlaceholders(comparison) || hasMismatch;
   }
 
   if (hasMismatch) {
