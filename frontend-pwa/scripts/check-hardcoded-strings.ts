@@ -201,6 +201,97 @@ function shouldSkipNode(
   return directives.disabledLines.has(line);
 }
 
+/** Extract text content from a supported JSX attribute initializer. */
+function extractAttributeText(
+  initializer: ts.StringLiteral | ts.JsxExpression,
+): string | undefined {
+  if (ts.isStringLiteral(initializer)) {
+    return initializer.text;
+  }
+
+  if (
+    ts.isJsxExpression(initializer) &&
+    initializer.expression !== undefined &&
+    (ts.isStringLiteral(initializer.expression) ||
+      ts.isNoSubstitutionTemplateLiteral(initializer.expression))
+  ) {
+    return initializer.expression.text;
+  }
+
+  return undefined;
+}
+
+/** Visit JSX text nodes and record violations when they contain user-facing text. */
+function visitJsxText(
+  node: ts.JsxText,
+  filePath: string,
+  wordRegex: RegExp,
+  source: ts.SourceFile,
+  directives: LintDirectives,
+  results: Violation[],
+): void {
+  if (!wordRegex.test(node.text)) {
+    return;
+  }
+
+  if (isInsideTCall(node) || shouldSkipNode(node, source, directives)) {
+    return;
+  }
+
+  const { line, character } = source.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  results.push({
+    file: filePath,
+    line: line + 1,
+    column: character + 1,
+    text: node.text.trim().slice(0, 40),
+    kind: 'jsx-text',
+  });
+}
+
+/** Visit JSX attributes and record violations for hard-coded user-facing values. */
+function visitJsxAttribute(
+  node: ts.JsxAttribute,
+  filePath: string,
+  wordRegex: RegExp,
+  attrSet: Set<string>,
+  source: ts.SourceFile,
+  directives: LintDirectives,
+  results: Violation[],
+): void {
+  if (!node.initializer) {
+    return;
+  }
+
+  const attrName = ts.isIdentifier(node.name)
+    ? node.name.text
+    : node.name.getText();
+  if (!attrSet.has(attrName)) {
+    return;
+  }
+
+  const text = extractAttributeText(node.initializer);
+  if (text === undefined || !wordRegex.test(text)) {
+    return;
+  }
+
+  if (isInsideTCall(node) || shouldSkipNode(node, source, directives)) {
+    return;
+  }
+
+  const { line, character } = source.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+  results.push({
+    file: filePath,
+    line: line + 1,
+    column: character + 1,
+    text: text.slice(0, 40),
+    kind: 'attribute',
+  });
+}
+
 export function analyseFile(
   filePath: string,
   wordRegex: RegExp,
@@ -218,66 +309,21 @@ export function analyseFile(
   const directives = collectLintDirectives(sourceText, source);
 
   const visit = (node: ts.Node) => {
-    if (isIgnoredJsxElement(node)) {
-      return;
+    if (isIgnoredJsxElement(node)) return;
+    if (ts.isJsxText(node)) {
+      visitJsxText(node, filePath, wordRegex, source, directives, results);
     }
-
-    // 1. JsxText — raw text between JSX tags
-    if (ts.isJsxText(node) && wordRegex.test(node.text)) {
-      if (!isInsideTCall(node) && !shouldSkipNode(node, source, directives)) {
-        const { line, character } = source.getLineAndCharacterOfPosition(
-          node.getStart(),
-        );
-        results.push({
-          file: filePath,
-          line: line + 1,
-          column: character + 1,
-          text: node.text.trim().slice(0, 40),
-          kind: 'jsx-text',
-        });
-      }
+    if (ts.isJsxAttribute(node)) {
+      visitJsxAttribute(
+        node,
+        filePath,
+        wordRegex,
+        attrSet,
+        source,
+        directives,
+        results,
+      );
     }
-
-    // 2. JsxAttribute with a string literal in a user-facing attribute
-    if (ts.isJsxAttribute(node) && node.initializer) {
-      const attrName = ts.isIdentifier(node.name)
-        ? node.name.text
-        : node.name.getText();
-      if (attrSet.has(attrName)) {
-        const initializer = node.initializer;
-        let text: string | undefined;
-
-        if (ts.isStringLiteral(initializer)) {
-          text = initializer.text;
-        } else if (
-          ts.isJsxExpression(initializer) &&
-          initializer.expression !== undefined &&
-          (ts.isStringLiteral(initializer.expression) ||
-            ts.isNoSubstitutionTemplateLiteral(initializer.expression))
-        ) {
-          text = initializer.expression.text;
-        }
-
-        if (
-          text !== undefined &&
-          wordRegex.test(text) &&
-          !isInsideTCall(node) &&
-          !shouldSkipNode(node, source, directives)
-        ) {
-          const { line, character } = source.getLineAndCharacterOfPosition(
-            node.getStart(),
-          );
-          results.push({
-            file: filePath,
-            line: line + 1,
-            column: character + 1,
-            text: text.slice(0, 40),
-            kind: 'attribute',
-          });
-        }
-      }
-    }
-
     ts.forEachChild(node, visit);
   };
 

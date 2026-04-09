@@ -49,6 +49,15 @@ function extractStringLiteral(
   return null;
 }
 
+/** Return true when the node is a JSX `className` attribute with an initializer. */
+function isClassNameAttribute(node: ts.Node): node is ts.JsxAttribute {
+  return (
+    ts.isJsxAttribute(node) &&
+    node.name.text === 'className' &&
+    node.initializer != null
+  );
+}
+
 function analyseFile(
   filePath: string,
   maxLength: number,
@@ -64,11 +73,7 @@ function analyseFile(
   );
 
   const visit = (node: ts.Node) => {
-    if (
-      ts.isJsxAttribute(node) &&
-      node.name.text === 'className' &&
-      node.initializer
-    ) {
+    if (isClassNameAttribute(node)) {
       const literal = extractStringLiteral(node.initializer);
       if (literal) {
         const count = literal.trim().split(/\s+/u).filter(Boolean).length;

@@ -38,8 +38,18 @@ async function loadMessages(filePath: string): Promise<MessageMap> {
   return exports[0];
 }
 
+/**
+ * Return true when the value is a non-null object and not an array.
+ *
+ * @param value - Candidate value to inspect.
+ * @returns {value is Record<string, unknown>} Whether the value is a plain object candidate.
+ */
+function isNonArrayObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function isMessageMap(value: unknown): value is MessageMap {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isNonArrayObject(value)) {
     return false;
   }
 
@@ -134,7 +144,12 @@ function comparePlaceholders(
   return hasMismatch;
 }
 
-async function main(): Promise<void> {
+/**
+ * Resolve the locale file list after validating the locale directory.
+ *
+ * @returns {Promise<string[]>} Non-empty locale file list.
+ */
+async function resolveLocaleFiles(): Promise<string[]> {
   if (!fs.existsSync(LOCALES_DIR)) {
     console.error(`[locale-vars] No locale directory at ${LOCALES_DIR}`);
     process.exit(1);
@@ -146,6 +161,16 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  return localeFiles;
+}
+
+/**
+ * Resolve the base locale file from the discovered locale list.
+ *
+ * @param localeFiles - Locale files discovered under the locale directory.
+ * @returns {string} Base locale file path.
+ */
+function resolveBaseFile(localeFiles: string[]): string {
   const baseFile = localeFiles.find(
     (filePath) => path.basename(filePath, '.ts') === BASE_LOCALE,
   );
@@ -156,11 +181,49 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const baseMessages = await loadMessages(baseFile);
-  const comparisonFiles = localeFiles.filter(
-    (filePath) => filePath !== baseFile,
-  );
+  return baseFile;
+}
 
+/**
+ * Validate every non-base locale against the base locale catalogue.
+ *
+ * @param baseMessages - Message catalogue loaded from the base locale file.
+ * @param comparisonFiles - Locale files to compare against the base locale.
+ * @returns {Promise<boolean>} True when any mismatch is detected.
+ */
+async function validateLocales(
+  baseMessages: MessageMap,
+  comparisonFiles: string[],
+): Promise<boolean> {
+  let hasMismatch = false;
+
+  for (const filePath of comparisonFiles) {
+    const locale = path.basename(filePath, '.ts');
+    const localeMessages = await loadMessages(filePath);
+    hasMismatch =
+      compareMessageKeys(BASE_LOCALE, locale, baseMessages, localeMessages) ||
+      hasMismatch;
+    hasMismatch =
+      comparePlaceholders(BASE_LOCALE, locale, baseMessages, localeMessages) ||
+      hasMismatch;
+  }
+
+  return hasMismatch;
+}
+
+void validateLocales;
+
+/**
+ * Check every locale against the base catalogue and exit on mismatch.
+ *
+ * @param baseMessages - Message catalogue loaded from the base locale file.
+ * @param comparisonFiles - Locale files to compare against the base locale.
+ * @returns {Promise<void>}
+ */
+async function checkAllLocales(
+  baseMessages: MessageMap,
+  comparisonFiles: string[],
+): Promise<void> {
   if (comparisonFiles.length === 0) {
     console.log(
       '[locale-vars] Only the base locale is present; placeholder parity check skipped',
@@ -187,6 +250,16 @@ async function main(): Promise<void> {
   }
 
   console.log('[locale-vars] Locale catalogues match the base locale');
+}
+
+async function main(): Promise<void> {
+  const localeFiles = await resolveLocaleFiles();
+  const baseFile = resolveBaseFile(localeFiles);
+  const baseMessages = await loadMessages(baseFile);
+  const comparisonFiles = localeFiles.filter(
+    (filePath) => filePath !== baseFile,
+  );
+  await checkAllLocales(baseMessages, comparisonFiles);
 }
 
 await main();

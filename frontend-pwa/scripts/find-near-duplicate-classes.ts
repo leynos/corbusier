@@ -158,6 +158,17 @@ function shouldSuppress(
   );
 }
 
+/** Return true when the node is a JSX `className` attribute with an initializer. */
+function isClassNameAttribute(
+  node: ts.Node,
+): node is ts.JsxAttribute & { initializer: ts.JsxAttributeValue } {
+  return (
+    ts.isJsxAttribute(node) &&
+    node.name.text === 'className' &&
+    node.initializer !== undefined
+  );
+}
+
 function collectOccurrences(filePath: string): Occurrence[] {
   const sourceText = readFileSync(filePath, 'utf8');
   const source = ts.createSourceFile(
@@ -170,11 +181,7 @@ function collectOccurrences(filePath: string): Occurrence[] {
   const results: Occurrence[] = [];
 
   const visit = (node: ts.Node) => {
-    if (
-      ts.isJsxAttribute(node) &&
-      node.name.text === 'className' &&
-      node.initializer
-    ) {
+    if (isClassNameAttribute(node)) {
       const literal = extractStringLiteral(node.initializer);
       if (literal) {
         const tokens = normalizeTokens(literal);
