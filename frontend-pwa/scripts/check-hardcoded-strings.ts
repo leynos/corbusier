@@ -90,13 +90,19 @@ function getTsxFiles(): string[] {
   );
 }
 
+/**
+ * Return true when the configured minimum word length is valid.
+ *
+ * @param value Candidate minimum word length.
+ * @returns {boolean} Whether the value is a finite positive integer.
+ */
+function isValidMinLength(value: number): boolean {
+  return Number.isFinite(value) && Number.isInteger(value) && value >= 1;
+}
+
 /** Build the Unicode-aware word matcher used to detect literals. */
 export function buildWordRegex(minLength: number): RegExp {
-  if (
-    !Number.isFinite(minLength) ||
-    !Number.isInteger(minLength) ||
-    minLength < 1
-  ) {
+  if (!isValidMinLength(minLength)) {
     throw new TypeError('minLength must be a finite positive integer');
   }
 

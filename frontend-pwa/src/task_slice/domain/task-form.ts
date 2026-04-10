@@ -23,6 +23,16 @@ export const SUPPORTED_PROVIDERS: readonly IssueProvider[] = [
   'github',
   'gitlab',
 ];
+const ERROR_PRECEDENCE: readonly TaskCreateField[] = [
+  'provider',
+  'repository',
+  'issueNumber',
+  'title',
+  'description',
+  'labels',
+  'assignees',
+  'milestone',
+];
 
 export const initialTaskCreateDraft: TaskCreateDraft = {
   provider: SUPPORTED_PROVIDERS[0],
@@ -75,7 +85,14 @@ export function validateTaskCreateDraft(
  */
 function assertValidDraft(draft: TaskCreateDraft): void {
   const errors = validateTaskCreateDraft(draft);
-  const [firstError] = Object.values(errors);
+  let firstError: string | undefined;
+  for (const field of ERROR_PRECEDENCE) {
+    firstError = errors[field];
+    if (firstError !== undefined) {
+      break;
+    }
+  }
+
   if (firstError !== undefined) {
     throw new Error(firstError);
   }
