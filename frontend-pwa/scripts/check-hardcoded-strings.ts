@@ -69,15 +69,21 @@ function loadConfig(): HardcodedStringsConfig {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
   const config = JSON.parse(raw) as SemanticConfig;
   const section = config.hardcodedStrings;
+  const userFacingAttributes = Array.isArray(section?.userFacingAttributes)
+    ? section.userFacingAttributes.filter(
+        (attribute): attribute is string =>
+          typeof attribute === 'string' && attribute.trim().length > 0,
+      )
+    : [];
+
   return {
     minWordLength:
       Number.isFinite(section?.minWordLength) && section.minWordLength > 0
         ? Math.floor(section.minWordLength)
         : DEFAULTS.minWordLength,
     userFacingAttributes:
-      Array.isArray(section?.userFacingAttributes) &&
-      section.userFacingAttributes.length > 0
-        ? section.userFacingAttributes
+      userFacingAttributes.length > 0
+        ? userFacingAttributes
         : DEFAULTS.userFacingAttributes,
   };
 }
@@ -135,14 +141,36 @@ function isInsideTCall(node: ts.Node): boolean {
   return false;
 }
 
+/** Return true when `data-i18n-ignore` is enabled for a JSX attribute. */
+function isEnabledI18nIgnoreAttribute(attribute: ts.JsxAttribute): boolean {
+  if (attribute.initializer === undefined) {
+    return true;
+  }
+
+  if (
+    ts.isJsxExpression(attribute.initializer) &&
+    attribute.initializer.expression?.kind === ts.SyntaxKind.TrueKeyword
+  ) {
+    return true;
+  }
+
+  return (
+    ts.isStringLiteral(attribute.initializer) &&
+    attribute.initializer.text === 'true'
+  );
+}
+
 /** Detect `data-i18n-ignore` on an opening JSX element. */
 function hasI18nIgnoreAttribute(element: ts.JsxOpeningLikeElement): boolean {
   return element.attributes.properties.some((attribute) => {
-    if (!ts.isJsxAttribute(attribute)) {
+    if (
+      !ts.isJsxAttribute(attribute) ||
+      attribute.name.getText() !== 'data-i18n-ignore'
+    ) {
       return false;
     }
 
-    return attribute.name.getText() === 'data-i18n-ignore';
+    return isEnabledI18nIgnoreAttribute(attribute);
   });
 }
 
