@@ -91,15 +91,25 @@ export function buildWordRegex(minLength: number): RegExp {
   return new RegExp(`\\p{L}{${minLength},}`, 'u');
 }
 
+/**
+ * Return true when the node is a `t(...)` call expression.
+ *
+ * @param node Candidate AST node.
+ * @returns {boolean} Whether the node is a translation call expression.
+ */
+function isTCallExpression(node: ts.Node): boolean {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 't'
+  );
+}
+
 /** Return true when the node sits inside a `t(…)` call expression. */
 function isInsideTCall(node: ts.Node): boolean {
   let cursor = node.parent;
   while (cursor) {
-    if (
-      ts.isCallExpression(cursor) &&
-      ts.isIdentifier(cursor.expression) &&
-      cursor.expression.text === 't'
-    ) {
+    if (isTCallExpression(cursor)) {
       return true;
     }
     cursor = cursor.parent;
