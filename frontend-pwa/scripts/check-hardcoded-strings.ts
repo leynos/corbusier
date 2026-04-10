@@ -11,7 +11,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 
@@ -47,8 +48,9 @@ interface VisitContext {
   results: Violation[];
 }
 
-const CONFIG_PATH = 'tools/semantic-lint.config.json';
-const PROJECT_ROOT = process.cwd();
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = resolve(SCRIPT_DIR, '..');
+const CONFIG_PATH = resolve(PROJECT_ROOT, 'tools/semantic-lint.config.json');
 
 const DEFAULTS: HardcodedStringsConfig = {
   minWordLength: 2,
@@ -83,11 +85,21 @@ function loadConfig(): HardcodedStringsConfig {
 /** Return the TSX files scanned by this rule. */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
-  return Array.from(glob.scanSync(PROJECT_ROOT));
+  return Array.from(glob.scanSync(PROJECT_ROOT), (filePath) =>
+    resolve(PROJECT_ROOT, filePath),
+  );
 }
 
 /** Build the Unicode-aware word matcher used to detect literals. */
 export function buildWordRegex(minLength: number): RegExp {
+  if (
+    !Number.isFinite(minLength) ||
+    !Number.isInteger(minLength) ||
+    minLength < 1
+  ) {
+    throw new TypeError('minLength must be a finite positive integer');
+  }
+
   return new RegExp(`\\p{L}{${minLength},}`, 'u');
 }
 

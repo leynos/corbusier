@@ -19,9 +19,13 @@ export interface TaskCreateDraft {
 
 export type TaskCreateField = keyof TaskCreateDraft;
 export type TaskCreateErrors = Partial<Record<TaskCreateField, string>>;
+export const SUPPORTED_PROVIDERS: readonly IssueProvider[] = [
+  'github',
+  'gitlab',
+];
 
 export const initialTaskCreateDraft: TaskCreateDraft = {
-  provider: 'github',
+  provider: SUPPORTED_PROVIDERS[0],
   repository: '',
   issueNumber: '',
   title: '',
@@ -43,7 +47,7 @@ export function validateTaskCreateDraft(
 ): TaskCreateErrors {
   const errors: TaskCreateErrors = {};
 
-  if (!['github', 'gitlab'].includes(draft.provider)) {
+  if (!SUPPORTED_PROVIDERS.includes(draft.provider)) {
     errors.provider = 'Choose a supported provider.';
   }
 

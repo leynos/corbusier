@@ -1,7 +1,7 @@
 /**
  * @file Shared helpers for running `bun audit` and reasoning about advisories.
  *
- * These helpers centralise the JSON parsing and filtering logic used by the
+ * These helpers centralize the JSON parsing and filtering logic used by the
  * security validation scripts. They ensure both the security gate and
  * workspace-specific audit wrappers interpret the CLI output consistently.
  *
@@ -13,6 +13,17 @@ import { spawnSync } from 'node:child_process';
 
 const GHSA_PATTERN = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
 
+/**
+ * Extract a GHSA identifier from an advisory URL.
+ *
+ * @param {string} url
+ * @returns {string | null}
+ */
+function extractGhsaFromUrl(url) {
+  const match = url.match(GHSA_PATTERN);
+  return match ? match[0] : null;
+}
+
 function extractGithubAdvisoryId(advisory) {
   if (!advisory || typeof advisory !== 'object') {
     return null;
@@ -23,10 +34,7 @@ function extractGithubAdvisoryId(advisory) {
   }
 
   if (typeof advisory.url === 'string') {
-    const match = advisory.url.match(GHSA_PATTERN);
-    if (match) {
-      return match[0];
-    }
+    return extractGhsaFromUrl(advisory.url);
   }
 
   return null;
@@ -173,6 +181,19 @@ export function partitionAdvisoriesById(advisories, allowedIds) {
 }
 
 /**
+ * Format a single unexpected advisory for stderr output.
+ *
+ * @param {{ github_advisory_id?: string, title?: string, package?: string }} advisory
+ * @returns {string}
+ */
+function formatAdvisoryLine(advisory) {
+  const id = advisory.github_advisory_id ?? 'UNKNOWN';
+  const packageName = advisory.package ? ` (${advisory.package})` : '';
+  const suffix = advisory.title ? `: ${advisory.title}` : '';
+  return `- ${id}${packageName}${suffix}`;
+}
+
+/**
  * Report unexpected advisories to stderr.
  *
  * @param {Array<{ github_advisory_id?: string, title?: string, package?: string }>} unexpected
@@ -193,10 +214,7 @@ export function reportUnexpectedAdvisories(unexpected, heading) {
 
   console.error(heading);
   for (const advisory of unexpected) {
-    const id = advisory.github_advisory_id ?? 'UNKNOWN';
-    const packageName = advisory.package ? ` (${advisory.package})` : '';
-    const suffix = advisory.title ? `: ${advisory.title}` : '';
-    console.error(`- ${id}${packageName}${suffix}`);
+    console.error(formatAdvisoryLine(advisory));
   }
 
   return true;

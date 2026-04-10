@@ -1,6 +1,5 @@
 `<h2 className="$class" $attrs>$body</h2>` as $node where {
   or {
-    $class <: contains " ",
     $class <: contains "text-",
     $class <: contains "font-",
     $class <: contains "tracking-",

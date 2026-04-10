@@ -55,7 +55,7 @@ fmt: ## Format Rust and Markdown sources
 		find . \
 			\( -path '*/node_modules/*' -o -path '*/.venv/*' -o -path '*/target/*' \) -prune -o \
 			-type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdx' \) -print0 | \
-			xargs -0 markdownlint --fix; \
+			xargs -0 $(MDLINT) --fix; \
 	fi
 
 check-fmt: ## Verify formatting
