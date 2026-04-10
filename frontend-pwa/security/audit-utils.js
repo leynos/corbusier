@@ -56,7 +56,12 @@ export function runAuditJson() {
     throw result.error;
   }
 
-  const status = result.status ?? 0;
+  if (result.status === null) {
+    const signalSuffix = result.signal ? ` (signal: ${result.signal})` : '';
+    throw new Error(`bun audit did not exit normally${signalSuffix}`);
+  }
+
+  const status = result.status;
   const stdout = result.stdout ? result.stdout.trim() : '';
   if (!stdout) {
     return { json: {}, status };

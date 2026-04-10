@@ -64,16 +64,30 @@ export function validateTaskCreateDraft(
 }
 
 export function toCreateTaskRequest(draft: TaskCreateDraft): CreateTaskRequest {
+  if (!['github', 'gitlab'].includes(draft.provider)) {
+    throw new Error('Choose a supported provider.');
+  }
+
+  const repository = draft.repository.trim();
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) {
+    throw new Error('Use the repository format owner/repository.');
+  }
+
   const issueNumber = Number(draft.issueNumber);
   if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
     throw new Error('Issue number must be a positive integer.');
   }
 
+  const title = draft.title.trim();
+  if (title.length === 0) {
+    throw new Error('Title is required.');
+  }
+
   return {
     provider: draft.provider,
-    repository: draft.repository.trim(),
+    repository,
     issue_number: issueNumber,
-    title: draft.title.trim(),
+    title,
     description: normalizeOptionalString(draft.description),
     labels: normalizeOptionalList(draft.labels),
     assignees: normalizeOptionalList(draft.assignees),

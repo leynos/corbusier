@@ -7,6 +7,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+import { sharedAxeRules } from '../utils/shared-axe-rules';
+
 test.describe('Accessibility', () => {
   test('task create route has no accessibility violations', async ({
     page,
@@ -17,7 +19,9 @@ test.describe('Accessibility', () => {
       page.getByRole('heading', { name: 'Create task from issue metadata' }),
     ).toBeVisible();
 
-    const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .options({ rules: sharedAxeRules })
+      .analyze();
 
     expect(accessibilityScanResults.violations).toEqual([]);
   });

@@ -12208,7 +12208,7 @@ narrow:
 
 The shipped `4.4.1` path is fixture-first. See the
 [canonical execplan for roadmap `4.4.1`](./execplans/4-4-1-create-the-repository-owned-frontend-pwa.md)
- and the [users guide](./users-guide.md) for rollout and operator guidance.
+ and the [User's guide](./users-guide.md) for rollout and operator guidance.
 `frontend-pwa/` renders the task create route and task detail route against a
 fixture adapter that mirrors the current `POST /api/v1/tasks` and
 `GET /api/v1/tasks/{task_id}` contract. A stub HTTP adapter remains in place so

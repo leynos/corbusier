@@ -37,11 +37,16 @@ export function formatTaskState(
 }
 
 export function formatTimestamp(value: string, locale = 'en-GB') {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'UTC',
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export function formatBranchRef(branchRef?: BranchRef) {

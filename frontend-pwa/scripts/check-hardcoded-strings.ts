@@ -69,7 +69,7 @@ function loadConfig(): HardcodedStringsConfig {
   const section = config.hardcodedStrings;
   return {
     minWordLength:
-      typeof section?.minWordLength === 'number' && section.minWordLength > 0
+      Number.isFinite(section?.minWordLength) && section.minWordLength > 0
         ? Math.floor(section.minWordLength)
         : DEFAULTS.minWordLength,
     userFacingAttributes:

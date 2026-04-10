@@ -1,4 +1,5 @@
 or {
+  `<section className="grid" $attrs>$body</section>` as $node,
   `<section className="grid $rest" $attrs>$body</section>` as $node,
   `<section className="$rest grid" $attrs>$body</section>` as $node,
   `<section className="$pre grid $post" $attrs>$body</section>` as $node,
