@@ -1,0 +1,12 @@
+// Flag nav links only when they carry three or more layout or spacing utilities.
+`<nav $navAttrs>...<a className="$class" $attrs>$inner</a> as $link...</nav>` as $node where {
+  or {
+    and { $class <: contains "flex", $class <: contains "items-", $class <: contains "gap-" },
+    and { $class <: contains "flex", $class <: contains "justify-", $class <: contains "gap-" },
+    and { $class <: contains "px-", $class <: contains "py-", $class <: contains "gap-" },
+    and { $class <: contains "px-", $class <: contains "py-", $class <: contains "space-" },
+    and { $class <: contains "grid", $class <: contains "items-", $class <: contains "gap-" },
+    and { $class <: contains "mx-", $class <: contains "my-", $class <: contains "gap-" },
+  },
+  register_diagnostic(span=$link, message="Navigation link uses 3+ inline utilities. Extract a semantic class to reduce repetition.")
+}

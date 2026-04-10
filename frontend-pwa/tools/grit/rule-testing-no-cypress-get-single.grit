@@ -1,0 +1,3 @@
+`cy.$method('[data-testid=$id]')` as $node where { $method <: `get`,
+  register_diagnostic($method, message="[test/no-testid-selectors] Prefer accessible locators before falling back to data-testid.")
+}

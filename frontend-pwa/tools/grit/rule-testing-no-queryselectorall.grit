@@ -1,0 +1,3 @@
+`$recv.querySelectorAll($arg)` as $node where {
+  register_diagnostic($node, message="[test/no-dom-selectors] Use Testing Library queries instead of querySelectorAll.")
+}

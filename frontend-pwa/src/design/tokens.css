@@ -1,0 +1,14 @@
+:root {
+  --corbusier-canvas: rgb(247 244 237);
+  --corbusier-surface: rgb(255 253 248);
+  --corbusier-surface-strong: rgb(239 229 210);
+  --corbusier-ink: rgb(27 23 18);
+  --corbusier-muted: rgb(96 87 76);
+  --corbusier-border: rgb(216 203 181);
+  --corbusier-accent: rgb(0 90 89);
+  --corbusier-accent-soft: rgb(213 236 231);
+  --corbusier-warn: rgb(157 58 15);
+  --corbusier-warn-soft: rgb(249 223 210);
+  --corbusier-shadow: color-mix(in srgb, var(--corbusier-ink) 15%, transparent);
+  --corbusier-radius: 1.2rem;
+}

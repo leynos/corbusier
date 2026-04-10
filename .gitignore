@@ -1,3 +1,6 @@
 target/
 **/*.rs.bk
 .grepai/
+frontend-pwa/node_modules/
+frontend-pwa/playwright-report/
+frontend-pwa/test-results/

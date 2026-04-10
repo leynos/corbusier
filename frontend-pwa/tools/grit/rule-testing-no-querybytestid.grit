@@ -1,0 +1,4 @@
+`$recv.$method($arg)` as $node where {
+  $method <: `queryByTestId`,
+  register_diagnostic($method, message="[test/no-testid-selectors] Prefer accessible queries (queryByRole/Label/Placeholder/Alt/Title). Using *ByTestId requires an ACCESSIBILITY justification.")
+}

@@ -10302,9 +10302,9 @@ mapping is `PreTurn` -> `TurnStart`, `PostTurn` -> `TurnEnd`, `PreToolCall` ->
 Post-event triggers (`PostCommit`, `PostMerge`, `PostPull`, `PostPush`,
 `PostDeploy`) are observational: they share the same payload shape as their
 pre-event counterpart plus an `outcome: String` field and do not gate workflow
-progression. A 5 s default timeout applies; on timeout the result is
-discarded. Resume is unsupported for all post-event triggers because they do
-not gate workflow progression.
+progression. A 5 s default timeout applies; on timeout the result is discarded.
+Resume is unsupported for all post-event triggers because they do not gate
+workflow progression.
 
 ###### Multi-Layer Policy Enforcement
 
@@ -12171,19 +12171,49 @@ enterprise systems.
 
 ##### Frontend Technology Stack
 
-| Technology   | Version | Purpose                      | Justification                                      |
-| ------------ | ------- | ---------------------------- | -------------------------------------------------- |
-| React        | 18.x    | Component-based UI framework | Industry standard for complex dashboards           |
-| TypeScript   | 5.x     | Type-safe JavaScript         | Enhanced developer experience and error prevention |
-| Tailwind CSS | 3.x     | Utility-first CSS framework  | Rapid UI development with consistent design        |
-| React Query  | 4.x     | Server state management      | Efficient data fetching and caching                |
-| Recharts     | 2.x     | Data visualization           | Real-time metrics and performance charts           |
+Table 7.1.2.1: Repository-owned frontend PWA technology stack.
+
+| Technology      | Version | Purpose                              | Justification                                         |
+| --------------- | ------- | ------------------------------------ | ----------------------------------------------------- |
+| React           | 19.x    | Component-based UI framework         | Baseline stack for the repository-owned PWA           |
+| TypeScript      | 5.x     | Type-safe JavaScript                 | Enhanced developer experience and error prevention    |
+| TanStack Router | 1.x     | Typed route structure                | Keeps route modules explicit without custom framework |
+| TanStack Query  | 5.x     | Server state management              | Efficient data fetching and mutation flows            |
+| Tailwind CSS    | 4.x     | Utility-first CSS framework          | Rapid UI development with consistent design           |
+| DaisyUI         | 5.x     | Themeable component primitives       | Speeds up shell delivery for the first task slice     |
+| Bun             | 1.x     | Workspace package manager and runner | Keeps frontend tooling self-contained in-repo         |
 
 ##### Backend Integration
 
 The UI communicates with Corbusier's core through the HTTP API layer built on
 Actix Web, leveraging extensive community-built connectors, monitoring
 dashboards, and scalability across cloud and on-prem environments.
+
+#### 7.1.3 Repository-owned frontend workspace boundary
+
+Roadmap item `4.4.1` establishes a repository-owned `frontend-pwa/` workspace
+for the first browser-facing vertical slice. The workspace is intentionally
+narrow:
+
+- app shell, providers, localization runtime, and design tokens live in
+  `frontend-pwa/src/app`, `frontend-pwa/src/i18n`, and
+  `frontend-pwa/src/design`;
+- pure task types, validation helpers, and view-model mapping live in
+  `frontend-pwa/src/task_slice/domain`;
+- slice-owned ports live in `frontend-pwa/src/task_slice/ports`;
+- fixture-backed and future HTTP adapters live in
+  `frontend-pwa/src/task_slice/adapters`;
+- route modules depend on ports and query wiring rather than embedding raw
+  transport mapping inside React components.
+
+The shipped `4.4.1` path is fixture-first. See the
+[canonical execplan for roadmap `4.4.1`](./execplans/4-4-1-create-the-repository-owned-frontend-pwa.md)
+ and the [User's guide](./users-guide.md) for rollout and operator guidance.
+`frontend-pwa/` renders the task create route and task detail route against a
+fixture adapter that mirrors the current `POST /api/v1/tasks` and
+`GET /api/v1/tasks/{task_id}` contract. A stub HTTP adapter remains in place so
+roadmap item `4.4.2` can attach the live transport seam without restructuring
+the route shell.
 
 ### 7.2 Core UI Use Cases
 

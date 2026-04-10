@@ -1,0 +1,13 @@
+`<span className=$class>$body</span>` as $node where {
+  or {
+    $class <: `btn`,
+    $class <: `btn $rest`,
+    $class <: `$rest btn`,
+    $class <: `$pre btn $post`,
+    $class <: `btn-$variant`,
+    $class <: `btn-$variant $rest`,
+    $class <: `$rest btn-$variant`,
+    $class <: `$pre btn-$variant $post`,
+  },
+  register_diagnostic(span=$class, message="[daisyui/semantic-btn] Apply DaisyUI 'btn' to a <button> or <a>, not a <span>.")
+}

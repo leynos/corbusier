@@ -1,0 +1,3 @@
+`$page.$method('[data-testid=$id]')` as $node where { $method <: `locator`,
+  register_diagnostic($method, message="[test/no-testid-selectors] Prefer page.getByRole or page.getByLabelText before falling back to data-testid.")
+}

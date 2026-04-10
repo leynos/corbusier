@@ -1,0 +1,63 @@
+/**
+ * English (Great Britain) translation catalogue for the frontend PWA.
+ *
+ * The runtime provider loads these keys as the default locale and components
+ * should treat this file as the canonical fallback message set.
+ */
+export const enGbMessages = {
+  'app.title': 'Corbusier',
+  'app.subtitle': 'Repository-owned task intake shell',
+  'app.nav.newTask': 'New task',
+  'app.nav.seedDetail': 'Seed detail',
+  'task.intake.kicker': 'Task intake',
+  'task.create.title': 'Create task from issue metadata',
+  'task.create.description':
+    'This fixture-backed slice mirrors the live task contract without coupling to backend auth or mutations yet.',
+  'task.form.provider': 'Provider',
+  'task.form.provider.github': 'GitHub',
+  'task.form.provider.gitlab': 'GitLab',
+  'task.form.repository': 'Repository',
+  'task.form.repository.placeholder': 'owner/repository',
+  'task.form.issueNumber': 'Issue number',
+  'task.form.issueNumber.placeholder': '42',
+  'task.form.title': 'Title',
+  'task.form.title.placeholder': 'Fix login flow',
+  'task.form.description': 'Description',
+  'task.form.description.placeholder': 'Optional issue synopsis',
+  'task.form.labels': 'Labels',
+  'task.form.labels.placeholder': 'bug, p1',
+  'task.form.assignees': 'Assignees',
+  'task.form.assignees.placeholder': 'alice, bob',
+  'task.form.milestone': 'Milestone',
+  'task.form.milestone.placeholder': 'sprint-12',
+  'task.form.submit': 'Create task',
+  'task.form.submitting': 'Creating task…',
+  'task.state.draft': 'Draft',
+  'task.state.in_progress': 'In progress',
+  'task.state.in_review': 'In review',
+  'task.state.paused': 'Paused',
+  'task.state.done': 'Done',
+  'task.state.abandoned': 'Abandoned',
+  'task.detail.title': 'Task detail',
+  'task.detail.taskId': 'Task ID',
+  'task.detail.origin': 'Origin',
+  'task.detail.created': 'Created',
+  'task.detail.updated': 'Updated',
+  'task.detail.branchRef': 'Branch reference',
+  'task.detail.pullRequestRef': 'Pull request reference',
+  'task.detail.description': 'Description',
+  'task.detail.notFound': 'Task not found',
+  'task.detail.notFoundBody':
+    'No fixture task matched this identifier. The live transport seam lands in roadmap item 4.4.2.',
+  'task.detail.notFoundAction': 'Return to task creation',
+  'task.detail.loading': 'Loading task',
+  'task.detail.error': 'Something went wrong loading the task.',
+  'task.refs.branch.empty':
+    'No branch linked yet. Live association lands in roadmap item 4.4.4.',
+  'task.refs.pr.empty':
+    'No pull request linked yet. Live association lands in roadmap item 4.4.4.',
+  'task.form.errorBanner':
+    'The fixture gateway rejected this submission. Adjust the input and retry.',
+};
+
+export type MessageKey = keyof typeof enGbMessages;

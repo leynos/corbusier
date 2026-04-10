@@ -1,0 +1,31 @@
+{
+  "maxClasslistLength": 16,
+  "allowProjectPrefixes": [
+    "app-",
+    "page-",
+    "layout-",
+    "shell-",
+    "form-",
+    "nav__",
+    "btn",
+    "card"
+  ],
+  "nearDuplicateClasses": {
+    "minTokenCount": 4,
+    "maxJaccardDistance": 0.2,
+    "minOccurrences": 2,
+    "suppressPrefixes": ["prose-", "wysiwyg-"],
+    "failOnViolation": false
+  },
+  "hardcodedStrings": {
+    "minWordLength": 2,
+    "userFacingAttributes": [
+      "aria-label",
+      "aria-description",
+      "aria-placeholder",
+      "placeholder",
+      "title",
+      "alt"
+    ]
+  }
+}

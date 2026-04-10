@@ -1,0 +1,12 @@
+`<h2 className="$class" $attrs>$body</h2>` as $node where {
+  or {
+    $class <: contains "text-",
+    $class <: contains "font-",
+    $class <: contains "tracking-",
+    $class <: contains "leading-",
+    $class <: `uppercase`,
+    $class <: `lowercase`,
+    $class <: `capitalize`,
+  },
+  register_diagnostic(span=$node, message="Heading uses inline utilities. Extract a semantic heading class and reuse it.")
+}
