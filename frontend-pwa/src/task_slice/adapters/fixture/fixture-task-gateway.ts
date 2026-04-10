@@ -1,3 +1,9 @@
+/**
+ * Implement a deterministic in-memory task gateway for tests and local runs.
+ *
+ * This module exports `createFixtureTaskGateway` plus fixture ids used to
+ * simulate seeded and not-found task states without live backend traffic.
+ */
 import type { CreateTaskRequest, Task } from '../../domain/task';
 import {
   TaskGatewayError,

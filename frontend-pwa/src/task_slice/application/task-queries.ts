@@ -1,3 +1,9 @@
+/**
+ * Provide React Query hooks for task creation and task detail reads.
+ *
+ * This module encapsulates query and mutation wiring so UI modules consume
+ * stable task hooks instead of raw gateway calls.
+ */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { CreateTaskRequest } from '../domain/task';

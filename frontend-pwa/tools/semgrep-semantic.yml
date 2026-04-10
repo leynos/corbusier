@@ -39,4 +39,4 @@ rules:
     message: "Avoid data-testid attributes. Prefer accessible roles, names, or labels."
     languages: [javascript, typescript, html]
     severity: ERROR
-    pattern-regex: "data-testid"
+    pattern-regex: "\\bdata-testid\\b\\s*="

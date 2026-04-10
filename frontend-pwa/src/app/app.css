@@ -5,8 +5,21 @@
 :root {
   color: var(--corbusier-ink);
   background:
-    radial-gradient(circle at top left, rgb(213 236 231 / 60%), transparent 35%),
-    linear-gradient(180deg, var(--corbusier-canvas), rgb(240 235 224) 100%);
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--corbusier-accent-soft) 60%, transparent),
+      transparent 35%
+    ),
+    linear-gradient(
+      180deg,
+      var(--corbusier-canvas),
+      color-mix(
+          in srgb,
+          var(--corbusier-canvas) 70%,
+          var(--corbusier-surface-strong)
+        )
+        100%
+    );
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
 }
 
@@ -49,15 +62,16 @@ body {
 }
 
 .app-header {
-  border-bottom: 1px solid rgb(216 203 181 / 70%);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--corbusier-border) 70%, transparent);
   backdrop-filter: blur(10px);
-  background: rgb(247 244 237 / 80%);
+  background: color-mix(in srgb, var(--corbusier-canvas) 80%, transparent);
 }
 
 .hero-panel,
 .surface-panel {
-  border: 1px solid rgb(216 203 181 / 80%);
-  background: rgb(255 253 248 / 92%);
+  border: 1px solid color-mix(in srgb, var(--corbusier-border) 80%, transparent);
+  background: color-mix(in srgb, var(--corbusier-surface) 92%, transparent);
   box-shadow: 0 1rem 3rem -2rem var(--corbusier-shadow);
 }
 

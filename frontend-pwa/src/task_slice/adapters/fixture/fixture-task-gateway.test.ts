@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the fixture task gateway used by local development and tests.
+ *
+ * The suite validates `createFixtureTaskGateway` success paths and
+ * `TaskGatewayError` surfaces for unavailable and not-found scenarios.
+ */
 import { TaskGatewayError } from '../../ports/task-slice-gateway';
 import { createFixtureTaskGateway } from './fixture-task-gateway';
 

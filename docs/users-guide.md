@@ -565,6 +565,9 @@ make frontend-install
 make frontend-dev
 ```
 
+For installation conventions and consumer-facing configuration guidance, see
+the [Whitaker user's guide](./whitaker-users-guide.md).
+
 The development server listens on `http://127.0.0.1:4173`.
 
 Current routes:

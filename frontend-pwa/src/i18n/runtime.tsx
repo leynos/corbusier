@@ -1,3 +1,9 @@
+/**
+ * Implement the lightweight i18n runtime for the frontend PWA.
+ *
+ * This module provides the locale context, translation lookup function, and
+ * `useI18n` hook consumed by route and component modules.
+ */
 import { createContext, type PropsWithChildren, useContext } from 'react';
 
 import { enGbMessages, type MessageKey } from './en-gb';

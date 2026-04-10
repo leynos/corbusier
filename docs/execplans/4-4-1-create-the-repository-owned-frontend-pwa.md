@@ -418,15 +418,19 @@ commands all reflect the shipped behaviour.
 
 ## Concrete steps
 
-All commands should run from repository root: `/home/user/project`.
+All commands should run from the repository root.
 
 Planned repository-owned commands and gates for this milestone:
 
 ```bash
 set -o pipefail; make frontend-install 2>&1 | tee /tmp/4-4-1-frontend-install.log
+set -o pipefail; make frontend-audit 2>&1 | tee /tmp/4-4-1-frontend-audit.log
 set -o pipefail; make frontend-lint 2>&1 | tee /tmp/4-4-1-frontend-lint.log
 set -o pipefail; make frontend-typecheck 2>&1 | tee /tmp/4-4-1-frontend-typecheck.log
 set -o pipefail; make frontend-test 2>&1 | tee /tmp/4-4-1-frontend-test.log
+set -o pipefail; make frontend-test-a11y 2>&1 | tee /tmp/4-4-1-frontend-test-a11y.log
+set -o pipefail; make frontend-localizability 2>&1 | tee /tmp/4-4-1-frontend-localizability.log
+set -o pipefail; make frontend-semantic 2>&1 | tee /tmp/4-4-1-frontend-semantic.log
 set -o pipefail; make frontend-e2e 2>&1 | tee /tmp/4-4-1-frontend-e2e.log
 set -o pipefail; make fmt 2>&1 | tee /tmp/4-4-1-fmt.log
 set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/4-4-1-markdownlint.log

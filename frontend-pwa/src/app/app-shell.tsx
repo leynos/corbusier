@@ -1,6 +1,14 @@
+/**
+ * Provide the shared application shell layout and route entry links.
+ *
+ * This module exports the shell component that localizes the heading and
+ * renders route content through `Outlet` alongside stable navigation anchors.
+ */
 import { Link, Outlet } from '@tanstack/react-router';
 
 import { useI18n } from '../i18n/runtime';
+
+const SEED_TASK_ID = '9f6adf0b-4908-47f5-a1fd-27d65f7d84bf';
 
 export function AppShell() {
   const { t } = useI18n();
@@ -20,7 +28,7 @@ export function AppShell() {
             <Link
               className="app-shell__nav-link"
               to="/tasks/$taskId"
-              params={{ taskId: '9f6adf0b-4908-47f5-a1fd-27d65f7d84bf' }}
+              params={{ taskId: SEED_TASK_ID }}
             >
               {t('app.nav.seedDetail')}
             </Link>

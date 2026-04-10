@@ -1,3 +1,9 @@
+/**
+ * Define the TanStack Router configuration for the frontend PWA.
+ *
+ * This module composes the root shell and task routes, then exports the router
+ * factory consumed by the application bootstrap path.
+ */
 import {
   createRootRoute,
   createRoute,

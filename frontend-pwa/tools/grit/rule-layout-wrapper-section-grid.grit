@@ -1,3 +1,7 @@
-`<section className="grid $rest" $attrs>$body</section>` as $node where {
+or {
+  `<section className="grid $rest" $attrs>$body</section>` as $node,
+  `<section className="$rest grid" $attrs>$body</section>` as $node,
+  `<section className="$pre grid $post" $attrs>$body</section>` as $node,
+} where {
   register_diagnostic(span=$node, message="Layout-only wrapper detected. Extract a named layout class such as `.stack` or `.cluster`.")
 }

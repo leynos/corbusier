@@ -1,3 +1,9 @@
+/**
+ * Configure Playwright end-to-end runs for the repository-owned frontend PWA.
+ *
+ * This module exports the default browser test configuration, including device
+ * presets and the local Vite web-server contract used by CI and local runs.
+ */
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({

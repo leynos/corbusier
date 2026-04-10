@@ -1,3 +1,10 @@
+/**
+ * Define the HTTP task gateway adapter boundary for future live transport work.
+ *
+ * The module exports `createHttpTaskGateway`, which already satisfies the
+ * `TaskSliceGateway` contract while signalling that live HTTP wiring remains
+ * deferred to roadmap item `4.4.2`.
+ */
 import type { CreateTaskRequest, Task } from '../../domain/task';
 import {
   TaskGatewayError,

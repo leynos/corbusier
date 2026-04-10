@@ -1,3 +1,11 @@
+/**
+ * @file Detect repeated and near-duplicate class stacks across TSX source.
+ *
+ * The script scans frontend `src/` TSX files, normalizes `className` literals,
+ * and emits
+ * diagnostics for exact or Jaccard-similar utility stacks so semantic classes
+ * can be extracted before duplication spreads.
+ */
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
@@ -327,4 +335,6 @@ function main(): void {
   }
 }
 
-main();
+if (import.meta.main) {
+  main();
+}

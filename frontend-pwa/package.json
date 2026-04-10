@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
-    "@biomejs/biome": "^2.2.4",
+    "@biomejs/biome": "^2.4.10",
     "@getgrit/cli": "^0.1.0-alpha.1743007075",
     "@testing-library/dom": "^10.4.1",
     "@playwright/test": "^1.56.0",

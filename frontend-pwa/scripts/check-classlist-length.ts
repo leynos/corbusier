@@ -1,3 +1,12 @@
+/**
+ * @file Lint script that enforces a configurable maximum `className` length in
+ * TSX source.
+ *
+ * The script scans JSX attributes in frontend `src/` TSX files, reads
+ * `SemanticConfig.maxClasslistLength` from `tools/semantic-lint.config.json`,
+ * and emits `file:line:column` diagnostics before exiting non-zero when any
+ * class list exceeds the configured threshold.
+ */
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 

@@ -1,3 +1,9 @@
+/**
+ * Configure Vitest for accessibility-focused frontend test runs.
+ *
+ * This module exports the a11y-specific configuration consumed by
+ * `vitest --config vitest.a11y.config.ts`.
+ */
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({

@@ -1,3 +1,9 @@
+/**
+ * Render the task creation route and own its local form workflow.
+ *
+ * This module manages draft state, validation, submission through
+ * `useCreateTaskMutation`, localized copy, and post-success navigation.
+ */
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
 

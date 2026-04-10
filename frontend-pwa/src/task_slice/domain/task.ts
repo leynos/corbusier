@@ -1,3 +1,9 @@
+/**
+ * Shared task-slice domain contract used by adapters, hooks, and UI modules.
+ *
+ * The types in this module define task state, issue and review references, and
+ * request/view-model contracts that should remain stable across slice layers.
+ */
 export type TaskState =
   | 'draft'
   | 'in_progress'

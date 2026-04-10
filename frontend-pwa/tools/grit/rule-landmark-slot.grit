@@ -1,3 +1,11 @@
 `<nav $navAttrs>...<a className="$class" $attrs>$inner</a>...</nav>` as $node where {
+  or {
+    $class <: contains "px-",
+    $class <: contains "py-",
+    $class <: contains "mx-",
+    $class <: contains "my-",
+    $class <: contains "flex",
+    $class <: contains "gap-",
+  },
   register_diagnostic(span=$node, message="Navigation link candidate found. Extract a semantic class instead of repeating inline utilities.")
 }

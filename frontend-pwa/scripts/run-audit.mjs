@@ -78,6 +78,9 @@ function getLedgerExpiryError(entry, advisoryId, referenceDateValue) {
   }
 
   const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+  // `dateOnlyPattern` detects YYYY-MM-DD values in `rawExpiry`; when matched,
+  // `DAY_MS` is added to `expiryDate` so `expiryBoundary` treats the date as
+  // inclusive through the end of that day before comparison to `referenceDateValue`.
   const expiryBoundary = dateOnlyPattern.test(rawExpiry)
     ? expiryDate.getTime() + DAY_MS
     : expiryDate.getTime();

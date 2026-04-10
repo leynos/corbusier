@@ -1,3 +1,9 @@
+/**
+ * Bootstrap the repository-owned frontend PWA.
+ *
+ * This entrypoint wires the router, providers, and fixture task gateway before
+ * mounting the React tree into the root DOM element for local and CI runs.
+ */
 import { RouterProvider } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
 

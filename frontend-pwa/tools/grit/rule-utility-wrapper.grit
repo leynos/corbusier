@@ -1,3 +1,8 @@
-`<div className="$classA" $attrsA><div className="$classB" $attrsB>$body</div></div>` as $node where {
+or {
+  `<div className="$classA"><div className="$classB">$body</div></div>` as $node,
+  `<div className="$classA"><span className="$classB">$body</span></div>` as $node,
+  `<span className="$classA"><div className="$classB">$body</div></span>` as $node,
+  `<span className="$classA"><span className="$classB">$body</span></span>` as $node,
+} where {
   register_diagnostic(span=$node, message="Nested utility-only wrappers detected. Extract a named container class via @apply.")
 }

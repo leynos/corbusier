@@ -1,3 +1,9 @@
+/**
+ * End-to-end Playwright coverage for the fixture-backed task flow.
+ *
+ * The suite exercises create, validation, and not-found states, including the
+ * seeded missing-task fixture exported by the fixture gateway module.
+ */
 import { expect, test } from '@playwright/test';
 
 import { fixtureNotFoundTaskId } from '../../src/task_slice/adapters/fixture/fixture-task-gateway';

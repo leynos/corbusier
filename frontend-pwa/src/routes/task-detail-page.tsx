@@ -1,3 +1,9 @@
+/**
+ * Render the task detail route for the current task identifier.
+ *
+ * This route reads the task id from the URL, loads task detail through React
+ * Query, and localizes the visible loading and error states.
+ */
 import { useParams } from '@tanstack/react-router';
 
 import { useI18n } from '../i18n/runtime';
@@ -29,9 +35,10 @@ export function TaskDetailPage() {
   }
 
   if (query.error) {
+    console.error(query.error);
     return (
       <div className="alert alert-error" role="alert">
-        <span>{query.error.message}</span>
+        <span>{t('task.detail.error')}</span>
       </div>
     );
   }

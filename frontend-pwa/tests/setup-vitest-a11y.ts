@@ -1,3 +1,9 @@
+/**
+ * Configure Vitest accessibility setup for the frontend PWA test suite.
+ *
+ * This module installs jest-dom and axe matchers plus the DOM shims required
+ * by accessibility-focused component tests.
+ */
 import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/dom';
 import { cleanup } from '@testing-library/react';

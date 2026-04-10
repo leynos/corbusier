@@ -1,3 +1,9 @@
+/**
+ * Format task domain values into UI-friendly view models.
+ *
+ * This module keeps route and component code small by centralizing formatting
+ * for task state labels, timestamps, and branch or pull-request references.
+ */
 import type {
   BranchRef,
   PullRequestRef,
@@ -7,6 +13,16 @@ import type {
 } from './task';
 
 type TaskStateMessageKey = `task.state.${TaskState}`;
+type TaskStateTone = TaskStateViewModel['tone'];
+
+const toneMap: Record<TaskState, TaskStateTone> = {
+  draft: 'steady',
+  in_progress: 'steady',
+  in_review: 'steady',
+  paused: 'warning',
+  done: 'steady',
+  abandoned: 'warning',
+};
 
 export function formatIssueOrigin(origin: TaskOrigin) {
   const issueRef = origin.issue_ref;
@@ -17,20 +33,7 @@ export function formatTaskState(
   state: TaskState,
   t: (key: TaskStateMessageKey) => string,
 ): TaskStateViewModel {
-  switch (state) {
-    case 'draft':
-      return { label: t('task.state.draft'), tone: 'steady' };
-    case 'in_progress':
-      return { label: t('task.state.in_progress'), tone: 'steady' };
-    case 'in_review':
-      return { label: t('task.state.in_review'), tone: 'steady' };
-    case 'paused':
-      return { label: t('task.state.paused'), tone: 'warning' };
-    case 'done':
-      return { label: t('task.state.done'), tone: 'steady' };
-    case 'abandoned':
-      return { label: t('task.state.abandoned'), tone: 'warning' };
-  }
+  return { label: t(`task.state.${state}`), tone: toneMap[state] };
 }
 
 export function formatTimestamp(value: string, locale = 'en-GB') {

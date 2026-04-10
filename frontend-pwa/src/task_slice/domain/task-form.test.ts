@@ -1,3 +1,9 @@
+/**
+ * Unit tests for the task form helper functions.
+ *
+ * The suite covers `splitDelimitedValues`, `validateTaskCreateDraft`, and
+ * `toCreateTaskRequest` so draft parsing stays stable for the route layer.
+ */
 import {
   splitDelimitedValues,
   toCreateTaskRequest,
@@ -51,5 +57,20 @@ describe('task form helpers', () => {
       assignees: ['alice'],
       milestone: 'sprint-12',
     });
+  });
+
+  it('rejects invalid issue numbers before building a request', () => {
+    expect(() =>
+      toCreateTaskRequest({
+        provider: 'github',
+        repository: 'acme/widgets',
+        issueNumber: 'NaN',
+        title: 'Fix login flow',
+        description: '',
+        labels: '',
+        assignees: '',
+        milestone: '',
+      }),
+    ).toThrow('Issue number must be a positive integer.');
   });
 });

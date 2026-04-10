@@ -1,3 +1,9 @@
+/**
+ * Define task-create draft state and conversion helpers for the route layer.
+ *
+ * `TaskCreateDraft` models form-local strings while this module validates and
+ * converts them into the domain `CreateTaskRequest` contract.
+ */
 import type { CreateTaskRequest, IssueProvider } from './task';
 
 export interface TaskCreateDraft {
@@ -58,10 +64,15 @@ export function validateTaskCreateDraft(
 }
 
 export function toCreateTaskRequest(draft: TaskCreateDraft): CreateTaskRequest {
+  const issueNumber = Number(draft.issueNumber);
+  if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+    throw new Error('Issue number must be a positive integer.');
+  }
+
   return {
     provider: draft.provider,
     repository: draft.repository.trim(),
-    issue_number: Number(draft.issueNumber),
+    issue_number: issueNumber,
     title: draft.title.trim(),
     description: normalizeOptionalString(draft.description),
     labels: normalizeOptionalList(draft.labels),

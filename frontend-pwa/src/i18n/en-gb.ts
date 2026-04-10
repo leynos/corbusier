@@ -1,3 +1,9 @@
+/**
+ * English (Great Britain) translation catalogue for the frontend PWA.
+ *
+ * The runtime provider loads these keys as the default locale and components
+ * should treat this file as the canonical fallback message set.
+ */
 export const enGbMessages = {
   'app.title': 'Corbusier',
   'app.subtitle': 'Repository-owned task intake shell',
@@ -45,6 +51,7 @@ export const enGbMessages = {
     'No fixture task matched this identifier. The live transport seam lands in roadmap item 4.4.2.',
   'task.detail.notFoundAction': 'Return to task creation',
   'task.detail.loading': 'Loading task',
+  'task.detail.error': 'Something went wrong loading the task.',
   'task.refs.branch.empty':
     'No branch linked yet. Live association lands in roadmap item 4.4.4.',
   'task.refs.pr.empty':

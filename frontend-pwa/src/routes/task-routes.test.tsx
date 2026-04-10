@@ -1,3 +1,9 @@
+/**
+ * Integration tests for the task route flow in the repository-owned PWA.
+ *
+ * These tests render the app shell with fixture utilities and assert the
+ * create, validation, and not-found route behaviours.
+ */
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fixtureNotFoundTaskId } from '../task_slice/adapters/fixture/fixture-task-gateway';

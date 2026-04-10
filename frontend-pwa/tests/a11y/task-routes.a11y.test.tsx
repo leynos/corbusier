@@ -1,3 +1,9 @@
+/**
+ * Accessibility tests for the task route pages.
+ *
+ * The suite renders fixture-backed routes with `renderApp` and asserts zero
+ * automated axe violations via the shared `axe` helper.
+ */
 import { renderApp } from '../../src/test/test-utils';
 import { axe } from '../utils/axe';
 

@@ -1,3 +1,9 @@
+/**
+ * Playwright accessibility checks for the task creation route.
+ *
+ * The suite uses `AxeBuilder` against the fixture-backed UI and asserts that
+ * the task create page exposes no automated accessibility violations.
+ */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -6,7 +12,10 @@ test.describe('Accessibility', () => {
     page,
   }) => {
     await page.goto('/tasks/new');
-    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/tasks\/new$/);
+    await expect(
+      page.getByRole('heading', { name: 'Create task from issue metadata' }),
+    ).toBeVisible();
 
     const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
 

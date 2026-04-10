@@ -12171,6 +12171,8 @@ enterprise systems.
 
 ##### Frontend Technology Stack
 
+Table 7.1.2.1: Repository-owned frontend PWA technology stack.
+
 | Technology      | Version | Purpose                              | Justification                                         |
 | --------------- | ------- | ------------------------------------ | ----------------------------------------------------- |
 | React           | 19.x    | Component-based UI framework         | Baseline stack for the repository-owned PWA           |
@@ -12204,11 +12206,14 @@ narrow:
 - route modules depend on ports and query wiring rather than embedding raw
   transport mapping inside React components.
 
-The shipped `4.4.1` path is fixture-first. `frontend-pwa/` renders the task
-create route and task detail route against a fixture adapter that mirrors the
-current `POST /api/v1/tasks` and `GET /api/v1/tasks/{task_id}` contract. A stub
-HTTP adapter remains in place so roadmap item `4.4.2` can attach the live
-transport seam without restructuring the route shell.
+The shipped `4.4.1` path is fixture-first. See the
+[canonical execplan for roadmap `4.4.1`](./execplans/4-4-1-create-the-repository-owned-frontend-pwa.md)
+ and the [users guide](./users-guide.md) for rollout and operator guidance.
+`frontend-pwa/` renders the task create route and task detail route against a
+fixture adapter that mirrors the current `POST /api/v1/tasks` and
+`GET /api/v1/tasks/{task_id}` contract. A stub HTTP adapter remains in place so
+roadmap item `4.4.2` can attach the live transport seam without restructuring
+the route shell.
 
 ### 7.2 Core UI Use Cases
 
