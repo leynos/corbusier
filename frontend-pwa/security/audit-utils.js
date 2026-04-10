@@ -65,8 +65,11 @@ export function runAuditJson() {
   try {
     return { json: JSON.parse(stdout), status };
   } catch (error) {
-    error.message = `Failed to parse bun audit JSON: ${error.message}`;
-    throw error;
+    const wrapped = new Error(
+      `Failed to parse bun audit JSON: ${error.message}`,
+    );
+    wrapped.cause = error;
+    throw wrapped;
   }
 }
 

@@ -243,14 +243,16 @@ function isInlineStringExpression(
  * @returns {string | undefined} Extracted text when the initializer is static.
  */
 function extractAttributeText(
-  initializer: ts.StringLiteral | ts.JsxExpression,
+  initializer: ts.JsxAttributeValue,
 ): string | undefined {
   if (ts.isStringLiteral(initializer)) {
     return initializer.text;
   }
 
-  // initializer is narrowed to ts.JsxExpression by the union type
-  if (isInlineStringExpression(initializer.expression)) {
+  if (
+    ts.isJsxExpression(initializer) &&
+    isInlineStringExpression(initializer.expression)
+  ) {
     return initializer.expression.text;
   }
 
