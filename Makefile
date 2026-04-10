@@ -14,6 +14,7 @@ TEST_FLAGS ?= $(CARGO_FLAGS)
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 FRONTEND_DIR ?= frontend-pwa
+FRONTEND_INSTALL_FLAGS ?=
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
@@ -77,7 +78,7 @@ local-k8s-logs: ## Tail application logs from preview environment
 	uv run scripts/local_k8s.py logs
 
 frontend-install: ## Install frontend workspace dependencies and browser tooling
-	cd $(FRONTEND_DIR) && $(BUN) install
+	cd $(FRONTEND_DIR) && $(BUN) install $(FRONTEND_INSTALL_FLAGS)
 	cd $(FRONTEND_DIR) && $(BUN) x playwright install chromium
 
 frontend-dev: ## Run the frontend development server

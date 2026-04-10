@@ -96,10 +96,11 @@ function getTsxFiles(): string[] {
 
 function tokenMatches(pattern: string, token: string): boolean {
   if (pattern.endsWith('*')) {
-    return token.startsWith(pattern.slice(0, -1));
-  }
-  if (pattern === 'border*') {
-    return token === 'border' || token.startsWith('border-');
+    const base = pattern.slice(0, -1);
+    if (base === 'border') {
+      return token === 'border' || token.startsWith('border-');
+    }
+    return token.startsWith(base);
   }
   return token === pattern;
 }
@@ -156,6 +157,23 @@ function shouldSuppress(
   return tokens.every((token) =>
     prefixes.some((prefix) => token.startsWith(prefix)),
   );
+}
+
+function isCandidate(
+  occurrence: Occurrence,
+  options: NearDuplicateOptions,
+): boolean {
+  return (
+    occurrence.tokens.length >= options.minTokenCount &&
+    !shouldSuppress(occurrence.tokens, options.suppressPrefixes)
+  );
+}
+
+function getCandidateOccurrences(
+  occurrences: readonly Occurrence[],
+  options: NearDuplicateOptions,
+): Occurrence[] {
+  return occurrences.filter((occurrence) => isCandidate(occurrence, options));
 }
 
 /** Return true when the node is a JSX `className` attribute with an initializer. */
@@ -228,13 +246,7 @@ function reportExactDuplicates(
   options: NearDuplicateOptions,
 ): number {
   const grouped = new Map<string, Occurrence[]>();
-  for (const occurrence of occurrences) {
-    if (
-      occurrence.tokens.length < options.minTokenCount ||
-      shouldSuppress(occurrence.tokens, options.suppressPrefixes)
-    ) {
-      continue;
-    }
+  for (const occurrence of getCandidateOccurrences(occurrences, options)) {
     const bucket = grouped.get(occurrence.signature) ?? [];
     bucket.push(occurrence);
     grouped.set(occurrence.signature, bucket);
@@ -265,15 +277,10 @@ function reportNearDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,
 ): number {
+  const candidates = getCandidateOccurrences(occurrences, options);
   const unique = Array.from(
     new Map(
-      occurrences
-        .filter(
-          (occurrence) =>
-            occurrence.tokens.length >= options.minTokenCount &&
-            !shouldSuppress(occurrence.tokens, options.suppressPrefixes),
-        )
-        .map((occurrence) => [occurrence.signature, occurrence]),
+      candidates.map((occurrence) => [occurrence.signature, occurrence]),
     ).values(),
   );
 

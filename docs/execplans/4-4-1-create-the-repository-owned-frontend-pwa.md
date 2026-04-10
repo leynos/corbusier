@@ -50,9 +50,10 @@ Observable success means:
   - establish the app shell, providers, design tokens, and localization runtime
     needed by the narrow task routes;
   - render fixture-backed task create and task detail routes;
-  - do not implement live HTTP mutations, the development auth seam, SSE,
-    branch or pull-request mutation actions, dashboard views, conversation
-    surfaces, Podbot actions, or Frankie integrations.
+  - do not implement live HTTP mutations, the development auth seam,
+    Server-Sent Events (SSE), branch or pull-request mutation actions,
+    dashboard views, conversation surfaces, Podbot actions, or Frankie
+    integrations.
 - Align the workspace with RFC 0001 and RFC 0002:
   - use Bun, Vite, React 19, TypeScript, TanStack Router, Tailwind CSS v4, and
     DaisyUI v5 as the baseline stack unless the implementation discovers a
@@ -101,7 +102,7 @@ Observable success means:
 - Tooling: stop and escalate if Bun or Vite integration forces a repository
   restructuring broader than adding `frontend-pwa/`, root ignore rules, and
   focused Makefile targets.
-- State: stop and escalate if route-local state plus TanStack Query prove
+- State: stop and escalate if route-local state plus TanStack Query proves
   insufficient for the narrow slice and an extra state-management library seems
   necessary.
 - Testing: stop and escalate if useful browser-path coverage cannot be achieved
@@ -116,10 +117,11 @@ Observable success means:
   adding one may leak ad hoc tooling into the root instead of staying contained
   in `frontend-pwa/`. Severity: medium. Likelihood: high. Mitigation: keep the
   frontend self-contained and expose it through explicit Makefile targets.
-- Risk: route-shell fixtures can drift away from the real task DTO already
-  exposed by `4.2.1`. Severity: medium. Likelihood: medium. Mitigation: define
-  shared frontend task types from the current `src/http_api/routes/tasks.rs`
-  request and response shapes, and document any deliberate simplifications.
+- Risk: route-shell fixtures can drift away from the real task data transfer
+  object (DTO) already exposed by `4.2.1`. Severity: medium. Likelihood:
+  medium. Mitigation: define shared frontend task types from the current
+  `src/http_api/routes/tasks.rs` request and response shapes, and document any
+  deliberate simplifications.
 - Risk: React route modules may absorb domain mapping, validation, and fixture
   logic, eroding the requested hexagonal separation. Severity: high.
   Likelihood: medium. Mitigation: create explicit slice ports and adapters from
@@ -164,9 +166,10 @@ Observable success means:
   surface is narrower than the full vertical slice: it already supports create,
   detail, transition, branch association, and pull-request association, but
   `4.4.1` should only mirror create/detail shape and defer live mutations.
-- The current task DTO in `src/http_api/routes/tasks.rs` already provides the
-  exact detail-shell fields needed for the first route shell: `id`, `origin`,
-  `branch_ref`, `pull_request_ref`, `state`, `created_at`, and `updated_at`.
+- The current task data transfer object (DTO) in
+  `src/http_api/routes/tasks.rs` already provides the exact detail-shell fields
+  needed for the first route shell: `id`, `origin`, `branch_ref`,
+  `pull_request_ref`, `state`, `created_at`, and `updated_at`.
 - The root `Makefile` currently only covers Rust and documentation gates, so
   `4.4.1` must introduce a repository-native way to run frontend quality checks
   without bypassing `make`.
@@ -196,10 +199,10 @@ Observable success means:
   hardening, and task-state mutation stay in later roadmap steps. Rationale:
   this matches RFC 0002's recommended order and keeps the first browser slice
   narrow. Date/Author: 2026-04-08 / plan author.
-- Decision: mirror the existing Rust task request and response DTOs in the
-  frontend slice rather than inventing mockup-only transport shapes. Rationale:
-  reduces drift between fixture mode and the already-landed HTTP contract.
-  Date/Author: 2026-04-08 / plan author.
+- Decision: mirror the existing Rust task request and response data transfer
+  objects (DTOs) in the frontend slice rather than inventing mockup-only
+  transport shapes. Rationale: reduces drift between fixture mode and the
+  already-landed HTTP contract. Date/Author: 2026-04-08 / plan author.
 - Decision: add frontend quality gates through Makefile targets instead of
   relying on undocumented direct Bun commands. Rationale: follows repository
   command policy and keeps CI or local workflows reviewable. Date/Author:

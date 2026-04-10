@@ -6,25 +6,30 @@ import type {
   TaskStateViewModel,
 } from './task';
 
+type TaskStateMessageKey = `task.state.${TaskState}`;
+
 export function formatIssueOrigin(origin: TaskOrigin) {
   const issueRef = origin.issue_ref;
   return `${issueRef.provider}/${issueRef.repository}/#${issueRef.issue_number}`;
 }
 
-export function formatTaskState(state: TaskState): TaskStateViewModel {
+export function formatTaskState(
+  state: TaskState,
+  t: (key: TaskStateMessageKey) => string,
+): TaskStateViewModel {
   switch (state) {
     case 'draft':
-      return { label: 'Draft', tone: 'steady' };
+      return { label: t('task.state.draft'), tone: 'steady' };
     case 'in_progress':
-      return { label: 'In progress', tone: 'steady' };
+      return { label: t('task.state.in_progress'), tone: 'steady' };
     case 'in_review':
-      return { label: 'In review', tone: 'steady' };
+      return { label: t('task.state.in_review'), tone: 'steady' };
     case 'paused':
-      return { label: 'Paused', tone: 'warning' };
+      return { label: t('task.state.paused'), tone: 'warning' };
     case 'done':
-      return { label: 'Done', tone: 'steady' };
+      return { label: t('task.state.done'), tone: 'steady' };
     case 'abandoned':
-      return { label: 'Abandoned', tone: 'warning' };
+      return { label: t('task.state.abandoned'), tone: 'warning' };
   }
 }
 

@@ -9,9 +9,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 type MessageMap = Record<string, string>;
-type PlaceholderReport = {
-  placeholders: Set<string>;
-};
+type MessagePlaceholders = Map<string, Set<string>>;
 
 const BASE_LOCALE = process.env.I18N_BASE_LOCALE ?? 'en-gb';
 const LOCALES_DIR = path.resolve(process.cwd(), 'src/i18n');
@@ -56,17 +54,11 @@ function isMessageMap(value: unknown): value is MessageMap {
   return Object.values(value).every((entry) => typeof entry === 'string');
 }
 
-function collectPlaceholders(
-  messages: MessageMap,
-): Map<string, PlaceholderReport> {
+function collectPlaceholders(messages: MessageMap): MessagePlaceholders {
   return new Map(
     Object.entries(messages).map(([key, message]) => [
       key,
-      {
-        placeholders: new Set(
-          message.matchAll(PLACEHOLDER_PATTERN).map((match) => match[1]),
-        ),
-      },
+      new Set(message.matchAll(PLACEHOLDER_PATTERN).map((match) => match[1])),
     ]),
   );
 }
@@ -111,17 +103,17 @@ function comparePlaceholders(comparison: LocaleComparison): boolean {
   const localeReports = collectPlaceholders(localeMessages);
   let hasMismatch = false;
 
-  baseReports.forEach((baseReport, key) => {
-    const localeReport = localeReports.get(key);
-    if (!localeReport) {
+  baseReports.forEach((basePlaceholders, key) => {
+    const localePlaceholders = localeReports.get(key);
+    if (!localePlaceholders) {
       return;
     }
 
-    const missingPlaceholders = [...baseReport.placeholders].filter(
-      (placeholder) => !localeReport.placeholders.has(placeholder),
+    const missingPlaceholders = [...basePlaceholders].filter(
+      (placeholder) => !localePlaceholders.has(placeholder),
     );
-    const extraPlaceholders = [...localeReport.placeholders].filter(
-      (placeholder) => !baseReport.placeholders.has(placeholder),
+    const extraPlaceholders = [...localePlaceholders].filter(
+      (placeholder) => !basePlaceholders.has(placeholder),
     );
 
     if (missingPlaceholders.length === 0 && extraPlaceholders.length === 0) {
@@ -188,13 +180,13 @@ function resolveBaseFile(localeFiles: string[]): string {
 }
 
 /**
- * Validate every non-base locale against the base locale catalogue.
+ * Compare every non-base locale against the base locale catalogue.
  *
  * @param baseMessages - Message catalogue loaded from the base locale file.
  * @param comparisonFiles - Locale files to compare against the base locale.
  * @returns {Promise<boolean>} True when any mismatch is detected.
  */
-async function validateLocales(
+async function compareLocales(
   baseMessages: MessageMap,
   comparisonFiles: string[],
 ): Promise<boolean> {
@@ -216,8 +208,6 @@ async function validateLocales(
   return hasMismatch;
 }
 
-void validateLocales;
-
 /**
  * Check every locale against the base catalogue and exit on mismatch.
  *
@@ -236,20 +226,7 @@ async function checkAllLocales(
     return;
   }
 
-  let hasMismatch = false;
-
-  for (const filePath of comparisonFiles) {
-    const locale = path.basename(filePath, '.ts');
-    const localeMessages = await loadMessages(filePath);
-    const comparison: LocaleComparison = {
-      baseLocale: BASE_LOCALE,
-      locale,
-      baseMessages,
-      localeMessages,
-    };
-    hasMismatch = compareMessageKeys(comparison) || hasMismatch;
-    hasMismatch = comparePlaceholders(comparison) || hasMismatch;
-  }
+  const hasMismatch = await compareLocales(baseMessages, comparisonFiles);
 
   if (hasMismatch) {
     console.error('[locale-vars] Locale placeholder validation failed');

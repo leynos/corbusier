@@ -10,7 +10,7 @@ import {
 
 export function TaskDetailCard({ task }: { task: Task }) {
   const { locale, t } = useI18n();
-  const state = formatTaskState(task.state);
+  const state = formatTaskState(task.state, t);
 
   return (
     <section className="task-detail surface-panel">

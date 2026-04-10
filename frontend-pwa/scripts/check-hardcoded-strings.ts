@@ -257,9 +257,6 @@ function extractAttributeText(
   return undefined;
 }
 
-/** Shared state for a single-file analysis pass. */
-interface AnalysisContext extends VisitContext {}
-
 /**
  * Visit JSX text nodes and record hard-coded user-facing text violations.
  *
@@ -267,7 +264,7 @@ interface AnalysisContext extends VisitContext {}
  * @param ctx Shared single-file analysis context.
  * @returns {void}
  */
-function visitJsxText(node: ts.JsxText, ctx: AnalysisContext): void {
+function visitJsxText(node: ts.JsxText, ctx: VisitContext): void {
   if (!ctx.wordRegex.test(node.text)) {
     return;
   }
@@ -295,7 +292,7 @@ function visitJsxText(node: ts.JsxText, ctx: AnalysisContext): void {
  * @param ctx Shared single-file analysis context.
  * @returns {void}
  */
-function visitJsxAttribute(node: ts.JsxAttribute, ctx: AnalysisContext): void {
+function visitJsxAttribute(node: ts.JsxAttribute, ctx: VisitContext): void {
   if (!node.initializer) {
     return;
   }

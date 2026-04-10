@@ -6,6 +6,7 @@ import { useCreateTaskMutation } from '../task_slice/application/task-queries';
 import {
   initialTaskCreateDraft,
   type TaskCreateDraft,
+  type TaskCreateErrors,
   type TaskCreateField,
   toCreateTaskRequest,
   validateTaskCreateDraft,
@@ -17,7 +18,7 @@ export function TaskCreatePage() {
   const navigate = useNavigate();
   const mutation = useCreateTaskMutation();
   const [draft, setDraft] = useState<TaskCreateDraft>(initialTaskCreateDraft);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<TaskCreateErrors>({});
 
   function handleChange(field: TaskCreateField, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -33,11 +34,15 @@ export function TaskCreatePage() {
       return;
     }
 
-    const task = await mutation.mutateAsync(toCreateTaskRequest(draft));
-    await navigate({
-      to: '/tasks/$taskId',
-      params: { taskId: task.id },
-    });
+    try {
+      const task = await mutation.mutateAsync(toCreateTaskRequest(draft));
+      await navigate({
+        to: '/tasks/$taskId',
+        params: { taskId: task.id },
+      });
+    } catch {
+      // mutation.error will be set by React Query; allow the component to re-render
+    }
   }
 
   return (

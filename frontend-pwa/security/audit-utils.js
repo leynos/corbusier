@@ -71,70 +71,16 @@ export function runAuditJson() {
 }
 
 /**
- * Resolve Bun's advisory JSON to the list of package-name entry pairs.
- *
- * @param {Record<string, unknown>} auditJson Raw JSON payload from `bun audit`.
- * @returns {Array<[string, unknown]>}
- *
- * @example
- * const entries = resolveAdvisoryEntries({
- *   advisories: { lodash: [{ url: 'https://github.com/advisories/GHSA-1' }] },
- * });
- * console.log(entries[0][0]);
- */
-/**
- * Return true when the audit JSON exposes an advisories object map.
- *
- * @param {unknown} auditJson Candidate audit JSON payload.
- * @returns {boolean}
- */
-function hasAdvisoryMap(auditJson) {
-  return (
-    auditJson != null &&
-    typeof auditJson === 'object' &&
-    auditJson.advisories != null &&
-    typeof auditJson.advisories === 'object'
-  );
-}
-
-function resolveAdvisoryEntries(auditJson) {
-  if (hasAdvisoryMap(auditJson)) {
-    return Object.entries(auditJson.advisories);
-  }
-
-  return Object.entries(auditJson ?? {});
-}
-
-/**
- * Expand one package's advisory group into a flat array with derived metadata.
- *
- * @param {string} packageName Package name attached to each advisory.
- * @param {unknown} value Candidate advisory collection for the package.
- * @returns {Array<Record<string, unknown>>}
- *
- * @example
- * const advisories = expandAdvisoryGroup('lodash', [
- *   { url: 'https://github.com/advisories/GHSA-1' },
- * ]);
- * console.log(advisories[0].package);
- */
-function expandAdvisoryGroup(packageName, value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.map((advisory) => ({
-    ...advisory,
-    package: packageName,
-    github_advisory_id: extractGithubAdvisoryId(advisory),
-  }));
-}
-
-/**
  * Convert Bun's audit JSON into a flat array that is easier to filter.
  *
- * @param {Record<string, unknown>} auditJson Raw JSON payload from `bun audit`.
- * @returns {Array<Record<string, unknown>>}
+ * @param {Record<string, any>} auditJson Raw JSON payload from `bun audit`.
+ * @returns {Array<{
+ *   package?: string,
+ *   github_advisory_id?: string,
+ *   title?: string,
+ *   url?: string,
+ *   [key: string]: unknown,
+ * }>}
  *
  * @example
  * const advisories = collectAdvisories({
@@ -143,8 +89,23 @@ function expandAdvisoryGroup(packageName, value) {
  * console.log(advisories[0].github_advisory_id);
  */
 export function collectAdvisories(auditJson) {
-  return resolveAdvisoryEntries(auditJson).flatMap(([packageName, value]) =>
-    expandAdvisoryGroup(packageName, value),
+  if (!auditJson || typeof auditJson !== 'object') {
+    return [];
+  }
+
+  const entries =
+    auditJson.advisories && typeof auditJson.advisories === 'object'
+      ? Object.entries(auditJson.advisories)
+      : Object.entries(auditJson);
+
+  return entries.flatMap(([packageName, value]) =>
+    Array.isArray(value)
+      ? value.map((advisory) => ({
+          ...advisory,
+          package: packageName,
+          github_advisory_id: extractGithubAdvisoryId(advisory),
+        }))
+      : [],
   );
 }
 

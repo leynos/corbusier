@@ -36,14 +36,7 @@ const workspaceKeys = new Set([
 const unexpectedHeading = 'Unexpected vulnerabilities detected by bun audit:';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function buildLedgerMaps(currentWorkspaceKeys, auditEntries, referenceDate) {
-  if (
-    !(referenceDate instanceof Date) ||
-    Number.isNaN(referenceDate.getTime())
-  ) {
-    throw new TypeError('Invalid reference date');
-  }
-
+function buildLedgerMaps(auditEntries) {
   const ledgerByAdvisory = new Map();
   const allowedIds = [];
   const seenIds = new Set();
@@ -57,7 +50,7 @@ function buildLedgerMaps(currentWorkspaceKeys, auditEntries, referenceDate) {
       seenIds.add(entry.id);
     }
 
-    if (!currentWorkspaceKeys.has(entry.package)) {
+    if (!workspaceKeys.has(entry.package)) {
       continue;
     }
 
@@ -93,44 +86,6 @@ function getLedgerExpiryError(entry, advisoryId, referenceDateValue) {
   }
 
   return null;
-}
-
-function collectAdvisoryExpiryErrors(
-  advisories,
-  ledgerByAdvisory,
-  referenceDateValue,
-) {
-  const errors = [];
-  for (const advisory of advisories) {
-    const entry = ledgerByAdvisory.get(advisory.github_advisory_id ?? '');
-    const error = getLedgerExpiryError(
-      entry,
-      advisory.github_advisory_id,
-      referenceDateValue,
-    );
-    if (error) {
-      errors.push(error);
-    }
-  }
-
-  return errors;
-}
-
-function reportExpiryFailures(expected, ledgerByAdvisory, referenceDateValue) {
-  const expiryErrors = collectAdvisoryExpiryErrors(
-    expected,
-    ledgerByAdvisory,
-    referenceDateValue,
-  );
-  if (expiryErrors.length === 0) {
-    return false;
-  }
-
-  for (const error of expiryErrors) {
-    console.error(error);
-  }
-
-  return true;
 }
 
 function reportAllowedAdvisories(expected) {
@@ -181,23 +136,33 @@ function isExecutedDirectly(meta) {
  */
 export function evaluateAudit(payload, options = {}) {
   const referenceDate = options.now ?? new Date();
+  if (
+    !(referenceDate instanceof Date) ||
+    Number.isNaN(referenceDate.getTime())
+  ) {
+    throw new TypeError('Invalid reference date');
+  }
   const referenceDateValue = referenceDate.getTime();
   const rawAdvisories = payload.advisories ?? [];
   const statusCode = payload.status ?? 0;
-  const { ledgerByAdvisory, allowedIds } = buildLedgerMaps(
-    workspaceKeys,
-    auditExceptions,
-    referenceDate,
-  );
+  const { ledgerByAdvisory, allowedIds } = buildLedgerMaps(auditExceptions);
   const { expected, unexpected } = partitionAdvisoriesById(
     rawAdvisories,
     allowedIds,
   );
-  const hasExpiredEntries = reportExpiryFailures(
-    expected,
-    ledgerByAdvisory,
-    referenceDateValue,
-  );
+  let hasExpiredEntries = false;
+  for (const advisory of expected) {
+    const entry = ledgerByAdvisory.get(advisory.github_advisory_id ?? '');
+    const error = getLedgerExpiryError(
+      entry,
+      advisory.github_advisory_id,
+      referenceDateValue,
+    );
+    if (error) {
+      hasExpiredEntries = true;
+      console.error(error);
+    }
+  }
   const hasUnexpectedAdvisories = reportUnexpectedAdvisories(
     unexpected,
     unexpectedHeading,
