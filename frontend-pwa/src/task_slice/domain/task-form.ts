@@ -63,31 +63,28 @@ export function validateTaskCreateDraft(
   return errors;
 }
 
+/**
+ * Assert that a draft satisfies the task-create validation rules.
+ *
+ * @param draft - Draft values collected from the task-create form.
+ * @throws {Error} When the draft fails validation.
+ */
+function assertValidDraft(draft: TaskCreateDraft): void {
+  const errors = validateTaskCreateDraft(draft);
+  const [firstError] = Object.values(errors);
+  if (firstError !== undefined) {
+    throw new Error(firstError);
+  }
+}
+
 export function toCreateTaskRequest(draft: TaskCreateDraft): CreateTaskRequest {
-  if (!['github', 'gitlab'].includes(draft.provider)) {
-    throw new Error('Choose a supported provider.');
-  }
-
-  const repository = draft.repository.trim();
-  if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) {
-    throw new Error('Use the repository format owner/repository.');
-  }
-
-  const issueNumber = Number(draft.issueNumber);
-  if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
-    throw new Error('Issue number must be a positive integer.');
-  }
-
-  const title = draft.title.trim();
-  if (title.length === 0) {
-    throw new Error('Title is required.');
-  }
+  assertValidDraft(draft);
 
   return {
     provider: draft.provider,
-    repository,
-    issue_number: issueNumber,
-    title,
+    repository: draft.repository.trim(),
+    issue_number: Number(draft.issueNumber),
+    title: draft.title.trim(),
     description: normalizeOptionalString(draft.description),
     labels: normalizeOptionalList(draft.labels),
     assignees: normalizeOptionalList(draft.assignees),

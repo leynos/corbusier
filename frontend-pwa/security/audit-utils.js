@@ -33,6 +33,45 @@ function extractGithubAdvisoryId(advisory) {
 }
 
 /**
+ * Validate that `spawnSync` exited normally.
+ *
+ * @param {import('node:child_process').SpawnSyncReturns<string>} result
+ * @returns {void}
+ */
+function assertSpawnSuccess(result) {
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status === null) {
+    const signalSuffix = result.signal ? ` (signal: ${result.signal})` : '';
+    throw new Error(`bun audit did not exit normally${signalSuffix}`);
+  }
+}
+
+/**
+ * Parse the JSON payload emitted by `bun audit --json`.
+ *
+ * @param {string | null | undefined} raw
+ * @returns {Record<string, unknown>}
+ */
+function parseAuditOutput(raw) {
+  const stdout = (raw ?? '').trim();
+  if (!stdout) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    const wrapped = new Error(
+      `Failed to parse bun audit JSON: ${error.message}`,
+    );
+    wrapped.cause = error;
+    throw wrapped;
+  }
+}
+
+/**
  * Run `bun audit --json` and return the parsed payload alongside the exit
  * status. Whitespace-only output is treated as an empty advisory list so that
  * callers can rely on deterministic results even when Bun prints nothing.
@@ -52,30 +91,10 @@ export function runAuditJson() {
     stdio: ['ignore', 'pipe', 'inherit'],
   });
 
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status === null) {
-    const signalSuffix = result.signal ? ` (signal: ${result.signal})` : '';
-    throw new Error(`bun audit did not exit normally${signalSuffix}`);
-  }
-
+  assertSpawnSuccess(result);
   const status = result.status;
-  const stdout = result.stdout ? result.stdout.trim() : '';
-  if (!stdout) {
-    return { json: {}, status };
-  }
-
-  try {
-    return { json: JSON.parse(stdout), status };
-  } catch (error) {
-    const wrapped = new Error(
-      `Failed to parse bun audit JSON: ${error.message}`,
-    );
-    wrapped.cause = error;
-    throw wrapped;
-  }
+  const json = parseAuditOutput(result.stdout);
+  return { json, status };
 }
 
 /**
