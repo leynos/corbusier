@@ -24,7 +24,8 @@ After this change, Corbusier should have:
 1. Stable task create, detail, and transition HTTP contracts with golden
    response fixtures for happy and unhappy paths.
 2. Contract-tested error responses aligned with the shared phase 4
-   `actix-v2a` core HTTP primitives wherever those primitives touch the slice.
+   `actix-v2a` core HTTP primitives, adopted directly where applicable and
+   pinned to a Git SHA until an upstream point release is available.
 3. A development-only browser auth path that works for local preview and
    browser tests without settling the final production auth model.
 4. A frontend transport seam that can consume the stabilized contract without
@@ -63,7 +64,12 @@ Observable success means:
   - do not implement live branch or pull-request association UI;
   - do not widen into final production browser auth or session policy.
 - Treat the phase 4 `actix-v2a` core HTTP contract dependency as real:
-  - if the shared primitives are already consumable, integrate them directly;
+  - prefer direct adoption of upstream `actix-v2a` primitives over
+    Corbusier-local reimplementation whenever the primitive applies to the
+    slice contract;
+  - pin the dependency to a full Git SHA during implementation until a point
+    release is available, then move to the released version in a follow-on
+    cleanup;
   - if they are only partially available, adapt behind Corbusier-owned seams
     that can be replaced without changing the task endpoint contract;
   - do not invent a second incompatible envelope or idempotency scheme.
@@ -84,8 +90,8 @@ Observable success means:
 ## Tolerances (exception triggers)
 
 - Dependency: stop and escalate if the required phase 4 `actix-v2a` core HTTP
-  primitives are unavailable and cannot be wrapped behind a narrow temporary
-  compatibility seam.
+  primitives are unavailable at the chosen Git SHA and cannot be wrapped behind
+  a narrow temporary compatibility seam.
 - Scope: stop and escalate if stabilizing the slice contract requires list
   pagination, SSE, branch or pull-request mutation UI, or broader auth/session
   work beyond the task create/detail/transition path.
@@ -105,9 +111,9 @@ Observable success means:
 - Risk: the current API already ships a Corbusier-local success and error
   envelope, while the roadmap points to shared `actix-v2a` primitives that may
   not yet be present in-tree. Severity: high. Likelihood: high. Mitigation:
-  stage the work around a contract inventory first, then adapt shared
-  primitives behind narrow response/idempotency seams rather than rewriting
-  handlers ad hoc.
+  stage the work around a contract inventory first, adopt upstream `actix-v2a`
+  directly wherever applicable, pin it to a reviewed Git SHA, and only fall
+  back to narrow compatibility seams where direct adoption is not yet possible.
 - Risk: the current HTTP auth model is bearer JWT only, while
   `docs/corbusier-api-design.md` still treats cookie-based auth as the likely
   long-term default for SSE compatibility. Severity: medium. Likelihood: high.
@@ -158,7 +164,8 @@ Observable success means:
   `src/http_api/auth.rs`; there is no browser-facing development seam yet.
 - The shared phase 4 `actix-v2a` dependency is referenced in docs and roadmap
   text, but no in-repo crate or module currently exposes those primitives. This
-  milestone therefore needs an explicit compatibility strategy.
+  milestone therefore needs an explicit upstream adoption strategy and a Git
+  SHA pin until a point release is available.
 
 ## Decision Log
 
@@ -176,6 +183,11 @@ Observable success means:
   operations for the first live loop, and RFC 0002 calls out stable fixtures
   and contract-tested errors as the success criteria for `4.4.2`. Date/Author:
   2026-04-10 / plan author.
+- Decision: prefer direct upstream `actix-v2a` adoption, pinned to a full Git
+  SHA during implementation, instead of copying its primitives into
+  Corbusier-local modules. Rationale: the roadmap names `actix-v2a` as the
+  shared contract dependency, and a Git pin reduces drift while upstream point
+  releases catch up. Date/Author: 2026-04-11 / plan author.
 
 ## Outcomes & Retrospective
 
@@ -204,12 +216,21 @@ Current repository state relevant to `4.4.2`:
   paths, but they do not yet preserve golden fixtures or assert the richer
   shared error contract expected by this milestone.
 
+Temporary dependency pin for planning purposes:
+
+- Until `actix-v2a` publishes a suitable point release, implementation should
+  pin the dependency to a reviewed full Git SHA. Use
+  `0123456789abcdef0123456789abcdef01234567` as the placeholder in this plan
+  and replace it with the actual reviewed upstream commit before coding starts.
+
 Planned steady state after `4.4.2`:
 
 - task create, detail, and transition endpoints have stable contract fixtures;
 - error payloads are explicitly shaped and tested;
 - idempotency handling is settled for the slice-facing mutations or clearly
   documented where the shared dependency is still pending;
+- applicable shared `actix-v2a` primitives are consumed from an explicit Git
+  SHA pin rather than reimplemented locally;
 - frontend preview has a repeatable development auth seam;
 - the frontend HTTP adapter can be exercised in tests without forcing the app
   shell to abandon fixture-first default boot.
@@ -228,9 +249,13 @@ Establish exactly what must stabilize and what stays deferred:
     and error contracts`;
   - RFC 0002 sections `5.3` and `5.4`;
   - the phase 4 `actix-v2a` dependency expectations.
-- Decide and document the compatibility strategy for shared primitives:
-  - direct reuse if the dependency is consumable;
-  - a Corbusier-owned compatibility seam if not.
+- Select and record the exact upstream `actix-v2a` Git SHA to pin during this
+  milestone, then document where that SHA is used and what primitives it is
+  expected to provide.
+- Decide and document the adoption strategy for shared primitives:
+  - direct upstream reuse by default;
+  - a Corbusier-owned compatibility seam only for primitives not yet
+    consumable at the pinned SHA.
 - Decide and document the idempotency boundary for this step:
   - minimum acceptable outcome is stable create/detail/transition contracts;
   - preferred outcome is shared idempotency handling on task creation and, if
@@ -252,6 +277,11 @@ task bounded context:
 - Refactor or extend the HTTP adapter so task endpoints share one explicit
   contract module for slice-facing DTOs, error schema usage, and any shared
   OpenAPI fragment wiring touched by this milestone.
+- Replace Corbusier-local transport helpers with upstream `actix-v2a`
+  primitives where applicable to the slice:
+  - error envelope components;
+  - idempotency middleware or helpers;
+  - reusable OpenAPI fragments or schema definitions.
 - Align error responses with the shared envelope expectations where the slice
   cares:
   - stable `code`;
@@ -332,7 +362,8 @@ covered by focused tests.
 
 - Update `docs/corbusier-design.md` with:
   - the stabilized slice contract boundary;
-  - the adopted compatibility strategy for shared `actix-v2a` primitives;
+  - the adopted upstream `actix-v2a` primitives and the Git SHA pin used during
+    implementation;
   - the development auth seam and its explicitly temporary status;
   - any idempotency decision or deferral taken for task mutations.
 - Update `docs/users-guide.md` with:
@@ -383,8 +414,8 @@ Expected implementation order:
 - Browser-preview configuration should fail closed with clear errors when the
   development auth seam is misconfigured.
 - If the shared `actix-v2a` dependency changes while this milestone is in
-  flight, update the Decision Log and re-run the contract inventory before
-  proceeding.
+  flight, update the pinned Git SHA, note the reason in the Decision Log, and
+  re-run the contract inventory before proceeding.
 
 ## Interfaces and dependencies
 
@@ -407,8 +438,9 @@ Expected dependency posture:
 
 - Required:
   - roadmap `4.2.1`;
-  - the phase 4 `actix-v2a` core HTTP contract dependency, directly or through
-    a compatibility seam;
+  - the phase 4 `actix-v2a` core HTTP contract dependency, consumed from an
+    upstream Git dependency pinned to a full commit SHA until a point release
+    exists, and only wrapped locally where direct adoption is not yet possible;
   - existing `pg-embedded-setup-unpriv` test infrastructure.
 - Explicitly not required:
   - the phase 4 `actix-v2a` SSE dependency;
@@ -421,6 +453,7 @@ Implementation should capture the following evidence in this document as work
 proceeds:
 
 - the final task contract fixture set and where it lives;
+- the exact pinned `actix-v2a` Git SHA used during implementation;
 - which shared transport primitives were adopted directly versus wrapped;
 - the exact development auth seam chosen;
 - the final idempotency decision for task create and transition;
