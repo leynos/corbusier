@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -67,15 +67,18 @@ for MCP definitions; ADR 004 owns that lower-level model.
 
 ## Podbot roadmap dependencies
 
-This ADR depends on the following upstream Podbot roadmap steps:
+This ADR is ratified against the following upstream Podbot roadmap steps:
 
 - Step 4.5, "Normalized launch contract" because wire selection and injection
   details need to be normalized before launch.
+- Step 4.7, "MCP wire provisioning and injection" because that step is the
+  direct upstream Podbot surface that materializes workspace-scoped wires.
+
+The downstream delivery work ratified by this ADR then relies on:
+
 - Step 4.6, "Hosted session control plane" because Corbusier needs typed
   runtime events for wire status without moving tool calls back into its inline
   path.
-- Step 4.7, "MCP wire provisioning and injection" because that step is the
-  direct upstream Podbot surface that materializes workspace-scoped wires.
 
 ## Options Considered
 
@@ -107,9 +110,9 @@ Table 1: Trade-offs for tool-plane ownership in Podbot-hosted sessions.
 
 ## Decision Outcome / Proposed Direction
 
-For Podbot-hosted agents, the hosted agent should be the MCP client. Podbot
-should provision workspace-scoped wires, and Corbusier should remain the tool
-catalogue and policy authority rather than the inline runtime caller.
+For Podbot-hosted agents, the hosted agent is the Model Context Protocol (MCP)
+client. Podbot provisions workspace-scoped wires, and Corbusier remains the
+tool catalogue and policy authority rather than the inline runtime caller.
 
 Under this model:
 
@@ -127,6 +130,11 @@ Under this model:
 This ADR lands during ADR 010 Phase 1 (foundational architecture). The
 implementation steps below are scoped to this ADR; see ADR 010 for the
 cross-cutting migration sequence and advancement criteria.
+
+Roadmap item `1.1.1` accepted this ADR as part of the ADR 001 through 005
+bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
+ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
+the wire-specific delivery sequence below.
 
 ### Phase 1
 

@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 `PLANS.md` is not present in this repository as of 2026-04-10, so this plan is
 the controlling execution document for roadmap item `1.1.1`.
@@ -137,8 +137,17 @@ Observable success means:
   currently referenced by this phase, including Steps 1.4, 4.5, 4.6, 4.7, 4.8,
   4.9, 4.10, and the later conformance suites.
 - [x] (2026-04-10 00:00Z) Authored the initial ExecPlan draft in this file.
-- [ ] Await user approval before implementation.
-- [ ] Execute stages A through E and keep this section current.
+- [x] (2026-04-13 00:00Z) Received approval to implement roadmap item `1.1.1`.
+- [x] (2026-04-13 00:00Z) Completed Stage A by reconciling ADR 001 through 005,
+  ADR 010, `docs/roadmap.md`, and `docs/corbusier-design.md` against the
+  conformance design.
+- [x] (2026-04-13 00:00Z) Completed Stages B through D by accepting ADRs 001
+  through 005 and ADR 010 as a bundle, normalizing ratification versus
+  downstream Podbot dependencies, adding a stable reviewer checklist, and
+  synchronizing the design and roadmap documentation.
+- [x] (2026-04-13 00:00Z) Completed Stage E validation with `make fmt`,
+  `make markdownlint`, and `make nixie` using environment-local fallbacks for
+  missing documentation binaries, then marked roadmap item `1.1.1` done.
 
 ## Surprises & Discoveries
 
@@ -158,6 +167,22 @@ Observable success means:
 - Observation: no dedicated migration review checklist file currently exists.
   Impact: implementation should create one concise companion document or
   clearly extend an existing maintainer-facing document.
+- Observation: the requested Wyvern team support and the named
+  `hexagonal-architecture`, `leta`, `rust-router`, and Qdrant memory tooling
+  are not installed in this environment. Impact: implementation used direct
+  repository inspection and documented that fallback instead of fabricating
+  unavailable tooling.
+- Observation: roadmap item `1.6.2` already carried most of the end-of-
+  migration documentation gate, but it did not explicitly require the design
+  document or the new reviewer checklist. Impact: implementation can resolve
+  the open governance question by tightening that roadmap text instead of
+  inventing a second retirement policy document.
+- Observation: the local environment lacked `mdtablefix`,
+  `markdownlint-cli2`, `nixie`, and the browser libraries needed by Mermaid
+  rendering. Impact: validation needed controlled fallbacks
+  (`cargo install mdtablefix`, `npx markdownlint-cli2`, a temporary
+  `make nixie` wrapper using Mermaid CLI, and the missing shared-library
+  packages) before the required documentation gates could run successfully.
 
 ## Decision Log
 
@@ -180,13 +205,60 @@ Observable success means:
   ratifying boundaries and gates, so repository-wide automation would be
   additive only if a narrow enforcement gap remains after the docs update.
   Date/Author: 2026-04-10 / plan author.
+- Decision: accept ADRs 001 through 005 together with ADR 010 during roadmap
+  item `1.1.1` instead of leaving them proposed until a later implementation
+  phase. Rationale: the roadmap item explicitly asks for ratification, and
+  keeping the bundle proposed would preserve the same merge-time ambiguity that
+  `1.1.1` is meant to remove. Date/Author: 2026-04-13 / Codex.
+- Decision: split Podbot roadmap references in ADRs 001 through 005 into
+  ratification dependencies versus downstream delivery dependencies where the
+  previous text mixed foundation and later delivery concerns. Rationale: this
+  keeps the accepted ADR bundle consistent with roadmap item `1.1.1` while
+  preserving the later implementation dependencies needed by roadmap items
+  `1.1.2` through `1.3.x`. Date/Author: 2026-04-13 / Codex.
+- Decision: define compatibility, warn-only, and blocking as repository
+  governance states that may never be used to justify revived inline runtime
+  ownership in Corbusier. Rationale: the main review risk was stage names being
+  treated as implementation toggles instead of merge gates. Date/Author:
+  2026-04-13 / Codex.
+- Decision: store the maintainer-facing review checklist in
+  `docs/podbot-migration-review-checklist.md` instead of under
+  `docs/execplans/`. Rationale: the checklist is a stable operational document
+  for future reviewers, not a task-local planning artefact. Date/Author:
+  2026-04-13 / Codex.
+- Decision: do not change `docs/users-guide.md` for roadmap item `1.1.1`.
+  Rationale: the implementation is maintainer-only governance and does not
+  introduce an operator workflow or migration-state behaviour that users must
+  follow. Date/Author: 2026-04-13 / Codex.
 
 ## Outcomes & Retrospective
 
 Initial planning outcome: the repository now has an implementation sequence for
 ratifying the migration boundary, consolidating foundational ADR text, and
-turning migration stages into explicit repository review gates. Final outcomes,
-deviations, and lessons learned will be recorded after execution.
+turning migration stages into explicit repository review gates.
+
+Final execution outcome:
+
+- ADRs 001 through 005 and ADR 010 are now accepted as one ratified migration
+  bundle with consistent dependency and ownership language.
+- `docs/podbot-migration-review-checklist.md` now gives reviewers one stable
+  checklist for compatibility, warn-only, blocking, and end-of-migration
+  decisions.
+- `docs/corbusier-design.md` and `docs/roadmap.md` now reflect the same
+  Podbot-owned hosted-runtime boundary, and roadmap item `1.1.1` is marked
+  complete.
+- `docs/users-guide.md` was intentionally left unchanged because this roadmap
+  item changed maintainer governance only, not user-visible workflow.
+
+Validation evidence:
+
+- `MDLINT='npx --yes markdownlint-cli2' make fmt`
+- `MDLINT='npx --yes markdownlint-cli2' make markdownlint`
+- `NIXIE=/tmp/1-1-1-nixie-wrapper.sh make nixie`
+
+Deviation from the initial happy path: the requested helper tooling was not
+installed locally, so completion required environment recovery before the
+documentation gates could pass.
 
 ## Context and orientation
 

@@ -5932,6 +5932,24 @@ The encapsulation layer provides secure, isolated execution environments for
 tool operations and repository access through Podbot container management,
 ensuring consistent development environments and security boundaries.
 
+Roadmap item `1.1.1` ratifies the hosted-runtime migration boundary used by
+later phase 1 delivery work:
+
+- Podbot owns workspace shaping, container lifecycle, Model Context Protocol
+  (MCP) wire bridging, generic hook execution, and hosted-session control
+  delivery for Podbot-hosted sessions.
+- Corbusier owns policy, registry, orchestration, durable state, prompt and
+  bundle selection, and audit interpretation.
+- Compatibility, warn-only, and blocking are repository review states defined
+  by ADR 010, not permission to split runtime ownership back across both
+  systems.
+- Reviewers should use `docs/podbot-migration-review-checklist.md` when a pull
+  request claims phase advancement or legacy-path retirement.
+
+This section is normative for hosted-session ownership even where older target
+state passages in this design document still describe inline routing or local
+hook execution concepts that predate the ratified Podbot boundary.
+
 ```mermaid
 graph TB
     subgraph "Workspace Management"

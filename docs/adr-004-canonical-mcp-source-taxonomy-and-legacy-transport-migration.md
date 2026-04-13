@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -65,7 +65,7 @@ transport records.
 
 ## Podbot roadmap dependencies
 
-This ADR depends on the following upstream Podbot roadmap steps:
+This ADR is ratified against the following upstream Podbot roadmap steps:
 
 - Step 1.4, "Hosting schema migration and compatibility matrix" because the
   hosting-era configuration must carry the MCP-related defaults that align with
@@ -104,8 +104,8 @@ Table 1: Trade-offs for the canonical MCP source model.
 
 ## Decision Outcome / Proposed Direction
 
-Corbusier should replace the legacy transport model with a canonical source
-taxonomy and treat legacy transport labels as compatibility-only constructs.
+Corbusier replaces the legacy transport model with a canonical source taxonomy
+and treats legacy transport labels as compatibility-only constructs.
 
 The canonical taxonomy should distinguish:
 
@@ -127,6 +127,11 @@ the migration completes.
 This ADR lands during ADR 010 Phase 1 (foundational architecture). The
 implementation steps below are scoped to this ADR; see ADR 010 for the
 cross-cutting migration sequence and advancement criteria.
+
+Roadmap item `1.1.1` accepted this ADR as part of the ADR 001 through 005
+bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
+ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
+the taxonomy-specific delivery sequence below.
 
 ### Phase 1
 

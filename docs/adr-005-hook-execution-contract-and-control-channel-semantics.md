@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -67,12 +67,15 @@ schema for runtime state; ADR 006 covers that.
 
 ## Podbot roadmap dependencies
 
-This ADR depends on the following upstream Podbot roadmap steps:
+This ADR is ratified against the following upstream Podbot roadmap steps:
 
 - Step 4.6, "Hosted session control plane" because hook requests and
   acknowledgements must travel over a typed event and control surface.
 - Step 4.9, "Hook execution and orchestrator acknowledgement" because that
   step provides the direct Podbot implementation surface for this contract.
+
+The downstream delivery work ratified by this ADR then relies on:
+
 - Step 4.10, "Recovery, replay, and restart safety" because hook
   acknowledgement semantics are incomplete without restart-safe replay and
   duplicate-delivery handling.
@@ -108,8 +111,8 @@ Table 1: Trade-offs for the hook execution contract.
 
 ## Decision Outcome / Proposed Direction
 
-Corbusier should adopt a Podbot-owned hook execution model with a dedicated
-control channel and an explicit acknowledgement contract.
+Corbusier adopts a Podbot-owned hook execution model with a dedicated control
+channel and an explicit acknowledgement contract.
 
 The proposed contract is:
 
@@ -129,6 +132,11 @@ The proposed contract is:
 This ADR lands during ADR 010 Phase 1 (foundational architecture). The
 implementation steps below are scoped to this ADR; see ADR 010 for the
 cross-cutting migration sequence and advancement criteria.
+
+Roadmap item `1.1.1` accepted this ADR as part of the ADR 001 through 005
+bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
+ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
+the hook-specific delivery sequence below.
 
 ### Phase 1
 
