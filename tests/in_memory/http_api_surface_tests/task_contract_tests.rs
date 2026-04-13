@@ -3,6 +3,8 @@
 use super::super::helpers::runtime;
 use super::support::{build_bundle, with_bearer};
 use crate::http_api_test_helpers::{required_field, required_str_field};
+use actix_web::body::MessageBody;
+use actix_web::dev::ServiceResponse;
 use actix_web::{App, test as actix_test, web};
 use camino::Utf8Path;
 use cap_std::ambient_authority;
@@ -12,6 +14,164 @@ use rstest::rstest;
 use serde_json::{Value, json};
 use std::io;
 use tokio::runtime::Runtime;
+
+async fn check_create_task_success<F, Fut, B>(send: F, token: &str) -> Result<String, eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "owner/repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    let task_id =
+        required_str_field(required_field(required_field(&body, "data"), "task"), "id").to_owned();
+    normalize_task_success_response(&mut body)?;
+    assert_json_matches(&body, "tests/fixtures/http_api/tasks/create_success.json")?;
+    Ok(task_id)
+}
+
+async fn check_get_task_success<F, Fut, B>(
+    send: F,
+    token: &str,
+    task_id: &str,
+) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_task_success_response(&mut body)?;
+    assert_json_matches(&body, "tests/fixtures/http_api/tasks/get_success.json")
+}
+
+async fn check_transition_task_success<F, Fut, B>(
+    send: F,
+    token: &str,
+    task_id: &str,
+) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::put()
+            .uri(&format!("/api/v1/tasks/{task_id}/state"))
+            .set_json(json!({ "state": "in_progress" })),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_task_success_response(&mut body)?;
+    assert_json_matches(
+        &body,
+        "tests/fixtures/http_api/tasks/transition_success.json",
+    )
+}
+
+async fn check_validation_error<F, Fut, B>(send: F, token: &str) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "bad-repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_shared_error_response(&mut body)?;
+    assert_json_matches(&body, "tests/fixtures/http_api/tasks/validation_error.json")
+}
+
+async fn check_unauthorized_error<F, Fut, B>(send: F) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "owner/repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+    )
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_shared_error_response(&mut body)?;
+    assert_json_matches(
+        &body,
+        "tests/fixtures/http_api/tasks/unauthorized_error.json",
+    )
+}
+
+async fn check_not_found_error<F, Fut, B>(send: F, token: &str) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::get().uri("/api/v1/tasks/11111111-1111-1111-1111-111111111111"),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_shared_error_response(&mut body)?;
+    assert_json_matches(&body, "tests/fixtures/http_api/tasks/not_found_error.json")
+}
+
+async fn check_conflict_error<F, Fut, B>(send: F, token: &str) -> Result<(), eyre::Report>
+where
+    F: FnOnce(actix_test::TestRequest) -> Fut,
+    Fut: std::future::Future<Output = ServiceResponse<B>>,
+    B: MessageBody,
+{
+    let response = send(with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "owner/repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+        token,
+    ))
+    .await;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_shared_error_response(&mut body)?;
+    assert_json_matches(&body, "tests/fixtures/http_api/tasks/conflict_error.json")
+}
 
 #[rstest]
 fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result<(), eyre::Report> {
@@ -26,147 +186,40 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
         )
         .await;
 
-        let create_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::post()
-                    .uri("/api/v1/tasks")
-                    .set_json(json!({
-                        "provider": "github",
-                        "repository": "owner/repo",
-                        "issue_number": 42,
-                        "title": "Implement HTTP API"
-                    })),
-                &token,
-            )
-            .to_request(),
+        let task_id = check_create_task_success(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
         )
-        .await;
-        let mut create_body: Value = actix_test::read_body_json(create_response).await;
-        let task_id = required_str_field(
-            required_field(required_field(&create_body, "data"), "task"),
-            "id",
+        .await?;
+        check_get_task_success(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
+            &task_id,
         )
-        .to_owned();
-        normalize_task_success_response(&mut create_body)?;
-        assert_json_matches(
-            &create_body,
-            "tests/fixtures/http_api/tasks/create_success.json",
-        )?;
-
-        let get_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
-                &token,
-            )
-            .to_request(),
+        .await?;
+        check_transition_task_success(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
+            &task_id,
         )
-        .await;
-        let mut get_body: Value = actix_test::read_body_json(get_response).await;
-        normalize_task_success_response(&mut get_body)?;
-        assert_json_matches(&get_body, "tests/fixtures/http_api/tasks/get_success.json")?;
-
-        let transition_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::put()
-                    .uri(&format!("/api/v1/tasks/{task_id}/state"))
-                    .set_json(json!({ "state": "in_progress" })),
-                &token,
-            )
-            .to_request(),
+        .await?;
+        check_validation_error(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
         )
-        .await;
-        let mut transition_body: Value = actix_test::read_body_json(transition_response).await;
-        normalize_task_success_response(&mut transition_body)?;
-        assert_json_matches(
-            &transition_body,
-            "tests/fixtures/http_api/tasks/transition_success.json",
-        )?;
-
-        let validation_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::post()
-                    .uri("/api/v1/tasks")
-                    .set_json(json!({
-                        "provider": "github",
-                        "repository": "bad-repo",
-                        "issue_number": 42,
-                        "title": "Implement HTTP API"
-                    })),
-                &token,
-            )
-            .to_request(),
+        .await?;
+        check_unauthorized_error(|request| actix_test::call_service(&app, request.to_request()))
+            .await?;
+        check_not_found_error(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
         )
-        .await;
-        let mut validation_body: Value = actix_test::read_body_json(validation_response).await;
-        normalize_shared_error_response(&mut validation_body)?;
-        assert_json_matches(
-            &validation_body,
-            "tests/fixtures/http_api/tasks/validation_error.json",
-        )?;
-
-        let unauthorized_response = actix_test::call_service(
-            &app,
-            actix_test::TestRequest::post()
-                .uri("/api/v1/tasks")
-                .set_json(json!({
-                    "provider": "github",
-                    "repository": "owner/repo",
-                    "issue_number": 42,
-                    "title": "Implement HTTP API"
-                }))
-                .to_request(),
+        .await?;
+        check_conflict_error(
+            |request| actix_test::call_service(&app, request.to_request()),
+            &token,
         )
-        .await;
-        let mut unauthorized_body: Value = actix_test::read_body_json(unauthorized_response).await;
-        normalize_shared_error_response(&mut unauthorized_body)?;
-        assert_json_matches(
-            &unauthorized_body,
-            "tests/fixtures/http_api/tasks/unauthorized_error.json",
-        )?;
-
-        let not_found_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::get()
-                    .uri("/api/v1/tasks/11111111-1111-1111-1111-111111111111"),
-                &token,
-            )
-            .to_request(),
-        )
-        .await;
-        let mut not_found_body: Value = actix_test::read_body_json(not_found_response).await;
-        normalize_shared_error_response(&mut not_found_body)?;
-        assert_json_matches(
-            &not_found_body,
-            "tests/fixtures/http_api/tasks/not_found_error.json",
-        )?;
-
-        let conflict_response = actix_test::call_service(
-            &app,
-            with_bearer(
-                actix_test::TestRequest::post()
-                    .uri("/api/v1/tasks")
-                    .set_json(json!({
-                        "provider": "github",
-                        "repository": "owner/repo",
-                        "issue_number": 42,
-                        "title": "Implement HTTP API"
-                    })),
-                &token,
-            )
-            .to_request(),
-        )
-        .await;
-        let mut conflict_body: Value = actix_test::read_body_json(conflict_response).await;
-        normalize_shared_error_response(&mut conflict_body)?;
-        assert_json_matches(
-            &conflict_body,
-            "tests/fixtures/http_api/tasks/conflict_error.json",
-        )?;
+        .await?;
 
         Ok(())
     })

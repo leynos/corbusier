@@ -156,8 +156,8 @@ Observable success means:
   `traceId` and structured `details.reason`.
 - [x] (2026-04-13 00:00Z) Implemented the frontend seam changes: the task
   slice now has a real HTTP adapter, supports detail and transition calls, and
-  can opt into a same-origin Vite proxy that injects a development bearer
-  token outside the browser runtime.
+  can opt into a same-origin Vite proxy that injects a development bearer token
+  outside the browser runtime.
 - [x] (2026-04-13 00:00Z) Added golden JSON fixtures plus in-memory,
   PostgreSQL-backed, and BDD coverage for task create, detail, transition, and
   unhappy-path contract assertions.
@@ -165,7 +165,8 @@ Observable success means:
   `docs/users-guide.md`, and `docs/roadmap.md` to record the transport
   contract, local auth seam, and milestone completion.
 - [x] (2026-04-13 00:00Z) Quality gates passed:
-  `make fmt`, `make lint`, `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
+  `make fmt`, `make lint`,
+  `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
   `make frontend-typecheck`, `make frontend-lint`, `make frontend-test`,
   `make frontend-e2e`, `make frontend-test-a11y`, `make markdownlint`, and
   `make nixie`.
@@ -248,16 +249,16 @@ validates `Idempotency-Key` on task mutations, and preserves the existing
 Corbusier success envelope so the milestone stays scoped to the task slice
 instead of widening into API-wide success-shape churn.
 
-Frontend outcome: the PWA still defaults to fixture mode, but it now has a
-real HTTP adapter behind the `TaskSliceGateway` port plus an explicit
+Frontend outcome: the PWA still defaults to fixture mode, but it now has a real
+HTTP adapter behind the `TaskSliceGateway` port plus an explicit
 development-only same-origin proxy seam for local bearer auth. This preserves
 the hexagonal boundary and keeps `4.4.3` focused on switching the browser path
 live rather than renegotiating transport or auth wiring.
 
 Testing outcome: golden fixtures now cover task create, detail, transition,
 validation, unauthorised, not-found, and conflict responses. The contract is
-exercised in in-memory tests, PostgreSQL-backed tests, and BDD scenarios so
-the slice has both storage-agnostic and persistence-backed guardrails.
+exercised in in-memory tests, PostgreSQL-backed tests, and BDD scenarios so the
+slice has both storage-agnostic and persistence-backed guardrails.
 
 Documentation outcome: the Corbusier design doc and users guide now describe
 the mixed contract shape used in this milestone, the opt-in frontend HTTP seam,
