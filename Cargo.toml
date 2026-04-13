@@ -55,6 +55,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 # HTTP server (health endpoint adapter)
 actix-web = "4.9.0"
+actix_v2a = { git = "https://github.com/leynos/actix-v2a.git", rev = "7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe" }
 
 # JWT / token handling
 jsonwebtoken = "9.3.0"

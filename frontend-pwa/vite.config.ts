@@ -6,18 +6,36 @@
  */
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  server: {
-    host: '127.0.0.1',
-    port: 4173,
-    strictPort: true,
-  },
-  preview: {
-    host: '127.0.0.1',
-    port: 4173,
-    strictPort: true,
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const proxyTarget = env.CORBUSIER_API_PROXY_TARGET;
+  const bearerToken = env.CORBUSIER_DEV_BEARER_TOKEN;
+
+  return {
+    plugins: [react(), tailwindcss()],
+    server: {
+      host: '127.0.0.1',
+      port: 4173,
+      proxy: proxyTarget
+        ? {
+            '/api': {
+              changeOrigin: true,
+              headers: bearerToken
+                ? { Authorization: `Bearer ${bearerToken}` }
+                : undefined,
+              secure: false,
+              target: proxyTarget,
+            },
+          }
+        : undefined,
+      strictPort: true,
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: 4173,
+      strictPort: true,
+    },
+  };
 });

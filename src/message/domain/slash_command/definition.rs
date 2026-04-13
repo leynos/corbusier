@@ -221,30 +221,38 @@ fn validate_parameter_definitions(
     Ok(())
 }
 
-fn parse_number_value(
+fn parse_parameter_value(
     command: &str,
     parameter: &CommandParameterSpec,
     raw: &str,
 ) -> Result<Value, SlashCommandError> {
-    if let Ok(signed) = raw.parse::<i64>() {
-        return Ok(Value::Number(Number::from(signed)));
+    match parameter.parameter_type {
+        CommandParameterType::String => Ok(Value::String(raw.to_owned())),
+        CommandParameterType::Number => parse_number_parameter(command, parameter, raw),
+        CommandParameterType::Boolean => parse_boolean_parameter(command, parameter, raw),
+        CommandParameterType::Select => parse_select_parameter(command, parameter, raw),
     }
-    if let Ok(unsigned) = raw.parse::<u64>() {
-        return Ok(Value::Number(Number::from(unsigned)));
-    }
-    if let Ok(float_value) = raw.parse::<f64>()
-        && let Some(number) = Number::from_f64(float_value)
-    {
-        return Ok(Value::Number(number));
-    }
-    Err(SlashCommandError::InvalidParameterValue {
-        command: command.to_owned(),
-        parameter: parameter.name.clone(),
-        reason: "expected a number".to_owned(),
-    })
 }
 
-fn parse_boolean_value(
+fn parse_number_parameter(
+    command: &str,
+    parameter: &CommandParameterSpec,
+    raw: &str,
+) -> Result<Value, SlashCommandError> {
+    parse_json_number(raw)
+        .map(Value::Number)
+        .ok_or_else(|| invalid_parameter_value(command, parameter, "expected a number".to_owned()))
+}
+
+fn parse_json_number(raw: &str) -> Option<Number> {
+    raw.parse::<i64>()
+        .map(Number::from)
+        .ok()
+        .or_else(|| raw.parse::<u64>().map(Number::from).ok())
+        .or_else(|| raw.parse::<f64>().ok().and_then(Number::from_f64))
+}
+
+fn parse_boolean_parameter(
     command: &str,
     parameter: &CommandParameterSpec,
     raw: &str,
@@ -252,15 +260,15 @@ fn parse_boolean_value(
     match raw.to_ascii_lowercase().as_str() {
         "true" => Ok(Value::Bool(true)),
         "false" => Ok(Value::Bool(false)),
-        _ => Err(SlashCommandError::InvalidParameterValue {
-            command: command.to_owned(),
-            parameter: parameter.name.clone(),
-            reason: "expected true or false (case-insensitive)".to_owned(),
-        }),
+        _ => Err(invalid_parameter_value(
+            command,
+            parameter,
+            "expected true or false (case-insensitive)".to_owned(),
+        )),
     }
 }
 
-fn parse_select_value(
+fn parse_select_parameter(
     command: &str,
     parameter: &CommandParameterSpec,
     raw: &str,
@@ -269,27 +277,25 @@ fn parse_select_value(
         .options
         .iter()
         .find(|option| option.eq_ignore_ascii_case(raw))
-        .map_or_else(
-            || {
-                Err(SlashCommandError::InvalidParameterValue {
-                    command: command.to_owned(),
-                    parameter: parameter.name.clone(),
-                    reason: format!("expected one of [{}]", parameter.options.join(", ")),
-                })
-            },
-            |option| Ok(Value::String(option.clone())),
-        )
+        .cloned()
+        .map(Value::String)
+        .ok_or_else(|| {
+            invalid_parameter_value(
+                command,
+                parameter,
+                format!("expected one of [{}]", parameter.options.join(", ")),
+            )
+        })
 }
 
-fn parse_parameter_value(
+fn invalid_parameter_value(
     command: &str,
     parameter: &CommandParameterSpec,
-    raw: &str,
-) -> Result<Value, SlashCommandError> {
-    match parameter.parameter_type {
-        CommandParameterType::String => Ok(Value::String(raw.to_owned())),
-        CommandParameterType::Number => parse_number_value(command, parameter, raw),
-        CommandParameterType::Boolean => parse_boolean_value(command, parameter, raw),
-        CommandParameterType::Select => parse_select_value(command, parameter, raw),
+    reason: String,
+) -> SlashCommandError {
+    SlashCommandError::InvalidParameterValue {
+        command: command.to_owned(),
+        parameter: parameter.name.clone(),
+        reason,
     }
 }

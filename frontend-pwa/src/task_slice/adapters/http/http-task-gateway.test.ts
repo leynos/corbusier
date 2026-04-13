@@ -1,0 +1,104 @@
+/**
+ * Unit tests for the live HTTP task gateway.
+ *
+ * The suite validates success parsing plus shared-error mapping without
+ * reaching a real backend.
+ */
+import { TaskGatewayError } from '../../ports/task-slice-gateway';
+import { createHttpTaskGateway } from './http-task-gateway';
+
+describe('http task gateway', () => {
+  it('parses successful task detail responses', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: {
+              task: {
+                created_at: '2026-04-13T00:00:00.000Z',
+                id: 'task-1',
+                origin: {
+                  issue_ref: {
+                    issue_number: 42,
+                    provider: 'github',
+                    repository: 'acme/widgets',
+                  },
+                  metadata: {
+                    assignees: [],
+                    labels: [],
+                    title: 'Stabilise the transport contract',
+                  },
+                  type: 'issue',
+                },
+                state: 'draft',
+                updated_at: '2026-04-13T00:00:00.000Z',
+              },
+            },
+            error: null,
+            metadata: {
+              request_id: 'req-123',
+              timestamp: '2026-04-13T00:00:00.000Z',
+              version: 'v1',
+            },
+            success: true,
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-1')).resolves.toMatchObject({
+      id: 'task-1',
+      state: 'draft',
+    });
+  });
+
+  it('maps shared not-found responses to the task gateway error', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 'not_found',
+            details: { reason: 'task_not_found' },
+            message: 'task task-9 was not found',
+            traceId: 'trace-123',
+          }),
+          { status: 404 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-9')).rejects.toEqual(
+      new TaskGatewayError('not_found', 'task task-9 was not found'),
+    );
+  });
+
+  it('maps invalid transition conflicts separately from validation failures', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 'conflict',
+            details: {
+              reason: 'invalid_task_transition',
+              taskId: 'task-2',
+            },
+            message: 'invalid state transition for task task-2',
+            traceId: 'trace-234',
+          }),
+          { status: 409 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.transitionTask('task-2', 'done')).rejects.toEqual(
+      new TaskGatewayError(
+        'conflict',
+        'invalid state transition for task task-2',
+      ),
+    );
+  });
+});

@@ -2436,18 +2436,12 @@ diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_j
 
 ```dockerfile
 # Build stage
-FROM rust:1.75-slim as builder
+FROM rust:1.75-bookworm AS builder
 WORKDIR /app
-COPY . .
-RUN cargo build --release
 
 #### Runtime stage
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates
-COPY --from=builder /app/target/release/corbusier /usr/local/bin/
-EXPOSE 8080
-CMD ["corbusier"]
-```
+FROM debian:bookworm-slim AS runtime
+WORKDIR /app
 
 ##### Container Architecture
 
@@ -12230,9 +12224,23 @@ The shipped `4.4.1` path is fixture-first. See the
  and the [User's guide](./users-guide.md) for rollout and operator guidance.
 `frontend-pwa/` renders the task create route and task detail route against a
 fixture adapter that mirrors the current `POST /api/v1/tasks` and
-`GET /api/v1/tasks/{task_id}` contract. A stub HTTP adapter remains in place so
-roadmap item `4.4.2` can attach the live transport seam without restructuring
-the route shell.
+`GET /api/v1/tasks/{task_id}` contract. Roadmap item `4.4.2` stabilizes the
+live seam without restructuring the route shell by:
+
+- keeping the task slice ports and route modules transport-agnostic;
+- adding a real HTTP adapter behind the existing task gateway port;
+- keeping fixture mode as the shipped default;
+- using a development-only same-origin Vite proxy to inject bearer auth
+  server-side when contributors opt into the live gateway.
+
+The stabilized task contract now consists of:
+
+- Corbusier-owned success envelopes for task create, detail, and state
+  transition responses;
+- shared `actix-v2a` error payloads (`code`, `message`, `traceId`, `details`)
+  for task and auth failures;
+- shared `actix-v2a` `Idempotency-Key` header parsing on task mutations, with
+  durable replay storage explicitly deferred beyond this slice-preparation step.
 
 ### 7.2 Core UI Use Cases
 

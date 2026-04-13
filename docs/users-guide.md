@@ -477,7 +477,7 @@ accepted JWT claims are `sub`, `tenant_id`, `session_id`, `exp`, and optional
 `role` plus `tenant_kind`. The current release only accepts
 `tenant_kind = user`.
 
-Every response, including errors, uses the same envelope shape:
+Successful responses use the versioned Corbusier envelope shape:
 
 ```json
 {
@@ -491,6 +491,25 @@ Every response, including errors, uses the same envelope shape:
   }
 }
 ```
+
+Error responses now use the shared `actix-v2a` contract instead of the success
+envelope:
+
+```json
+{
+  "code": "invalid_request",
+  "message": "invalid repository name 'bad-repo', expected owner/repo",
+  "traceId": "<correlation-id>",
+  "details": {
+    "reason": "task_validation_failed"
+  }
+}
+```
+
+Task mutation routes accept an optional `Idempotency-Key` header. Corbusier
+validates the header as a UUID and returns `400 invalid_request` when the value
+is malformed. Durable replay and payload-mismatch conflict handling remain
+deferred to the later live-projection roadmap work.
 
 Example conversation flow:
 
@@ -556,7 +575,8 @@ roadmap items `2.5.2` and `2.5.3` land.
 Corbusier now ships a repository-owned `frontend-pwa/` workspace for the first
 browser-facing task slice. The current slice is intentionally fixture-backed:
 it renders task creation and task detail screens without depending on the live
-HTTP auth seam or backend mutations beyond the contract shape.
+HTTP auth seam or backend mutations beyond the contract shape. Live transport
+is now available as an opt-in development seam.
 
 Run the workspace from the repository root:
 
@@ -564,6 +584,27 @@ Run the workspace from the repository root:
 make frontend-install
 make frontend-dev
 ```
+
+To run the browser against the live backend during development, export the
+following environment variables before `make frontend-dev`:
+
+```text
+export VITE_TASK_GATEWAY_MODE=http
+export CORBUSIER_API_PROXY_TARGET=http://127.0.0.1:8080
+export CORBUSIER_DEV_BEARER_TOKEN=<jwt>
+```
+
+Optional:
+
+```text
+export VITE_CORBUSIER_API_BASE_URL=/api/v1
+```
+
+This development seam keeps the bearer token out of browser JavaScript by
+having Vite proxy `/api/*` requests to the backend and inject the
+`Authorization` header server-side. It is temporary and exists only to support
+local preview plus browser-path testing before the production browser-auth
+model is settled.
 
 For installation conventions and consumer-facing configuration guidance, see
 the [Whitaker user's guide](./whitaker-users-guide.md).
@@ -589,14 +630,19 @@ Quality gates for the workspace are also exposed through `make`:
 
 Current behaviour and limits:
 
-- Successful task creation stays inside the fixture adapter and then navigates
-  directly to the task detail route.
+- Successful task creation stays inside the fixture adapter by default and then
+  navigates directly to the task detail route.
 - Invalid create input shows client-side validation feedback before any
   adapter call is made.
 - Unknown task ids render a not-found state.
-- Live HTTP transport, browser auth, task state mutation, and branch or
-  pull-request association remain deferred to roadmap items `4.4.2` through
-  `4.4.4`.
+- Setting `VITE_TASK_GATEWAY_MODE=http` switches the slice to the live HTTP
+  gateway without changing the shipped default.
+- The live development seam depends on a manually supplied bearer token and a
+  same-origin Vite proxy.
+- Task state mutation is wired into the live HTTP adapter, but the current UI
+  does not surface it until roadmap item `4.4.3`.
+- Branch or pull-request association remain deferred to roadmap items `4.4.4`
+  and later.
 
 ## Model Context Protocol (MCP) server lifecycle management
 

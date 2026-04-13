@@ -37,6 +37,23 @@ describe('fixture task gateway', () => {
     );
   });
 
+  it('transitions an existing task', async () => {
+    const gateway = createFixtureTaskGateway();
+    const task = await gateway.createTask({
+      provider: 'github',
+      repository: 'acme/widgets',
+      issue_number: 33,
+      title: 'Move task into review',
+    });
+
+    await expect(
+      gateway.transitionTask(task.id, 'in_review'),
+    ).resolves.toMatchObject({
+      id: task.id,
+      state: 'in_review',
+    });
+  });
+
   it('simulates an unavailable submission path', async () => {
     const gateway = createFixtureTaskGateway();
 

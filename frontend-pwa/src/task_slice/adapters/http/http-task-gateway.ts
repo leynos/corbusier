@@ -1,29 +1,143 @@
 /**
- * Define the HTTP task gateway adapter boundary for future live transport work.
+ * Implement the live HTTP task gateway used by the frontend slice.
  *
- * The module exports `createHttpTaskGateway`, which already satisfies the
- * `TaskSliceGateway` contract while signalling that live HTTP wiring remains
- * deferred to roadmap item `4.4.2`.
+ * This adapter consumes the stabilized Corbusier task contract while keeping
+ * transport parsing and error mapping inside the adapter boundary.
  */
-import type { CreateTaskRequest, Task } from '../../domain/task';
+import type { Task } from '../../domain/task';
 import {
   TaskGatewayError,
+  type TaskGatewayErrorKind,
   type TaskSliceGateway,
 } from '../../ports/task-slice-gateway';
 
-export function createHttpTaskGateway(_baseUrl: string): TaskSliceGateway {
+interface ApiMetadata {
+  request_id: string;
+  timestamp: string;
+  version: string;
+}
+
+interface ApiEnvelope<T> {
+  data: T;
+  error: null;
+  metadata: ApiMetadata;
+  success: true;
+}
+
+interface TaskEnvelope {
+  task: Task;
+}
+
+interface SharedErrorResponse {
+  code: string;
+  details?: Record<string, unknown>;
+  message: string;
+  traceId?: string;
+}
+
+export function createHttpTaskGateway(
+  baseUrl: string = '/api/v1',
+  fetchFn: typeof fetch = fetch,
+): TaskSliceGateway {
   return {
-    async createTask(_request: CreateTaskRequest): Promise<Task> {
-      throw new TaskGatewayError(
-        'unavailable',
-        'The live HTTP adapter is intentionally deferred to roadmap item 4.4.2.',
-      );
+    createTask(request) {
+      return sendTaskRequest(fetchFn, `${baseUrl}/tasks`, {
+        body: JSON.stringify(request),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        method: 'POST',
+      });
     },
-    async getTask(_taskId: string): Promise<Task> {
-      throw new TaskGatewayError(
-        'unavailable',
-        'The live HTTP adapter is intentionally deferred to roadmap item 4.4.2.',
-      );
+    getTask(taskId) {
+      return sendTaskRequest(fetchFn, `${baseUrl}/tasks/${taskId}`);
+    },
+    transitionTask(taskId, targetState) {
+      return sendTaskRequest(fetchFn, `${baseUrl}/tasks/${taskId}/state`, {
+        body: JSON.stringify({ state: targetState }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        method: 'PUT',
+      });
     },
   };
+}
+
+async function sendTaskRequest(
+  fetchFn: typeof fetch,
+  resource: string,
+  init?: RequestInit,
+): Promise<Task> {
+  let response: Response;
+  try {
+    response = await fetchFn(resource, init);
+  } catch {
+    throw new TaskGatewayError(
+      'unavailable',
+      'The task API could not be reached.',
+    );
+  }
+
+  if (!response.ok) {
+    throw await readGatewayError(response);
+  }
+
+  const envelope = (await response.json()) as ApiEnvelope<TaskEnvelope>;
+  if (!envelope.data?.task) {
+    throw new TaskGatewayError(
+      'unavailable',
+      'The task API returned an invalid response.',
+    );
+  }
+
+  return envelope.data.task;
+}
+
+async function readGatewayError(response: Response): Promise<TaskGatewayError> {
+  let body: SharedErrorResponse | null = null;
+
+  try {
+    body = (await response.json()) as SharedErrorResponse;
+  } catch {
+    return new TaskGatewayError(
+      'unavailable',
+      `The task API returned HTTP ${response.status}.`,
+    );
+  }
+
+  return new TaskGatewayError(
+    mapErrorKind(response.status, body),
+    body.message || `The task API returned HTTP ${response.status}.`,
+  );
+
+  function mapErrorKind(
+    statusCode: number,
+    errorBody: SharedErrorResponse,
+  ): TaskGatewayErrorKind {
+    const reason = errorBody.details?.reason;
+    if (typeof reason === 'string' && reason === 'invalid_task_transition') {
+      return 'conflict';
+    }
+
+    return classifyErrorKind(statusCode);
+  }
+
+  function classifyErrorKind(statusCode: number): TaskGatewayErrorKind {
+    if (statusCode === 401 || statusCode === 403) {
+      return 'unauthorized';
+    }
+    if (statusCode === 404) {
+      return 'not_found';
+    }
+    if (statusCode === 409) {
+      return 'conflict';
+    }
+    if (statusCode === 400) {
+      return 'validation';
+    }
+    return 'unavailable';
+  }
 }

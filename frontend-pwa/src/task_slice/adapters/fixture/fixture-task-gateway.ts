@@ -4,7 +4,7 @@
  * This module exports `createFixtureTaskGateway` plus fixture ids used to
  * simulate seeded and not-found task states without live backend traffic.
  */
-import type { CreateTaskRequest, Task } from '../../domain/task';
+import type { CreateTaskRequest, Task, TaskState } from '../../domain/task';
 import {
   TaskGatewayError,
   type TaskSliceGateway,
@@ -41,6 +41,20 @@ export function createFixtureTaskGateway(
       }
 
       return tasks.get(taskId) as Task;
+    },
+    async transitionTask(taskId, targetState) {
+      await delay();
+      const existingTask = tasks.get(taskId);
+      if (taskId === notFoundTaskId || !existingTask) {
+        throw new TaskGatewayError(
+          'not_found',
+          `Task ${taskId} was not found.`,
+        );
+      }
+
+      const updatedTask = applyTransition(existingTask, targetState);
+      tasks.set(taskId, updatedTask);
+      return updatedTask;
     },
   };
 }
@@ -105,6 +119,14 @@ function buildSeedTask(): Task {
     state: 'in_review',
     created_at: timestamp,
     updated_at: timestamp,
+  };
+}
+
+function applyTransition(task: Task, targetState: TaskState): Task {
+  return {
+    ...task,
+    state: targetState,
+    updated_at: new Date().toISOString(),
   };
 }
 

@@ -691,7 +691,7 @@ Use the shared dependency labels below to keep this step readable:
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
 
-- [ ] 4.4.2 Stabilize the slice transport contract and development auth seam.
+- [x] 4.4.2 Stabilize the slice transport contract and development auth seam.
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
   `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
   contracts and `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`

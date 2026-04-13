@@ -42,6 +42,7 @@ mod postgres {
     mod crud_tests;
     mod hook_engine_tests;
     mod http_api_surface_tests;
+    mod http_api_task_contract_tests;
     mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod serialization_tests;

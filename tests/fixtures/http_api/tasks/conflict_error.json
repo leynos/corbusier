@@ -1,0 +1,9 @@
+{
+  "code": "conflict",
+  "message": "task already exists for issue github/owner/repo/#42",
+  "traceId": "<trace-id>",
+  "details": {
+    "reason": "duplicate_issue_origin",
+    "issueRef": "github/owner/repo/#42"
+  }
+}

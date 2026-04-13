@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETED
 
 Current roadmap numbering places this work at `4.4.2` in
 [docs/roadmap.md](../roadmap.md).
@@ -143,7 +143,32 @@ Observable success means:
   HTTP routes, auth extractor, shared response envelope, frontend fixture
   gateway, and stub HTTP gateway.
 - [x] (2026-04-10 00:00Z) Authored the initial ExecPlan draft in this file.
-- [ ] Await explicit user approval before implementation begins.
+- [x] (2026-04-13 00:00Z) User approved implementation and execution began.
+- [x] (2026-04-13 00:00Z) Resolved the phase 4 dependency pin to upstream
+  `actix-v2a` commit `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe`.
+- [x] (2026-04-13 00:00Z) Stage A contract decision recorded: adopt
+  `actix-v2a` shared error payloads and idempotency-header parsing directly,
+  while retaining Corbusier-owned success envelopes and deferring durable
+  idempotency replay storage for a later milestone.
+- [x] (2026-04-13 00:00Z) Implemented the backend contract changes: task
+  errors now serialize through `actix-v2a`, task mutation routes validate
+  `Idempotency-Key`, and auth failures emit the shared error payload with
+  `traceId` and structured `details.reason`.
+- [x] (2026-04-13 00:00Z) Implemented the frontend seam changes: the task
+  slice now has a real HTTP adapter, supports detail and transition calls, and
+  can opt into a same-origin Vite proxy that injects a development bearer
+  token outside the browser runtime.
+- [x] (2026-04-13 00:00Z) Added golden JSON fixtures plus in-memory,
+  PostgreSQL-backed, and BDD coverage for task create, detail, transition, and
+  unhappy-path contract assertions.
+- [x] (2026-04-13 00:00Z) Updated `docs/corbusier-design.md`,
+  `docs/users-guide.md`, and `docs/roadmap.md` to record the transport
+  contract, local auth seam, and milestone completion.
+- [x] (2026-04-13 00:00Z) Quality gates passed:
+  `make fmt`, `make lint`, `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
+  `make frontend-typecheck`, `make frontend-lint`, `make frontend-test`,
+  `make frontend-e2e`, `make frontend-test-a11y`, `make markdownlint`, and
+  `make nixie`.
 
 ## Surprises & Discoveries
 
@@ -166,6 +191,16 @@ Observable success means:
   text, but no in-repo crate or module currently exposes those primitives. This
   milestone therefore needs an explicit upstream adoption strategy and a Git
   SHA pin until a point release is available.
+- The upstream repository is reachable and exposes the expected modules:
+  `src/http/error.rs`, `src/idempotency/http.rs`, and `src/openapi/`, so the
+  remaining design choice is how much of Corbusier's existing response shape to
+  replace in this milestone versus preserve behind a compatibility seam.
+- The existing task slice boundary was already well-factored for this work:
+  the route shell needed no transport logic, and the only frontend widening
+  required was extending the gateway port to include `transitionTask`.
+- The repository lint gate depends on Whitaker being installed in the current
+  environment. Running `whitaker-installer --skip-deps` was sufficient to make
+  `make lint` usable again without changing project code or Make targets.
 
 ## Decision Log
 
@@ -188,12 +223,57 @@ Observable success means:
   Corbusier-local modules. Rationale: the roadmap names `actix-v2a` as the
   shared contract dependency, and a Git pin reduces drift while upstream point
   releases catch up. Date/Author: 2026-04-11 / plan author.
+- Decision: pin `actix-v2a` to upstream `main` commit
+  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` for this milestone. Rationale:
+  this reviewed upstream head exposes the required `error`, `idempotency`, and
+  `openapi` modules. Date/Author: 2026-04-13 / implementation.
+- Decision: adopt `actix-v2a` for error payloads and idempotency-header
+  parsing, but keep Corbusier-owned success envelopes in place for now.
+  Rationale: the shared crate provides the error contract the slice needs, but
+  it does not provide a replacement success envelope, and replacing successful
+  payload shapes across the whole API would widen the milestone beyond the task
+  slice. Date/Author: 2026-04-13 / implementation.
+- Decision: defer durable idempotency replay persistence and limit this
+  milestone to validating `Idempotency-Key` syntax on task mutations.
+  Rationale: the shared crate exposes header parsing and response snapshot
+  primitives, but Corbusier does not yet have the persistence seam needed to
+  replay mutation responses without widening scope. Date/Author: 2026-04-13 /
+  implementation.
 
 ## Outcomes & Retrospective
 
-Planning outcome: the execution order, quality gates, and seam boundaries for
-`4.4.2` are now captured in one document. Implementation outcomes, deviations,
-and lessons learned must be added after execution.
+Implementation outcome: roadmap item `4.4.2` is complete. Corbusier now uses
+the pinned upstream `actix-v2a` error payload for task and auth failures,
+validates `Idempotency-Key` on task mutations, and preserves the existing
+Corbusier success envelope so the milestone stays scoped to the task slice
+instead of widening into API-wide success-shape churn.
+
+Frontend outcome: the PWA still defaults to fixture mode, but it now has a
+real HTTP adapter behind the `TaskSliceGateway` port plus an explicit
+development-only same-origin proxy seam for local bearer auth. This preserves
+the hexagonal boundary and keeps `4.4.3` focused on switching the browser path
+live rather than renegotiating transport or auth wiring.
+
+Testing outcome: golden fixtures now cover task create, detail, transition,
+validation, unauthorised, not-found, and conflict responses. The contract is
+exercised in in-memory tests, PostgreSQL-backed tests, and BDD scenarios so
+the slice has both storage-agnostic and persistence-backed guardrails.
+
+Documentation outcome: the Corbusier design doc and users guide now describe
+the mixed contract shape used in this milestone, the opt-in frontend HTTP seam,
+and the local preview environment variables. `docs/roadmap.md` marks `4.4.2`
+done to reflect the shipped slice contract.
+
+Lessons learned:
+
+- Direct upstream reuse was viable for errors and idempotency parsing, but not
+  for success payloads; preserving the Corbusier success envelope was the
+  cleanest way to keep the scope bounded.
+- The existing frontend port boundary was strong enough that transport work
+  stayed inside the HTTP adapter and Vite dev-server config rather than leaking
+  into route modules or task domain code.
+- Golden fixtures were easiest to keep stable by normalizing request IDs,
+  timestamps, task IDs, and trace IDs before comparison.
 
 ## Context and orientation
 
@@ -220,8 +300,8 @@ Temporary dependency pin for planning purposes:
 
 - Until `actix-v2a` publishes a suitable point release, implementation should
   pin the dependency to a reviewed full Git SHA. Use
-  `0123456789abcdef0123456789abcdef01234567` as the placeholder in this plan
-  and replace it with the actual reviewed upstream commit before coding starts.
+  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` as the pinned upstream commit for
+  this implementation.
 
 Planned steady state after `4.4.2`:
 

@@ -2,7 +2,7 @@
 
 use super::super::helpers::runtime;
 use super::support::{assert_rejects_response, build_bundle, reject_conversations_request};
-use crate::http_api_test_helpers::{required_field, required_str_field};
+use crate::http_api_test_helpers::required_str_field;
 use actix_web::{App, web};
 use corbusier::http_api::api_routes;
 use rstest::rstest;
@@ -67,8 +67,7 @@ fn rejects_authentication_failures(
         let body = run_auth_rejection_case(auth_case).await?;
         if let Some(expected_substr) = expected_message {
             eyre::ensure!(
-                required_str_field(required_field(&body, "error"), "message")
-                    .contains(expected_substr),
+                required_str_field(&body, "message").contains(expected_substr),
                 "error message should mention {expected_substr}"
             );
         }

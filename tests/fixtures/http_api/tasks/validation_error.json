@@ -1,0 +1,8 @@
+{
+  "code": "invalid_request",
+  "message": "invalid repository name 'bad-repo', expected owner/repo",
+  "traceId": "<trace-id>",
+  "details": {
+    "reason": "task_validation_failed"
+  }
+}
