@@ -61,7 +61,7 @@ jobs:
       - name: Frontend e2e
         run: make frontend-e2e
       - name: Cache Whitaker installer
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: |
             ~/.cargo/bin/whitaker-installer
@@ -80,13 +80,13 @@ jobs:
         run: make lint
       - name: Cache pg_worker binary
         id: cache-pg-worker
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: ~/.cargo/bin/pg_worker
           key: pg-worker-0.4.0-${{ runner.os }}
       - name: Cache PostgreSQL binaries
         id: cache-pg-binaries
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: |
             ~/.cache/postgresql_embedded
