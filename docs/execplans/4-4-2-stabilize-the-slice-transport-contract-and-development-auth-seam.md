@@ -170,6 +170,11 @@ Observable success means:
   `make frontend-typecheck`, `make frontend-lint`, `make frontend-test`,
   `make frontend-e2e`, `make frontend-test-a11y`, `make markdownlint`, and
   `make nixie`.
+- [x] (2026-04-15 00:00Z) Post-context-reset verification confirmed that the
+  repository still matches this execplan: the backend task contract, frontend
+  HTTP seam, golden fixtures, and documentation updates are present in-tree, so
+  no residual implementation drift remained to fix before re-running the
+  quality gates.
 
 ## Surprises & Discoveries
 
@@ -202,6 +207,9 @@ Observable success means:
 - The repository lint gate depends on Whitaker being installed in the current
   environment. Running `whitaker-installer --skip-deps` was sufficient to make
   `make lint` usable again without changing project code or Make targets.
+- A post-implementation audit after context reset found no drift between this
+  plan and the repository state; the clean worktree meant the only required
+  update was recording the verification pass here before re-running the gates.
 
 ## Decision Log
 
