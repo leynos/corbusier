@@ -3,7 +3,7 @@
 use super::super::helpers::runtime;
 use super::support::{build_bundle, with_bearer};
 use crate::http_api_test_helpers::{required_field, required_str_field};
-use actix_web::body::MessageBody;
+use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;
 use actix_web::{App, test as actix_test, web};
 use camino::Utf8Path;
@@ -12,7 +12,9 @@ use cap_std::fs_utf8::Dir;
 use corbusier::http_api::api_routes;
 use rstest::rstest;
 use serde_json::{Value, json};
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
 use tokio::runtime::Runtime;
 
 /// Opaque bearer token used in test requests.
@@ -45,21 +47,26 @@ impl Replacement {
     }
 }
 
+/// Type-erased sender: drives a single actix test request through the service
+/// and returns a boxed response. The concrete alias removes the `<F, Fut, B>`
+/// generic triple - and its identical `where` clause - from every `check_*`
+/// helper.
+type Sender<'a> = &'a dyn Fn(
+    actix_test::TestRequest,
+) -> Pin<Box<dyn Future<Output = ServiceResponse<BoxBody>> + 'a>>;
+
 #[expect(
     clippy::too_many_arguments,
-    reason = "shared scenario helper keeps the contract checks as single-expression wrappers"
+    reason = "shared scenario helper keeps the type-erased contract checks as single-expression wrappers"
 )]
-async fn run_scenario<F, Fut, B, Extract, Out>(
+async fn run_scenario<Extract, Out>(
     request: actix_test::TestRequest,
-    send: F,
+    send: Sender<'_>,
     extract: Extract,
     normalise: fn(&mut Value) -> Result<(), eyre::Report>,
     fixture: &Utf8Path,
 ) -> Result<Out, eyre::Report>
 where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
     Extract: FnOnce(&Value) -> Result<Out, eyre::Report>,
 {
     let response = send(request).await;
@@ -70,15 +77,10 @@ where
     Ok(out)
 }
 
-async fn check_create_task_success<F, Fut, B>(
-    send: F,
+async fn check_create_task_success(
+    send: Sender<'_>,
     token: BearerToken<'_>,
-) -> Result<String, eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<String, eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::post()
@@ -104,16 +106,11 @@ where
     .await
 }
 
-async fn check_get_task_success<F, Fut, B>(
-    send: F,
+async fn check_get_task_success(
+    send: Sender<'_>,
     token: BearerToken<'_>,
     task_id: &str,
-) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<(), eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
@@ -127,16 +124,11 @@ where
     .await
 }
 
-async fn check_transition_task_success<F, Fut, B>(
-    send: F,
+async fn check_transition_task_success(
+    send: Sender<'_>,
     token: BearerToken<'_>,
     task_id: &str,
-) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<(), eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::put()
@@ -152,15 +144,10 @@ where
     .await
 }
 
-async fn check_validation_error<F, Fut, B>(
-    send: F,
+async fn check_validation_error(
+    send: Sender<'_>,
     token: BearerToken<'_>,
-) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<(), eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::post()
@@ -181,12 +168,7 @@ where
     .await
 }
 
-async fn check_unauthorized_error<F, Fut, B>(send: F) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+async fn check_unauthorized_error(send: Sender<'_>) -> Result<(), eyre::Report> {
     run_scenario(
         actix_test::TestRequest::post()
             .uri("/api/v1/tasks")
@@ -204,15 +186,10 @@ where
     .await
 }
 
-async fn check_not_found_error<F, Fut, B>(
-    send: F,
+async fn check_not_found_error(
+    send: Sender<'_>,
     token: BearerToken<'_>,
-) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<(), eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::get()
@@ -227,15 +204,10 @@ where
     .await
 }
 
-async fn check_conflict_error<F, Fut, B>(
-    send: F,
+async fn check_conflict_error(
+    send: Sender<'_>,
     token: BearerToken<'_>,
-) -> Result<(), eyre::Report>
-where
-    F: FnOnce(actix_test::TestRequest) -> Fut,
-    Fut: std::future::Future<Output = ServiceResponse<B>>,
-    B: MessageBody,
-{
+) -> Result<(), eyre::Report> {
     run_scenario(
         with_bearer(
             actix_test::TestRequest::post()
@@ -269,41 +241,23 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
                 .configure(api_routes),
         )
         .await;
+        let send_fn =
+            |req: actix_test::TestRequest| -> Pin<Box<dyn Future<Output = ServiceResponse<BoxBody>> + '_>> {
+                Box::pin(async {
+                    actix_test::call_service(&app, req.to_request())
+                        .await
+                        .map_into_boxed_body()
+                })
+            };
+        let send: Sender<'_> = &send_fn;
 
-        let task_id = check_create_task_success(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-        )
-        .await?;
-        check_get_task_success(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-            &task_id,
-        )
-        .await?;
-        check_transition_task_success(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-            &task_id,
-        )
-        .await?;
-        check_validation_error(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-        )
-        .await?;
-        check_unauthorized_error(|request| actix_test::call_service(&app, request.to_request()))
-            .await?;
-        check_not_found_error(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-        )
-        .await?;
-        check_conflict_error(
-            |request| actix_test::call_service(&app, request.to_request()),
-            token,
-        )
-        .await?;
+        let task_id = check_create_task_success(send, token).await?;
+        check_get_task_success(send, token, &task_id).await?;
+        check_transition_task_success(send, token, &task_id).await?;
+        check_validation_error(send, token).await?;
+        check_unauthorized_error(send).await?;
+        check_not_found_error(send, token).await?;
+        check_conflict_error(send, token).await?;
 
         Ok(())
     })
