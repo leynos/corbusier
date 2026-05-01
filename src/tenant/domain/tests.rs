@@ -156,8 +156,8 @@ fn clock() -> DefaultClock {
 }
 
 #[fixture]
-fn acme_slug() -> TenantSlug {
-    TenantSlug::new("acme").expect("valid slug")
+fn acme_slug() -> Result<TenantSlug, TenantDomainError> {
+    TenantSlug::new("acme")
 }
 
 #[fixture]
@@ -178,49 +178,60 @@ fn new_tenant_defaults_to_active(clock: DefaultClock, owner: UserId) {
 }
 
 #[rstest]
-fn new_tenant_trims_display_name(clock: DefaultClock, acme_slug: TenantSlug) {
-    let tenant =
-        Tenant::new(acme_slug, "  Acme Corp  ", UserId::new(), &clock).expect("valid tenant");
-    assert_eq!(tenant.display_name(), "Acme Corp");
+fn new_tenant_trims_display_name(
+    clock: DefaultClock,
+    acme_slug: Result<TenantSlug, TenantDomainError>,
+) -> Result<(), eyre::Report> {
+    let tenant = Tenant::new(acme_slug?, "  Acme Corp  ", UserId::new(), &clock)?;
+    eyre::ensure!(tenant.display_name() == "Acme Corp");
+    Ok(())
 }
 
 #[rstest]
-fn new_tenant_with_empty_display_name_fails(clock: DefaultClock, acme_slug: TenantSlug) {
-    let result = Tenant::new(acme_slug, "   ", UserId::new(), &clock);
-    assert!(matches!(result, Err(TenantDomainError::EmptyDisplayName)));
+fn new_tenant_with_empty_display_name_fails(
+    clock: DefaultClock,
+    acme_slug: Result<TenantSlug, TenantDomainError>,
+) -> Result<(), eyre::Report> {
+    let result = Tenant::new(acme_slug?, "   ", UserId::new(), &clock);
+    eyre::ensure!(matches!(result, Err(TenantDomainError::EmptyDisplayName)));
+    Ok(())
 }
 
 #[rstest]
-fn suspend_changes_status_to_suspended(clock: DefaultClock, acme_slug: TenantSlug) {
-    let mut tenant =
-        Tenant::new(acme_slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
+fn suspend_changes_status_to_suspended(
+    clock: DefaultClock,
+    acme_slug: Result<TenantSlug, TenantDomainError>,
+) -> Result<(), eyre::Report> {
+    let mut tenant = Tenant::new(acme_slug?, "Acme Corp", UserId::new(), &clock)?;
     tenant.suspend(&clock);
-    assert_eq!(tenant.status(), TenantStatus::Suspended);
+    eyre::ensure!(tenant.status() == TenantStatus::Suspended);
+    Ok(())
 }
 
 #[rstest]
-fn reactivate_changes_status_to_active(clock: DefaultClock, acme_slug: TenantSlug) {
-    let mut tenant =
-        Tenant::new(acme_slug, "Acme Corp", UserId::new(), &clock).expect("valid tenant");
+fn reactivate_changes_status_to_active(
+    clock: DefaultClock,
+    acme_slug: Result<TenantSlug, TenantDomainError>,
+) -> Result<(), eyre::Report> {
+    let mut tenant = Tenant::new(acme_slug?, "Acme Corp", UserId::new(), &clock)?;
     tenant.suspend(&clock);
     tenant.reactivate(&clock);
-    assert_eq!(tenant.status(), TenantStatus::Active);
+    eyre::ensure!(tenant.status() == TenantStatus::Active);
+    Ok(())
 }
 
 #[rstest]
 fn tenant_owner_user_id_is_distinct_from_tenant_id(
     clock: DefaultClock,
-    acme_slug: TenantSlug,
+    acme_slug: Result<TenantSlug, TenantDomainError>,
     owner: UserId,
-) {
-    let tenant = Tenant::new(acme_slug, "Acme Corp", owner, &clock).expect("valid tenant");
+) -> Result<(), eyre::Report> {
+    let tenant = Tenant::new(acme_slug?, "Acme Corp", owner, &clock)?;
 
     // The owner user ID and tenant ID are distinct types with distinct values.
-    assert_eq!(tenant.owner_user_id(), owner);
-    assert_ne!(
-        tenant.id().into_inner(),
-        tenant.owner_user_id().into_inner()
-    );
+    eyre::ensure!(tenant.owner_user_id() == owner);
+    eyre::ensure!(tenant.id().into_inner() != tenant.owner_user_id().into_inner());
+    Ok(())
 }
 
 #[rstest]

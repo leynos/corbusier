@@ -14,10 +14,10 @@ fn clock() -> DefaultClock {
 }
 
 #[fixture]
-fn registration(clock: DefaultClock) -> McpServerRegistration {
-    let name = McpServerName::new("workspace_tools").expect("valid server name");
-    let transport = McpTransport::stdio("mcp-server").expect("valid transport");
-    McpServerRegistration::new(name, transport, &clock)
+fn registration(clock: DefaultClock) -> Result<McpServerRegistration, eyre::Report> {
+    let name = McpServerName::new("workspace_tools")?;
+    let transport = McpTransport::stdio("mcp-server")?;
+    Ok(McpServerRegistration::new(name, transport, &clock))
 }
 
 /// Helper to assert lifecycle state and health status in one call.
@@ -25,24 +25,25 @@ fn assert_state_and_health(
     registration: &McpServerRegistration,
     expected_state: McpServerLifecycleState,
     expected_health_status: McpServerHealthStatus,
-) {
-    assert_eq!(registration.lifecycle_state(), expected_state);
-    assert_eq!(
-        registration
-            .last_health()
-            .expect("health snapshot should exist")
-            .status(),
-        expected_health_status
-    );
+) -> Result<(), eyre::Report> {
+    eyre::ensure!(registration.lifecycle_state() == expected_state);
+    let health = registration
+        .last_health()
+        .ok_or_else(|| eyre::eyre!("health snapshot should exist"))?;
+    eyre::ensure!(health.status() == expected_health_status);
+    Ok(())
 }
 
 #[rstest]
-fn registration_starts_in_registered_state(registration: McpServerRegistration) {
+fn registration_starts_in_registered_state(
+    registration: Result<McpServerRegistration, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let server_registration = registration?;
     assert_state_and_health(
-        &registration,
+        &server_registration,
         McpServerLifecycleState::Registered,
         McpServerHealthStatus::Unknown,
-    );
+    )
 }
 
 #[rstest]
@@ -86,88 +87,88 @@ fn lifecycle_transition_matrix(
 
 #[rstest]
 fn mark_started_updates_state_and_health(
-    mut registration: McpServerRegistration,
+    registration: Result<McpServerRegistration, eyre::Report>,
     clock: DefaultClock,
-) {
+) -> Result<(), eyre::Report> {
+    let mut server_registration = registration?;
     let health = McpServerHealthSnapshot::healthy(Utc::now());
-    registration
-        .mark_started(health, &clock)
-        .expect("start transition should succeed");
+    server_registration.mark_started(health, &clock)?;
 
     assert_state_and_health(
-        &registration,
+        &server_registration,
         McpServerLifecycleState::Running,
         McpServerHealthStatus::Healthy,
-    );
+    )
 }
 
 #[rstest]
 fn mark_stopped_updates_state_and_resets_health(
-    mut registration: McpServerRegistration,
+    registration: Result<McpServerRegistration, eyre::Report>,
     clock: DefaultClock,
-) {
+) -> Result<(), eyre::Report> {
+    let mut server_registration = registration?;
     let health = McpServerHealthSnapshot::healthy(Utc::now());
-    registration
-        .mark_started(health, &clock)
-        .expect("start transition should succeed");
+    server_registration.mark_started(health, &clock)?;
 
-    registration
-        .mark_stopped(&clock)
-        .expect("stop transition should succeed");
+    server_registration.mark_stopped(&clock)?;
 
     assert_state_and_health(
-        &registration,
+        &server_registration,
         McpServerLifecycleState::Stopped,
         McpServerHealthStatus::Unknown,
-    );
+    )
 }
 
 #[rstest]
 fn update_health_modifies_health_without_changing_state(
-    mut registration: McpServerRegistration,
+    registration: Result<McpServerRegistration, eyre::Report>,
     clock: DefaultClock,
-) {
-    registration
-        .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
-        .expect("start transition should succeed");
-    let lifecycle_state = registration.lifecycle_state();
+) -> Result<(), eyre::Report> {
+    let mut server_registration = registration?;
+    server_registration.mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)?;
+    let lifecycle_state = server_registration.lifecycle_state();
 
-    registration.update_health(
+    server_registration.update_health(
         McpServerHealthSnapshot::unhealthy(Utc::now(), "probe timeout"),
         &clock,
     );
 
-    assert_eq!(registration.lifecycle_state(), lifecycle_state);
-    let health = registration
+    eyre::ensure!(server_registration.lifecycle_state() == lifecycle_state);
+    let health = server_registration
         .last_health()
-        .expect("health snapshot should exist");
-    assert_eq!(health.status(), McpServerHealthStatus::Unhealthy);
-    assert_eq!(health.message(), Some("probe timeout"));
+        .ok_or_else(|| eyre::eyre!("health snapshot should exist"))?;
+    eyre::ensure!(health.status() == McpServerHealthStatus::Unhealthy);
+    eyre::ensure!(health.message() == Some("probe timeout"));
+    Ok(())
 }
 
 #[rstest]
 fn invalid_transition_attempts_return_error(
-    mut registration: McpServerRegistration,
+    registration: Result<McpServerRegistration, eyre::Report>,
     clock: DefaultClock,
-) {
-    registration
-        .mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)
-        .expect("start transition should succeed");
+) -> Result<(), eyre::Report> {
+    let mut server_registration = registration?;
+    server_registration.mark_started(McpServerHealthSnapshot::healthy(Utc::now()), &clock)?;
 
-    let result = registration.transition_to(McpServerLifecycleState::Registered);
+    let result = server_registration.transition_to(McpServerLifecycleState::Registered);
 
-    assert!(matches!(
+    eyre::ensure!(matches!(
         result,
-        Err(ToolRegistryDomainError::InvalidLifecycleTransition { from, to })
+        Err(ToolRegistryDomainError::InvalidLifecycleTransition { ref from, ref to })
         if from == "running" && to == "registered"
     ));
+    Ok(())
 }
 
 #[rstest]
-fn ensure_can_query_tools_requires_running_state(registration: McpServerRegistration) {
-    let result = registration.ensure_can_query_tools();
-    assert!(matches!(
+fn ensure_can_query_tools_requires_running_state(
+    registration: Result<McpServerRegistration, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let server_registration = registration?;
+    let result = server_registration.ensure_can_query_tools();
+    eyre::ensure!(matches!(
         result,
         Err(ToolRegistryDomainError::ToolQueryRequiresRunning { .. })
     ));
+    Ok(())
 }

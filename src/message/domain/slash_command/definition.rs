@@ -221,6 +221,50 @@ fn validate_parameter_definitions(
     Ok(())
 }
 
+fn parse_number_value(
+    command: &str,
+    parameter: &CommandParameterSpec,
+    raw: &str,
+) -> Result<Value, SlashCommandError> {
+    if let Ok(signed) = raw.parse::<i64>() {
+        return Ok(Value::Number(Number::from(signed)));
+    }
+    if let Ok(unsigned) = raw.parse::<u64>() {
+        return Ok(Value::Number(Number::from(unsigned)));
+    }
+    if let Ok(float_value) = raw.parse::<f64>()
+        && let Some(number) = Number::from_f64(float_value)
+    {
+        return Ok(Value::Number(number));
+    }
+    Err(SlashCommandError::InvalidParameterValue {
+        command: command.to_owned(),
+        parameter: parameter.name.clone(),
+        reason: "expected a number".to_owned(),
+    })
+}
+
+fn parse_select_value(
+    command: &str,
+    parameter: &CommandParameterSpec,
+    raw: &str,
+) -> Result<Value, SlashCommandError> {
+    parameter
+        .options
+        .iter()
+        .find(|option| option.eq_ignore_ascii_case(raw))
+        .map_or_else(
+            || {
+                Err(SlashCommandError::InvalidParameterValue {
+                    command: command.to_owned(),
+                    parameter: parameter.name.clone(),
+                    reason: format!("expected one of [{}]", parameter.options.join(", ")),
+                })
+            },
+            |option| Ok(Value::String(option.clone())),
+        )
+}
+
 fn parse_parameter_value(
     command: &str,
     parameter: &CommandParameterSpec,
@@ -228,24 +272,7 @@ fn parse_parameter_value(
 ) -> Result<Value, SlashCommandError> {
     match parameter.parameter_type {
         CommandParameterType::String => Ok(Value::String(raw.to_owned())),
-        CommandParameterType::Number => {
-            if let Ok(signed) = raw.parse::<i64>() {
-                return Ok(Value::Number(Number::from(signed)));
-            }
-            if let Ok(unsigned) = raw.parse::<u64>() {
-                return Ok(Value::Number(Number::from(unsigned)));
-            }
-            if let Ok(float_value) = raw.parse::<f64>()
-                && let Some(number) = Number::from_f64(float_value)
-            {
-                return Ok(Value::Number(number));
-            }
-            Err(SlashCommandError::InvalidParameterValue {
-                command: command.to_owned(),
-                parameter: parameter.name.clone(),
-                reason: "expected a number".to_owned(),
-            })
-        }
+        CommandParameterType::Number => parse_number_value(command, parameter, raw),
         CommandParameterType::Boolean => match raw.to_ascii_lowercase().as_str() {
             "true" => Ok(Value::Bool(true)),
             "false" => Ok(Value::Bool(false)),
@@ -255,19 +282,6 @@ fn parse_parameter_value(
                 reason: "expected true or false (case-insensitive)".to_owned(),
             }),
         },
-        CommandParameterType::Select => parameter
-            .options
-            .iter()
-            .find(|option| option.eq_ignore_ascii_case(raw))
-            .map_or_else(
-                || {
-                    Err(SlashCommandError::InvalidParameterValue {
-                        command: command.to_owned(),
-                        parameter: parameter.name.clone(),
-                        reason: format!("expected one of [{}]", parameter.options.join(", ")),
-                    })
-                },
-                |option| Ok(Value::String(option.clone())),
-            ),
+        CommandParameterType::Select => parse_select_value(command, parameter, raw),
     }
 }
