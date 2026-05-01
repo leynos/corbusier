@@ -37,26 +37,38 @@ fn assert_session_outcome(
     let prior_session_id = expect_existing_session_id(world)?;
     let response = successful_response(world)?;
     match outcome {
-        SessionOutcome::Reused => {
-            if !response.reused_session() {
-                return Err(eyre::eyre!("expected reused_session=true"));
-            }
-            if response.session_id() != prior_session_id {
-                return Err(eyre::eyre!(
-                    "expected session {:?}, got {:?}",
-                    prior_session_id,
-                    response.session_id()
-                ));
-            }
-        }
-        SessionOutcome::Rotated => {
-            if !response.rotated_session() {
-                return Err(eyre::eyre!("expected rotated_session=true"));
-            }
-            if response.session_id() == prior_session_id {
-                return Err(eyre::eyre!("expected a new rotated session id"));
-            }
-        }
+        SessionOutcome::Reused => assert_reused_session(response, prior_session_id)?,
+        SessionOutcome::Rotated => assert_rotated_session(response, prior_session_id)?,
+    }
+    Ok(())
+}
+
+fn assert_reused_session(
+    response: &ExecuteAgentTurnResponse,
+    prior_session_id: TurnSessionId,
+) -> Result<(), eyre::Report> {
+    if !response.reused_session() {
+        return Err(eyre::eyre!("expected reused_session=true"));
+    }
+    if response.session_id() != prior_session_id {
+        return Err(eyre::eyre!(
+            "expected session {:?}, got {:?}",
+            prior_session_id,
+            response.session_id()
+        ));
+    }
+    Ok(())
+}
+
+fn assert_rotated_session(
+    response: &ExecuteAgentTurnResponse,
+    prior_session_id: TurnSessionId,
+) -> Result<(), eyre::Report> {
+    if !response.rotated_session() {
+        return Err(eyre::eyre!("expected rotated_session=true"));
+    }
+    if response.session_id() == prior_session_id {
+        return Err(eyre::eyre!("expected a new rotated session id"));
     }
     Ok(())
 }

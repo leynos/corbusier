@@ -314,7 +314,10 @@ mod tests {
     use mockable::DefaultClock;
     use rstest::rstest;
 
-    fn create_message_with_content(content: Vec<ContentPart>, clock: &DefaultClock) -> Message {
+    fn create_message_with_content(
+        content: Vec<ContentPart>,
+        clock: &DefaultClock,
+    ) -> Result<Message, eyre::Report> {
         Message::new(
             ConversationId::new(),
             Role::User,
@@ -322,22 +325,23 @@ mod tests {
             SequenceNumber::new(1),
             clock,
         )
-        .expect("test message should be valid")
+        .map_err(Into::into)
     }
 
     #[rstest]
-    fn validate_message_id_accepts_valid_id(clock: DefaultClock) {
+    fn validate_message_id_accepts_valid_id(clock: DefaultClock) -> Result<(), eyre::Report> {
         let message =
-            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
-        assert!(validate_message_id(&message).is_ok());
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock)?;
+        eyre::ensure!(validate_message_id(&message).is_ok());
+        Ok(())
     }
 
     #[rstest]
-    fn validate_message_id_rejects_nil_id(clock: DefaultClock) {
+    fn validate_message_id_rejects_nil_id(clock: DefaultClock) -> Result<(), eyre::Report> {
         // Create a valid message, then deserialize a modified version with nil ID.
         // This tests the defensive validation for external data/deserialization.
         let message =
-            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock)?;
         let mut json_value: serde_json::Value = serde_json::to_value(&message).expect("serialize");
         *json_value
             .get_mut("id")
@@ -346,17 +350,21 @@ mod tests {
         let nil_id_message: Message =
             serde_json::from_value(json_value).expect("deserialize with nil ID");
 
-        assert!(matches!(
+        eyre::ensure!(matches!(
             validate_message_id(&nil_id_message),
             Err(ValidationError::MissingMessageId)
         ));
+        Ok(())
     }
 
     #[rstest]
-    fn validate_content_not_empty_accepts_non_empty(clock: DefaultClock) {
+    fn validate_content_not_empty_accepts_non_empty(
+        clock: DefaultClock,
+    ) -> Result<(), eyre::Report> {
         let message =
-            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock);
-        assert!(validate_content_not_empty(&message).is_ok());
+            create_message_with_content(vec![ContentPart::Text(TextPart::new("test"))], &clock)?;
+        eyre::ensure!(validate_content_not_empty(&message).is_ok());
+        Ok(())
     }
 
     #[rstest]

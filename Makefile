@@ -3,7 +3,15 @@
 
 TARGET ?= corbusier
 
-CARGO ?= cargo
+CARGO ?= $(shell command -v cargo 2>/dev/null || printf '%s/.cargo/bin/cargo' "$$HOME")
+WHITAKER ?= $(shell command -v whitaker 2>/dev/null || \
+	if [ -x "$$HOME/.local/share/whitaker/whitaker" ]; then \
+		printf '%s/.local/share/whitaker/whitaker' "$$HOME"; \
+	elif [ -x "$$HOME/.local/bin/whitaker" ]; then \
+		printf '%s/.local/bin/whitaker' "$$HOME"; \
+	else \
+		printf '%s/.cargo/bin/whitaker' "$$HOME"; \
+	fi)
 BUN ?= bun
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
@@ -36,7 +44,7 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 lint: ## Run Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
-	RUSTFLAGS="$(RUST_FLAGS)" whitaker --all -- $(CARGO_FLAGS)
+	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
