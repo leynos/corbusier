@@ -43,34 +43,49 @@ fn assert_session_outcome(
     Ok(())
 }
 
+fn check_session(
+    flag_ok: bool,
+    flag_err: &str,
+    id_ok: bool,
+    id_err: impl FnOnce() -> eyre::Report,
+) -> Result<(), eyre::Report> {
+    if !flag_ok {
+        return Err(eyre::eyre!("{flag_err}"));
+    }
+    if !id_ok {
+        return Err(id_err());
+    }
+    Ok(())
+}
+
 fn assert_reused_session(
     response: &ExecuteAgentTurnResponse,
     prior_session_id: TurnSessionId,
 ) -> Result<(), eyre::Report> {
-    if !response.reused_session() {
-        return Err(eyre::eyre!("expected reused_session=true"));
-    }
-    if response.session_id() != prior_session_id {
-        return Err(eyre::eyre!(
-            "expected session {:?}, got {:?}",
-            prior_session_id,
-            response.session_id()
-        ));
-    }
-    Ok(())
+    check_session(
+        response.reused_session(),
+        "expected reused_session=true",
+        response.session_id() == prior_session_id,
+        || {
+            eyre::eyre!(
+                "expected session {:?}, got {:?}",
+                prior_session_id,
+                response.session_id()
+            )
+        },
+    )
 }
 
 fn assert_rotated_session(
     response: &ExecuteAgentTurnResponse,
     prior_session_id: TurnSessionId,
 ) -> Result<(), eyre::Report> {
-    if !response.rotated_session() {
-        return Err(eyre::eyre!("expected rotated_session=true"));
-    }
-    if response.session_id() == prior_session_id {
-        return Err(eyre::eyre!("expected a new rotated session id"));
-    }
-    Ok(())
+    check_session(
+        response.rotated_session(),
+        "expected rotated_session=true",
+        response.session_id() != prior_session_id,
+        || eyre::eyre!("expected a new rotated session id"),
+    )
 }
 
 #[then("the turn succeeds")]
