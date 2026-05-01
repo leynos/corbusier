@@ -55,8 +55,13 @@ type Sender<'a> = &'a dyn Fn(
     actix_test::TestRequest,
 ) -> Pin<Box<dyn Future<Output = ServiceResponse<BoxBody>> + 'a>>;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "repository threshold is stricter than Clippy's default and the test scenarios pass five stable parts"
+)]
 async fn run_scenario<Extract, Out>(
-    (request, send): (actix_test::TestRequest, Sender<'_>),
+    request: actix_test::TestRequest,
+    send: Sender<'_>,
     extract: Extract,
     normalise: fn(&mut Value) -> Result<(), eyre::Report>,
     fixture: &Utf8Path,
@@ -70,6 +75,79 @@ where
     normalise(&mut body)?;
     assert_json_matches(&body, fixture)?;
     Ok(out)
+}
+
+fn create_task_request(token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(standard_task_json()),
+        token.as_str(),
+    )
+}
+
+fn get_task_request(task_id: &str, token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
+        token.as_str(),
+    )
+}
+
+fn transition_task_request(task_id: &str, token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::put()
+            .uri(&format!("/api/v1/tasks/{task_id}/state"))
+            .set_json(json!({ "state": "in_progress" })),
+        token.as_str(),
+    )
+}
+
+fn validation_error_request(token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .set_json(json!({
+                "provider": "github",
+                "repository": "bad-repo",
+                "issue_number": 42,
+                "title": "Implement HTTP API"
+            })),
+        token.as_str(),
+    )
+}
+
+fn unauthorized_error_request() -> actix_test::TestRequest {
+    actix_test::TestRequest::post()
+        .uri("/api/v1/tasks")
+        .set_json(standard_task_json())
+}
+
+fn not_found_error_request(token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::get().uri("/api/v1/tasks/11111111-1111-1111-1111-111111111111"),
+        token.as_str(),
+    )
+}
+
+fn conflict_error_request(token: BearerToken<'_>) -> actix_test::TestRequest {
+    create_task_request(token)
+}
+
+fn task_id_from_body(body: &Value) -> String {
+    required_str_field(required_field(required_field(body, "data"), "task"), "id").to_owned()
+}
+
+fn fixture(path: &'static str) -> &'static Utf8Path {
+    Utf8Path::new(path)
+}
+
+fn standard_task_json() -> serde_json::Value {
+    json!({
+        "provider": "github",
+        "repository": "owner/repo",
+        "issue_number": 42,
+        "title": "Implement HTTP API"
+    })
 }
 
 #[rstest]
@@ -96,129 +174,40 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
         let send: Sender<'_> = &send_fn;
 
         let task_id = run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::post()
-                        .uri("/api/v1/tasks")
-                        .set_json(json!({
-                            "provider": "github",
-                            "repository": "owner/repo",
-                            "issue_number": 42,
-                            "title": "Implement HTTP API"
-                        })),
-                    token.as_str(),
-                ),
-                send,
-            ),
-            |body| {
-                Ok(
-                    required_str_field(required_field(required_field(body, "data"), "task"), "id")
-                        .to_owned(),
-                )
-            },
+            create_task_request(token),
+            send,
+            |body| Ok(task_id_from_body(body)),
             normalize_task_success_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/create_success.json"),
+            fixture("tests/fixtures/http_api/tasks/create_success.json"),
         )
         .await?;
         run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
-                    token.as_str(),
-                ),
-                send,
-            ),
+            get_task_request(&task_id, token),
+            send,
             |_| Ok(()),
             normalize_task_success_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/get_success.json"),
+            fixture("tests/fixtures/http_api/tasks/get_success.json"),
         )
         .await?;
         run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::put()
-                        .uri(&format!("/api/v1/tasks/{task_id}/state"))
-                        .set_json(json!({ "state": "in_progress" })),
-                    token.as_str(),
-                ),
-                send,
-            ),
+            transition_task_request(&task_id, token),
+            send,
             |_| Ok(()),
             normalize_task_success_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/transition_success.json"),
+            fixture("tests/fixtures/http_api/tasks/transition_success.json"),
         )
         .await?;
-        run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::post()
-                        .uri("/api/v1/tasks")
-                        .set_json(json!({
-                            "provider": "github",
-                            "repository": "bad-repo",
-                            "issue_number": 42,
-                            "title": "Implement HTTP API"
-                        })),
-                    token.as_str(),
-                ),
-                send,
-            ),
-            |_| Ok(()),
-            normalize_shared_error_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/validation_error.json"),
-        )
-        .await?;
-        run_scenario(
-            (
-                actix_test::TestRequest::post()
-                    .uri("/api/v1/tasks")
-                    .set_json(json!({
-                        "provider": "github",
-                        "repository": "owner/repo",
-                        "issue_number": 42,
-                        "title": "Implement HTTP API"
-                    })),
-                send,
-            ),
-            |_| Ok(()),
-            normalize_shared_error_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/unauthorized_error.json"),
-        )
-        .await?;
-        run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::get()
-                        .uri("/api/v1/tasks/11111111-1111-1111-1111-111111111111"),
-                    token.as_str(),
-                ),
-                send,
-            ),
-            |_| Ok(()),
-            normalize_shared_error_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/not_found_error.json"),
-        )
-        .await?;
-        run_scenario(
-            (
-                with_bearer(
-                    actix_test::TestRequest::post()
-                        .uri("/api/v1/tasks")
-                        .set_json(json!({
-                            "provider": "github",
-                            "repository": "owner/repo",
-                            "issue_number": 42,
-                            "title": "Implement HTTP API"
-                        })),
-                    token.as_str(),
-                ),
-                send,
-            ),
-            |_| Ok(()),
-            normalize_shared_error_response,
-            Utf8Path::new("tests/fixtures/http_api/tasks/conflict_error.json"),
-        )
-        .await?;
+
+        let error_scenarios: [(actix_test::TestRequest, &Utf8Path); 4] = [
+            (validation_error_request(token), fixture("tests/fixtures/http_api/tasks/validation_error.json")),
+            (unauthorized_error_request(), fixture("tests/fixtures/http_api/tasks/unauthorized_error.json")),
+            (not_found_error_request(token), fixture("tests/fixtures/http_api/tasks/not_found_error.json")),
+            (conflict_error_request(token), fixture("tests/fixtures/http_api/tasks/conflict_error.json")),
+        ];
+        for (request, fixture) in error_scenarios {
+            run_scenario(request, send, |_| Ok(()), normalize_shared_error_response, fixture)
+                .await?;
+        }
 
         Ok(())
     })
