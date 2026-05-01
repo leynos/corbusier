@@ -1,6 +1,6 @@
 .PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e frontend-audit
 
-export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(PATH)
+export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(HOME)/.local/bin:$(PATH)
 
 TARGET ?= corbusier
 
