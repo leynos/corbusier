@@ -171,6 +171,85 @@ fn standard_task_json() -> serde_json::Value {
     })
 }
 
+async fn run_happy_path_scenarios(
+    send: Sender<'_>,
+    token: BearerToken<'_>,
+) -> Result<String, eyre::Report> {
+    let task_id: String = run_scenario(
+        create_task_request(token),
+        send,
+        |body| Ok(task_id_from_body(body)),
+        normalize_task_success_response,
+        fixture("tests/fixtures/http_api/tasks/create_success.json"),
+        StatusCode::CREATED,
+    )
+    .await?;
+    run_scenario(
+        get_task_request(&task_id, token),
+        send,
+        |_| Ok(()),
+        normalize_task_success_response,
+        fixture("tests/fixtures/http_api/tasks/get_success.json"),
+        StatusCode::OK,
+    )
+    .await?;
+    run_scenario(
+        transition_task_request(&task_id, token),
+        send,
+        |_| Ok(()),
+        normalize_task_success_response,
+        fixture("tests/fixtures/http_api/tasks/transition_success.json"),
+        StatusCode::OK,
+    )
+    .await?;
+    Ok(task_id)
+}
+
+async fn run_error_scenarios(
+    send: Sender<'_>,
+    token: BearerToken<'_>,
+) -> Result<(), eyre::Report> {
+    let scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 5] = [
+        (
+            validation_error_request(token),
+            fixture("tests/fixtures/http_api/tasks/validation_error.json"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            malformed_idempotency_key_request(token),
+            fixture("tests/fixtures/http_api/tasks/invalid_idempotency_key.json"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            unauthorized_error_request(),
+            fixture("tests/fixtures/http_api/tasks/unauthorized_error.json"),
+            StatusCode::UNAUTHORIZED,
+        ),
+        (
+            not_found_error_request(token),
+            fixture("tests/fixtures/http_api/tasks/not_found_error.json"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            conflict_error_request(token),
+            fixture("tests/fixtures/http_api/tasks/conflict_error.json"),
+            StatusCode::CONFLICT,
+        ),
+    ];
+    for (request, path, expected_status) in scenarios {
+        run_scenario(
+            request,
+            send,
+            |_| Ok(()),
+            normalize_shared_error_response,
+            path,
+            expected_status,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 #[rstest]
 fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result<(), eyre::Report> {
     let rt = runtime?;
@@ -194,72 +273,8 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
             };
         let send: Sender<'_> = &send_fn;
 
-        let task_id = run_scenario(
-            create_task_request(token),
-            send,
-            |body| Ok(task_id_from_body(body)),
-            normalize_task_success_response,
-            fixture("tests/fixtures/http_api/tasks/create_success.json"),
-            StatusCode::CREATED,
-        )
-        .await?;
-        run_scenario(
-            get_task_request(&task_id, token),
-            send,
-            |_| Ok(()),
-            normalize_task_success_response,
-            fixture("tests/fixtures/http_api/tasks/get_success.json"),
-            StatusCode::OK,
-        )
-        .await?;
-        run_scenario(
-            transition_task_request(&task_id, token),
-            send,
-            |_| Ok(()),
-            normalize_task_success_response,
-            fixture("tests/fixtures/http_api/tasks/transition_success.json"),
-            StatusCode::OK,
-        )
-        .await?;
-
-        let error_scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 5] = [
-            (
-                validation_error_request(token),
-                fixture("tests/fixtures/http_api/tasks/validation_error.json"),
-                StatusCode::BAD_REQUEST,
-            ),
-            (
-                malformed_idempotency_key_request(token),
-                fixture("tests/fixtures/http_api/tasks/invalid_idempotency_key.json"),
-                StatusCode::BAD_REQUEST,
-            ),
-            (
-                unauthorized_error_request(),
-                fixture("tests/fixtures/http_api/tasks/unauthorized_error.json"),
-                StatusCode::UNAUTHORIZED,
-            ),
-            (
-                not_found_error_request(token),
-                fixture("tests/fixtures/http_api/tasks/not_found_error.json"),
-                StatusCode::NOT_FOUND,
-            ),
-            (
-                conflict_error_request(token),
-                fixture("tests/fixtures/http_api/tasks/conflict_error.json"),
-                StatusCode::CONFLICT,
-            ),
-        ];
-        for (request, fixture, expected_status) in error_scenarios {
-            run_scenario(
-                request,
-                send,
-                |_| Ok(()),
-                normalize_shared_error_response,
-                fixture,
-                expected_status,
-            )
-            .await?;
-        }
+        run_happy_path_scenarios(send, token).await?;
+        run_error_scenarios(send, token).await?;
 
         Ok(())
     })

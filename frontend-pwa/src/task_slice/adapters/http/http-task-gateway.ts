@@ -64,6 +64,14 @@ function isIssueProvider(value: unknown): value is IssueProvider {
   return value === 'github' || value === 'gitlab';
 }
 
+/**
+ * Returns true when `value` is a finite integer ≥ `min`.
+ * Narrows the type to `number` for the caller.
+ */
+function isIntegerAtLeast(value: unknown, min: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min;
+}
+
 function requireNonEmptyString(
   raw: Record<string, unknown>,
   field: string,
@@ -99,10 +107,7 @@ function validateIssueRef(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'repository');
-  const num = raw.issue_number;
-  if (typeof num !== 'number' || !Number.isInteger(num) || num < 0) {
-    throw taskShapeGatewayError();
-  }
+  if (!isIntegerAtLeast(raw.issue_number, 0)) throw taskShapeGatewayError();
 }
 
 function validateTaskOrigin(raw: unknown): asserts raw is TaskOrigin {
@@ -123,28 +128,29 @@ function validateOptionalPullRequestRef(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'repository');
-  const n = raw.pull_request_number;
-  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
+  if (!isIntegerAtLeast(raw.pull_request_number, 1))
     throw taskShapeGatewayError();
-  }
 }
 
-function validateParsedTaskEnvelopeTask(task: unknown): Task {
-  if (!isPlainRecord(task)) throw taskShapeGatewayError();
-  requireNonEmptyString(task, 'id');
+function requireValidTaskState(task: Record<string, unknown>): void {
   if (
     typeof task.state !== 'string' ||
     !(TASK_STATES as ReadonlySet<string>).has(task.state)
   ) {
     throw taskShapeGatewayError();
   }
-  validateTaskOrigin(task.origin);
+}
+
+function validateOptionalRefs(task: Record<string, unknown>): void {
   if (task.branch_ref !== undefined && task.branch_ref !== null) {
     validateOptionalBranchRef(task.branch_ref);
   }
   if (task.pull_request_ref !== undefined && task.pull_request_ref !== null) {
     validateOptionalPullRequestRef(task.pull_request_ref);
   }
+}
+
+function validateTimestampFields(task: Record<string, unknown>): void {
   const createdAt = task.created_at;
   const updatedAt = task.updated_at;
   if (typeof createdAt !== 'string' || createdAt.length === 0) {
@@ -153,7 +159,32 @@ function validateParsedTaskEnvelopeTask(task: unknown): Task {
   if (typeof updatedAt !== 'string' || updatedAt.length === 0) {
     throw taskShapeGatewayError();
   }
+}
+
+function validateParsedTaskEnvelopeTask(task: unknown): Task {
+  if (!isPlainRecord(task)) throw taskShapeGatewayError();
+  requireNonEmptyString(task, 'id');
+  requireValidTaskState(task);
+  validateTaskOrigin(task.origin);
+  validateOptionalRefs(task);
+  validateTimestampFields(task);
   return task as unknown as Task;
+}
+
+/**
+ * Builds the RequestInit for state-mutating task requests (POST / PUT).
+ * Centralises the repeated Content-Type + Idempotency-Key header pair and
+ * JSON serialisation so that createTask and transitionTask stay DRY.
+ */
+function mutationInit(body: unknown, method: 'POST' | 'PUT'): RequestInit {
+  return {
+    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    method,
+  };
 }
 
 export function createHttpTaskGateway(
@@ -162,26 +193,21 @@ export function createHttpTaskGateway(
 ): TaskSliceGateway {
   return {
     createTask(request) {
-      return sendTaskRequest(fetchFn, `${baseUrl}/tasks`, {
-        body: JSON.stringify(request),
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
-        },
-        method: 'POST',
-      });
+      return sendTaskRequest(
+        fetchFn,
+        `${baseUrl}/tasks`,
+        mutationInit(request, 'POST'),
+      );
     },
     getTask(taskId) {
       return sendTaskRequest(fetchFn, `${baseUrl}/tasks/${taskId}`);
     },
     transitionTask(taskId, targetState) {
-      return sendTaskRequest(fetchFn, `${baseUrl}/tasks/${taskId}/state`, {
-        body: JSON.stringify({ state: targetState }),
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
-        },
-      });
+      return sendTaskRequest(
+        fetchFn,
+        `${baseUrl}/tasks/${taskId}/state`,
+        mutationInit({ state: targetState }, 'PUT'),
+      );
     },
   };
 }
@@ -231,6 +257,32 @@ async function parseSuccessEnvelope(
 }
 
 async function readGatewayError(response: Response): Promise<TaskGatewayError> {
+  const HTTP_STATUS_TO_ERROR_KIND: Readonly<
+    Partial<Record<number, TaskGatewayErrorKind>>
+  > = {
+    400: 'validation',
+    401: 'unauthorized',
+    403: 'unauthorized',
+    404: 'not_found',
+    409: 'conflict',
+  } as const;
+
+  function classifyErrorKind(statusCode: number): TaskGatewayErrorKind {
+    return HTTP_STATUS_TO_ERROR_KIND[statusCode] ?? 'unavailable';
+  }
+
+  function mapErrorKind(
+    statusCode: number,
+    errorBody: SharedErrorResponse,
+  ): TaskGatewayErrorKind {
+    const reason = errorBody.details?.reason;
+    if (typeof reason === 'string' && reason === 'invalid_task_transition') {
+      return 'conflict';
+    }
+
+    return classifyErrorKind(statusCode);
+  }
+
   let body: SharedErrorResponse | null = null;
 
   try {
@@ -246,32 +298,4 @@ async function readGatewayError(response: Response): Promise<TaskGatewayError> {
     mapErrorKind(response.status, body),
     body.message || `The task API returned HTTP ${response.status}.`,
   );
-
-  function mapErrorKind(
-    statusCode: number,
-    errorBody: SharedErrorResponse,
-  ): TaskGatewayErrorKind {
-    const reason = errorBody.details?.reason;
-    if (typeof reason === 'string' && reason === 'invalid_task_transition') {
-      return 'conflict';
-    }
-
-    return classifyErrorKind(statusCode);
-  }
-
-  function classifyErrorKind(statusCode: number): TaskGatewayErrorKind {
-    if (statusCode === 401 || statusCode === 403) {
-      return 'unauthorized';
-    }
-    if (statusCode === 404) {
-      return 'not_found';
-    }
-    if (statusCode === 409) {
-      return 'conflict';
-    }
-    if (statusCode === 400) {
-      return 'validation';
-    }
-    return 'unavailable';
-  }
 }

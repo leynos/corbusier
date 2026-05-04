@@ -15,6 +15,40 @@ use corbusier::http_api::api_routes;
 use rstest::rstest;
 use serde_json::{Value, json};
 
+#[derive(Clone, Copy)]
+struct BearerToken<'a>(&'a str);
+
+impl<'a> BearerToken<'a> {
+    const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Replacement {
+    RequestId,
+    Timestamp,
+    TaskId,
+    TraceId,
+}
+
+impl Replacement {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::RequestId => "<request-id>",
+            Self::Timestamp => "<timestamp>",
+            Self::TaskId => "<task-id>",
+            Self::TraceId => "<trace-id>",
+        }
+    }
+}
+
+struct ScenarioDesc<'a> {
+    label: &'a str,
+    body: Value,
+    fixture: &'a Utf8Path,
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_task_contract_matches_golden_fixtures(
@@ -24,7 +58,8 @@ async fn postgres_task_contract_matches_golden_fixtures(
     >,
 ) -> Result<(), BoxError> {
     let postgres_context = context.await?;
-    let token = postgres_context.auth.token()?;
+    let token_string = postgres_context.auth.token()?;
+    let token = BearerToken(token_string.as_str());
     let app = actix_test::init_service(
         App::new()
             .app_data(web::Data::new(postgres_context.state))
@@ -32,33 +67,36 @@ async fn postgres_task_contract_matches_golden_fixtures(
     )
     .await;
 
-    let (_create_body, task_id) = create_task_succeeds(&app, &token).await?;
-    let _get_body = get_task_succeeds(&app, &token, &task_id).await?;
-    let _transition_body = transition_task_succeeds(&app, &token, &task_id).await?;
+    let (_create_body, task_id) = create_task_succeeds(&app, token).await?;
+    let _get_body = get_task_succeeds(&app, token, &task_id).await?;
+    let _transition_body = transition_task_succeeds(&app, token, &task_id).await?;
 
     let scenarios = [
-        (
-            "repository validation rejects bad slug",
-            json!({
+        ScenarioDesc {
+            label: "repository validation rejects bad slug",
+            body: json!({
                 "provider": "github",
                 "repository": "bad-repo",
                 "issue_number": 42,
                 "title": "Implement HTTP API"
             }),
-            "tests/fixtures/http_api/tasks/validation_error.json",
-        ),
-        (
-            "duplicate creation returns conflict envelope",
-            standard_task_json(),
-            "tests/fixtures/http_api/tasks/conflict_error.json",
-        ),
+            fixture: Utf8Path::new("tests/fixtures/http_api/tasks/validation_error.json"),
+        },
+        ScenarioDesc {
+            label: "duplicate creation returns conflict envelope",
+            body: standard_task_json(),
+            fixture: Utf8Path::new("tests/fixtures/http_api/tasks/conflict_error.json"),
+        },
     ];
-    error_scenario_loop(&app, &token, &scenarios).await?;
+    error_scenario_loop(&app, token, scenarios.as_slice()).await?;
 
     Ok(())
 }
 
-async fn create_task_succeeds<S>(app: &S, token: &str) -> Result<(Value, String), BoxError>
+async fn create_task_succeeds<S>(
+    app: &S,
+    token: BearerToken<'_>,
+) -> Result<(Value, String), BoxError>
 where
     S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
 {
@@ -68,7 +106,7 @@ where
             actix_test::TestRequest::post()
                 .uri("/api/v1/tasks")
                 .set_json(standard_task_json()),
-            token,
+            token.as_str(),
         )
         .to_request(),
     )
@@ -87,84 +125,105 @@ where
     normalize_task_success_response(&mut create_body)?;
     assert_json_matches(
         &create_body,
-        "tests/fixtures/http_api/tasks/create_success.json",
+        Utf8Path::new("tests/fixtures/http_api/tasks/create_success.json"),
     )?;
     Ok((create_body, task_id))
 }
 
-async fn get_task_succeeds<S>(app: &S, token: &str, task_id: &str) -> Result<Value, BoxError>
+#[expect(
+    clippy::too_many_arguments,
+    reason = "repository threshold is stricter than Clippy's default and the golden scenario passes five stable parts"
+)]
+async fn run_success_scenario<S>(
+    app: &S,
+    request: actix_test::TestRequest,
+    expected_status: StatusCode,
+    scenario: &str,
+    fixture_path: &Utf8Path,
+) -> Result<Value, BoxError>
 where
     S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
 {
-    let get_response = actix_test::call_service(
+    let response = actix_test::call_service(app, request.to_request()).await;
+    assert_actix_status(&response, expected_status, scenario)?;
+    let mut body: Value = actix_test::read_body_json(response).await;
+    normalize_task_success_response(&mut body)?;
+    assert_json_matches(&body, fixture_path)?;
+    Ok(body)
+}
+
+async fn get_task_succeeds<S>(
+    app: &S,
+    token: BearerToken<'_>,
+    task_id: &str,
+) -> Result<Value, BoxError>
+where
+    S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
+{
+    run_success_scenario(
         app,
         with_bearer(
             actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
-            token,
-        )
-        .to_request(),
+            token.as_str(),
+        ),
+        StatusCode::OK,
+        "task get succeeds",
+        Utf8Path::new("tests/fixtures/http_api/tasks/get_success.json"),
     )
-    .await;
-    assert_actix_status(&get_response, StatusCode::OK, "task get succeeds")?;
-    let mut get_body: Value = actix_test::read_body_json(get_response).await;
-    normalize_task_success_response(&mut get_body)?;
-    assert_json_matches(&get_body, "tests/fixtures/http_api/tasks/get_success.json")?;
-    Ok(get_body)
+    .await
 }
 
-async fn transition_task_succeeds<S>(app: &S, token: &str, task_id: &str) -> Result<Value, BoxError>
+async fn transition_task_succeeds<S>(
+    app: &S,
+    token: BearerToken<'_>,
+    task_id: &str,
+) -> Result<Value, BoxError>
 where
     S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
 {
-    let transition_response = actix_test::call_service(
+    run_success_scenario(
         app,
         with_bearer(
             actix_test::TestRequest::put()
                 .uri(&format!("/api/v1/tasks/{task_id}/state"))
                 .set_json(json!({ "state": "in_progress" })),
-            token,
-        )
-        .to_request(),
-    )
-    .await;
-    assert_actix_status(
-        &transition_response,
+            token.as_str(),
+        ),
         StatusCode::OK,
         "task transition succeeds",
-    )?;
-    let mut transition_body: Value = actix_test::read_body_json(transition_response).await;
-    normalize_task_success_response(&mut transition_body)?;
-    assert_json_matches(
-        &transition_body,
-        "tests/fixtures/http_api/tasks/transition_success.json",
-    )?;
-    Ok(transition_body)
+        Utf8Path::new("tests/fixtures/http_api/tasks/transition_success.json"),
+    )
+    .await
 }
 
 async fn error_scenario_loop<S>(
     app: &S,
-    token: &str,
-    scenarios: &[(&str, Value, &'static str)],
+    token: BearerToken<'_>,
+    scenarios: &[ScenarioDesc<'_>],
 ) -> Result<(), BoxError>
 where
     S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
 {
-    for &(description, ref body_json, fixture_path) in scenarios {
+    for scenario in scenarios {
         let response = actix_test::call_service(
             app,
             with_bearer(
                 actix_test::TestRequest::post()
                     .uri("/api/v1/tasks")
-                    .set_json(body_json.clone()),
-                token,
+                    .set_json(scenario.body.clone()),
+                token.as_str(),
             )
             .to_request(),
         )
         .await;
-        assert_actix_status(&response, expected_http_status(fixture_path)?, description)?;
+        assert_actix_status(
+            &response,
+            expected_http_status(scenario.fixture)?,
+            scenario.label,
+        )?;
         let mut body: Value = actix_test::read_body_json(response).await;
         normalize_shared_error_response(&mut body)?;
-        assert_json_matches(&body, fixture_path)?;
+        assert_json_matches(&body, scenario.fixture)?;
     }
     Ok(())
 }
@@ -184,8 +243,8 @@ fn assert_actix_status(
     Ok(())
 }
 
-fn expected_http_status(fixture_path: &'static str) -> Result<StatusCode, BoxError> {
-    let path = Utf8Path::new(fixture_path).file_name().ok_or_else(|| {
+fn expected_http_status(fixture_path: &Utf8Path) -> Result<StatusCode, BoxError> {
+    let path = fixture_path.file_name().ok_or_else(|| {
         Box::new(std::io::Error::other(format!(
             "fixture path `{fixture_path}` has no final segment"
         ))) as BoxError
@@ -210,26 +269,28 @@ fn standard_task_json() -> Value {
     })
 }
 
-fn assert_json_matches(actual: &Value, expected_path: &str) -> Result<(), BoxError> {
+fn assert_json_matches(actual: &Value, expected_path: &Utf8Path) -> Result<(), BoxError> {
     let expected = load_json_fixture(expected_path)?;
     if actual != &expected {
         return Err(Box::new(std::io::Error::other(format!(
-            "fixture mismatch for {expected_path}\nactual: {actual}\nexpected: {expected}"
+            "fixture mismatch for {}\nactual: {actual}\nexpected: {expected}",
+            expected_path.as_str()
         ))) as BoxError);
     }
     Ok(())
 }
 
-fn load_json_fixture(path: &str) -> Result<Value, BoxError> {
-    let fixture_path = Utf8Path::new(path);
-    let parent = fixture_path.parent().ok_or_else(|| {
+fn load_json_fixture(path: &Utf8Path) -> Result<Value, BoxError> {
+    let parent = path.parent().ok_or_else(|| {
         Box::new(std::io::Error::other(format!(
-            "fixture path {path} should include a parent directory"
+            "fixture path {} should include a parent directory",
+            path.as_str()
         ))) as BoxError
     })?;
-    let file_name = fixture_path.file_name().ok_or_else(|| {
+    let file_name = path.file_name().ok_or_else(|| {
         Box::new(std::io::Error::other(format!(
-            "fixture path {path} should include a file name"
+            "fixture path {} should include a file name",
+            path.as_str()
         ))) as BoxError
     })?;
     let fixture_dir = Dir::open_ambient_dir(parent, ambient_authority())
@@ -241,21 +302,29 @@ fn load_json_fixture(path: &str) -> Result<Value, BoxError> {
 }
 
 fn normalize_task_success_response(body: &mut Value) -> Result<(), BoxError> {
-    replace_string_at_path(body, &["metadata", "request_id"], "<request-id>")?;
-    replace_string_at_path(body, &["metadata", "timestamp"], "<timestamp>")?;
-    replace_string_at_path(body, &["data", "task", "id"], "<task-id>")?;
-    replace_string_at_path(body, &["data", "task", "created_at"], "<timestamp>")?;
-    replace_string_at_path(body, &["data", "task", "updated_at"], "<timestamp>")
+    replace_string_at_path(body, &["metadata", "request_id"], Replacement::RequestId)?;
+    replace_string_at_path(body, &["metadata", "timestamp"], Replacement::Timestamp)?;
+    replace_string_at_path(body, &["data", "task", "id"], Replacement::TaskId)?;
+    replace_string_at_path(
+        body,
+        &["data", "task", "created_at"],
+        Replacement::Timestamp,
+    )?;
+    replace_string_at_path(
+        body,
+        &["data", "task", "updated_at"],
+        Replacement::Timestamp,
+    )
 }
 
 fn normalize_shared_error_response(body: &mut Value) -> Result<(), BoxError> {
-    replace_string_at_path(body, &["traceId"], "<trace-id>")
+    replace_string_at_path(body, &["traceId"], Replacement::TraceId)
 }
 
 fn replace_string_at_path(
     body: &mut Value,
     path: &[&str],
-    replacement: &str,
+    replacement: Replacement,
 ) -> Result<(), BoxError> {
     let mut current = body;
     let Some((leaf, parents)) = path.split_last() else {
@@ -276,10 +345,11 @@ fn replace_string_at_path(
         ))) as BoxError);
     };
     match value {
-        Value::String(existing) => replacement.clone_into(existing),
+        Value::String(existing) => replacement.as_str().clone_into(existing),
         other => {
             return Err(Box::new(std::io::Error::other(format!(
-                "expected JSON string at leaf `{leaf}` for replacement `{replacement}`, found {other}"
+                "expected JSON string at leaf `{leaf}` for replacement `{}`, found {other}",
+                replacement.as_str()
             ))) as BoxError);
         }
     }
