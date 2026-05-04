@@ -5943,7 +5943,8 @@ later phase 1 delivery work:
 - Compatibility, warn-only, and blocking are repository review states defined
   by ADR 010, not permission to split runtime ownership back across both
   systems.
-- Reviewers should use `docs/podbot-migration-review-checklist.md` when a pull
+- Reviewers must provide evidence from
+  `docs/podbot-migration-review-checklist.md` when a pull
   request claims phase advancement or legacy-path retirement.
 
 This section is normative for hosted-session ownership even where older target
