@@ -205,10 +205,7 @@ async fn run_happy_path_scenarios(
     Ok(task_id)
 }
 
-async fn run_error_scenarios(
-    send: Sender<'_>,
-    token: BearerToken<'_>,
-) -> Result<(), eyre::Report> {
+async fn run_error_scenarios(send: Sender<'_>, token: BearerToken<'_>) -> Result<(), eyre::Report> {
     let scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 5] = [
         (
             validation_error_request(token),

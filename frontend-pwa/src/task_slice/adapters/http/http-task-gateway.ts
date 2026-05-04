@@ -100,14 +100,21 @@ function validateIssueSnapshot(raw: unknown): void {
   requireOptionalString(raw, 'milestone');
 }
 
+/**
+ * Returns true when `value` is a finite integer ≥ `min`.
+ * Narrows the type to `number` for the caller.
+ */
+function isIntegerAtLeast(value: unknown, min: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min;
+}
+
 /** Throws if `record[field]` is not an integer ≥ `minValue`. */
 function requireIntegerField(
   record: Record<string, unknown>,
   field: string,
   minValue: number,
 ): void {
-  const n = record[field];
-  if (typeof n !== 'number' || !Number.isInteger(n) || n < minValue) {
+  if (!isIntegerAtLeast(record[field], minValue)) {
     throw taskShapeGatewayError();
   }
 }
