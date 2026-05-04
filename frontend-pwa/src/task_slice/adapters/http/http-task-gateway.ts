@@ -64,14 +64,6 @@ function isIssueProvider(value: unknown): value is IssueProvider {
   return value === 'github' || value === 'gitlab';
 }
 
-/**
- * Returns true when `value` is a finite integer ≥ `min`.
- * Narrows the type to `number` for the caller.
- */
-function isIntegerAtLeast(value: unknown, min: number): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min;
-}
-
 function requireNonEmptyString(
   raw: Record<string, unknown>,
   field: string,
@@ -90,15 +82,32 @@ function requireStringArray(raw: Record<string, unknown>, field: string): void {
   }
 }
 
+function requireOptionalString(
+  raw: Record<string, unknown>,
+  key: string,
+): void {
+  if (raw[key] !== undefined && typeof raw[key] !== 'string') {
+    throw taskShapeGatewayError();
+  }
+}
+
 function validateIssueSnapshot(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'title');
   requireStringArray(raw, 'labels');
   requireStringArray(raw, 'assignees');
-  if (raw.description !== undefined && typeof raw.description !== 'string') {
-    throw taskShapeGatewayError();
-  }
-  if (raw.milestone !== undefined && typeof raw.milestone !== 'string') {
+  requireOptionalString(raw, 'description');
+  requireOptionalString(raw, 'milestone');
+}
+
+/** Throws if `record[field]` is not an integer ≥ `minValue`. */
+function requireIntegerField(
+  record: Record<string, unknown>,
+  field: string,
+  minValue: number,
+): void {
+  const n = record[field];
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < minValue) {
     throw taskShapeGatewayError();
   }
 }
@@ -107,7 +116,7 @@ function validateIssueRef(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'repository');
-  if (!isIntegerAtLeast(raw.issue_number, 0)) throw taskShapeGatewayError();
+  requireIntegerField(raw, 'issue_number', 0);
 }
 
 function validateTaskOrigin(raw: unknown): asserts raw is TaskOrigin {
@@ -128,11 +137,10 @@ function validateOptionalPullRequestRef(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'repository');
-  if (!isIntegerAtLeast(raw.pull_request_number, 1))
-    throw taskShapeGatewayError();
+  requireIntegerField(raw, 'pull_request_number', 1);
 }
 
-function requireValidTaskState(task: Record<string, unknown>): void {
+function validateTaskState(task: Record<string, unknown>): void {
   if (
     typeof task.state !== 'string' ||
     !(TASK_STATES as ReadonlySet<string>).has(task.state)
@@ -141,16 +149,16 @@ function requireValidTaskState(task: Record<string, unknown>): void {
   }
 }
 
-function validateOptionalRefs(task: Record<string, unknown>): void {
-  if (task.branch_ref !== undefined && task.branch_ref !== null) {
-    validateOptionalBranchRef(task.branch_ref);
-  }
-  if (task.pull_request_ref !== undefined && task.pull_request_ref !== null) {
-    validateOptionalPullRequestRef(task.pull_request_ref);
+function validateOptionalRef(
+  raw: unknown,
+  validator: (v: unknown) => void,
+): void {
+  if (raw !== undefined && raw !== null) {
+    validator(raw);
   }
 }
 
-function validateTimestampFields(task: Record<string, unknown>): void {
+function requireTimestampFields(task: Record<string, unknown>): void {
   const createdAt = task.created_at;
   const updatedAt = task.updated_at;
   if (typeof createdAt !== 'string' || createdAt.length === 0) {
@@ -164,10 +172,11 @@ function validateTimestampFields(task: Record<string, unknown>): void {
 function validateParsedTaskEnvelopeTask(task: unknown): Task {
   if (!isPlainRecord(task)) throw taskShapeGatewayError();
   requireNonEmptyString(task, 'id');
-  requireValidTaskState(task);
+  validateTaskState(task);
   validateTaskOrigin(task.origin);
-  validateOptionalRefs(task);
-  validateTimestampFields(task);
+  validateOptionalRef(task.branch_ref, validateOptionalBranchRef);
+  validateOptionalRef(task.pull_request_ref, validateOptionalPullRequestRef);
+  requireTimestampFields(task);
   return task as unknown as Task;
 }
 
