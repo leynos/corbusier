@@ -632,7 +632,7 @@ Current behaviour and limits:
 
 - Successful task creation stays inside the fixture adapter by default and then
   navigates directly to the task detail route.
-- Invalid create input shows client-side validation feedback before any
+- Invalid task-creation input shows client-side validation feedback before any
   adapter call is made.
 - Unknown task ids render a not-found state.
 - Setting `VITE_TASK_GATEWAY_MODE=http` switches the slice to the live HTTP

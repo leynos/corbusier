@@ -52,6 +52,10 @@ describe('fixture task gateway', () => {
       id: task.id,
       state: 'in_review',
     });
+    await expect(gateway.getTask(task.id)).resolves.toMatchObject({
+      id: task.id,
+      state: 'in_review',
+    });
   });
 
   it('simulates an unavailable submission path', async () => {

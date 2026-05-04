@@ -264,7 +264,7 @@ the hexagonal boundary and keeps `4.4.3` focused on switching the browser path
 live rather than renegotiating transport or auth wiring.
 
 Testing outcome: golden fixtures now cover task create, detail, transition,
-validation, unauthorised, not-found, and conflict responses. The contract is
+validation, unauthorized, not-found, and conflict responses. The contract is
 exercised in in-memory tests, PostgreSQL-backed tests, and BDD scenarios so the
 slice has both storage-agnostic and persistence-backed guardrails.
 

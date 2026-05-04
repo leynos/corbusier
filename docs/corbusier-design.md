@@ -12233,6 +12233,21 @@ live seam without restructuring the route shell by:
 - using a development-only same-origin Vite proxy to inject bearer auth
   server-side when contributors opt into the live gateway.
 
+
+##### Task gateway seam: `VITE_TASK_GATEWAY_MODE`
+
+The frontend task slice selects how the `TaskSliceGateway` port is wired at
+development and preview time via the **`VITE_TASK_GATEWAY_MODE`** environment
+variable.
+
+| Allowed value | Default | Behaviour |
+| --- | --- | --- |
+| `fixture` | **Yes** | Shipped path: fixture-backed task gateway mirroring HTTP contract semantics without network I/O. |
+| `http` | No | Real HTTP adapter against the backend task endpoints (conventional API client behind the slice port). |
+| `vite-proxy` | No | Development-only: same-origin Vite dev proxy injects bearer authentication server-side before upstreaming to the backend task API. |
+
+If unset, the build behaves as **`fixture`** (fixture adapter is the default).
+
 The stabilized task contract now consists of:
 
 - Corbusier-owned success envelopes for task create, detail, and state

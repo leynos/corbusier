@@ -85,7 +85,7 @@ async function sendTaskRequest(
     throw await readGatewayError(response);
   }
 
-  const envelope = (await response.json()) as ApiEnvelope<TaskEnvelope>;
+  let envelope = await parseSuccessEnvelope(response);
   if (!envelope.data?.task) {
     throw new TaskGatewayError(
       'unavailable',
@@ -94,6 +94,19 @@ async function sendTaskRequest(
   }
 
   return envelope.data.task;
+}
+
+async function parseSuccessEnvelope(
+  response: Response,
+): Promise<ApiEnvelope<TaskEnvelope>> {
+  try {
+    return (await response.json()) as ApiEnvelope<TaskEnvelope>;
+  } catch {
+    throw new TaskGatewayError(
+      'unavailable',
+      'The task API returned malformed JSON.',
+    );
+  }
 }
 
 async function readGatewayError(response: Response): Promise<TaskGatewayError> {

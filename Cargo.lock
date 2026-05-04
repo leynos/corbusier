@@ -722,6 +722,7 @@ dependencies = [
 name = "corbusier"
 version = "0.1.0"
 dependencies = [
+ "actix-http",
  "actix-web",
  "actix_v2a",
  "async-trait",

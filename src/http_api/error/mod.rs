@@ -15,6 +15,7 @@ use actix_web::{
 };
 use serde_json::{Value, json};
 use std::fmt;
+use uuid::Uuid;
 
 pub(crate) use self::{
     conversation::{map_conversation_repository_error, map_message_repository_error},
@@ -135,7 +136,10 @@ impl ResponseError for ApiError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        self.response_with_trace_id("trace-unavailable")
+        // Fallback when Actix invokes `ResponseError` without handler `into_response`; there is no request
+        // correlation identifier on this trait path — issue a stable-format unique trace token instead of
+        // a constant placeholder.
+        self.response_with_trace_id(Uuid::new_v4().hyphenated().to_string())
     }
 }
 

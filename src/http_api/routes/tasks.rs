@@ -1,6 +1,7 @@
 //! Registers the authenticated task routes mounted under `/api/v1`, including
 //! `POST /tasks`, `GET /tasks/{id}`, task state transitions, and branch or
-//! pull-request association operations handled through
+//! pull-request association mutations. Write paths use `TaskMutationContext`
+//! (Bearer plus validated `Idempotency-Key`); reads use
 //! [`AuthenticatedRequestContext`]. [`routes`] is the public entrypoint that
 //! wires these task-management handlers into the HTTP router.
 
@@ -202,7 +203,7 @@ async fn transition_task(
 
 async fn associate_branch(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociateBranchBody>,
 ) -> HttpResponse {
@@ -237,7 +238,7 @@ async fn associate_branch(
 
 async fn associate_pull_request(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociatePullRequestBody>,
 ) -> HttpResponse {

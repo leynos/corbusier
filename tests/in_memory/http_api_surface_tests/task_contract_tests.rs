@@ -5,6 +5,7 @@ use super::support::{build_bundle, with_bearer};
 use crate::http_api_test_helpers::{required_field, required_str_field};
 use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;
+use actix_web::http::StatusCode;
 use actix_web::{App, test as actix_test, web};
 use camino::Utf8Path;
 use cap_std::ambient_authority;
@@ -65,11 +66,21 @@ async fn run_scenario<Extract, Out>(
     extract: Extract,
     normalise: fn(&mut Value) -> Result<(), eyre::Report>,
     fixture: &Utf8Path,
+    expected_status: StatusCode,
 ) -> Result<Out, eyre::Report>
 where
     Extract: FnOnce(&Value) -> Result<Out, eyre::Report>,
 {
     let response = send(request).await;
+    if response.status() != expected_status {
+        return Err(eyre::eyre!(
+            "expected HTTP {:?} {:?}, got {:?} {:?}",
+            expected_status,
+            expected_status.canonical_reason(),
+            response.status(),
+            response.status().canonical_reason(),
+        ));
+    }
     let mut body: Value = actix_test::read_body_json(response).await;
     let out = extract(&body)?;
     normalise(&mut body)?;
@@ -179,6 +190,7 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
             |body| Ok(task_id_from_body(body)),
             normalize_task_success_response,
             fixture("tests/fixtures/http_api/tasks/create_success.json"),
+            StatusCode::CREATED,
         )
         .await?;
         run_scenario(
@@ -187,6 +199,7 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
             |_| Ok(()),
             normalize_task_success_response,
             fixture("tests/fixtures/http_api/tasks/get_success.json"),
+            StatusCode::OK,
         )
         .await?;
         run_scenario(
@@ -195,18 +208,42 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
             |_| Ok(()),
             normalize_task_success_response,
             fixture("tests/fixtures/http_api/tasks/transition_success.json"),
+            StatusCode::OK,
         )
         .await?;
 
-        let error_scenarios: [(actix_test::TestRequest, &Utf8Path); 4] = [
-            (validation_error_request(token), fixture("tests/fixtures/http_api/tasks/validation_error.json")),
-            (unauthorized_error_request(), fixture("tests/fixtures/http_api/tasks/unauthorized_error.json")),
-            (not_found_error_request(token), fixture("tests/fixtures/http_api/tasks/not_found_error.json")),
-            (conflict_error_request(token), fixture("tests/fixtures/http_api/tasks/conflict_error.json")),
+        let error_scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 4] = [
+            (
+                validation_error_request(token),
+                fixture("tests/fixtures/http_api/tasks/validation_error.json"),
+                StatusCode::BAD_REQUEST,
+            ),
+            (
+                unauthorized_error_request(),
+                fixture("tests/fixtures/http_api/tasks/unauthorized_error.json"),
+                StatusCode::UNAUTHORIZED,
+            ),
+            (
+                not_found_error_request(token),
+                fixture("tests/fixtures/http_api/tasks/not_found_error.json"),
+                StatusCode::NOT_FOUND,
+            ),
+            (
+                conflict_error_request(token),
+                fixture("tests/fixtures/http_api/tasks/conflict_error.json"),
+                StatusCode::CONFLICT,
+            ),
         ];
-        for (request, fixture) in error_scenarios {
-            run_scenario(request, send, |_| Ok(()), normalize_shared_error_response, fixture)
-                .await?;
+        for (request, fixture, expected_status) in error_scenarios {
+            run_scenario(
+                request,
+                send,
+                |_| Ok(()),
+                normalize_shared_error_response,
+                fixture,
+                expected_status,
+            )
+            .await?;
         }
 
         Ok(())
@@ -281,6 +318,13 @@ fn replace_string_at_path(
     let Some(value) = current.get_mut(*leaf) else {
         return Err(eyre::eyre!("expected path leaf `{leaf}` to exist"));
     };
-    *value = Value::String(replacement.as_str().to_owned());
+    let Value::String(target) = value else {
+        return Err(eyre::eyre!(
+            "expected JSON string at path leaf `{leaf}` for replacement `{}`, found {}",
+            replacement.as_str(),
+            serde_json::to_string(value).unwrap_or_else(|_| "<opaque>".to_owned())
+        ));
+    };
+    replacement.as_str().clone_into(target);
     Ok(())
 }
