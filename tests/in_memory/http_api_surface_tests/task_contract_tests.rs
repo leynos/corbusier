@@ -127,6 +127,16 @@ fn validation_error_request(token: BearerToken<'_>) -> actix_test::TestRequest {
     )
 }
 
+fn malformed_idempotency_key_request(token: BearerToken<'_>) -> actix_test::TestRequest {
+    with_bearer(
+        actix_test::TestRequest::post()
+            .uri("/api/v1/tasks")
+            .insert_header(("Idempotency-Key", "not-a-valid-uuid"))
+            .set_json(standard_task_json()),
+        token.as_str(),
+    )
+}
+
 fn unauthorized_error_request() -> actix_test::TestRequest {
     actix_test::TestRequest::post()
         .uri("/api/v1/tasks")
@@ -212,10 +222,15 @@ fn task_contract_matches_golden_fixtures(runtime: io::Result<Runtime>) -> Result
         )
         .await?;
 
-        let error_scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 4] = [
+        let error_scenarios: [(actix_test::TestRequest, &Utf8Path, StatusCode); 5] = [
             (
                 validation_error_request(token),
                 fixture("tests/fixtures/http_api/tasks/validation_error.json"),
+                StatusCode::BAD_REQUEST,
+            ),
+            (
+                malformed_idempotency_key_request(token),
+                fixture("tests/fixtures/http_api/tasks/invalid_idempotency_key.json"),
                 StatusCode::BAD_REQUEST,
             ),
             (

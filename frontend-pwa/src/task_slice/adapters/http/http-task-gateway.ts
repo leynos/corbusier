@@ -4,7 +4,12 @@
  * This adapter consumes the stabilized Corbusier task contract while keeping
  * transport parsing and error mapping inside the adapter boundary.
  */
-import type { Task } from '../../domain/task';
+import type {
+  IssueProvider,
+  Task,
+  TaskOrigin,
+  TaskState,
+} from '../../domain/task';
 import {
   TaskGatewayError,
   type TaskGatewayErrorKind,
@@ -35,6 +40,122 @@ interface SharedErrorResponse {
   traceId?: string;
 }
 
+const TASK_STATES = new Set<TaskState>([
+  'draft',
+  'in_progress',
+  'in_review',
+  'paused',
+  'done',
+  'abandoned',
+]);
+
+const INVALID_TASK_SHAPE_MESSAGE =
+  'The task API returned an invalid task shape.' as const;
+
+function taskShapeGatewayError(): TaskGatewayError {
+  return new TaskGatewayError('unavailable', INVALID_TASK_SHAPE_MESSAGE);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isIssueProvider(value: unknown): value is IssueProvider {
+  return value === 'github' || value === 'gitlab';
+}
+
+function requireNonEmptyString(
+  raw: Record<string, unknown>,
+  field: string,
+): string {
+  const value = raw[field];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw taskShapeGatewayError();
+  }
+  return value;
+}
+
+function requireStringArray(raw: Record<string, unknown>, field: string): void {
+  const value = raw[field];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw taskShapeGatewayError();
+  }
+}
+
+function validateIssueSnapshot(raw: unknown): void {
+  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
+  requireNonEmptyString(raw, 'title');
+  requireStringArray(raw, 'labels');
+  requireStringArray(raw, 'assignees');
+  if (raw.description !== undefined && typeof raw.description !== 'string') {
+    throw taskShapeGatewayError();
+  }
+  if (raw.milestone !== undefined && typeof raw.milestone !== 'string') {
+    throw taskShapeGatewayError();
+  }
+}
+
+function validateIssueRef(raw: unknown): void {
+  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
+  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
+  requireNonEmptyString(raw, 'repository');
+  const num = raw.issue_number;
+  if (typeof num !== 'number' || !Number.isInteger(num) || num < 0) {
+    throw taskShapeGatewayError();
+  }
+}
+
+function validateTaskOrigin(raw: unknown): asserts raw is TaskOrigin {
+  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
+  if (raw.type !== 'issue') throw taskShapeGatewayError();
+  validateIssueRef(raw.issue_ref);
+  validateIssueSnapshot(raw.metadata);
+}
+
+function validateOptionalBranchRef(raw: unknown): void {
+  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
+  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
+  requireNonEmptyString(raw, 'repository');
+  requireNonEmptyString(raw, 'branch_name');
+}
+
+function validateOptionalPullRequestRef(raw: unknown): void {
+  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
+  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
+  requireNonEmptyString(raw, 'repository');
+  const n = raw.pull_request_number;
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
+    throw taskShapeGatewayError();
+  }
+}
+
+function validateParsedTaskEnvelopeTask(task: unknown): Task {
+  if (!isPlainRecord(task)) throw taskShapeGatewayError();
+  requireNonEmptyString(task, 'id');
+  if (
+    typeof task.state !== 'string' ||
+    !(TASK_STATES as ReadonlySet<string>).has(task.state)
+  ) {
+    throw taskShapeGatewayError();
+  }
+  validateTaskOrigin(task.origin);
+  if (task.branch_ref !== undefined && task.branch_ref !== null) {
+    validateOptionalBranchRef(task.branch_ref);
+  }
+  if (task.pull_request_ref !== undefined && task.pull_request_ref !== null) {
+    validateOptionalPullRequestRef(task.pull_request_ref);
+  }
+  const createdAt = task.created_at;
+  const updatedAt = task.updated_at;
+  if (typeof createdAt !== 'string' || createdAt.length === 0) {
+    throw taskShapeGatewayError();
+  }
+  if (typeof updatedAt !== 'string' || updatedAt.length === 0) {
+    throw taskShapeGatewayError();
+  }
+  return task as unknown as Task;
+}
+
 export function createHttpTaskGateway(
   baseUrl: string = '/api/v1',
   fetchFn: typeof fetch = fetch,
@@ -60,7 +181,6 @@ export function createHttpTaskGateway(
           'Content-Type': 'application/json',
           'Idempotency-Key': crypto.randomUUID(),
         },
-        method: 'PUT',
       });
     },
   };
@@ -85,15 +205,16 @@ async function sendTaskRequest(
     throw await readGatewayError(response);
   }
 
-  let envelope = await parseSuccessEnvelope(response);
-  if (!envelope.data?.task) {
+  const envelope = await parseSuccessEnvelope(response);
+  const taskCandidate = envelope.data?.task as unknown;
+  if (taskCandidate === undefined || taskCandidate === null) {
     throw new TaskGatewayError(
       'unavailable',
       'The task API returned an invalid response.',
     );
   }
 
-  return envelope.data.task;
+  return validateParsedTaskEnvelopeTask(taskCandidate);
 }
 
 async function parseSuccessEnvelope(

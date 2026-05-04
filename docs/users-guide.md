@@ -641,7 +641,7 @@ Current behaviour and limits:
   same-origin Vite proxy.
 - Task state mutation is wired into the live HTTP adapter, but the current UI
   does not surface it until roadmap item `4.4.3`.
-- Branch or pull-request association remain deferred to roadmap items `4.4.4`
+- Branch or pull-request associations remain deferred to roadmap items `4.4.4`
   and later.
 
 ## Model Context Protocol (MCP) server lifecycle management

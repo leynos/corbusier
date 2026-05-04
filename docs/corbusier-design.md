@@ -12240,6 +12240,8 @@ The frontend task slice selects how the `TaskSliceGateway` port is wired at
 development and preview time via the **`VITE_TASK_GATEWAY_MODE`** environment
 variable.
 
+Table 7.1.3.1: Frontend task gateway modes for VITE_TASK_GATEWAY_MODE
+
 | Allowed value | Default | Behaviour |
 | --- | --- | --- |
 | `fixture` | **Yes** | Shipped path: fixture-backed task gateway mirroring HTTP contract semantics without network I/O. |

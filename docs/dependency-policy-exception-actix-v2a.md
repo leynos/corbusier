@@ -7,7 +7,7 @@ requirements.
 
 ## Rationale
 
-The task slice milestone (`4.4.2`) standardises slice-facing errors,
+The task slice milestone (`4.4.2`) standardizes slice-facing errors,
 `Trace-Id`/trace payload handling, and `Idempotency-Key` parsing on that shared
 crate. A published crates.io package was not yet available at integration time,
 so Corbusier pins a **specific reviewed commit** rather than drifting on a bare

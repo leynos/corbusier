@@ -167,9 +167,10 @@ Observable success means:
 - [x] (2026-04-13 00:00Z) Quality gates passed:
   `make fmt`, `make lint`,
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
-  `make frontend-typecheck`, `make frontend-lint`, `make frontend-test`,
-  `make frontend-e2e`, `make frontend-test-a11y`, `make markdownlint`, and
-  `make nixie`.
+  `make frontend-audit`, `make frontend-typecheck`, `make frontend-lint`,
+  `make frontend-test`, `make frontend-test-a11y`,
+  `make frontend-localizability`, `make frontend-semantic`,
+  `make frontend-e2e`, `make markdownlint`, and `make nixie`.
 - [x] (2026-04-15 00:00Z) Post-context-reset verification confirmed that the
   repository still matches this execplan: the backend task contract, frontend
   HTTP seam, golden fixtures, and documentation updates are present in-tree, so

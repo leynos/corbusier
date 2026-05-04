@@ -75,6 +75,54 @@ describe('http task gateway', () => {
     );
   });
 
+  it('rejects a 200 envelope when the nested task violates the slice contract shape', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: {
+              task: {
+                created_at: '2026-04-13T00:00:00.000Z',
+                id: 123,
+                origin: {
+                  issue_ref: {
+                    issue_number: 42,
+                    provider: 'github',
+                    repository: 'acme/widgets',
+                  },
+                  metadata: {
+                    assignees: [],
+                    labels: [],
+                    title: 'Stabilise the transport contract',
+                  },
+                  type: 'issue',
+                },
+                state: 'draft',
+                updated_at: '2026-04-13T00:00:00.000Z',
+              },
+            },
+            error: null,
+            metadata: {
+              request_id: 'req-999',
+              timestamp: '2026-04-13T00:00:00.000Z',
+              version: 'v1',
+            },
+            success: true,
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-shape')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid task shape.',
+      ),
+    );
+  });
+
   it('maps invalid transition conflicts separately from validation failures', async () => {
     const gateway = createHttpTaskGateway(
       '/api/v1',
