@@ -254,6 +254,26 @@ async function sendTaskRequest(
   return validateParsedTaskEnvelopeTask(envelope.data.task);
 }
 
+function isValidEnvelopeShell(
+  parsed: unknown,
+): parsed is Record<string, unknown> {
+  return (
+    isPlainRecord(parsed) &&
+    parsed.success === true &&
+    parsed.error === null &&
+    isPlainRecord(parsed.metadata)
+  );
+}
+
+function hasValidTaskPayload(data: unknown): boolean {
+  return (
+    isPlainRecord(data) &&
+    'task' in data &&
+    data.task !== null &&
+    data.task !== undefined
+  );
+}
+
 async function parseSuccessEnvelope(
   response: Response,
 ): Promise<ApiEnvelope<TaskEnvelope>> {
@@ -267,19 +287,10 @@ async function parseSuccessEnvelope(
     );
   }
 
-  if (
-    parsed === null ||
-    !isPlainRecord(parsed) ||
-    parsed.success !== true ||
-    parsed.error !== null ||
-    !('data' in parsed) ||
-    !isPlainRecord(parsed.data) ||
-    !('task' in parsed.data) ||
-    parsed.data.task === null ||
-    parsed.data.task === undefined ||
-    !('metadata' in parsed) ||
-    !isPlainRecord(parsed.metadata)
-  ) {
+  if (!isValidEnvelopeShell(parsed)) {
+    throw new TaskGatewayError('unavailable', INVALID_SUCCESS_ENVELOPE_MESSAGE);
+  }
+  if (!hasValidTaskPayload(parsed.data)) {
     throw new TaskGatewayError('unavailable', INVALID_SUCCESS_ENVELOPE_MESSAGE);
   }
 

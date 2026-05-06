@@ -164,13 +164,12 @@ Observable success means:
 - [x] (2026-04-13 00:00Z) Updated `docs/corbusier-design.md`,
   `docs/users-guide.md`, and `docs/roadmap.md` to record the transport
   contract, local auth seam, and milestone completion.
-- [x] (2026-04-13 00:00Z) Quality gates passed:
-  `make check-fmt`, `make lint`,
+- [x] (2026-04-13 00:00Z) Quality gates passed: `make check-fmt`, `make lint`,
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
   `make frontend-audit`, `make frontend-typecheck`, `make frontend-lint`,
-  `make frontend-test`, `make frontend-test-a11y`,
-  `make frontend-localizability`, `make frontend-semantic`,
-  `make frontend-e2e`, `make markdownlint`, and `make nixie`.
+  `make frontend-test`, `make frontend-test-a11y`, `make frontend-localizability`,
+  `make frontend-semantic`, `make frontend-e2e`, `make markdownlint`, and
+  `make nixie`.
 - [x] (2026-04-15 00:00Z) Post-context-reset verification confirmed that the
   repository still matches this execplan: the backend task contract, frontend
   HTTP seam, golden fixtures, and documentation updates are present in-tree, so
@@ -269,7 +268,7 @@ validation, unauthorized, not-found, and conflict responses. The contract is
 exercised in in-memory tests, PostgreSQL-backed tests, and BDD scenarios so the
 slice has both storage-agnostic and persistence-backed guardrails.
 
-Documentation outcome: the Corbusier design doc and users guide now describe
+Documentation outcome: the Corbusier design doc and user's guide now describe
 the mixed contract shape used in this milestone, the opt-in frontend HTTP seam,
 and the local preview environment variables. `docs/roadmap.md` marks `4.4.2`
 done to reflect the shipped slice contract.

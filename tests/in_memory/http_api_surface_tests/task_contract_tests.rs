@@ -56,21 +56,34 @@ type Sender<'a> = &'a dyn Fn(
     actix_test::TestRequest,
 ) -> Pin<Box<dyn Future<Output = ServiceResponse<BoxBody>> + 'a>>;
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "repository threshold is stricter than Clippy's default and the test scenarios pass five stable parts"
-)]
-async fn run_scenario<Extract, Out>(
+/// Single golden scenario: request, transport, extraction, normalisation,
+/// fixture, and expected status.
+struct Scenario<'a, Extract, Out>
+where
+    Extract: FnOnce(&Value) -> Result<Out, eyre::Report>,
+{
     request: actix_test::TestRequest,
-    send: Sender<'_>,
+    send: Sender<'a>,
     extract: Extract,
     normalize: fn(&mut Value) -> Result<(), eyre::Report>,
-    fixture: &Utf8Path,
+    fixture: &'a Utf8Path,
     expected_status: StatusCode,
+}
+
+async fn run_scenario<Extract, Out>(
+    scenario: Scenario<'_, Extract, Out>,
 ) -> Result<Out, eyre::Report>
 where
     Extract: FnOnce(&Value) -> Result<Out, eyre::Report>,
 {
+    let Scenario {
+        request,
+        send,
+        extract,
+        normalize,
+        fixture,
+        expected_status,
+    } = scenario;
     let response = send(request).await;
     if response.status() != expected_status {
         return Err(eyre::eyre!(
@@ -175,32 +188,32 @@ async fn run_happy_path_scenarios(
     send: Sender<'_>,
     token: BearerToken<'_>,
 ) -> Result<String, eyre::Report> {
-    let task_id: String = run_scenario(
-        create_task_request(token),
+    let task_id: String = run_scenario(Scenario {
+        request: create_task_request(token),
         send,
-        |body| Ok(task_id_from_body(body)),
-        normalize_task_success_response,
-        fixture("tests/fixtures/http_api/tasks/create_success.json"),
-        StatusCode::CREATED,
-    )
+        extract: |body| Ok(task_id_from_body(body)),
+        normalize: normalize_task_success_response,
+        fixture: fixture("tests/fixtures/http_api/tasks/create_success.json"),
+        expected_status: StatusCode::CREATED,
+    })
     .await?;
-    run_scenario(
-        get_task_request(&task_id, token),
+    run_scenario(Scenario {
+        request: get_task_request(&task_id, token),
         send,
-        |_| Ok(()),
-        normalize_task_success_response,
-        fixture("tests/fixtures/http_api/tasks/get_success.json"),
-        StatusCode::OK,
-    )
+        extract: |_| Ok(()),
+        normalize: normalize_task_success_response,
+        fixture: fixture("tests/fixtures/http_api/tasks/get_success.json"),
+        expected_status: StatusCode::OK,
+    })
     .await?;
-    run_scenario(
-        transition_task_request(&task_id, token),
+    run_scenario(Scenario {
+        request: transition_task_request(&task_id, token),
         send,
-        |_| Ok(()),
-        normalize_task_success_response,
-        fixture("tests/fixtures/http_api/tasks/transition_success.json"),
-        StatusCode::OK,
-    )
+        extract: |_| Ok(()),
+        normalize: normalize_task_success_response,
+        fixture: fixture("tests/fixtures/http_api/tasks/transition_success.json"),
+        expected_status: StatusCode::OK,
+    })
     .await?;
     Ok(task_id)
 }
@@ -234,14 +247,14 @@ async fn run_error_scenarios(send: Sender<'_>, token: BearerToken<'_>) -> Result
         ),
     ];
     for (request, path, expected_status) in scenarios {
-        run_scenario(
+        run_scenario(Scenario {
             request,
             send,
-            |_| Ok(()),
-            normalize_shared_error_response,
-            path,
+            extract: |_| Ok(()),
+            normalize: normalize_shared_error_response,
+            fixture: path,
             expected_status,
-        )
+        })
         .await?;
     }
     Ok(())

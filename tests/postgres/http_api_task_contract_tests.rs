@@ -49,6 +49,12 @@ struct ScenarioDesc<'a> {
     fixture: &'a Utf8Path,
 }
 
+struct SuccessExpectation<'a> {
+    status: StatusCode,
+    scenario: &'a str,
+    fixture: &'a Utf8Path,
+}
+
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_task_contract_matches_golden_fixtures(
@@ -68,8 +74,36 @@ async fn postgres_task_contract_matches_golden_fixtures(
     .await;
 
     let (_create_body, task_id) = create_task_succeeds(&app, token).await?;
-    let _get_body = get_task_succeeds(&app, token, &task_id).await?;
-    let _transition_body = transition_task_succeeds(&app, token, &task_id).await?;
+
+    let _get_body = run_success_scenario(
+        &app,
+        with_bearer(
+            actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
+            token.as_str(),
+        ),
+        SuccessExpectation {
+            status: StatusCode::OK,
+            scenario: "task get succeeds",
+            fixture: Utf8Path::new("tests/fixtures/http_api/tasks/get_success.json"),
+        },
+    )
+    .await?;
+
+    let _transition_body = run_success_scenario(
+        &app,
+        with_bearer(
+            actix_test::TestRequest::put()
+                .uri(&format!("/api/v1/tasks/{task_id}/state"))
+                .set_json(json!({ "state": "in_progress" })),
+            token.as_str(),
+        ),
+        SuccessExpectation {
+            status: StatusCode::OK,
+            scenario: "task transition succeeds",
+            fixture: Utf8Path::new("tests/fixtures/http_api/tasks/transition_success.json"),
+        },
+    )
+    .await?;
 
     let scenarios = [
         ScenarioDesc {
@@ -130,70 +164,20 @@ where
     Ok((create_body, task_id))
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "repository threshold is stricter than Clippy's default and the golden scenario passes five stable parts"
-)]
 async fn run_success_scenario<S>(
     app: &S,
     request: actix_test::TestRequest,
-    expected_status: StatusCode,
-    scenario: &str,
-    fixture_path: &Utf8Path,
+    expectation: SuccessExpectation<'_>,
 ) -> Result<Value, BoxError>
 where
     S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
 {
     let response = actix_test::call_service(app, request.to_request()).await;
-    assert_actix_status(&response, expected_status, scenario)?;
+    assert_actix_status(&response, expectation.status, expectation.scenario)?;
     let mut body: Value = actix_test::read_body_json(response).await;
     normalize_task_success_response(&mut body)?;
-    assert_json_matches(&body, fixture_path)?;
+    assert_json_matches(&body, expectation.fixture)?;
     Ok(body)
-}
-
-async fn get_task_succeeds<S>(
-    app: &S,
-    token: BearerToken<'_>,
-    task_id: &str,
-) -> Result<Value, BoxError>
-where
-    S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
-{
-    run_success_scenario(
-        app,
-        with_bearer(
-            actix_test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")),
-            token.as_str(),
-        ),
-        StatusCode::OK,
-        "task get succeeds",
-        Utf8Path::new("tests/fixtures/http_api/tasks/get_success.json"),
-    )
-    .await
-}
-
-async fn transition_task_succeeds<S>(
-    app: &S,
-    token: BearerToken<'_>,
-    task_id: &str,
-) -> Result<Value, BoxError>
-where
-    S: Service<Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>,
-{
-    run_success_scenario(
-        app,
-        with_bearer(
-            actix_test::TestRequest::put()
-                .uri(&format!("/api/v1/tasks/{task_id}/state"))
-                .set_json(json!({ "state": "in_progress" })),
-            token.as_str(),
-        ),
-        StatusCode::OK,
-        "task transition succeeds",
-        Utf8Path::new("tests/fixtures/http_api/tasks/transition_success.json"),
-    )
-    .await
 }
 
 async fn error_scenario_loop<S>(
