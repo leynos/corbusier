@@ -52,6 +52,9 @@ const TASK_STATES = new Set<TaskState>([
 const INVALID_TASK_SHAPE_MESSAGE =
   'The task API returned an invalid task shape.' as const;
 
+const INVALID_SUCCESS_ENVELOPE_MESSAGE =
+  'The task API returned an invalid success response.' as const;
+
 function taskShapeGatewayError(): TaskGatewayError {
   return new TaskGatewayError('unavailable', INVALID_TASK_SHAPE_MESSAGE);
 }
@@ -123,7 +126,7 @@ function validateIssueRef(raw: unknown): void {
   if (!isPlainRecord(raw)) throw taskShapeGatewayError();
   if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
   requireNonEmptyString(raw, 'repository');
-  requireIntegerField(raw, 'issue_number', 0);
+  requireIntegerField(raw, 'issue_number', 1);
 }
 
 function validateTaskOrigin(raw: unknown): asserts raw is TaskOrigin {
@@ -189,8 +192,8 @@ function validateParsedTaskEnvelopeTask(task: unknown): Task {
 
 /**
  * Builds the RequestInit for state-mutating task requests (POST / PUT).
- * Centralises the repeated Content-Type + Idempotency-Key header pair and
- * JSON serialisation so that createTask and transitionTask stay DRY.
+ * Centralizes the repeated Content-Type + Idempotency-Key header pair and
+ * JSON serialization so that createTask and transitionTask stay DRY.
  */
 function mutationInit(body: unknown, method: 'POST' | 'PUT'): RequestInit {
   return {
@@ -248,28 +251,39 @@ async function sendTaskRequest(
   }
 
   const envelope = await parseSuccessEnvelope(response);
-  const taskCandidate = envelope.data?.task as unknown;
-  if (taskCandidate === undefined || taskCandidate === null) {
-    throw new TaskGatewayError(
-      'unavailable',
-      'The task API returned an invalid response.',
-    );
-  }
-
-  return validateParsedTaskEnvelopeTask(taskCandidate);
+  return validateParsedTaskEnvelopeTask(envelope.data.task);
 }
 
 async function parseSuccessEnvelope(
   response: Response,
 ): Promise<ApiEnvelope<TaskEnvelope>> {
+  let parsed: unknown;
   try {
-    return (await response.json()) as ApiEnvelope<TaskEnvelope>;
+    parsed = await response.json();
   } catch {
     throw new TaskGatewayError(
       'unavailable',
       'The task API returned malformed JSON.',
     );
   }
+
+  if (
+    parsed === null ||
+    !isPlainRecord(parsed) ||
+    parsed.success !== true ||
+    parsed.error !== null ||
+    !('data' in parsed) ||
+    !isPlainRecord(parsed.data) ||
+    !('task' in parsed.data) ||
+    parsed.data.task === null ||
+    parsed.data.task === undefined ||
+    !('metadata' in parsed) ||
+    !isPlainRecord(parsed.metadata)
+  ) {
+    throw new TaskGatewayError('unavailable', INVALID_SUCCESS_ENVELOPE_MESSAGE);
+  }
+
+  return parsed as unknown as ApiEnvelope<TaskEnvelope>;
 }
 
 async function readGatewayError(response: Response): Promise<TaskGatewayError> {
@@ -299,19 +313,23 @@ async function readGatewayError(response: Response): Promise<TaskGatewayError> {
     return classifyErrorKind(statusCode);
   }
 
-  let body: SharedErrorResponse | null = null;
+  const fallbackMessage = `The task API returned HTTP ${response.status}.`;
 
+  let body: unknown;
   try {
-    body = (await response.json()) as SharedErrorResponse;
+    body = await response.json();
   } catch {
-    return new TaskGatewayError(
-      'unavailable',
-      `The task API returned HTTP ${response.status}.`,
-    );
+    return new TaskGatewayError('unavailable', fallbackMessage);
   }
 
+  if (!isPlainRecord(body) || typeof body.message !== 'string') {
+    return new TaskGatewayError('unavailable', fallbackMessage);
+  }
+
+  const errorBody = body as unknown as SharedErrorResponse;
+
   return new TaskGatewayError(
-    mapErrorKind(response.status, body),
-    body.message || `The task API returned HTTP ${response.status}.`,
+    mapErrorKind(response.status, errorBody),
+    errorBody.message || fallbackMessage,
   );
 }

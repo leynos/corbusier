@@ -64,7 +64,7 @@ async fn run_scenario<Extract, Out>(
     request: actix_test::TestRequest,
     send: Sender<'_>,
     extract: Extract,
-    normalise: fn(&mut Value) -> Result<(), eyre::Report>,
+    normalize: fn(&mut Value) -> Result<(), eyre::Report>,
     fixture: &Utf8Path,
     expected_status: StatusCode,
 ) -> Result<Out, eyre::Report>
@@ -83,7 +83,7 @@ where
     }
     let mut body: Value = actix_test::read_body_json(response).await;
     let out = extract(&body)?;
-    normalise(&mut body)?;
+    normalize(&mut body)?;
     assert_json_matches(&body, fixture)?;
     Ok(out)
 }

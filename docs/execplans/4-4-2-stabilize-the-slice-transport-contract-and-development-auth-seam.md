@@ -165,7 +165,7 @@ Observable success means:
   `docs/users-guide.md`, and `docs/roadmap.md` to record the transport
   contract, local auth seam, and milestone completion.
 - [x] (2026-04-13 00:00Z) Quality gates passed:
-  `make fmt`, `make lint`,
+  `make check-fmt`, `make lint`,
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
   `make frontend-audit`, `make frontend-typecheck`, `make frontend-lint`,
   `make frontend-test`, `make frontend-test-a11y`,
