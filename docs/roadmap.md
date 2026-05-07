@@ -48,20 +48,21 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.1. Migration governance and runtime boundary
 
-- [ ] 1.1.1 Ratify the staged migration boundary and phase gates. Requires
+- [x] 1.1.1 Ratify the staged migration boundary and phase gates. Requires
   the phase 1 hosting schema dependency and Podbot Step 4.5, "Normalized launch
   contract". See adr-010-migration-and-coexistence-strategy.md §Decision
-  Outcome / Proposed Direction and §Migration Plan.
-  - [ ] Ratify ADRs 001 through 005 together, so no foundational migration
+  Outcome / Proposed Direction, §Migration Plan, and
+  `docs/podbot-migration-review-checklist.md`.
+  - [x] Ratify ADRs 001 through 005 together, so no foundational migration
     ADR carries contradictory dependency or ownership text.
-  - [ ] Record advancement criteria for warn-only, compatibility, and blocking
+  - [x] Record advancement criteria for warn-only, compatibility, and blocking
     phases in repository-facing documentation and review checklists.
   - Design note: migration gates should advance only when Podbot-facing
     surfaces are stable enough to avoid reviving inline runtime ownership in
     Corbusier.
-  - Outstanding decisions: which phases require accepted ADRs before merge,
-    and which roadmap or documentation updates gate the end of migration.
-  - [ ] Success criteria: ADRs 001 through 005 cite consistent Podbot
+  - Ratified rule: ADRs 001 through 005 and ADR 010 must be accepted before a
+    pull request may claim compatibility, warn-only, or blocking status.
+  - [x] Success criteria: ADRs 001 through 005 cite consistent Podbot
     dependencies, and each migration phase has explicit entry and exit gates.
 - [ ] 1.1.2 Establish the Podbot-hosted runtime seam. Requires 2.5.1, Podbot
   Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted session
@@ -299,7 +300,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   dependency, the phase 1 hosting core dependencies, the phase 1
   prompt-validation dependencies, and the phase 1 hook-recovery dependencies.
   See adr-010-migration-and-coexistence-strategy.md §Decision Outcome /
-  Proposed Direction and §Migration Plan.
+  Proposed Direction, §Migration Plan, and
+  `docs/podbot-migration-review-checklist.md`.
   - [ ] Run warn-only validation where blocking behaviour would break active
     flows, and record diagnostics for reviewed prompt and bundle samples.
   - [ ] Freeze legacy routing and legacy transport labels on new writes while
@@ -318,8 +320,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   §Outstanding Decisions.
   - [ ] Define the evidence bundle required to remove inline hosted runtime
     ownership, legacy routing, and legacy transport write paths.
-  - [ ] Require roadmap, ADR, and operator-documentation updates before any
-    legacy removal pull request is considered complete.
+  - [ ] Require roadmap, ADR, design, and migration-checklist updates before
+    any legacy removal pull request is considered complete. Update
+    `docs/users-guide.md` only if the retirement introduces operator-visible
+    behaviour.
   - Design note: migration is complete only when the architectural boundary,
     operator expectations, and test gates all point at the same hosted path.
   - Outstanding decisions: what granularity of acceptance criteria is required

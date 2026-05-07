@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -70,17 +70,22 @@ depend on this one.
 
 ## Podbot roadmap dependencies
 
-This ADR depends on the following upstream Podbot roadmap steps:
+This ADR is ratified against the following upstream Podbot roadmap steps:
 
 - Step 1.4, "Hosting schema migration and compatibility matrix" because the
-  library-facing hosting configuration must exist before Corbusier can treat
-  the library API as the normative runtime surface.
-- Step 4.3b, "App server startup" because the hosted app-server path is part
-  of the runtime boundary that this ADR assigns to Podbot.
+  hosting schema defines the typed configuration terms that make the runtime
+  boundary reviewable.
 - Step 4.5, "Normalized launch contract" because Corbusier needs one typed
   launch seam rather than a mix of ad hoc runtime entry points.
-- Step 4.6, "Hosted session control plane" because Corbusier depends on a
-  typed control and event surface instead of CLI scraping.
+
+The downstream delivery work ratified by this ADR then relies on:
+
+- Step 4.6, "Hosted session control plane" because roadmap item `1.1.2` needs
+  a typed control and event surface instead of command-line interface (CLI)
+  scraping.
+
+Hosted app-server startup remains a later command-surface delivery concern for
+roadmap item `1.3.3`, not a bundle-ratification dependency for this ADR.
 
 ## Options Considered
 
@@ -113,8 +118,8 @@ Table 1: Trade-offs for the runtime ownership boundary.
 
 ## Decision Outcome / Proposed Direction
 
-Corbusier should treat Podbot as the sole runtime owner for hosted sessions and
-should use the Podbot library API as the normative integration surface.
+Corbusier treats Podbot as the sole runtime owner for hosted sessions and uses
+the Podbot library API as the normative integration surface.
 
 Under this direction:
 
@@ -132,6 +137,11 @@ Under this direction:
 This ADR lands during ADR 010 Phase 1 (foundational architecture). The
 implementation steps below are scoped to this ADR; see ADR 010 for the
 cross-cutting migration sequence and advancement criteria.
+
+Roadmap item `1.1.1` accepted this ADR as part of the ADR 001 through 005
+bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
+ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
+the boundary-specific delivery sequence below.
 
 ### Phase 1
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -67,13 +67,16 @@ record itself.
 
 ## Podbot roadmap dependencies
 
-This ADR depends on the following upstream Podbot roadmap steps:
+This ADR is ratified against the following upstream Podbot roadmap steps:
 
 - Step 1.4, "Hosting schema migration and compatibility matrix" because
   workspace source and mount-related configuration must exist in Podbot's typed
   hosting schema.
 - Step 4.4, "Workspace strategies" because that step delivers the clone and
   host-mount runtime behaviours that this ADR relies on.
+
+The downstream delivery work ratified by this ADR then relies on:
+
 - Step 4.5, "Normalized launch contract" because workspace source, mount
   policy, and access mode should be resolved through one normalized launch path.
 
@@ -107,8 +110,8 @@ Table 1: Trade-offs for the workspace runtime model.
 
 ## Decision Outcome / Proposed Direction
 
-Corbusier should keep one canonical workspace runtime record while Podbot owns
-the concrete prepared workspace for hosted execution.
+Corbusier keeps one canonical workspace runtime record while Podbot owns the
+concrete prepared workspace for hosted execution.
 
 The proposed workspace model is:
 
@@ -129,6 +132,11 @@ The proposed workspace model is:
 This ADR lands during ADR 010 Phase 1 (foundational architecture). The
 implementation steps below are scoped to this ADR; see ADR 010 for the
 cross-cutting migration sequence and advancement criteria.
+
+Roadmap item `1.1.1` accepted this ADR as part of the ADR 001 through 005
+bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
+ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
+the workspace-specific delivery sequence below.
 
 ### Phase 1
 

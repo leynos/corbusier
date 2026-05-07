@@ -28,13 +28,11 @@
     "react-dom": "^19.2.0"
   },
   "overrides": {
-    "follow-redirects": "^1.16.0",
     "postcss": "^8.5.13"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
     "@biomejs/biome": "^2.4.10",
-    "@getgrit/cli": "^0.1.0-alpha.1743007075",
     "@testing-library/dom": "^10.4.1",
     "@playwright/test": "^1.56.0",
     "@tailwindcss/vite": "^4.1.16",

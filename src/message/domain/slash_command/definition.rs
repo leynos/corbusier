@@ -244,6 +244,22 @@ fn parse_number_value(
     })
 }
 
+fn parse_boolean_value(
+    command: &str,
+    parameter: &CommandParameterSpec,
+    raw: &str,
+) -> Result<Value, SlashCommandError> {
+    match raw.to_ascii_lowercase().as_str() {
+        "true" => Ok(Value::Bool(true)),
+        "false" => Ok(Value::Bool(false)),
+        _ => Err(SlashCommandError::InvalidParameterValue {
+            command: command.to_owned(),
+            parameter: parameter.name.clone(),
+            reason: "expected true or false (case-insensitive)".to_owned(),
+        }),
+    }
+}
+
 fn parse_select_value(
     command: &str,
     parameter: &CommandParameterSpec,
@@ -273,15 +289,7 @@ fn parse_parameter_value(
     match parameter.parameter_type {
         CommandParameterType::String => Ok(Value::String(raw.to_owned())),
         CommandParameterType::Number => parse_number_value(command, parameter, raw),
-        CommandParameterType::Boolean => match raw.to_ascii_lowercase().as_str() {
-            "true" => Ok(Value::Bool(true)),
-            "false" => Ok(Value::Bool(false)),
-            _ => Err(SlashCommandError::InvalidParameterValue {
-                command: command.to_owned(),
-                parameter: parameter.name.clone(),
-                reason: "expected true or false (case-insensitive)".to_owned(),
-            }),
-        },
+        CommandParameterType::Boolean => parse_boolean_value(command, parameter, raw),
         CommandParameterType::Select => parse_select_value(command, parameter, raw),
     }
 }

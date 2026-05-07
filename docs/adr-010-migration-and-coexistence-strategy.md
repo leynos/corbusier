@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
@@ -103,9 +103,9 @@ Table 1: Trade-offs for the migration strategy.
 
 ## Decision Outcome / Proposed Direction
 
-Corbusier should adopt a staged migration with compatibility adapters, warning
-phases, explicit advancement criteria, and hard removal criteria for legacy
-assumptions.
+Corbusier adopts a staged migration with compatibility adapters, warn-only
+diagnostics, explicit advancement criteria, and hard removal criteria for
+legacy assumptions.
 
 The proposed migration sequence is:
 
@@ -120,19 +120,73 @@ The proposed migration sequence is:
    normal write paths, and tighten validation and privilege checks to blocking
    behaviour.
 
-Advancement between phases should require quality gates, migration tests, and
-review confirmation that the preceding ADR-owned boundary is no longer being
-re-litigated in implementation pull requests.
+Roadmap item `1.1.1` accepts ADRs 001 through 005 together with this ADR as one
+foundational bundle. No pull request may claim compatibility, warn-only, or
+blocking status unless that accepted bundle remains intact and the reviewer
+evidence in `docs/podbot-migration-review-checklist.md` is attached.
+
+Migration stages are repository governance states, not permission to split
+runtime ownership:
+
+### Compatibility stage
+
+- Entry criteria: ADRs 001 through 005 and ADR 010 are accepted; this ADR, the
+  roadmap, the design document, and the migration checklist all describe the
+  same Podbot-owned runtime boundary; and the pull request routes new hosted
+  work through a Podbot-facing seam or an explicit compatibility adapter
+  without reviving inline runtime ownership in Corbusier.
+- Exit criteria: canonical write paths exist for the in-scope surface;
+  compatibility reads for retained history are proven where required; and the
+  remaining legacy paths are named, scoped, and assigned to later roadmap items.
+- Rollback expectation: revert to the previous compatibility adapter or freeze
+  the new write path, but do not reintroduce inline runtime ownership,
+  Corbusier-side hosted tool routing, or Corbusier-side hook execution for
+  Podbot-hosted sessions.
+
+### Warn-only stage
+
+- Entry criteria: the affected surface has already met the compatibility-stage
+  exit criteria; diagnostics are persisted or otherwise reviewable; and warning
+  evaluation blocks zero supported flows by itself.
+- Exit criteria: reviewed fixtures and sampled production-like inputs show that
+  warnings align with the intended blocking policy, and every remaining warning
+  class has a documented owner in the roadmap or checklist evidence.
+- Rollback expectation: return to compatibility-stage behaviour while
+  preserving the warning instrumentation and the canonical model introduced in
+  the compatibility stage.
+
+### Blocking stage
+
+- Entry criteria: the affected surface has met the warn-only exit criteria; CI
+  deny-path fixtures fail closed with no manual bypass in the evidence bundle;
+  rollback steps are documented; and any compatibility reads retained by ADR
+  004 remain available for historical records.
+- Exit criteria: roadmap item `1.6.2` is complete, legacy removals no longer
+  need compatibility reads or warn-only diagnostics for the retired surface,
+  and the documentation gates below have all been met.
+- Rollback expectation: fall back only to warn-only behaviour, record the
+  regression in the checklist evidence, and keep the accepted runtime boundary
+  intact.
+
+Migration cannot be declared complete until `docs/roadmap.md`,
+`docs/corbusier-design.md`, this ADR, and
+`docs/podbot-migration-review-checklist.md` all point at the same hosted path.
+`docs/users-guide.md` changes are required only if a migration gate introduces
+operator-visible behaviour that users must follow.
 
 ## Migration Plan
+
+Use `docs/podbot-migration-review-checklist.md` as the operational companion
+for the gates below.
 
 ### Phase 1
 
 Foundational architecture
 
 - [ ] 1.1 Ratify ADRs 001 through 005. Finish criteria: ADRs 001 through 005
-  remain `Proposed` or advance together with no contradictory dependency text
-  and all referenced companion links resolve in CI preview. Dependencies: None.
+  and ADR 010 are `Accepted`, no contradictory dependency or ownership text
+  remains, the migration checklist exists, and all referenced companion links
+  resolve in CI preview. Dependencies: None.
 - [ ] 1.2 Add Podbot-facing adapters and compatibility seams. Finish criteria:
   the Podbot-facing adapter interfaces compile behind the selected feature
   gate, and one integration fixture exercises the adapter boundary without
@@ -145,8 +199,9 @@ Durability and document surfaces
 - [ ] 2.1 Land ADRs 006 through 008 with backing schemas, parsers, and
   fixtures. Finish criteria: runtime-state schema migrations apply cleanly in
   fresh and upgrade paths, and fixtures cover workspace, wire, hook, and
-  validation records across at least 3 representative scenarios. Dependencies:
-  1.1, 1.2.
+  validation records across at least 3 representative scenarios. This opens the
+  compatibility stage for those surfaces only when the checklist evidence is
+  present. Dependencies: 1.1, 1.2.
 - [ ] 2.2 Run warn-only validation where blocking behaviour would break active
   flows. Finish criteria: warn-only validation runs against at least 10
   reviewed prompt samples, records diagnostics for each sample, and blocks 0
@@ -163,11 +218,13 @@ Security tightening and retirement
 - [ ] 3.2 Remove legacy routing and legacy transport write paths. Finish
   criteria: no new writes use legacy routing or legacy transport labels, and
   the migration suite proves compatibility reads still succeed for retained
-  historical records. Dependencies: 2.1, 3.1.
+  historical records. This closes the compatibility stage for those legacy
+  write paths. Dependencies: 2.1, 3.1.
 - [ ] 3.3 Promote warnings to blocking checks according to defined gates.
   Finish criteria: blocking gates fail closed in CI for all deny-path fixtures
-  and pass in 3 consecutive full acceptance runs with no manual bypasses.
-  Dependencies: 2.2, 3.1, 3.2.
+  and pass in 3 consecutive full acceptance runs with no manual bypasses. This
+  opens the blocking stage only after the warn-only checklist exit criteria are
+  satisfied. Dependencies: 2.2, 3.1, 3.2.
 
 ## Known Risks and Limitations
 
@@ -181,8 +238,6 @@ Security tightening and retirement
 
 - How long legacy transport parsing remains supported
 - When in-memory or legacy runtime adapters can be deleted
-- Which phases require accepted ADRs before merge
-- Which roadmap and documentation updates gate the end of migration
 
 ## Architectural Rationale
 
