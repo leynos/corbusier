@@ -150,7 +150,7 @@ remaining best-effort-only runtime paths.
   bounded.
 - Tool-call telemetry may arrive out of order relative to state transitions and
   require reconciliation.
-- Over-normalisation can slow down operator queries if read models are not
+- Over-normalization can slow down operator queries if read models are not
   designed carefully.
 
 ## Outstanding Decisions
