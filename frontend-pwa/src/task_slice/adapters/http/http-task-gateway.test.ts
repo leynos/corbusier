@@ -8,50 +8,102 @@ import { TaskGatewayError } from '../../ports/task-slice-gateway';
 import { createHttpTaskGateway } from './http-task-gateway';
 
 describe('http task gateway', () => {
+  const taskEnvelope = {
+    data: {
+      task: {
+        created_at: '2026-04-13T00:00:00.000Z',
+        id: 'task-1',
+        origin: {
+          issue_ref: {
+            issue_number: 42,
+            provider: 'github',
+            repository: 'acme/widgets',
+          },
+          metadata: {
+            assignees: [],
+            labels: [],
+            title: 'Stabilise the transport contract',
+          },
+          type: 'issue',
+        },
+        state: 'draft',
+        updated_at: '2026-04-13T00:00:00.000Z',
+      },
+    },
+    error: null,
+    metadata: {
+      request_id: 'req-123',
+      timestamp: '2026-04-13T00:00:00.000Z',
+      version: 'v1',
+    },
+    success: true,
+  };
+
   it('parses successful task detail responses', async () => {
     const gateway = createHttpTaskGateway(
       '/api/v1',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            data: {
-              task: {
-                created_at: '2026-04-13T00:00:00.000Z',
-                id: 'task-1',
-                origin: {
-                  issue_ref: {
-                    issue_number: 42,
-                    provider: 'github',
-                    repository: 'acme/widgets',
-                  },
-                  metadata: {
-                    assignees: [],
-                    labels: [],
-                    title: 'Stabilise the transport contract',
-                  },
-                  type: 'issue',
-                },
-                state: 'draft',
-                updated_at: '2026-04-13T00:00:00.000Z',
-              },
-            },
-            error: null,
-            metadata: {
-              request_id: 'req-123',
-              timestamp: '2026-04-13T00:00:00.000Z',
-              version: 'v1',
-            },
-            success: true,
-          }),
-          { status: 200 },
-        ),
-      ) as typeof fetch,
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(taskEnvelope), { status: 200 }),
+        ) as typeof fetch,
     );
 
     await expect(gateway.getTask('task-1')).resolves.toMatchObject({
       id: 'task-1',
       state: 'draft',
     });
+  });
+
+  it('escapes task identifiers in task path segments', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(taskEnvelope), { status: 200 }),
+        ),
+      ) as typeof fetch;
+    const gateway = createHttpTaskGateway('/api/v1', fetchFn);
+
+    await gateway.getTask('task/with reserved?characters');
+    await gateway.transitionTask('task/with reserved?characters', 'done');
+
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/tasks/task%2Fwith%20reserved%3Fcharacters',
+      undefined,
+    );
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/tasks/task%2Fwith%20reserved%3Fcharacters/state',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('rejects a 200 envelope when metadata is incomplete', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ...taskEnvelope,
+            metadata: {
+              request_id: 'req-123',
+              timestamp: '',
+              version: 'v1',
+            },
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid success response.',
+      ),
+    );
   });
 
   it('maps shared not-found responses to the task gateway error', async () => {

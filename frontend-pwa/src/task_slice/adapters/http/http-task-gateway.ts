@@ -219,12 +219,15 @@ export function createHttpTaskGateway(
       );
     },
     getTask(taskId) {
-      return sendTaskRequest(fetchFn, `${baseUrl}/tasks/${taskId}`);
+      return sendTaskRequest(
+        fetchFn,
+        `${baseUrl}/tasks/${encodeURIComponent(taskId)}`,
+      );
     },
     transitionTask(taskId, targetState) {
       return sendTaskRequest(
         fetchFn,
-        `${baseUrl}/tasks/${taskId}/state`,
+        `${baseUrl}/tasks/${encodeURIComponent(taskId)}/state`,
         mutationInit({ state: targetState }, 'PUT'),
       );
     },
@@ -261,7 +264,32 @@ function isValidEnvelopeShell(
     isPlainRecord(parsed) &&
     parsed.success === true &&
     parsed.error === null &&
-    isPlainRecord(parsed.metadata)
+    isPlainRecord(parsed.metadata) &&
+    hasValidMetadata(parsed.metadata)
+  );
+}
+
+function hasValidMetadata(metadata: Record<string, unknown>): boolean {
+  return (
+    isNonEmptyString(metadata.request_id) &&
+    isNonEmptyString(metadata.version) &&
+    isValidTimestamp(metadata.timestamp)
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function isValidTimestamp(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false;
+
+  const parsed = Date.parse(value);
+  return (
+    !Number.isNaN(parsed) &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      value,
+    )
   );
 }
 
