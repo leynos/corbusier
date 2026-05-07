@@ -86,9 +86,9 @@ The downstream delivery work ratified by this ADR then relies on:
 
 Podbot sends a typed hook request over a dedicated control channel. Corbusier
 evaluates policy and responds with an idempotent acknowledgement that either
-approves, skip, fail-current-step, or abort-session the hook request. Podbot
-then executes or skips the
-hook according to that acknowledgement.
+specifies `approved`, `skip`, `fail-current-step`, or `abort-session` for the
+hook request. Podbot then executes or skips the hook according to that
+acknowledgement.
 
 ### Option B: Corbusier executes hooks itself
 
@@ -121,7 +121,8 @@ The proposed contract is:
   workspace identifier, trigger name, requested access mode, and artefact
   reference.
 - Corbusier evaluates policy and replies with an idempotent acknowledgement
-  that explicitly approves, skip, fail-current-step, or abort-session the request.
+  that specifies `approved`, `skip`, `fail-current-step`, or `abort-session` for
+  the request.
 - Podbot suspends the relevant hosted execution path until it receives that
   acknowledgement or a timeout occurs.
 - Podbot executes the hook only after approval and reports completion or
@@ -326,8 +327,8 @@ Podbot-hosted sessions.
 
 ## Outstanding Decisions
 
-- Whether trigger vocabulary belongs primarily to Corbusier workflow concepts
-  or Podbot runtime concepts
+- Trigger vocabulary ownership is decided by the Hook event definitions, which
+  provide the normative vocabulary for the Podbot-owned hook execution model.
 
 ## Architectural Rationale
 
