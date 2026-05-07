@@ -149,8 +149,9 @@ rules.
   - `accessMode` (string): `"ro"` (read-only workspace access)
   - `turnIndex` (number): the index of the upcoming turn within the session
 - **Acknowledgement semantics:** Podbot suspends the hosted execution path
-  until it receives an idempotent `approved`, `skip`, `fail-current-step`, or `abort-session`
-  acknowledgement. Corbusier must respond within the configured timeout.
+  until it receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
+  configured timeout.
 - **Timeout and resume rules:** timeout defaults to 30 seconds. On timeout,
   Podbot treats the unacknowledged hook as `abort-session` and terminates the
   session.
@@ -166,8 +167,9 @@ rules.
   - `turnIndex` (number): the index of the completed turn
   - `artefactRef` (string, optional): reference to the turn result artefact
 - **Acknowledgement semantics:** Podbot suspends the hosted execution path
-  until it receives an idempotent `approved`, `skip`, `fail-current-step`, or `abort-session`
-  acknowledgement. Corbusier must respond within the configured timeout.
+  until it receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
+  configured timeout.
 - **Timeout and resume rules:** timeout defaults to 30 seconds. On timeout,
   Podbot treats the unacknowledged hook as `abort-session` and terminates the
   session.
@@ -183,11 +185,11 @@ rules.
   - `toolName` (string): name of the tool about to be invoked
   - `toolInput` (object): the input parameters for the tool call
 - **Acknowledgement semantics:** Podbot suspends the hosted execution path
-  until it receives an idempotent `approved`, `skip`, `fail-current-step`, or `abort-session`
-  acknowledgement. Corbusier must respond within the configured timeout. A
-  `skip` denial blocks the tool call; a `fail-current-step` denial blocks the
-  tool call and marks the current step failed; an `abort-session` denial
-  terminates the session.
+  until it receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
+  configured timeout. A `skip` denial blocks the tool call; a
+  `fail-current-step` denial blocks the tool call and marks the current step
+  failed; an `abort-session` denial terminates the session.
 - **Timeout and resume rules:** timeout defaults to 15 seconds. On timeout,
   Podbot treats the unacknowledged hook as `skip` (deny the tool call without
   failing the step).
@@ -221,8 +223,8 @@ rules.
   - `changedFiles` (array of string): paths of files included in the commit
   - `diff` (string, optional): the full diff of the proposed commit
 - **Acknowledgement semantics:** Podbot suspends the commit operation until it
-  receives an idempotent `approved`, `skip`, `fail-current-step`, or
-  `abort-session` acknowledgement. Corbusier must respond within the
+  receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
   configured timeout.
 - **Timeout and resume rules:** timeout defaults to 60 seconds. On timeout,
   Podbot treats the unacknowledged hook as `skip` (block the commit without
@@ -239,8 +241,8 @@ rules.
   - `sourceBranch` (string): the branch being merged
   - `targetBranch` (string): the target branch
 - **Acknowledgement semantics:** Podbot suspends the merge operation until it
-  receives an idempotent `approved`, `skip`, `fail-current-step`, or
-  `abort-session` acknowledgement. Corbusier must respond within the
+  receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
   configured timeout.
 - **Timeout and resume rules:** timeout defaults to 120 seconds. On timeout,
   Podbot treats the unacknowledged hook as `skip` (block the merge without
@@ -257,8 +259,8 @@ rules.
   - `target` (string): the deployment target identifier
   - `artefactRef` (string): reference to the build or image being deployed
 - **Acknowledgement semantics:** Podbot suspends the deployment operation
-  until it receives an idempotent `approved`, `skip`, `fail-current-step`, or
-  `abort-session` acknowledgement. Corbusier must respond within the
+  until it receives an idempotent acknowledgement specifying `approved`, `skip`,
+  `fail-current-step`, or `abort-session`. Corbusier must respond within the
   configured timeout.
 - **Timeout and resume rules:** timeout defaults to 300 seconds. On timeout,
   Podbot treats the unacknowledged hook as `abort-session` and terminates the
@@ -300,7 +302,7 @@ gate for the affected hook; a `fail-current-step` denial is a warn-only gate
 for the session but a blocking gate for the step; an `abort-session` denial is
 a blocking gate for the session.
 
-Roadmap item `1.1.1` accepted this ADR as part of the ADR 001–005 and ADR 010
+Roadmap item 1.1.1 accepted this ADR as part of the ADR 001–005 and ADR 010
 bundle. Reviewer-facing compatibility, warn-only, and blocking gates live in
 ADR 010 and `docs/podbot-migration-review-checklist.md`; this ADR only scopes
 the hook-specific delivery sequence below.
