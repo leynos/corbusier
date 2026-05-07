@@ -115,6 +115,9 @@ Table 1: Trade-offs for the hook execution contract.
 Corbusier adopts a Podbot-owned hook execution model with a dedicated control
 channel and an explicit acknowledgement contract.
 
+Trigger vocabulary ownership is decided by the Hook event definitions, which
+provide the normative vocabulary for the Podbot-owned hook execution model.
+
 The proposed contract is:
 
 - Podbot emits a typed hook request with a stable correlation identifier,
@@ -324,11 +327,6 @@ Podbot-hosted sessions.
   interruptions.
 - Hook requests that depend on wires or other runtime resources require clear
   ordering with other Podbot runtime actions.
-
-## Outstanding Decisions
-
-- Trigger vocabulary ownership is decided by the Hook event definitions, which
-  provide the normative vocabulary for the Podbot-owned hook execution model.
 
 ## Architectural Rationale
 
