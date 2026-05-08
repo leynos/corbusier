@@ -291,6 +291,18 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+function isTimeOfDayInRange(
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
+  return hour <= 23 && minute <= 59 && second <= 59;
+}
+
+function isOffsetInRange(offsetHour: number, offsetMinute: number): boolean {
+  return offsetHour <= 23 && offsetMinute <= 59;
+}
+
 function isValidTimestamp(value: unknown): value is string {
   const groups = parseTimestampMatch(value);
   return (
@@ -327,7 +339,7 @@ function isClockRangeValid({
   minute,
   second,
 }: Pick<TimestampGroups, 'hour' | 'minute' | 'second'>): boolean {
-  return hour <= 23 && minute <= 59 && second <= 59;
+  return isTimeOfDayInRange(hour, minute, second);
 }
 
 function isOffsetValid(offset: string): boolean {
@@ -335,7 +347,7 @@ function isOffsetValid(offset: string): boolean {
 
   const offsetHour = Number(offset.slice(1, 3));
   const offsetMinute = Number(offset.slice(4, 6));
-  return offsetHour <= 23 && offsetMinute <= 59;
+  return isOffsetInRange(offsetHour, offsetMinute);
 }
 
 function isDateConsistent({
