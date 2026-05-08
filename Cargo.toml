@@ -66,7 +66,7 @@ pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "asyn
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
-actix-http = "3"
+actix-http = "3.12.1"
 corbusier = { path = ".", features = ["test-support"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"

@@ -22,6 +22,7 @@
 //! - `tool_policy_enforcement_tests`: Hook-backed policy enforcement for tool calls
 //! - `hook_engine_tests`: Hook execution log persistence
 //! - `http_api_surface_tests`: HTTP API surface integration tests
+//! - `http_api_task_contract_tests`: Golden HTTP task contract fixture coverage
 
 mod http_api_test_helpers;
 mod test_helpers;

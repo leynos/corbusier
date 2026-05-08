@@ -145,7 +145,8 @@ Observable success means:
 - [x] (2026-04-10 00:00Z) Authored the initial ExecPlan draft in this file.
 - [x] (2026-04-13 00:00Z) User approved implementation and execution began.
 - [x] (2026-04-13 00:00Z) Resolved the phase 4 dependency pin to upstream
-  `actix-v2a` commit `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe`.
+  `actix-v2a` commit `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe`
+  (upstream: github.com/leynos/actix-v2a).
 - [x] (2026-04-13 00:00Z) Stage A contract decision recorded: adopt
   `actix-v2a` shared error payloads and idempotency-header parsing directly,
   while retaining Corbusier-owned success envelopes and deferring durable
@@ -233,9 +234,10 @@ Observable success means:
   shared contract dependency, and a Git pin reduces drift while upstream point
   releases catch up. Date/Author: 2026-04-11 / plan author.
 - Decision: pin `actix-v2a` to upstream `main` commit
-  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` for this milestone. Rationale:
-  this reviewed upstream head exposes the required `error`, `idempotency`, and
-  `openapi` modules. Date/Author: 2026-04-13 / implementation.
+  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` (upstream:
+  github.com/leynos/actix-v2a) for this milestone. Rationale: this reviewed
+  upstream head exposes the required `error`, `idempotency`, and `openapi`
+  modules. Date/Author: 2026-04-13 / implementation.
 - Decision: adopt `actix-v2a` for error payloads and idempotency-header
   parsing, but keep Corbusier-owned success envelopes in place for now.
   Rationale: the shared crate provides the error contract the slice needs, but
@@ -309,8 +311,9 @@ Temporary dependency pin for planning purposes:
 
 - Until `actix-v2a` publishes a suitable point release, implementation should
   pin the dependency to a reviewed full Git SHA. Use
-  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` as the pinned upstream commit for
-  this implementation.
+  `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` (upstream:
+  github.com/leynos/actix-v2a) as the pinned upstream commit for this
+  implementation.
 
 Planned steady state after `4.4.2`:
 

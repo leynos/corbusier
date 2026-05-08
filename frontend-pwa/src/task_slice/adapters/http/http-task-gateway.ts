@@ -55,6 +55,8 @@ const INVALID_TASK_SHAPE_MESSAGE =
 const INVALID_SUCCESS_ENVELOPE_MESSAGE =
   'The task API returned an invalid success response.' as const;
 
+const CONTRACT_VERSION = 'v1' as const;
+
 function taskShapeGatewayError(): TaskGatewayError {
   return new TaskGatewayError('unavailable', INVALID_TASK_SHAPE_MESSAGE);
 }
@@ -169,12 +171,10 @@ function validateOptionalRef(
 }
 
 function requireTimestampFields(task: Record<string, unknown>): void {
-  const createdAt = task.created_at;
-  const updatedAt = task.updated_at;
-  if (typeof createdAt !== 'string' || createdAt.length === 0) {
+  if (!isValidTimestamp(task.created_at)) {
     throw taskShapeGatewayError();
   }
-  if (typeof updatedAt !== 'string' || updatedAt.length === 0) {
+  if (!isValidTimestamp(task.updated_at)) {
     throw taskShapeGatewayError();
   }
 }
@@ -272,7 +272,7 @@ function isValidEnvelopeShell(
 function hasValidMetadata(metadata: Record<string, unknown>): boolean {
   return (
     isNonEmptyString(metadata.request_id) &&
-    isNonEmptyString(metadata.version) &&
+    metadata.version === CONTRACT_VERSION &&
     isValidTimestamp(metadata.timestamp)
   );
 }

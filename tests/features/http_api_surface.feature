@@ -40,6 +40,7 @@ Feature: HTTP API surface
     When I create a conversation through the API
     Then the response status is 401
     And the shared error code is "unauthorized"
+    And the shared error reason is "missing_bearer_token"
     And the error trace id is present
 
   Scenario: Reject invalid task input through HTTP

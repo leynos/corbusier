@@ -106,6 +106,31 @@ describe('http task gateway', () => {
     );
   });
 
+  it('rejects a 200 envelope with an unsupported metadata version', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ...taskEnvelope,
+            metadata: {
+              ...taskEnvelope.metadata,
+              version: 'v2',
+            },
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid success response.',
+      ),
+    );
+  });
+
   it('maps shared not-found responses to the task gateway error', async () => {
     const gateway = createHttpTaskGateway(
       '/api/v1',
@@ -161,6 +186,33 @@ describe('http task gateway', () => {
               version: 'v1',
             },
             success: true,
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+
+    await expect(gateway.getTask('task-shape')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid task shape.',
+      ),
+    );
+  });
+
+  it('rejects a 200 envelope when the nested task has invalid timestamps', async () => {
+    const gateway = createHttpTaskGateway(
+      '/api/v1',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ...taskEnvelope,
+            data: {
+              task: {
+                ...taskEnvelope.data.task,
+                created_at: 'not-a-date',
+              },
+            },
           }),
           { status: 200 },
         ),

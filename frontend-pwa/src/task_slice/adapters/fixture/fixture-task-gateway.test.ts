@@ -43,18 +43,39 @@ describe('fixture task gateway', () => {
       provider: 'github',
       repository: 'acme/widgets',
       issue_number: 33,
-      title: 'Move task into review',
+      title: 'Move task into progress',
     });
 
     await expect(
-      gateway.transitionTask(task.id, 'in_review'),
+      gateway.transitionTask(task.id, 'in_progress'),
     ).resolves.toMatchObject({
       id: task.id,
-      state: 'in_review',
+      state: 'in_progress',
     });
     await expect(gateway.getTask(task.id)).resolves.toMatchObject({
       id: task.id,
-      state: 'in_review',
+      state: 'in_progress',
+    });
+  });
+
+  it('rejects invalid state transitions before mutating a task', async () => {
+    const gateway = createFixtureTaskGateway();
+    const task = await gateway.createTask({
+      provider: 'github',
+      repository: 'acme/widgets',
+      issue_number: 34,
+      title: 'Reject invalid transition',
+    });
+
+    await expect(gateway.transitionTask(task.id, 'done')).rejects.toEqual(
+      new TaskGatewayError(
+        'conflict',
+        `Invalid task transition for ${task.id}: cannot move from draft to done.`,
+      ),
+    );
+    await expect(gateway.getTask(task.id)).resolves.toMatchObject({
+      id: task.id,
+      state: 'draft',
     });
   });
 

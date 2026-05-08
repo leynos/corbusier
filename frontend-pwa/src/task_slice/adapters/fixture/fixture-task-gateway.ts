@@ -12,6 +12,15 @@ import {
 
 const notFoundTaskId = '11111111-1111-1111-1111-111111111111';
 
+const allowedTransitions: Readonly<Record<TaskState, readonly TaskState[]>> = {
+  abandoned: [],
+  done: [],
+  draft: ['in_progress', 'in_review', 'abandoned'],
+  in_progress: ['in_review', 'paused', 'done', 'abandoned'],
+  in_review: ['in_progress', 'done', 'abandoned'],
+  paused: ['in_progress', 'abandoned'],
+};
+
 export function createFixtureTaskGateway(
   seedTasks: Task[] = [buildSeedTask()],
 ): TaskSliceGateway {
@@ -52,11 +61,25 @@ export function createFixtureTaskGateway(
         );
       }
 
+      assertTransitionAllowed(taskId, existingTask.state, targetState);
       const updatedTask = applyTransition(existingTask, targetState);
       tasks.set(taskId, updatedTask);
       return updatedTask;
     },
   };
+}
+
+function assertTransitionAllowed(
+  taskId: string,
+  currentState: TaskState,
+  targetState: TaskState,
+): void {
+  if (!allowedTransitions[currentState].includes(targetState)) {
+    throw new TaskGatewayError(
+      'conflict',
+      `Invalid task transition for ${taskId}: cannot move from ${currentState} to ${targetState}.`,
+    );
+  }
 }
 
 function buildTaskFromRequest(request: CreateTaskRequest): Task {

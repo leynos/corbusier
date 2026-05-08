@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const proxyTarget = env.CORBUSIER_API_PROXY_TARGET;
   const bearerToken = env.CORBUSIER_DEV_BEARER_TOKEN;
+  const allowInsecureTls = env.CORBUSIER_API_PROXY_INSECURE_TLS === 'true';
 
   return {
     plugins: [react(), tailwindcss()],
@@ -25,7 +26,7 @@ export default defineConfig(({ mode }) => {
               headers: bearerToken
                 ? { Authorization: `Bearer ${bearerToken}` }
                 : undefined,
-              secure: false,
+              secure: !allowInsecureTls,
               target: proxyTarget,
             },
           }
