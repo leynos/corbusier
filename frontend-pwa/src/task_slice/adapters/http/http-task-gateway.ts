@@ -40,16 +40,6 @@ interface SharedErrorResponse {
   traceId?: string;
 }
 
-interface TimestampGroups {
-  day: number;
-  hour: number;
-  minute: number;
-  month: number;
-  offset: string;
-  second: number;
-  year: number;
-}
-
 const TASK_STATES = new Set<TaskState>([
   'draft',
   'in_progress',
@@ -291,7 +281,35 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
-function isTimeOfDayInRange(
+interface ParsedTimestamp {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  offset: string;
+}
+
+const TIMESTAMP_RE =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:\d{2})$/;
+
+function parseTimestampGroups(value: string): ParsedTimestamp | null {
+  const match = TIMESTAMP_RE.exec(value);
+  const groups = match?.groups;
+  if (!groups) return null;
+  return {
+    year: Number(groups.year),
+    month: Number(groups.month),
+    day: Number(groups.day),
+    hour: Number(groups.hour),
+    minute: Number(groups.minute),
+    second: Number(groups.second),
+    offset: groups.offset,
+  };
+}
+
+function isValidTimeOfDay(
   hour: number,
   minute: number,
   second: number,
@@ -299,73 +317,35 @@ function isTimeOfDayInRange(
   return hour <= 23 && minute <= 59 && second <= 59;
 }
 
-function isOffsetInRange(offsetHour: number, offsetMinute: number): boolean {
+function isValidOffset(offset: string): boolean {
+  if (offset === 'Z') return true;
+  const offsetHour = Number(offset.slice(1, 3));
+  const offsetMinute = Number(offset.slice(4, 6));
   return offsetHour <= 23 && offsetMinute <= 59;
 }
 
-function isValidTimestamp(value: unknown): value is string {
-  const groups = parseTimestampMatch(value);
+function matchesCalendarDate(p: ParsedTimestamp): boolean {
+  const date = new Date(
+    Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second),
+  );
   return (
-    groups !== null &&
-    isClockRangeValid(groups) &&
-    isOffsetValid(groups.offset) &&
-    isDateConsistent(groups)
+    date.getUTCFullYear() === p.year &&
+    date.getUTCMonth() === p.month - 1 &&
+    date.getUTCDate() === p.day &&
+    date.getUTCHours() === p.hour &&
+    date.getUTCMinutes() === p.minute &&
+    date.getUTCSeconds() === p.second
   );
 }
 
-function parseTimestampMatch(value: unknown): TimestampGroups | null {
-  if (!isNonEmptyString(value)) return null;
-
-  const match =
-    /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:\d{2})$/.exec(
-      value,
-    );
-  const groups = match?.groups;
-  if (!groups) return null;
-
-  return {
-    day: Number(groups.day),
-    hour: Number(groups.hour),
-    minute: Number(groups.minute),
-    month: Number(groups.month),
-    offset: groups.offset ?? '',
-    second: Number(groups.second),
-    year: Number(groups.year),
-  };
-}
-
-function isClockRangeValid({
-  hour,
-  minute,
-  second,
-}: Pick<TimestampGroups, 'hour' | 'minute' | 'second'>): boolean {
-  return isTimeOfDayInRange(hour, minute, second);
-}
-
-function isOffsetValid(offset: string): boolean {
-  if (offset === 'Z') return true;
-
-  const offsetHour = Number(offset.slice(1, 3));
-  const offsetMinute = Number(offset.slice(4, 6));
-  return isOffsetInRange(offsetHour, offsetMinute);
-}
-
-function isDateConsistent({
-  day,
-  hour,
-  minute,
-  month,
-  second,
-  year,
-}: TimestampGroups): boolean {
-  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+function isValidTimestamp(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false;
+  const parts = parseTimestampGroups(value);
+  if (parts === null) return false;
   return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day &&
-    date.getUTCHours() === hour &&
-    date.getUTCMinutes() === minute &&
-    date.getUTCSeconds() === second
+    isValidTimeOfDay(parts.hour, parts.minute, parts.second) &&
+    isValidOffset(parts.offset) &&
+    matchesCalendarDate(parts)
   );
 }
 
