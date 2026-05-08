@@ -17,6 +17,17 @@ use uuid::Uuid;
 
 const JWT_TTL_SECONDS: i64 = 86_400;
 
+/// A validated bearer token string produced by [`HttpApiAuth`].
+pub struct BearerToken(pub String);
+
+impl BearerToken {
+    /// Returns the token as a string slice suitable for an authorization header.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Consistent JWT and request-context fixture for HTTP API tests.
 pub struct HttpApiAuth {
     secret: String,
@@ -278,8 +289,8 @@ mod tests {
     //! Smoke tests for the shared HTTP API helper surface.
 
     use super::{
-        HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field, required_str_field,
-        with_bearer,
+        BearerToken, HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field,
+        required_str_field, with_bearer,
     };
     use actix_web::test as actix_test;
     use serde_json::json;
@@ -322,5 +333,7 @@ mod tests {
         );
         let request = with_bearer(actix_test::TestRequest::get(), "token-value");
         let _request = request.to_request();
+        let token = BearerToken("token-value".to_owned());
+        assert_eq!(token.as_str(), "token-value");
     }
 }
