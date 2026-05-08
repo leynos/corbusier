@@ -481,6 +481,9 @@ set -o pipefail; make frontend-lint 2>&1 | tee /tmp/4-4-2-frontend-lint.log
 set -o pipefail; make frontend-typecheck 2>&1 | tee /tmp/4-4-2-frontend-typecheck.log
 set -o pipefail; make frontend-test 2>&1 | tee /tmp/4-4-2-frontend-test.log
 set -o pipefail; make frontend-test-a11y 2>&1 | tee /tmp/4-4-2-frontend-test-a11y.log
+set -o pipefail; make frontend-audit 2>&1 | tee /tmp/4-4-2-frontend-audit.log
+set -o pipefail; make frontend-localizability 2>&1 | tee /tmp/4-4-2-frontend-localizability.log
+set -o pipefail; make frontend-semantic 2>&1 | tee /tmp/4-4-2-frontend-semantic.log
 set -o pipefail; make frontend-e2e 2>&1 | tee /tmp/4-4-2-frontend-e2e.log
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/4-4-2-check-fmt.log
 set -o pipefail; make lint 2>&1 | tee /tmp/4-4-2-lint.log
