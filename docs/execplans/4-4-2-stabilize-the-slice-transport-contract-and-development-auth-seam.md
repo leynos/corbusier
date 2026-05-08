@@ -83,7 +83,7 @@ Observable success means:
     clearer than low-level adapter assertions;
   - PostgreSQL-backed tests must use the `pg-embedded-setup-unpriv` fixtures;
   - update `docs/corbusier-design.md` with the transport/auth design decisions;
-  - update `docs/users-guide.md` with the repeatable local preview path;
+  - update `docs/whitaker-users-guide.md` with the repeatable local preview path;
   - mark roadmap item `4.4.2` done in `docs/roadmap.md` only after all feature
     and documentation gates pass.
 
@@ -163,7 +163,7 @@ Observable success means:
   PostgreSQL-backed, and BDD coverage for task create, detail, transition, and
   unhappy-path contract assertions.
 - [x] (2026-04-13 00:00Z) Updated `docs/corbusier-design.md`,
-  `docs/users-guide.md`, and `docs/roadmap.md` to record the transport
+  `docs/whitaker-users-guide.md`, and `docs/roadmap.md` to record the transport
   contract, local auth seam, and milestone completion.
 - [x] (2026-04-13 00:00Z) Quality gates passed: `make check-fmt`, `make lint`,
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
@@ -458,7 +458,7 @@ covered by focused tests.
     implementation;
   - the development auth seam and its explicitly temporary status;
   - any idempotency decision or deferral taken for task mutations.
-- Update `docs/users-guide.md` with:
+- Update `docs/whitaker-users-guide.md` with:
   - how to run the frontend preview against the live API in development;
   - required environment variables or proxy configuration;
   - the current behavioural limits of the preview seam.
