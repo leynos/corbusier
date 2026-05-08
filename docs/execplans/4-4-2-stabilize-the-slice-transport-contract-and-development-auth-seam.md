@@ -489,7 +489,7 @@ set -o pipefail; make check-fmt 2>&1 | tee /tmp/4-4-2-check-fmt.log
 set -o pipefail; make lint 2>&1 | tee /tmp/4-4-2-lint.log
 set -o pipefail; make test TEST_FLAGS='--profile long --all-targets --all-features' 2>&1 | tee /tmp/4-4-2-test.log
 set -o pipefail; make fmt 2>&1 | tee /tmp/4-4-2-fmt.log
-set -o pipefail; PATH=/root/.bun/bin:$PATH make markdownlint 2>&1 | tee /tmp/4-4-2-markdownlint.log
+set -o pipefail; make markdownlint 2>&1 | tee /tmp/4-4-2-markdownlint.log
 set -o pipefail; make nixie 2>&1 | tee /tmp/4-4-2-nixie.log
 ```
 

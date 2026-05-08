@@ -84,39 +84,40 @@ describe('http task gateway', () => {
     );
   });
 
-  it('rejects a 200 envelope when metadata is incomplete', async () => {
-    const gateway = createGatewayWithResponse({
-      ...taskEnvelope,
-      metadata: {
-        request_id: 'req-123',
-        timestamp: '',
-        version: 'v1',
+  it.each([
+    {
+      body: {
+        ...taskEnvelope,
+        metadata: {
+          request_id: 'req-123',
+          timestamp: '',
+          version: 'v1',
+        },
       },
-    });
-
-    await expect(gateway.getTask('task-1')).rejects.toEqual(
-      new TaskGatewayError(
+      expectedError: new TaskGatewayError(
         'unavailable',
         'The task API returned an invalid success response.',
       ),
-    );
-  });
-
-  it('rejects a 200 envelope with an unsupported metadata version', async () => {
-    const gateway = createGatewayWithResponse({
-      ...taskEnvelope,
-      metadata: {
-        ...taskEnvelope.metadata,
-        version: 'v2',
+      name: 'metadata is incomplete',
+    },
+    {
+      body: {
+        ...taskEnvelope,
+        metadata: {
+          ...taskEnvelope.metadata,
+          version: 'v2',
+        },
       },
-    });
-
-    await expect(gateway.getTask('task-1')).rejects.toEqual(
-      new TaskGatewayError(
+      expectedError: new TaskGatewayError(
         'unavailable',
         'The task API returned an invalid success response.',
       ),
-    );
+      name: 'metadata version is unsupported',
+    },
+  ])('rejects a 200 envelope when $name', async ({ body, expectedError }) => {
+    const gateway = createGatewayWithResponse(body);
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(expectedError);
   });
 
   it('maps shared not-found responses to the task gateway error', async () => {
@@ -135,63 +136,64 @@ describe('http task gateway', () => {
     );
   });
 
-  it('rejects a 200 envelope when the nested task violates the slice contract shape', async () => {
-    const gateway = createGatewayWithResponse({
-      data: {
-        task: {
-          created_at: '2026-04-13T00:00:00.000Z',
-          id: 123,
-          origin: {
-            issue_ref: {
-              issue_number: 42,
-              provider: 'github',
-              repository: 'acme/widgets',
+  it.each([
+    {
+      body: {
+        data: {
+          task: {
+            created_at: '2026-04-13T00:00:00.000Z',
+            id: 123,
+            origin: {
+              issue_ref: {
+                issue_number: 42,
+                provider: 'github',
+                repository: 'acme/widgets',
+              },
+              metadata: {
+                assignees: [],
+                labels: [],
+                title: 'Stabilise the transport contract',
+              },
+              type: 'issue',
             },
-            metadata: {
-              assignees: [],
-              labels: [],
-              title: 'Stabilise the transport contract',
-            },
-            type: 'issue',
+            state: 'draft',
+            updated_at: '2026-04-13T00:00:00.000Z',
           },
-          state: 'draft',
-          updated_at: '2026-04-13T00:00:00.000Z',
         },
+        error: null,
+        metadata: {
+          request_id: 'req-999',
+          timestamp: '2026-04-13T00:00:00.000Z',
+          version: 'v1',
+        },
+        success: true,
       },
-      error: null,
-      metadata: {
-        request_id: 'req-999',
-        timestamp: '2026-04-13T00:00:00.000Z',
-        version: 'v1',
-      },
-      success: true,
-    });
-
-    await expect(gateway.getTask('task-shape')).rejects.toEqual(
-      new TaskGatewayError(
+      expectedError: new TaskGatewayError(
         'unavailable',
         'The task API returned an invalid task shape.',
       ),
-    );
-  });
-
-  it('rejects a 200 envelope when the nested task has invalid timestamps', async () => {
-    const gateway = createGatewayWithResponse({
-      ...taskEnvelope,
-      data: {
-        task: {
-          ...taskEnvelope.data.task,
-          created_at: '2026-02-30T00:00:00.000Z',
+      name: 'the nested task violates the slice contract shape',
+    },
+    {
+      body: {
+        ...taskEnvelope,
+        data: {
+          task: {
+            ...taskEnvelope.data.task,
+            created_at: '2026-02-30T00:00:00.000Z',
+          },
         },
       },
-    });
-
-    await expect(gateway.getTask('task-shape')).rejects.toEqual(
-      new TaskGatewayError(
+      expectedError: new TaskGatewayError(
         'unavailable',
         'The task API returned an invalid task shape.',
       ),
-    );
+      name: 'the nested task has invalid timestamps',
+    },
+  ])('rejects a 200 envelope when $name', async ({ body, expectedError }) => {
+    const gateway = createGatewayWithResponse(body);
+
+    await expect(gateway.getTask('task-shape')).rejects.toEqual(expectedError);
   });
 
   it('maps invalid transition conflicts separately from validation failures', async () => {

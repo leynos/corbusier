@@ -40,6 +40,16 @@ interface SharedErrorResponse {
   traceId?: string;
 }
 
+interface TimestampGroups {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  offset: string;
+  second: number;
+  year: number;
+}
+
 const TASK_STATES = new Set<TaskState>([
   'draft',
   'in_progress',
@@ -282,29 +292,60 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isValidTimestamp(value: unknown): value is string {
-  if (!isNonEmptyString(value)) return false;
+  const groups = parseTimestampMatch(value);
+  return (
+    groups !== null &&
+    isClockRangeValid(groups) &&
+    isOffsetValid(groups.offset) &&
+    isDateConsistent(groups)
+  );
+}
+
+function parseTimestampMatch(value: unknown): TimestampGroups | null {
+  if (!isNonEmptyString(value)) return null;
 
   const match =
     /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:\d{2})$/.exec(
       value,
     );
-  if (!match?.groups) return false;
+  const groups = match?.groups;
+  if (!groups) return null;
 
-  const year = Number(match.groups.year);
-  const month = Number(match.groups.month);
-  const day = Number(match.groups.day);
-  const hour = Number(match.groups.hour);
-  const minute = Number(match.groups.minute);
-  const second = Number(match.groups.second);
-  const offset = match.groups.offset;
+  return {
+    day: Number(groups.day),
+    hour: Number(groups.hour),
+    minute: Number(groups.minute),
+    month: Number(groups.month),
+    offset: groups.offset ?? '',
+    second: Number(groups.second),
+    year: Number(groups.year),
+  };
+}
 
-  if (hour > 23 || minute > 59 || second > 59) return false;
-  if (offset !== 'Z') {
-    const offsetHour = Number(offset.slice(1, 3));
-    const offsetMinute = Number(offset.slice(4, 6));
-    if (offsetHour > 23 || offsetMinute > 59) return false;
-  }
+function isClockRangeValid({
+  hour,
+  minute,
+  second,
+}: Pick<TimestampGroups, 'hour' | 'minute' | 'second'>): boolean {
+  return hour <= 23 && minute <= 59 && second <= 59;
+}
 
+function isOffsetValid(offset: string): boolean {
+  if (offset === 'Z') return true;
+
+  const offsetHour = Number(offset.slice(1, 3));
+  const offsetMinute = Number(offset.slice(4, 6));
+  return offsetHour <= 23 && offsetMinute <= 59;
+}
+
+function isDateConsistent({
+  day,
+  hour,
+  minute,
+  month,
+  second,
+  year,
+}: TimestampGroups): boolean {
   const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
   return (
     date.getUTCFullYear() === year &&
