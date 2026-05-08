@@ -33,7 +33,7 @@ describe('http task gateway', () => {
           metadata: {
             assignees: [],
             labels: [],
-            title: 'Stabilise the transport contract',
+            title: 'Stabilize the transport contract',
           },
           type: 'issue',
         },
@@ -152,7 +152,7 @@ describe('http task gateway', () => {
               metadata: {
                 assignees: [],
                 labels: [],
-                title: 'Stabilise the transport contract',
+                title: 'Stabilize the transport contract',
               },
               type: 'issue',
             },
