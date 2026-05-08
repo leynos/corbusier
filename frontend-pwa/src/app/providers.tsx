@@ -1,3 +1,12 @@
+/**
+ * `@file` Root provider tree for the Corbusier PWA.
+ *
+ * Composes `QueryClientProvider` (TanStack Query), `I18nProvider`, and
+ * `TaskGatewayProvider` into a single `AppProviders` wrapper consumed by the
+ * application entry point and test utilities. The `TaskSliceGateway`
+ * dependency is injected here so that tests and Storybook can substitute
+ * fixture adapters without touching routing or query configuration.
+ */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type PropsWithChildren, useState } from 'react';
 

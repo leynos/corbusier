@@ -1,3 +1,11 @@
+/**
+ * `@file` Presentational card component for task detail display.
+ *
+ * Renders a `Task` value object's fields using the view-model formatters from
+ * `task_slice/domain/task-view-model`. Locale-aware formatting (timestamps,
+ * state labels, branch references, pull-request references) is delegated to
+ * those formatters; this component contains no formatting logic of its own.
+ */
 import { useI18n } from '../../i18n/runtime';
 import type { Task } from '../domain/task';
 import {

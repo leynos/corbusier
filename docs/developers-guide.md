@@ -14,6 +14,40 @@ Start here:
 For architecture and implementation details, read the relevant ADRs and
 execplans under [`docs/`](.).
 
+## Tooling
+
+
+### Markdown linting
+
+Markdown linting uses
+[`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2). The
+Makefile target is:
+
+```shell
+make markdownlint
+```
+
+The `MDLINT` variable resolves the executable automatically. If
+`markdownlint-cli2` is installed under `~/.bun/bin/` (for example via
+`bun install --global markdownlint-cli2`), the Makefile uses that copy. If not,
+it falls back to whatever `markdownlint-cli2` is on `PATH`. To override, set
+`MDLINT` explicitly:
+
+```shell
+MDLINT=/path/to/markdownlint-cli2 make markdownlint
+```
+
+Install via Bun (recommended for contributors who already use Bun):
+
+```shell
+bun install --global markdownlint-cli2
+```
+
+Or via npm:
+
+```shell
+npm install --global markdownlint-cli2
+```
 ## Dependency audit
 
 The workspace ships a unified dependency-vulnerability gate. Run it with:

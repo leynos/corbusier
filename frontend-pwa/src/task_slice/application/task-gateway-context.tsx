@@ -1,3 +1,12 @@
+/**
+ * `@file` React context and hook for the `TaskSliceGateway` port.
+ *
+ * Exports `TaskGatewayProvider`, which places a `TaskSliceGateway`
+ * implementation into React context, and `useTaskGateway`, which retrieves it.
+ * Components and hooks in `task_slice/application/` consume the gateway
+ * exclusively through `useTaskGateway` to preserve the hexagonal boundary and
+ * keep infrastructure adapters out of the component tree.
+ */
 import { createContext, type PropsWithChildren, useContext } from 'react';
 
 import type { TaskSliceGateway } from '../ports/task-slice-gateway';

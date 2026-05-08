@@ -1,3 +1,11 @@
+/**
+ * `@file` Presentational form component for task creation.
+ *
+ * Renders the task-create input fields and submit button. All state, error
+ * handling, and submission logic are supplied by the parent through
+ * `TaskCreateFormProps`; this component is purely presentational and carries
+ * no side-effects. Field names and labels are resolved via `useI18n`.
+ */
 import type { FormEvent } from 'react';
 
 import { useI18n } from '../../i18n/runtime';
