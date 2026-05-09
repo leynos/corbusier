@@ -1,0 +1,8 @@
+{
+  "code": "unauthorized",
+  "message": "missing bearer token",
+  "traceId": "<trace-id>",
+  "details": {
+    "reason": "missing_bearer_token"
+  }
+}

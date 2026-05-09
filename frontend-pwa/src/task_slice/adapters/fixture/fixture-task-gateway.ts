@@ -4,13 +4,22 @@
  * This module exports `createFixtureTaskGateway` plus fixture ids used to
  * simulate seeded and not-found task states without live backend traffic.
  */
-import type { CreateTaskRequest, Task } from '../../domain/task';
+import type { CreateTaskRequest, Task, TaskState } from '../../domain/task';
 import {
   TaskGatewayError,
   type TaskSliceGateway,
 } from '../../ports/task-slice-gateway';
 
 const notFoundTaskId = '11111111-1111-1111-1111-111111111111';
+
+const allowedTransitions: Readonly<Record<TaskState, readonly TaskState[]>> = {
+  abandoned: [],
+  done: [],
+  draft: ['in_progress', 'in_review', 'abandoned'],
+  in_progress: ['in_review', 'paused', 'done', 'abandoned'],
+  in_review: ['in_progress', 'done', 'abandoned'],
+  paused: ['in_progress', 'abandoned'],
+};
 
 export function createFixtureTaskGateway(
   seedTasks: Task[] = [buildSeedTask()],
@@ -42,7 +51,35 @@ export function createFixtureTaskGateway(
 
       return tasks.get(taskId) as Task;
     },
+    async transitionTask(taskId, targetState) {
+      await delay();
+      const existingTask = tasks.get(taskId);
+      if (taskId === notFoundTaskId || !existingTask) {
+        throw new TaskGatewayError(
+          'not_found',
+          `Task ${taskId} was not found.`,
+        );
+      }
+
+      assertTransitionAllowed(taskId, existingTask.state, targetState);
+      const updatedTask = applyTransition(existingTask, targetState);
+      tasks.set(taskId, updatedTask);
+      return updatedTask;
+    },
   };
+}
+
+function assertTransitionAllowed(
+  taskId: string,
+  currentState: TaskState,
+  targetState: TaskState,
+): void {
+  if (!allowedTransitions[currentState].includes(targetState)) {
+    throw new TaskGatewayError(
+      'conflict',
+      `Invalid task transition for ${taskId}: cannot move from ${currentState} to ${targetState}.`,
+    );
+  }
 }
 
 function buildTaskFromRequest(request: CreateTaskRequest): Task {
@@ -105,6 +142,14 @@ function buildSeedTask(): Task {
     state: 'in_review',
     created_at: timestamp,
     updated_at: timestamp,
+  };
+}
+
+function applyTransition(task: Task, targetState: TaskState): Task {
+  return {
+    ...task,
+    state: targetState,
+    updated_at: new Date().toISOString(),
   };
 }
 

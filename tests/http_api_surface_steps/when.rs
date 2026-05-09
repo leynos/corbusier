@@ -124,6 +124,17 @@ async fn transition_task_state(
         .await
 }
 
+#[when(r#"I request the task "{task_id}""#)]
+async fn request_task(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+    task_id: String,
+) -> Result<(), eyre::Report> {
+    let current_world = world_mut(world)?;
+    current_world
+        .send(actix_web::test::TestRequest::get().uri(&format!("/api/v1/tasks/{task_id}")))
+        .await
+}
+
 #[when("I list tools through the API")]
 async fn list_tools(world: &mut Result<HttpApiWorld, eyre::Report>) -> Result<(), eyre::Report> {
     let current_world = world_mut(world)?;

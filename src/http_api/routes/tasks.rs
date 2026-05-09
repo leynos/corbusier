@@ -1,13 +1,16 @@
 //! Registers the authenticated task routes mounted under `/api/v1`, including
 //! `POST /tasks`, `GET /tasks/{id}`, task state transitions, and branch or
-//! pull-request association operations handled through
+//! pull-request association mutations. Write paths use `TaskMutationContext`
+//! (Bearer plus validated `Idempotency-Key`); reads use
 //! [`AuthenticatedRequestContext`]. [`routes`] is the public entrypoint that
 //! wires these task-management handlers into the HTTP router.
 
 use super::super::{
     auth::AuthenticatedRequestContext, error::ApiError, response::json_success, state::ApiState,
 };
-use actix_web::{HttpResponse, http::StatusCode, web};
+use actix_v2a::{extract_idempotency_key, map_idempotency_key_error};
+use actix_web::{FromRequest, HttpRequest, HttpResponse, dev::Payload, http::StatusCode, web};
+use futures::future::{Ready, ready};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -85,6 +88,35 @@ struct TaskResponse {
     task: TaskDto,
 }
 
+#[derive(Debug, Clone)]
+struct TaskMutationContext {
+    auth: AuthenticatedRequestContext,
+}
+
+impl TaskMutationContext {
+    fn request_id(&self) -> String {
+        self.auth.request_id()
+    }
+
+    const fn context(&self) -> &crate::context::RequestContext {
+        self.auth.context()
+    }
+}
+
+impl FromRequest for TaskMutationContext {
+    type Error = ApiError;
+    type Future = Ready<Result<Self, Self::Error>>;
+
+    fn from_request(request: &HttpRequest, payload: &mut Payload) -> Self::Future {
+        let auth = match AuthenticatedRequestContext::from_request(request, payload).into_inner() {
+            Ok(auth) => auth,
+            Err(err) => return ready(Err(err)),
+        };
+
+        ready(validate_idempotency_header(request).map(|()| Self { auth }))
+    }
+}
+
 /// Registers the task routes under `/api/v1`.
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/tasks").route(web::post().to(create_task)))
@@ -99,12 +131,16 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
 
 async fn create_task(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     body: web::Json<CreateTaskBody>,
 ) -> HttpResponse {
     let request_id = auth.request_id();
-    let request = build_create_task_request(body.into_inner());
-    match state.tasks.create_task(auth.context(), request).await {
+    let create_request = build_create_task_request(body.into_inner());
+    match state
+        .tasks
+        .create_task(auth.context(), create_request)
+        .await
+    {
         Ok(task) => json_success(
             &*state.clock,
             StatusCode::CREATED,
@@ -138,7 +174,7 @@ async fn get_task(
 
 async fn transition_task(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     path: web::Path<TaskPath>,
     body: web::Json<TransitionTaskBody>,
 ) -> HttpResponse {
@@ -167,7 +203,7 @@ async fn transition_task(
 
 async fn associate_branch(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociateBranchBody>,
 ) -> HttpResponse {
@@ -202,7 +238,7 @@ async fn associate_branch(
 
 async fn associate_pull_request(
     state: web::Data<ApiState>,
-    auth: AuthenticatedRequestContext,
+    auth: TaskMutationContext,
     path: web::Path<TaskPath>,
     body: web::Json<AssociatePullRequestBody>,
 ) -> HttpResponse {
@@ -266,4 +302,13 @@ fn parse_task_id(raw: &str) -> Result<TaskId, ApiError> {
     Uuid::parse_str(raw)
         .map(TaskId::from_uuid)
         .map_err(|_| ApiError::bad_request("invalid_task_id", "invalid task id"))
+}
+
+fn validate_idempotency_header(request: &HttpRequest) -> Result<(), ApiError> {
+    extract_idempotency_key(request.headers())
+        .map(|_| ())
+        .map_err(|error| {
+            let shared_error = map_idempotency_key_error(&error);
+            ApiError::bad_request("invalid_idempotency_key", shared_error.message())
+        })
 }

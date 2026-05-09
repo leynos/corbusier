@@ -1,0 +1,8 @@
+{
+  "code": "invalid_request",
+  "message": "idempotency-key header must be a valid uuid",
+  "traceId": "<trace-id>",
+  "details": {
+    "reason": "invalid_idempotency_key"
+  }
+}

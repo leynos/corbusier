@@ -133,3 +133,44 @@ async fn tool_call_response_names_tool(
     );
     Ok(())
 }
+
+#[then(r#"the shared error code is "{expected_code}""#)]
+async fn shared_error_code_is(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+    expected_code: String,
+) -> Result<(), eyre::Report> {
+    let body = last_body(world)?;
+    eyre::ensure!(
+        required_field(body, "code")? == &expected_code,
+        "expected shared error code {expected_code}, got {}",
+        required_field(body, "code")?
+    );
+    Ok(())
+}
+
+#[then(r#"the shared error reason is "{expected_reason}""#)]
+async fn shared_error_reason_is(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+    expected_reason: String,
+) -> Result<(), eyre::Report> {
+    let body = last_body(world)?;
+    let details = required_field(body, "details")?;
+    eyre::ensure!(
+        required_field(details, "reason")? == &expected_reason,
+        "expected shared error reason {expected_reason}, got {}",
+        required_field(details, "reason")?
+    );
+    Ok(())
+}
+
+#[then("the error trace id is present")]
+async fn error_trace_id_is_present(
+    world: &mut Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let body = last_body(world)?;
+    eyre::ensure!(
+        required_field(body, "traceId")?.is_string(),
+        "expected traceId to be a string"
+    );
+    Ok(())
+}

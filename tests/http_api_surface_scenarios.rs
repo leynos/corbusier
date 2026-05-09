@@ -67,3 +67,39 @@ async fn reject_unauthenticated_access(
     let _ = world?;
     Ok(())
 }
+
+#[scenario(
+    path = "tests/features/http_api_surface.feature",
+    name = "Reject invalid task input through HTTP"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_invalid_task_input(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
+}
+
+#[scenario(
+    path = "tests/features/http_api_surface.feature",
+    name = "Reject duplicate task creation through HTTP"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_duplicate_task_creation(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
+}
+
+#[scenario(
+    path = "tests/features/http_api_surface.feature",
+    name = "Reject missing task detail through HTTP"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_missing_task_detail(
+    world: Result<HttpApiWorld, eyre::Report>,
+) -> Result<(), eyre::Report> {
+    let _ = world?;
+    Ok(())
+}

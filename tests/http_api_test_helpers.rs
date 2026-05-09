@@ -195,6 +195,18 @@ pub fn assert_v1_metadata(body: &Value) {
     assert!(required_field(metadata, "timestamp").is_string());
 }
 
+/// Asserts the shared `actix-v2a` error contract.
+///
+/// # Panics
+///
+/// Panics if `body` does not contain the expected top-level shared error
+/// fields.
+pub fn assert_shared_error(body: &Value, expected_code: &str) {
+    assert_eq!(required_field(body, "code"), expected_code);
+    assert!(required_field(body, "message").is_string());
+    assert!(required_field(body, "traceId").is_string());
+}
+
 /// Registers and starts the standard `file_tools` MCP server used by HTTP API tests.
 ///
 /// # Errors
@@ -265,7 +277,10 @@ struct CustomJwtClaims {
 mod tests {
     //! Smoke tests for the shared HTTP API helper surface.
 
-    use super::{HttpApiAuth, assert_v1_metadata, required_field, required_str_field, with_bearer};
+    use super::{
+        HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field, required_str_field,
+        with_bearer,
+    };
     use actix_web::test as actix_test;
     use serde_json::json;
 
@@ -297,6 +312,14 @@ mod tests {
                 "timestamp": "2026-04-01T00:00:00Z"
             }
         }));
+        assert_shared_error(
+            &json!({
+                "code": "unauthorized",
+                "message": "missing bearer token",
+                "traceId": "trace-123",
+            }),
+            "unauthorized",
+        );
         let request = with_bearer(actix_test::TestRequest::get(), "token-value");
         let _request = request.to_request();
     }

@@ -22,6 +22,7 @@
 //! - `tool_policy_enforcement_tests`: Hook-backed policy enforcement for tool calls
 //! - `hook_engine_tests`: Hook execution log persistence
 //! - `http_api_surface_tests`: HTTP API surface integration tests
+//! - `http_api_task_contract_tests`: Golden HTTP task contract fixture coverage
 
 mod http_api_test_helpers;
 mod test_helpers;
@@ -42,6 +43,7 @@ mod postgres {
     mod crud_tests;
     mod hook_engine_tests;
     mod http_api_surface_tests;
+    mod http_api_task_contract_tests;
     mod mcp_server_lifecycle_tests;
     mod sequence_tests;
     mod serialization_tests;

@@ -1,0 +1,34 @@
+{
+  "success": true,
+  "data": {
+    "task": {
+      "id": "<task-id>",
+      "origin": {
+        "type": "issue",
+        "issue_ref": {
+          "provider": "github",
+          "repository": "owner/repo",
+          "issue_number": 42
+        },
+        "metadata": {
+          "title": "Implement HTTP API",
+          "description": null,
+          "labels": [],
+          "assignees": [],
+          "milestone": null
+        }
+      },
+      "branch_ref": null,
+      "pull_request_ref": null,
+      "state": "draft",
+      "created_at": "<timestamp>",
+      "updated_at": "<timestamp>"
+    }
+  },
+  "error": null,
+  "metadata": {
+    "version": "v1",
+    "request_id": "<request-id>",
+    "timestamp": "<timestamp>"
+  }
+}

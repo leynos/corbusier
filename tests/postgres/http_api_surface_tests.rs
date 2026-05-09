@@ -1,7 +1,8 @@
 //! `PostgreSQL` integration tests for the HTTP API surface.
 
 use crate::http_api_test_helpers::{
-    HttpApiAuth, assert_v1_metadata, required_field, required_str_field, with_bearer,
+    HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field, required_str_field,
+    with_bearer,
 };
 use crate::postgres::helpers::BoxError;
 use crate::postgres::http_api_surface_common::{PostgresHttpApiContext, TEST_JWT_SECRET, context};
@@ -238,9 +239,9 @@ async fn postgres_conversation_history_is_tenant_isolated(
     .await;
     assert_eq!(history_response.status().as_u16(), 404);
     let history_body: Value = actix_test::read_body_json(history_response).await;
-    assert_v1_metadata(&history_body);
+    assert_shared_error(&history_body, "not_found");
     assert_eq!(
-        required_field(required_field(&history_body, "error"), "code"),
+        required_field(required_field(&history_body, "details"), "reason"),
         "conversation_not_found"
     );
     Ok(())

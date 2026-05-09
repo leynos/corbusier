@@ -55,6 +55,8 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 # HTTP server (health endpoint adapter)
 actix-web = "4.9.0"
+# Git pin authorized in docs/dependency-policy-exception-actix-v2a.md (publish to crates.io when ready).
+actix_v2a = { git = "https://github.com/leynos/actix-v2a.git", rev = "7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe" }
 
 # JWT / token handling
 jsonwebtoken = "9.3.0"
@@ -64,6 +66,7 @@ pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "asyn
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]
+actix-http = "3.12.1"
 corbusier = { path = ".", features = ["test-support"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"

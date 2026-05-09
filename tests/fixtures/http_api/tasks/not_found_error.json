@@ -1,0 +1,9 @@
+{
+  "code": "not_found",
+  "message": "task 11111111-1111-1111-1111-111111111111 was not found",
+  "traceId": "<trace-id>",
+  "details": {
+    "reason": "task_not_found",
+    "taskId": "11111111-1111-1111-1111-111111111111"
+  }
+}

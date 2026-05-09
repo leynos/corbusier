@@ -1,6 +1,6 @@
 //! Shared support for in-memory HTTP API surface tests.
 
-use crate::http_api_test_helpers::{HttpApiAuth, bootstrap_file_tools_server};
+use crate::http_api_test_helpers::{HttpApiAuth, assert_shared_error, bootstrap_file_tools_server};
 use actix_web::test as actix_test;
 use corbusier::{
     http_api::{ApiConfig, ApiState, BearerTokenAuthenticator},
@@ -142,7 +142,7 @@ where
 {
     assert_eq!(response.status().as_u16(), 401);
     let body: Value = actix_test::read_body_json(response).await;
-    assert_v1_metadata(&body);
+    assert_shared_error(&body, "unauthorized");
     body
 }
 
