@@ -619,7 +619,7 @@ Current routes:
 
 Quality gates for the workspace are also exposed through `make`:
 
-- `make frontend-audit`
+- `make audit`
 - `make frontend-lint`
 - `make frontend-typecheck`
 - `make frontend-test`
