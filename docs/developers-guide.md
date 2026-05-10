@@ -20,24 +20,26 @@ execplans under [`docs/`](.).
 ### Markdown linting
 
 Markdown linting uses
-[`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2). The
-Makefile target is:
+[`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2).
+Run the linting target with:
 
 ```shell
 make markdownlint
 ```
 
-The `MDLINT` variable resolves the executable automatically. If
-`markdownlint-cli2` is installed under `~/.bun/bin/` (for example via
-`bun install --global markdownlint-cli2`), the Makefile uses that copy. If not,
-it falls back to whatever `markdownlint-cli2` is on `PATH`. To override, set
-`MDLINT` explicitly:
+The `MDLINT` variable resolves the executable automatically:
+
+1. If `markdownlint-cli2` exists at `~/.bun/bin/markdownlint-cli2` it is
+   used directly.
+2. Otherwise the `markdownlint-cli2` found on `PATH` is used.
+
+Override the resolved path explicitly if needed:
 
 ```shell
 MDLINT=/path/to/markdownlint-cli2 make markdownlint
 ```
 
-Install via Bun (recommended for contributors who already use Bun):
+Install via Bun (recommended if Bun is already in use):
 
 ```shell
 bun install --global markdownlint-cli2
