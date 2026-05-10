@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 const JWT_TTL_SECONDS: i64 = 86_400;
 
-/// A validated bearer token string produced by [`HttpApiAuth`].
+/// A bearer token string produced by or used with [`HttpApiAuth`].
 pub struct BearerToken(
     /// The encoded bearer token value.
     pub String,
