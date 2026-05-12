@@ -122,7 +122,7 @@ audit-node: ## Audit frontend dependencies for known vulnerabilities
 rust-audit: ## Audit every Rust manifest for known vulnerabilities
 	find . \
 		\( -path '*/target/*' -o -path '*/node_modules/*' -o -path '*/.venv/*' \) -prune -o \
-		-name Cargo.toml -exec sh -c 'for manifest do \
+		-name Cargo.toml -exec sh -c 'set -e; for manifest do \
 			manifest_dir=$$(dirname "$$manifest"); \
 			printf "Auditing Rust manifest %s\n" "$$manifest"; \
 			(cd "$$manifest_dir" && $(CARGO) audit); \
