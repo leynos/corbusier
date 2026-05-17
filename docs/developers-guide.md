@@ -89,6 +89,58 @@ Or via npm:
 ```shell
 npm install --global markdownlint-cli2
 ```
+
+## Frontend task slice public APIs
+
+
+### `TaskGatewayProvider` and `useTaskGateway`
+
+Defined in
+`frontend-pwa/src/task_slice/application/task-gateway-context.tsx`.
+
+`TaskGatewayProvider` injects a `TaskSliceGateway` implementation into React
+context. Wrap the component tree with it in tests and in `AppProviders` to
+supply the gateway:
+
+```tsx
+<TaskGatewayProvider gateway={myGateway}>
+  <App />
+</TaskGatewayProvider>
+```
+
+`useTaskGateway` retrieves the gateway from context. Call it inside any
+component that belongs to the task slice. It throws with the message
+`"Task gateway provider is missing."` if no provider ancestor is present.
+
+
+### `TaskNotFound`
+
+Defined in `frontend-pwa/src/task_slice/ui/task-not-found.tsx`.
+
+Presentational component rendered by the task-detail route when the gateway
+reports a `not_found` error. It displays a localised heading, body text, and
+a navigation link back to `/tasks/new`. It carries no data-fetching or
+error-boundary logic.
+
+## Test utilities
+
+
+### `BearerToken` (Rust integration tests)
+
+Defined in `tests/http_api_test_helpers.rs`.
+
+A newtype wrapper around `String` that represents a bearer token produced by
+`HttpApiAuth::token()`. Use `BearerToken::as_str()` to obtain a `&str`
+suitable for passing to `with_bearer`:
+
+```rust
+let token = BearerToken(auth.token()?);
+let request = with_bearer(TestRequest::get().uri("/api/v1/tasks"), token.as_str());
+```
+
+Using `BearerToken` rather than a bare `&str` reduces string-argument
+saturation and makes the intended role of each parameter unambiguous at
+call sites.
 ## Dependency audit
 
 The workspace ships a unified dependency-vulnerability gate. Run it with:
