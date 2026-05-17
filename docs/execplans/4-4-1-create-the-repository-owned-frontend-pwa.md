@@ -424,7 +424,7 @@ Planned repository-owned commands and gates for this milestone:
 
 ```bash
 set -o pipefail; make frontend-install 2>&1 | tee /tmp/4-4-1-frontend-install.log
-set -o pipefail; make frontend-audit 2>&1 | tee /tmp/4-4-1-frontend-audit.log
+set -o pipefail; make audit 2>&1 | tee /tmp/4-4-1-audit.log
 set -o pipefail; make frontend-lint 2>&1 | tee /tmp/4-4-1-frontend-lint.log
 set -o pipefail; make frontend-typecheck 2>&1 | tee /tmp/4-4-1-frontend-typecheck.log
 set -o pipefail; make frontend-test 2>&1 | tee /tmp/4-4-1-frontend-test.log

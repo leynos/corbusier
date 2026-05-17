@@ -619,7 +619,11 @@ Current routes:
 
 Quality gates for the workspace are also exposed through `make`:
 
-- `make frontend-audit`
+- `make audit` — audits both Rust and Node.js dependencies for known
+  vulnerabilities; replaces the former frontend-only audit target. Run the
+  sub-targets individually when needed:
+  - `make audit-node` — audits Node.js/Bun dependencies only
+  - `make rust-audit` — audits every Rust manifest for known vulnerabilities
 - `make frontend-lint`
 - `make frontend-typecheck`
 - `make frontend-test`

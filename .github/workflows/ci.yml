@@ -44,8 +44,10 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
-      - name: Frontend audit
-        run: make frontend-audit
+      - name: Install cargo-audit
+        run: cargo binstall --no-confirm cargo-audit
+      - name: Audit dependencies
+        run: make audit
       - name: Frontend lint
         run: make frontend-lint
       - name: Frontend typecheck

@@ -13,3 +13,23 @@ Start here:
 
 For architecture and implementation details, read the relevant ADRs and
 execplans under [`docs/`](.).
+
+## Dependency audit
+
+The workspace ships a unified dependency-vulnerability gate. Run it with:
+
+```sh
+make audit
+```
+
+`make audit` runs both `make audit-node` (Bun/Node.js) and `make rust-audit`
+(Cargo) in sequence. Either sub-target may be invoked individually.
+
+`rust-audit` requires `cargo-audit` to be installed. Install it with:
+
+```sh
+cargo binstall cargo-audit
+```
+
+`cargo-audit` is installed automatically in CI via the workflow at
+`.github/workflows/ci.yml`.
