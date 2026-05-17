@@ -48,8 +48,8 @@ does not describe these frontend-only APIs.
 Rust HTTP API integration tests share helpers in
 `tests/http_api_test_helpers.rs`.
 
-- `HttpApiAuth` creates JWTs and matching request contexts for Actix HTTP API
-  tests.
+- `HttpApiAuth` creates JSON Web Tokens (JWTs) and matching request contexts
+  for Actix HTTP API tests.
 - `BearerToken` is a raw bearer-token string wrapper produced by
   `HttpApiAuth`. It does not validate token syntax or claims; validation is
   performed by the HTTP auth layer under test.
