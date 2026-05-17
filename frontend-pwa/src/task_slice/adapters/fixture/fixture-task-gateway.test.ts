@@ -58,6 +58,53 @@ describe('fixture task gateway', () => {
     });
   });
 
+  it('serializes concurrent mutations against shared fixture state', async () => {
+    const gateway = createFixtureTaskGateway();
+    const task = await gateway.createTask({
+      provider: 'github',
+      repository: 'acme/widgets',
+      issue_number: 35,
+      title: 'Serialize fixture transitions',
+    });
+
+    const [startedTask, completedTask] = await Promise.all([
+      gateway.transitionTask(task.id, 'in_progress'),
+      gateway.transitionTask(task.id, 'done'),
+    ]);
+
+    expect(startedTask.state).toBe('in_progress');
+    expect(completedTask.state).toBe('done');
+    await expect(gateway.getTask(task.id)).resolves.toMatchObject({
+      id: task.id,
+      state: 'done',
+    });
+  });
+
+  it('continues queued operations after a rejected mutation', async () => {
+    const gateway = createFixtureTaskGateway();
+    const task = await gateway.createTask({
+      provider: 'github',
+      repository: 'acme/widgets',
+      issue_number: 36,
+      title: 'Continue after rejection',
+    });
+
+    const [rejectedResult, completedTask] = await Promise.allSettled([
+      gateway.transitionTask(task.id, 'done'),
+      gateway.transitionTask(task.id, 'in_progress'),
+    ]);
+
+    expect(rejectedResult).toMatchObject({ status: 'rejected' });
+    expect(completedTask).toMatchObject({
+      status: 'fulfilled',
+      value: expect.objectContaining({ state: 'in_progress' }),
+    });
+    await expect(gateway.getTask(task.id)).resolves.toMatchObject({
+      id: task.id,
+      state: 'in_progress',
+    });
+  });
+
   it('rejects invalid state transitions before mutating a task', async () => {
     const gateway = createFixtureTaskGateway();
     const task = await gateway.createTask({

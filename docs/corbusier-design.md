@@ -12233,6 +12233,12 @@ live seam without restructuring the route shell by:
 - using a development-only same-origin Vite proxy to inject bearer auth
   server-side when contributors opt into the live gateway.
 
+The fixture adapter owns an in-memory task map for local development and tests.
+It serializes gateway operations through a promise queue so concurrent fixture
+mutations observe deterministic state transitions. This is a fixture contract
+only: the live HTTP adapter remains responsible for surfacing backend
+concurrency and conflict semantics through the same `TaskSliceGateway` port.
+
 ##### Task gateway seam: `VITE_TASK_GATEWAY_MODE`
 
 The frontend task slice selects how the `TaskSliceGateway` port is wired at

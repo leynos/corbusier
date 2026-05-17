@@ -17,6 +17,43 @@ execplans under [`docs/`](.).
 ## Tooling
 
 
+### Frontend task slice APIs
+
+The repository-owned frontend lives under `frontend-pwa/`. The task slice uses
+an explicit port-and-adapter boundary so route components do not import
+transport code directly.
+
+- `TaskGatewayProvider` provides a `TaskSliceGateway` implementation to React
+  components. Mount it through `AppProviders` for application and route tests
+  unless a unit test is exercising the context boundary directly.
+- `useTaskGateway` retrieves the current gateway and throws
+  `Task gateway provider is missing.` when no provider is mounted. Hook and
+  route tests should assert this failure mode when they bypass `AppProviders`.
+- `TaskNotFound` renders the localized task-detail not-found state and links
+  back to `/tasks/new`. It contains no data fetching; `TaskDetailPage` owns the
+  gateway error mapping.
+- `createFixtureTaskGateway` is the default local and test adapter. It keeps
+  task state in memory, serializes queued operations over that shared state,
+  and preserves fixture-first development until the live HTTP gateway is
+  selected in later roadmap work.
+
+The shipped `4.4.1` slice boundary is recorded in
+[`corbusier-design.md`](corbusier-design.md#713-repository-owned-frontend-workspace-boundary).
+The Whitaker user's guide remains a tooling guide for the Rust lint runner and
+does not describe these frontend-only APIs.
+
+
+### HTTP API test helpers
+
+Rust HTTP API integration tests share helpers in
+`tests/http_api_test_helpers.rs`.
+
+- `HttpApiAuth` creates JWTs and matching request contexts for Actix HTTP API
+  tests.
+- `BearerToken` is a raw bearer-token string wrapper produced by
+  `HttpApiAuth`. It does not validate token syntax or claims; validation is
+  performed by the HTTP auth layer under test.
+
 ### Markdown linting
 
 Markdown linting uses

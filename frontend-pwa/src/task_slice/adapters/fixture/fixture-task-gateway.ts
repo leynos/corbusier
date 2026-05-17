@@ -25,46 +25,64 @@ export function createFixtureTaskGateway(
   seedTasks: Task[] = [buildSeedTask()],
 ): TaskSliceGateway {
   const tasks = new Map(seedTasks.map((task) => [task.id, task]));
+  let operationQueue = Promise.resolve();
+
+  function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const nextOperation = operationQueue.then(operation, operation);
+    operationQueue = nextOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return nextOperation;
+  }
 
   return {
     async createTask(request) {
-      await delay();
-      if (request.title.toLowerCase().includes('[fixture-error]')) {
-        throw new TaskGatewayError(
-          'unavailable',
-          'Fixture gateway rejected the task submission.',
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        if (request.title.toLowerCase().includes('[fixture-error]')) {
+          throw new TaskGatewayError(
+            'unavailable',
+            'Fixture gateway rejected the task submission.',
+          );
+        }
 
-      const task = buildTaskFromRequest(request);
-      tasks.set(task.id, task);
-      return task;
+        const task = buildTaskFromRequest(request);
+        tasks.set(task.id, task);
+        return task;
+      });
     },
     async getTask(taskId) {
-      await delay();
-      if (taskId === notFoundTaskId || !tasks.has(taskId)) {
-        throw new TaskGatewayError(
-          'not_found',
-          `Task ${taskId} was not found.`,
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        const task = tasks.get(taskId);
+        if (taskId === notFoundTaskId || !task) {
+          throw new TaskGatewayError(
+            'not_found',
+            `Task ${taskId} was not found.`,
+          );
+        }
 
-      return tasks.get(taskId) as Task;
+        return task;
+      });
     },
     async transitionTask(taskId, targetState) {
-      await delay();
-      const existingTask = tasks.get(taskId);
-      if (taskId === notFoundTaskId || !existingTask) {
-        throw new TaskGatewayError(
-          'not_found',
-          `Task ${taskId} was not found.`,
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        const existingTask = tasks.get(taskId);
+        if (taskId === notFoundTaskId || !existingTask) {
+          throw new TaskGatewayError(
+            'not_found',
+            `Task ${taskId} was not found.`,
+          );
+        }
 
-      assertTransitionAllowed(taskId, existingTask.state, targetState);
-      const updatedTask = applyTransition(existingTask, targetState);
-      tasks.set(taskId, updatedTask);
-      return updatedTask;
+        assertTransitionAllowed(taskId, existingTask.state, targetState);
+        const updatedTask = applyTransition(existingTask, targetState);
+        tasks.set(taskId, updatedTask);
+        return updatedTask;
+      });
     },
   };
 }
