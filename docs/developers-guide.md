@@ -17,7 +17,7 @@ execplans under [`docs/`](.).
 ## Tooling
 
 
-### Frontend task slice APIs
+### Frontend task slice tooling
 
 The repository-owned frontend lives under `frontend-pwa/`. The task slice uses
 an explicit port-and-adapter boundary so route components do not import
@@ -42,6 +42,7 @@ The shipped `4.4.1` slice boundary is recorded in
 The Whitaker user's guide remains a tooling guide for the Rust lint runner and
 does not describe these frontend-only APIs.
 
+## Frontend task slice APIs
 
 ### HTTP API test helpers
 
@@ -89,9 +90,6 @@ Or via npm:
 ```shell
 npm install --global markdownlint-cli2
 ```
-
-## Frontend task slice public APIs
-
 
 ### `TaskGatewayProvider` and `useTaskGateway`
 
