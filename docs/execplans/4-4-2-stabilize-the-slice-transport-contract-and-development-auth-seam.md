@@ -167,10 +167,10 @@ Observable success means:
   contract, local auth seam, and milestone completion.
 - [x] (2026-04-13 00:00Z) Quality gates passed: `make check-fmt`, `make lint`,
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
-  `make frontend-audit`, `make frontend-typecheck`, `make frontend-lint`,
-  `make frontend-test`, `make frontend-test-a11y`, `make frontend-localizability`,
-  `make frontend-semantic`, `make frontend-e2e`, `make markdownlint`, and
-  `make nixie`.
+  `make audit`, `make frontend-typecheck`, `make frontend-lint`,
+  `make frontend-test`, `make frontend-test-a11y`,
+  `make frontend-localizability`, `make frontend-semantic`,
+  `make frontend-e2e`, `make markdownlint`, and `make nixie`.
 - [x] (2026-04-15 00:00Z) Post-context-reset verification confirmed that the
   repository still matches this execplan: the backend task contract, frontend
   HTTP seam, golden fixtures, and documentation updates are present in-tree, so
@@ -481,7 +481,7 @@ set -o pipefail; make frontend-lint 2>&1 | tee /tmp/4-4-2-frontend-lint.log
 set -o pipefail; make frontend-typecheck 2>&1 | tee /tmp/4-4-2-frontend-typecheck.log
 set -o pipefail; make frontend-test 2>&1 | tee /tmp/4-4-2-frontend-test.log
 set -o pipefail; make frontend-test-a11y 2>&1 | tee /tmp/4-4-2-frontend-test-a11y.log
-set -o pipefail; make frontend-audit 2>&1 | tee /tmp/4-4-2-frontend-audit.log
+set -o pipefail; make audit 2>&1 | tee /tmp/4-4-2-audit.log
 set -o pipefail; make frontend-localizability 2>&1 | tee /tmp/4-4-2-frontend-localizability.log
 set -o pipefail; make frontend-semantic 2>&1 | tee /tmp/4-4-2-frontend-semantic.log
 set -o pipefail; make frontend-e2e 2>&1 | tee /tmp/4-4-2-frontend-e2e.log
