@@ -334,8 +334,16 @@ mod tests {
             }),
             "unauthorized",
         );
+        let token_a = BearerToken("token-alpha".to_owned());
+        let token_b = BearerToken("token-beta".to_owned());
+        assert_eq!(token_a.as_str(), "token-alpha");
+        assert_eq!(token_b.as_str(), "token-beta");
+        assert_ne!(token_a.as_str(), token_b.as_str());
+        // Verify BearerToken works with the request helper without panicking.
+        let _req =
+            with_bearer(actix_test::TestRequest::get().uri("/"), token_a.as_str()).to_request();
+
         let token = BearerToken("token-value".to_owned());
-        assert_eq!(token.as_str(), "token-value");
         let request = with_bearer(actix_test::TestRequest::get(), token.as_str()).to_request();
         let authorization = request
             .headers()
