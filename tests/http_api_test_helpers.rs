@@ -295,7 +295,7 @@ mod tests {
         BearerToken, HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field,
         required_str_field, with_bearer,
     };
-    use actix_web::test as actix_test;
+    use actix_web::{HttpMessage, http::header, test as actix_test};
     use serde_json::json;
 
     #[test]
@@ -334,9 +334,21 @@ mod tests {
             }),
             "unauthorized",
         );
-        let request = with_bearer(actix_test::TestRequest::get(), "token-value");
-        let _request = request.to_request();
         let token = BearerToken("token-value".to_owned());
         assert_eq!(token.as_str(), "token-value");
+        let request = with_bearer(actix_test::TestRequest::get(), token.as_str()).to_request();
+        let authorization = request
+            .headers()
+            .get(header::AUTHORIZATION)
+            .expect("authorization header should be present")
+            .to_str()
+            .expect("authorization header should be valid ASCII");
+        assert_eq!(authorization, "Bearer token-value");
+
+        let empty_token = BearerToken(String::new());
+        assert_eq!(empty_token.as_str(), "");
+
+        let special_token = BearerToken("token.value-with_special.chars".to_owned());
+        assert_eq!(special_token.as_str(), "token.value-with_special.chars");
     }
 }
