@@ -1,5 +1,5 @@
 /**
- * `@file` Unit tests for the `TaskNotFound` presentational component.
+ * @file Unit tests for the `TaskNotFound` presentational component.
  */
 import {
   createMemoryHistory,

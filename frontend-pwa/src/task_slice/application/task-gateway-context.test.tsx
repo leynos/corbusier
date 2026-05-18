@@ -1,5 +1,5 @@
 /**
- * `@file` Unit tests for `TaskGatewayContext` and `useTaskGateway`.
+ * @file Unit tests for `TaskGatewayContext` and `useTaskGateway`.
  */
 import { renderHook } from '@testing-library/react';
 
