@@ -16,6 +16,14 @@ import {
   formatTimestamp,
 } from '../domain/task-view-model';
 
+/**
+ * Presentational card for displaying a `Task`'s detail fields.
+ *
+ * Renders origin, state, timestamps, branch reference, pull-request
+ * reference, and description. Locale-aware formatting is delegated to the
+ * view-model utilities from `task_slice/domain/task-view-model`; this
+ * component contains no formatting logic of its own.
+ */
 export function TaskDetailCard({ task }: { task: Task }) {
   const { locale, t } = useI18n();
   const state = formatTaskState(task.state, t);

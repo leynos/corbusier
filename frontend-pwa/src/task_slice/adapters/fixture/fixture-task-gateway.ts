@@ -1,8 +1,9 @@
 /**
- * Implement a deterministic in-memory task gateway for tests and local runs.
+ * @file Fixture task gateway for local development and tests.
  *
- * This module exports `createFixtureTaskGateway` plus fixture ids used to
- * simulate seeded and not-found task states without live backend traffic.
+ * Exports {@link createFixtureTaskGateway} and {@link fixtureNotFoundTaskId}.
+ * Use this module in place of the live HTTP adapter to exercise the PWA task
+ * slice without a running backend.
  */
 import type { CreateTaskRequest, Task, TaskState } from '../../domain/task';
 import {
@@ -21,6 +22,16 @@ const allowedTransitions: Readonly<Record<TaskState, readonly TaskState[]>> = {
   paused: ['in_progress', 'abandoned'],
 };
 
+/**
+ * Creates a deterministic in-memory `TaskSliceGateway` for tests and local
+ * development.
+ *
+ * All gateway operations are serialised through an internal promise queue so
+ * that concurrent callers observe consistent task state without races.
+ *
+ * @param seedTasks - Initial task records to populate the store; defaults to
+ *   a single seed task. Pass `[]` for an empty store.
+ */
 export function createFixtureTaskGateway(
   seedTasks: Task[] = [buildSeedTask()],
 ): TaskSliceGateway {

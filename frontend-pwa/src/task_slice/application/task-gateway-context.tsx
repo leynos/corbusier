@@ -13,6 +13,12 @@ import type { TaskSliceGateway } from '../ports/task-slice-gateway';
 
 const TaskGatewayContext = createContext<TaskSliceGateway | null>(null);
 
+/**
+ * Injects a `TaskSliceGateway` implementation into the React context tree.
+ *
+ * Wrap application entry points and route-level test trees with this provider
+ * so that child components can retrieve the gateway via {@link useTaskGateway}.
+ */
 export function TaskGatewayProvider({
   children,
   gateway,
@@ -24,6 +30,12 @@ export function TaskGatewayProvider({
   );
 }
 
+/**
+ * Retrieves the nearest `TaskSliceGateway` from context.
+ *
+ * Throws an `Error` with the message `"Task gateway provider is missing."`
+ * when called outside a `TaskGatewayProvider` tree.
+ */
 export function useTaskGateway() {
   const gateway = useContext(TaskGatewayContext);
   if (!gateway) {

@@ -14,6 +14,14 @@ import { I18nProvider } from '../i18n/runtime';
 import { TaskGatewayProvider } from '../task_slice/application/task-gateway-context';
 import type { TaskSliceGateway } from '../task_slice/ports/task-slice-gateway';
 
+/**
+ * Composes the root provider tree for the Corbusier PWA.
+ *
+ * Wraps children with `QueryClientProvider`, `I18nProvider`, and
+ * `TaskGatewayProvider`. Inject a `TaskSliceGateway` via the `gateway` prop
+ * to substitute a fixture adapter in tests and Storybook without altering
+ * routing or query configuration.
+ */
 export function AppProviders({
   children,
   gateway,

@@ -24,6 +24,15 @@ interface TaskCreateFormProps {
   onSubmit(event: FormEvent<HTMLFormElement>): void;
 }
 
+/**
+ * Presentational form for task creation.
+ *
+ * Renders provider, repository, issue-number, title, description, labels,
+ * assignees, and milestone fields. All state, validation errors, and
+ * submission logic are owned by the parent via {@link TaskCreateFormProps};
+ * this component is side-effect-free. Field labels are resolved via
+ * `useI18n`.
+ */
 export function TaskCreateForm({
   draft,
   errors,
