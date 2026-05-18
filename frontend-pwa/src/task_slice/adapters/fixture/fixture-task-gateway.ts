@@ -98,6 +98,10 @@ export function createFixtureTaskGateway(
   };
 }
 
+/**
+ * Throws a `conflict` `TaskGatewayError` if `targetState` is not a permitted
+ * successor of `currentState` according to `allowedTransitions`.
+ */
 function assertTransitionAllowed(
   taskId: string,
   currentState: TaskState,
@@ -111,6 +115,11 @@ function assertTransitionAllowed(
   }
 }
 
+/**
+ * Constructs a new `Task` in the `draft` state from a `CreateTaskRequest`.
+ *
+ * Assigns a fresh UUID and sets both timestamps to the current instant.
+ */
 function buildTaskFromRequest(request: CreateTaskRequest): Task {
   const timestamp = new Date().toISOString();
 
@@ -137,6 +146,10 @@ function buildTaskFromRequest(request: CreateTaskRequest): Task {
   };
 }
 
+/**
+ * Returns the default seed `Task` used when no explicit seed array is
+ * supplied to `createFixtureTaskGateway`.
+ */
 function buildSeedTask(): Task {
   const timestamp = '2026-04-08T12:00:00.000Z';
 
@@ -174,6 +187,10 @@ function buildSeedTask(): Task {
   };
 }
 
+/**
+ * Returns a copy of `task` with `state` set to `targetState` and
+ * `updated_at` refreshed to the current instant.
+ */
 function applyTransition(task: Task, targetState: TaskState): Task {
   return {
     ...task,
@@ -182,6 +199,10 @@ function applyTransition(task: Task, targetState: TaskState): Task {
   };
 }
 
+/**
+ * Resolves after a short fixed delay to simulate network latency in tests
+ * and local development.
+ */
 function delay() {
   return new Promise((resolve) => window.setTimeout(resolve, 15));
 }

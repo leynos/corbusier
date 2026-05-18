@@ -32,7 +32,7 @@ function renderForm(overrides?: {
 }) {
   const onChange = overrides?.onChange ?? vi.fn();
   const onSubmit = overrides?.onSubmit ?? vi.fn();
-  render(
+  const { container } = render(
     <I18nProvider>
       <TaskCreateForm
         draft={{ ...emptyDraft, ...overrides?.draft }}
@@ -44,7 +44,7 @@ function renderForm(overrides?: {
       />
     </I18nProvider>,
   );
-  return { onChange, onSubmit };
+  return { container, onChange, onSubmit };
 }
 
 describe('TaskCreateForm', () => {
@@ -109,5 +109,13 @@ describe('TaskCreateForm', () => {
     fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('matches the expected rendered structure for the idle state', () => {
+    const { container } = renderForm();
+
+    expect(container.firstElementChild?.innerHTML).toMatchInlineSnapshot(
+      `"<div class="task-create-form__row"><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Provider</span><select class="select select-bordered" name="provider"><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></label><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Repository</span><input class="input input-bordered w-full" placeholder="owner/repository" value="" name="repository"></label></div><div class="task-create-form__row"><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Issue number</span><input class="input input-bordered w-full" placeholder="42" value="" name="issueNumber"></label><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Title</span><input class="input input-bordered w-full" placeholder="Fix login flow" value="" name="title"></label></div><label class="form-control"><span class="label-text mb-2 font-semibold">Description</span><textarea class="textarea textarea-bordered min-h-28" name="description" placeholder="Optional issue synopsis"></textarea></label><div class="task-create-form__row"><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Labels</span><input class="input input-bordered w-full" placeholder="bug, p1" value="" name="labels"></label><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Assignees</span><input class="input input-bordered w-full" placeholder="alice, bob" value="" name="assignees"></label></div><label class="form-control w-full"><span class="label-text mb-2 font-semibold">Milestone</span><input class="input input-bordered w-full" placeholder="sprint-12" value="" name="milestone"></label><button class="btn btn-primary" type="submit">Create task</button>"`,
+    );
   });
 });

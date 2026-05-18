@@ -29,11 +29,12 @@ const baseTask: Task = {
 };
 
 function renderCard(task: Task = baseTask) {
-  render(
+  const { container } = render(
     <I18nProvider>
       <TaskDetailCard task={task} />
     </I18nProvider>,
   );
+  return { container };
 }
 
 describe('TaskDetailCard', () => {
@@ -77,5 +78,13 @@ describe('TaskDetailCard', () => {
     for (const label of ['Task ID', 'Origin', 'Created', 'Updated']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it('matches the expected rendered structure for the base task', () => {
+    const { container } = renderCard();
+
+    expect(container.firstElementChild?.innerHTML).toMatchInlineSnapshot(
+      `"<div class="task-detail__header"><div class="task-detail__summary"><p class="task-detail__eyebrow">Task detail</p><h2 class="task-detail__title">Fix login flow</h2><p class="task-detail__origin">github/acme/widgets/#42</p></div><span class="status-pill" data-tone="steady">Draft</span></div><dl class="task-detail__meta-grid"><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Task ID</dt><dd class="task-detail__meta-value">aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</dd></div><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Origin</dt><dd class="task-detail__meta-value">github/acme/widgets/#42</dd></div><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Created</dt><dd class="task-detail__meta-value">8 Apr 2026, 12:00</dd></div><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Updated</dt><dd class="task-detail__meta-value">8 Apr 2026, 13:00</dd></div><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Branch reference</dt><dd class="task-detail__meta-value">No branch linked yet. Live association lands in roadmap item 4.4.4.</dd></div><div class="task-detail__meta-item"><dt class="task-detail__meta-label">Pull request reference</dt><dd class="task-detail__meta-value">No pull request linked yet. Live association lands in roadmap item 4.4.4.</dd></div></dl><div class="task-detail__description"><h3 class="task-detail__description-title">Description</h3><p class="task-detail__description-body">A brief description.</p></div>"`,
+    );
   });
 });

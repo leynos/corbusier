@@ -86,6 +86,11 @@ export function TaskDetailCard({ task }: { task: Task }) {
   );
 }
 
+/**
+ * Renders a definition-list row comprising a label (`dt`) and a value (`dd`).
+ *
+ * Used internally by `TaskDetailCard` for each metadata entry.
+ */
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="task-detail__meta-item">

@@ -65,4 +65,15 @@ describe('TaskNotFound', () => {
       screen.getByRole('link', { name: 'Return to task creation' }),
     ).toHaveAttribute('href', '/tasks/new');
   });
+
+  it('matches the expected rendered output', async () => {
+    await renderComponent();
+
+    expect(
+      screen.getByRole('heading', { name: 'Task not found' }).parentElement
+        ?.innerHTML,
+    ).toMatchInlineSnapshot(
+      `"<h2 class="task-not-found__title">Task not found</h2><p class="task-not-found__body">No fixture task matched this identifier. The live transport seam lands in roadmap item 4.4.2.</p><a href="/tasks/new" class="btn btn-primary mt-6">Return to task creation</a>"`,
+    );
+  });
 });

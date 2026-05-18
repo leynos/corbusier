@@ -146,6 +146,12 @@ interface FieldProps {
   onChange(field: TaskCreateField, value: string): void;
 }
 
+/**
+ * Renders a single labelled text input with an optional validation-error
+ * message.
+ *
+ * Used internally by `TaskCreateForm` for single-line string fields.
+ */
 function Field({
   error,
   label,
