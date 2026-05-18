@@ -16,11 +16,10 @@ execplans under [`docs/`](.).
 
 ## Tooling
 
-
 ### Frontend task slice tooling
 
 The repository-owned frontend lives under `frontend-pwa/`. The task slice uses
-an explicit port-and-adapter boundary so route components do not import
+an explicit port-and-adapter boundary, so route components do not import
 transport code directly.
 
 - `TaskGatewayProvider` provides a `TaskSliceGateway` implementation to React
@@ -110,18 +109,16 @@ supply the gateway:
 component that belongs to the task slice. It throws with the message
 `"Task gateway provider is missing."` if no provider ancestor is present.
 
-
 ### `TaskNotFound`
 
 Defined in `frontend-pwa/src/task_slice/ui/task-not-found.tsx`.
 
 Presentational component rendered by the task-detail route when the gateway
-reports a `not_found` error. It displays a localised heading, body text, and
+reports a `not_found` error. It displays a localized heading, body text, and
 a navigation link back to `/tasks/new`. It carries no data-fetching or
 error-boundary logic.
 
 ## Test utilities
-
 
 ### `BearerToken` (Rust integration tests)
 
@@ -139,6 +136,7 @@ let request = with_bearer(TestRequest::get().uri("/api/v1/tasks"), token.as_str(
 Using `BearerToken` rather than a bare `&str` reduces string-argument
 saturation and makes the intended role of each parameter unambiguous at
 call sites.
+
 ## Dependency audit
 
 The workspace ships a unified dependency-vulnerability gate. Run it with:

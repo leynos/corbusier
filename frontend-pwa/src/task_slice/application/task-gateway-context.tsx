@@ -1,5 +1,5 @@
 /**
- * `@file` React context and hook for the `TaskSliceGateway` port.
+ * @file React context and hook for the `TaskSliceGateway` port.
  *
  * Exports `TaskGatewayProvider`, which places a `TaskSliceGateway`
  * implementation into React context, and `useTaskGateway`, which retrieves it.

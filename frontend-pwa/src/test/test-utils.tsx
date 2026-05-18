@@ -1,5 +1,5 @@
 /**
- * `@file` Shared test utilities for full-app render tests.
+ * @file Shared test utilities for full-app render tests.
  *
  * Exports `renderApp`, which mounts the complete Corbusier PWA — including
  * routing, providers, and an injected `FixtureTaskGateway` — into a JSDOM

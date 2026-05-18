@@ -1,5 +1,5 @@
 /**
- * `@file` Root provider tree for the Corbusier PWA.
+ * @file Root provider tree for the Corbusier PWA.
  *
  * Composes `QueryClientProvider` (TanStack Query), `I18nProvider`, and
  * `TaskGatewayProvider` into a single `AppProviders` wrapper consumed by the

@@ -1,5 +1,5 @@
 /**
- * `@file` Presentational form component for task creation.
+ * @file Presentational form component for task creation.
  *
  * Renders the task-create input fields and submit button. All state, error
  * handling, and submission logic are supplied by the parent through

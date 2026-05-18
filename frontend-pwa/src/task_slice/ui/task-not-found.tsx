@@ -1,8 +1,8 @@
 /**
- * `@file` Not-found state component for the task detail route.
+ * @file Not-found state component for the task detail route.
  *
  * Displayed when the task identified by the current route parameter does not
- * exist in the gateway. Renders a localised message and a navigational link
+ * exist in the gateway. Renders a localized message and a navigational link
  * back to the task-create route. Contains no data-fetching or error-boundary
  * logic.
  */

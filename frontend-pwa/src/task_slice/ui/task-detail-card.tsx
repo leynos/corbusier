@@ -1,5 +1,5 @@
 /**
- * `@file` Presentational card component for task detail display.
+ * @file Presentational card component for task detail display.
  *
  * Renders a `Task` value object's fields using the view-model formatters from
  * `task_slice/domain/task-view-model`. Locale-aware formatting (timestamps,

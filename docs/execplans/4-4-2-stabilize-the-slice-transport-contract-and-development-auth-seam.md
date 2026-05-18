@@ -550,19 +550,6 @@ Expected dependency posture:
   - Podbot hosted-session work;
   - Frankie review-adapter work.
 
-
-## Artefacts and notes
-
-Implementation should capture the following evidence in this document as work
-proceeds:
-
-- the final task contract fixture set and where it lives;
-- the exact pinned `actix-v2a` Git SHA used during implementation;
-- which shared transport primitives were adopted directly versus wrapped;
-- the exact development auth seam chosen;
-- the final idempotency decision for task create and transition;
-- pass or fail summaries for the planned quality gates.
-
 ## Artefacts and notes
 
 Implementation should capture the following evidence in this document as work
