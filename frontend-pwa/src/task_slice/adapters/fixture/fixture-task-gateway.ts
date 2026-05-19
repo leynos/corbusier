@@ -26,7 +26,7 @@ const allowedTransitions: Readonly<Record<TaskState, readonly TaskState[]>> = {
  * Creates a deterministic in-memory `TaskSliceGateway` for tests and local
  * development.
  *
- * All gateway operations are serialised through an internal promise queue so
+ * All gateway operations are serialized through an internal promise queue so
  * that concurrent callers observe consistent task state without races.
  *
  * @param seedTasks - Initial task records to populate the store; defaults to
