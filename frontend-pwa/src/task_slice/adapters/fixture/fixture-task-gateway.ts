@@ -1,8 +1,9 @@
 /**
- * Implement a deterministic in-memory task gateway for tests and local runs.
+ * @file Fixture task gateway for local development and tests.
  *
- * This module exports `createFixtureTaskGateway` plus fixture ids used to
- * simulate seeded and not-found task states without live backend traffic.
+ * Exports {@link createFixtureTaskGateway} and {@link fixtureNotFoundTaskId}.
+ * Use this module in place of the live HTTP adapter to exercise the PWA task
+ * slice without a running backend.
  */
 import type { CreateTaskRequest, Task, TaskState } from '../../domain/task';
 import {
@@ -21,54 +22,86 @@ const allowedTransitions: Readonly<Record<TaskState, readonly TaskState[]>> = {
   paused: ['in_progress', 'abandoned'],
 };
 
+/**
+ * Creates a deterministic in-memory `TaskSliceGateway` for tests and local
+ * development.
+ *
+ * All gateway operations are serialized through an internal promise queue so
+ * that concurrent callers observe consistent task state without races.
+ *
+ * @param seedTasks - Initial task records to populate the store; defaults to
+ *   a single seed task. Pass `[]` for an empty store.
+ */
 export function createFixtureTaskGateway(
   seedTasks: Task[] = [buildSeedTask()],
 ): TaskSliceGateway {
   const tasks = new Map(seedTasks.map((task) => [task.id, task]));
+  let operationQueue = Promise.resolve();
+
+  function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const nextOperation = operationQueue.then(operation, operation);
+    operationQueue = nextOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return nextOperation;
+  }
 
   return {
     async createTask(request) {
-      await delay();
-      if (request.title.toLowerCase().includes('[fixture-error]')) {
-        throw new TaskGatewayError(
-          'unavailable',
-          'Fixture gateway rejected the task submission.',
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        if (request.title.toLowerCase().includes('[fixture-error]')) {
+          throw new TaskGatewayError(
+            'unavailable',
+            'Fixture gateway rejected the task submission.',
+          );
+        }
 
-      const task = buildTaskFromRequest(request);
-      tasks.set(task.id, task);
-      return task;
+        const task = buildTaskFromRequest(request);
+        tasks.set(task.id, task);
+        return task;
+      });
     },
     async getTask(taskId) {
-      await delay();
-      if (taskId === notFoundTaskId || !tasks.has(taskId)) {
-        throw new TaskGatewayError(
-          'not_found',
-          `Task ${taskId} was not found.`,
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        const task = tasks.get(taskId);
+        if (taskId === notFoundTaskId || !task) {
+          throw new TaskGatewayError(
+            'not_found',
+            `Task ${taskId} was not found.`,
+          );
+        }
 
-      return tasks.get(taskId) as Task;
+        return task;
+      });
     },
     async transitionTask(taskId, targetState) {
-      await delay();
-      const existingTask = tasks.get(taskId);
-      if (taskId === notFoundTaskId || !existingTask) {
-        throw new TaskGatewayError(
-          'not_found',
-          `Task ${taskId} was not found.`,
-        );
-      }
+      return enqueue(async () => {
+        await delay();
+        const existingTask = tasks.get(taskId);
+        if (taskId === notFoundTaskId || !existingTask) {
+          throw new TaskGatewayError(
+            'not_found',
+            `Task ${taskId} was not found.`,
+          );
+        }
 
-      assertTransitionAllowed(taskId, existingTask.state, targetState);
-      const updatedTask = applyTransition(existingTask, targetState);
-      tasks.set(taskId, updatedTask);
-      return updatedTask;
+        assertTransitionAllowed(taskId, existingTask.state, targetState);
+        const updatedTask = applyTransition(existingTask, targetState);
+        tasks.set(taskId, updatedTask);
+        return updatedTask;
+      });
     },
   };
 }
 
+/**
+ * Throws a `conflict` `TaskGatewayError` if `targetState` is not a permitted
+ * successor of `currentState` according to `allowedTransitions`.
+ */
 function assertTransitionAllowed(
   taskId: string,
   currentState: TaskState,
@@ -82,6 +115,11 @@ function assertTransitionAllowed(
   }
 }
 
+/**
+ * Constructs a new `Task` in the `draft` state from a `CreateTaskRequest`.
+ *
+ * Assigns a fresh UUID and sets both timestamps to the current instant.
+ */
 function buildTaskFromRequest(request: CreateTaskRequest): Task {
   const timestamp = new Date().toISOString();
 
@@ -108,6 +146,10 @@ function buildTaskFromRequest(request: CreateTaskRequest): Task {
   };
 }
 
+/**
+ * Returns the default seed `Task` used when no explicit seed array is
+ * supplied to `createFixtureTaskGateway`.
+ */
 function buildSeedTask(): Task {
   const timestamp = '2026-04-08T12:00:00.000Z';
 
@@ -145,6 +187,10 @@ function buildSeedTask(): Task {
   };
 }
 
+/**
+ * Returns a copy of `task` with `state` set to `targetState` and
+ * `updated_at` refreshed to the current instant.
+ */
 function applyTransition(task: Task, targetState: TaskState): Task {
   return {
     ...task,
@@ -153,8 +199,16 @@ function applyTransition(task: Task, targetState: TaskState): Task {
   };
 }
 
+/**
+ * Resolves after a short fixed delay to simulate network latency in tests
+ * and local development.
+ */
 function delay() {
   return new Promise((resolve) => window.setTimeout(resolve, 15));
 }
 
+/**
+ * Stable fixture task identifier that always resolves to a `not_found`
+ * gateway error.
+ */
 export const fixtureNotFoundTaskId = notFoundTaskId;

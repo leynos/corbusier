@@ -1,3 +1,11 @@
+/**
+ * @file Presentational form component for task creation.
+ *
+ * Renders the task-create input fields and submit button. All state, error
+ * handling, and submission logic are supplied by the parent through
+ * `TaskCreateFormProps`; this component is purely presentational and carries
+ * no side-effects. Field names and labels are resolved via `useI18n`.
+ */
 import type { FormEvent } from 'react';
 
 import { useI18n } from '../../i18n/runtime';
@@ -16,6 +24,15 @@ interface TaskCreateFormProps {
   onSubmit(event: FormEvent<HTMLFormElement>): void;
 }
 
+/**
+ * Presentational form for task creation.
+ *
+ * Renders provider, repository, issue-number, title, description, labels,
+ * assignees, and milestone fields. All state, validation errors, and
+ * submission logic are owned by the parent via {@link TaskCreateFormProps};
+ * this component is side-effect-free. Field labels are resolved via
+ * `useI18n`.
+ */
 export function TaskCreateForm({
   draft,
   errors,
@@ -129,6 +146,12 @@ interface FieldProps {
   onChange(field: TaskCreateField, value: string): void;
 }
 
+/**
+ * Renders a single labelled text input with an optional validation-error
+ * message.
+ *
+ * Used internally by `TaskCreateForm` for single-line string fields.
+ */
 function Field({
   error,
   label,

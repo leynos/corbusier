@@ -18,7 +18,13 @@ RUSTDOC_FLAGS ?=
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
-MDLINT ?= $(shell command -v markdownlint-cli2 2>/dev/null || printf '%s/.bun/bin/markdownlint-cli2' "$$HOME")
+MDLINT ?= $(shell if [ -n "$$HOME" ] && [ -x "$$HOME/.bun/bin/markdownlint-cli2" ]; then \
+		printf '%s/.bun/bin/markdownlint-cli2' "$$HOME"; \
+	elif command -v markdownlint-cli2 >/dev/null 2>&1; then \
+		command -v markdownlint-cli2; \
+	else \
+		printf 'markdownlint-cli2'; \
+	fi)
 NIXIE ?= nixie
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=

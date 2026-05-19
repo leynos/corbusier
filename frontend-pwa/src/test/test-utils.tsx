@@ -1,3 +1,12 @@
+/**
+ * @file Shared test utilities for full-app render tests.
+ *
+ * Exports `renderApp`, which mounts the complete Corbusier PWA — including
+ * routing, providers, and an injected `FixtureTaskGateway` — into a JSDOM
+ * environment using Testing Library. Use this helper for integration tests
+ * that exercise route transitions or cross-cutting provider behaviour; use
+ * component-local render helpers for unit tests that do not need routing.
+ */
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { act, render } from '@testing-library/react';
 

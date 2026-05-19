@@ -16,8 +16,8 @@ Execution does not begin until this plan is explicitly approved.
 
 Implement roadmap item `4.4.2` so the first frontend vertical slice can rely on
 a stable backend transport contract and a repeatable local browser auth seam
-before `4.4.3` swaps the PWA from fixtures to live task create, detail, and
-transition calls.
+before `4.4.3` swaps the progressive web app (PWA) from fixtures to live task
+create, detail, and transition calls.
 
 After this change, Corbusier should have:
 
@@ -98,8 +98,15 @@ Observable success means:
 - Auth: stop and escalate if the development preview seam would require adding
   a production-grade login flow, cookie/session issuance, or persistent browser
   credential storage.
-- Churn: stop and escalate if the work exceeds roughly 35 changed files or
-  2,500 net lines before `4.4.3` begins.
+- Churn: stop and escalate if the work exceeds roughly 48 changed files or
+  2,400 net lines before `4.4.3` begins. This tolerance deliberately covers
+  the known approximately 40-file baseline for backend contract code, frontend
+  adapter code, golden fixtures, PostgreSQL-backed tests, BDD tests,
+  documentation, and lint-driven test-helper repairs. It does not cover
+  deferred work: full `4.4.3` live UI controls, SSE, pagination, production
+  authentication, service workers, offline persistence, new frontend state
+  libraries, or durable idempotency replay storage beyond an already approved
+  primitive.
 - Frontend coupling: stop and escalate if the route modules would need to
   absorb raw HTTP envelope parsing or auth-token handling directly.
 - Idempotency: stop and escalate if adopting shared idempotency requires new
@@ -296,8 +303,9 @@ Current repository state relevant to `4.4.2`:
 - `src/http_api/response.rs` currently provides Corbusier-local response
   envelopes and metadata, while `src/http_api/error/mod.rs` maps typed errors
   into that envelope.
-- `src/http_api/auth.rs` currently enforces `Authorization: Bearer <jwt>` with
-  HS256 claims carrying `sub`, `tenant_id`, `session_id`, and `exp`.
+- `src/http_api/auth.rs` currently enforces a JSON Web Token (JWT) bearer
+  header, `Authorization: Bearer <JWT>`, with HS256 claims carrying `sub`,
+  `tenant_id`, `session_id`, and `exp`.
 - `frontend-pwa/src/main.tsx` still boots with `createFixtureTaskGateway()`;
   the HTTP gateway exists only as a stub.
 - `frontend-pwa/src/task_slice/ports/task-slice-gateway.ts` only models create
@@ -542,7 +550,7 @@ Expected dependency posture:
   - Podbot hosted-session work;
   - Frankie review-adapter work.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Implementation should capture the following evidence in this document as work
 proceeds:

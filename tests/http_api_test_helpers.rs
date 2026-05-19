@@ -17,6 +17,20 @@ use uuid::Uuid;
 
 const JWT_TTL_SECONDS: i64 = 86_400;
 
+/// A bearer token string wrapper produced by [`HttpApiAuth`].
+pub struct BearerToken(
+    /// The encoded bearer token value.
+    pub String,
+);
+
+impl BearerToken {
+    /// Returns the token as a string slice suitable for an authorization header.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Consistent JWT and request-context fixture for HTTP API tests.
 pub struct HttpApiAuth {
     secret: String,
@@ -278,10 +292,10 @@ mod tests {
     //! Smoke tests for the shared HTTP API helper surface.
 
     use super::{
-        HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field, required_str_field,
-        with_bearer,
+        BearerToken, HttpApiAuth, assert_shared_error, assert_v1_metadata, required_field,
+        required_str_field, with_bearer,
     };
-    use actix_web::test as actix_test;
+    use actix_web::{HttpMessage, http::header, test as actix_test};
     use serde_json::json;
 
     #[test]
@@ -320,7 +334,29 @@ mod tests {
             }),
             "unauthorized",
         );
-        let request = with_bearer(actix_test::TestRequest::get(), "token-value");
-        let _request = request.to_request();
+        let token_a = BearerToken("token-alpha".to_owned());
+        let token_b = BearerToken("token-beta".to_owned());
+        assert_eq!(token_a.as_str(), "token-alpha");
+        assert_eq!(token_b.as_str(), "token-beta");
+        assert_ne!(token_a.as_str(), token_b.as_str());
+        // Verify BearerToken works with the request helper without panicking.
+        let _req =
+            with_bearer(actix_test::TestRequest::get().uri("/"), token_a.as_str()).to_request();
+
+        let token = BearerToken("token-value".to_owned());
+        let request = with_bearer(actix_test::TestRequest::get(), token.as_str()).to_request();
+        let authorization = request
+            .headers()
+            .get(header::AUTHORIZATION)
+            .expect("authorization header should be present")
+            .to_str()
+            .expect("authorization header should be valid ASCII");
+        assert_eq!(authorization, "Bearer token-value");
+
+        let empty_token = BearerToken(String::new());
+        assert_eq!(empty_token.as_str(), "");
+
+        let special_token = BearerToken("token.value-with_special.chars".to_owned());
+        assert_eq!(special_token.as_str(), "token.value-with_special.chars");
     }
 }

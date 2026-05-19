@@ -695,7 +695,8 @@ Use the shared dependency labels below to keep this step readable:
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
   `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
   contracts and `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`
-  §5.3–§5.4.
+  §5.3–§5.4. Mark this item done only after code, documentation, `check-fmt`,
+  `typecheck`, `test`, and `lint` gates all pass.
 
 - [ ] 4.4.3 Implement the live task create → detail → transition path in the
   progressive web app (PWA). Requires 4.4.1 and 4.4.2. See

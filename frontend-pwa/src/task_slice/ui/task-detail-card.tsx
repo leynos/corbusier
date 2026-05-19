@@ -1,3 +1,11 @@
+/**
+ * @file Presentational card component for task detail display.
+ *
+ * Renders a `Task` value object's fields using the view-model formatters from
+ * `task_slice/domain/task-view-model`. Locale-aware formatting (timestamps,
+ * state labels, branch references, pull-request references) is delegated to
+ * those formatters; this component contains no formatting logic of its own.
+ */
 import { useI18n } from '../../i18n/runtime';
 import type { Task } from '../domain/task';
 import {
@@ -8,6 +16,14 @@ import {
   formatTimestamp,
 } from '../domain/task-view-model';
 
+/**
+ * Presentational card for displaying a `Task`'s detail fields.
+ *
+ * Renders origin, state, timestamps, branch reference, pull-request
+ * reference, and description. Locale-aware formatting is delegated to the
+ * view-model utilities from `task_slice/domain/task-view-model`; this
+ * component contains no formatting logic of its own.
+ */
 export function TaskDetailCard({ task }: { task: Task }) {
   const { locale, t } = useI18n();
   const state = formatTaskState(task.state, t);
@@ -70,6 +86,11 @@ export function TaskDetailCard({ task }: { task: Task }) {
   );
 }
 
+/**
+ * Renders a definition-list row comprising a label (`dt`) and a value (`dd`).
+ *
+ * Used internally by `TaskDetailCard` for each metadata entry.
+ */
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="task-detail__meta-item">
