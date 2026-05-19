@@ -207,4 +207,8 @@ function delay() {
   return new Promise((resolve) => window.setTimeout(resolve, 15));
 }
 
+/**
+ * Stable fixture task identifier that always resolves to a `not_found`
+ * gateway error.
+ */
 export const fixtureNotFoundTaskId = notFoundTaskId;
