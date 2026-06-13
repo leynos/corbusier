@@ -1423,14 +1423,14 @@ Table 2.2.4.2: Entity-relationship diagram showing the tool registry
 persistence model.
 ```mermaid
 erDiagram
-    mcp_servers {
+    MCP_SERVERS {
         uuid id PK
         uuid tenant_id
         varchar name
         varchar transport
     }
 
-    mcp_tool_catalog {
+    MCP_TOOL_CATALOG {
         uuid id PK
         uuid tenant_id
         uuid server_id FK
@@ -1444,7 +1444,7 @@ erDiagram
         timestamptz updated_at
     }
 
-    tool_call_audit_log {
+    MCP_CALL_AUDIT_LOG {
         uuid id PK
         uuid tenant_id
         uuid call_id
@@ -1460,7 +1460,7 @@ erDiagram
         varchar stderr_log_path
     }
 
-    tool_log_metadata {
+    MCP_LOG_METADATA {
         uuid id PK
         uuid tenant_id
         uuid server_id FK
@@ -1472,9 +1472,9 @@ erDiagram
         timestamptz expires_at
     }
 
-    mcp_servers ||--o{ mcp_tool_catalog : "(id, tenant_id)"
-    mcp_servers ||--o{ tool_log_metadata : "(id, tenant_id)"
-    mcp_servers ||--o{ tool_call_audit_log : "(id, tenant_id)"
+    MCP_SERVERS ||--o{ MCP_TOOL_CATALOG : "(id, tenant_id)"
+    MCP_SERVERS ||--o{ MCP_LOG_METADATA : "(id, tenant_id)"
+    MCP_SERVERS ||--o{ MCP_CALL_AUDIT_LOG : "(id, tenant_id)"
 ```
 <!-- markdownlint-enable MD031 -->
 
@@ -7155,7 +7155,7 @@ efficient query patterns for operational data.
 
 ```mermaid
 erDiagram
-    conversations {
+    CONVERSATIONS {
         uuid id PK
         uuid task_id FK
         jsonb context
@@ -7164,7 +7164,7 @@ erDiagram
         timestamptz updated_at
     }
     
-    messages {
+    MESSAGES {
         uuid id PK
         uuid conversation_id FK
         varchar role
@@ -7174,7 +7174,7 @@ erDiagram
         bigserial sequence_number
     }
     
-    tasks {
+    TASKS {
         uuid id PK
         jsonb origin
         varchar branch_ref
@@ -7185,7 +7185,7 @@ erDiagram
         timestamptz updated_at
     }
     
-    domain_events {
+    DOMAIN_EVENTS {
         uuid id PK
         uuid aggregate_id
         varchar aggregate_type
@@ -7195,7 +7195,7 @@ erDiagram
         timestamptz occurred_at
     }
     
-    workspaces {
+    WORKSPACES {
         uuid id PK
         uuid task_id FK
         jsonb configuration
@@ -7205,7 +7205,7 @@ erDiagram
         timestamptz destroyed_at
     }
     
-    tool_executions {
+    MCP_TOOL_EXECUTIONS {
         uuid id PK
         uuid conversation_id FK
         uuid turn_id
@@ -7217,7 +7217,7 @@ erDiagram
         timestamptz completed_at
     }
     
-    hook_executions {
+    HOOK_EXECUTIONS {
         uuid id PK
         uuid trigger_context_id
         varchar hook_id
@@ -7228,13 +7228,13 @@ erDiagram
         timestamptz executed_at
     }
     
-    conversations ||--o{ messages : contains
-    tasks ||--o| conversations : has
-    tasks ||--o| workspaces : uses
-    conversations ||--o{ tool_executions : executes
-    domain_events }o--|| conversations : audits
-    domain_events }o--|| tasks : audits
-    hook_executions }o--|| conversations : governs
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    TASKS ||--o| CONVERSATIONS : has
+    TASKS ||--o| WORKSPACES : uses
+    CONVERSATIONS ||--o{ MCP_TOOL_EXECUTIONS : executes
+    DOMAIN_EVENTS }o--|| CONVERSATIONS : audits
+    DOMAIN_EVENTS }o--|| TASKS : audits
+    HOOK_EXECUTIONS }o--|| CONVERSATIONS : governs
 ```
 
 ##### 6.2.1.2 Data Models and Structures
