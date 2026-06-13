@@ -16,6 +16,108 @@ execplans under [`docs/`](.).
 
 ## Tooling
 
+## Maintainer requirements
+
+This section records internal development requirements that contributors must
+apply when changing Corbusier. The canonical agent instructions remain in
+[`AGENTS.md`](../AGENTS.md); this guide summarizes the requirements that affect
+day-to-day implementation choices.
+
+### Quality gates
+
+Run the repository gates before committing code changes:
+
+```sh
+make check-fmt
+make lint
+make test
+```
+
+`make check-fmt` validates Rust formatting, `make lint` runs documentation
+generation, Clippy, and Whitaker with warnings denied, and `make test` runs the
+workspace test suite through nextest. Documentation changes should also run:
+
+```sh
+make markdownlint
+make nixie
+```
+
+Run `make fmt` after documentation changes to apply Rust and Markdown
+formatting, but review formatter output before committing. Markdown formatter
+defects that affect this repository are tracked upstream in
+[`leynos/mdtablefix`](https://github.com/leynos/mdtablefix).
+
+### Abstractions, ports, and helpers
+
+Before adding a new abstraction, hexagonal port, or extracted helper, sweep the
+repository for an existing equivalent. If a new abstraction is still needed,
+document its intended scope, ownership boundary, permitted call-sites, and
+composition rules in the relevant design or maintainer document.
+
+Use [`contents.md`](contents.md) to choose the right documentation destination.
+Substantive architectural decisions belong in an ADR or the relevant design
+document, not only in code comments.
+
+### Dependency management
+
+Cargo dependencies must use explicit SemVer-compatible caret requirements such
+as `some-crate = "1.2.3"`. Avoid wildcard requirements and open-ended
+inequality requirements because they make builds unpredictable. Use tilde
+requirements only when patch-level locking is required for a documented reason.
+
+When adding a dependency, update the relevant design or developer
+documentation if the dependency changes architecture, runtime behaviour,
+operator workflow, or contributor tooling. Run the dependency audit gate when
+the change affects Rust or frontend dependency surfaces:
+
+```sh
+make audit
+```
+
+### Error handling
+
+Use semantic error enums for library and domain errors that callers may
+inspect, retry, or map to an HTTP status. Derive `std::error::Error` with
+`thiserror` for those cases. Reserve opaque reports such as `eyre::Report` for
+application boundaries, logs, and top-level task entry points.
+
+Tests should prefer `.expect(...)` over `.unwrap()` for clearer diagnostics.
+Production code and shared fixtures should return `Result` and propagate
+errors with `?` instead of panicking. Keep the `expect_used` lint strict, and
+remember that test-only lint allowances do not apply to helpers outside
+`#[cfg(test)]` or `#[test]`.
+
+Fallible `rstest` fixtures should be consumed by tests that return `Result`,
+so fixture setup errors can be propagated with `?`.
+
+### Observability
+
+Use `tracing` for application diagnostics. Prefer structured
+`tracing::{trace, debug, info, warn, error}` events and spans over `println!`,
+`eprintln!`, or direct `log` macros. Include stable identifiers, state, and
+error context as structured fields so subscribers can filter and correlate
+events without parsing message text.
+
+Instrument request handling, command execution, retries, background jobs, and
+other meaningful work units with `#[tracing::instrument]` or explicit spans. Do
+not hold `Span::enter()` guards across `.await`; use `Instrument::instrument`
+or scoped synchronous spans instead.
+
+Emit metrics through the `metrics` crate where usage, uptake, failure, or
+mitigation metrics are required. Use low-cardinality labels and avoid user
+input, request identifiers, raw paths with unbounded parameters, or raw error
+strings as labels. Libraries may emit `metrics` and `tracing` instrumentation,
+but applications own global exporter and subscriber initialization.
+
+### Additional tools
+
+Common local tools include `mbake` for Makefile validation, `shellcheck` for
+shell scripts, `difft` for structural diffs, `srgn` for structural search,
+`hyperfine` for benchmarking, and system inspection tools such as `strace`,
+`ltrace`, `gdb`, `lldb`, `lsof`, `htop`, `iotop`, and `ncdu`. Prefer
+repository `make` targets when they exist, and use direct tool invocations for
+diagnosis or focused checks that do not have a Makefile wrapper.
+
 ### Frontend task slice tooling
 
 The repository-owned frontend lives under `frontend-pwa/`. The task slice uses
