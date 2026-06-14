@@ -23,6 +23,21 @@ apply when changing Corbusier. The canonical agent instructions remain in
 [`AGENTS.md`](../AGENTS.md); this guide summarizes the requirements that affect
 day-to-day implementation choices.
 
+The following sections intentionally mirror the development rules added to
+`AGENTS.md`:
+
+- Internal tooling and build gates are documented in
+  [quality gates](#quality-gates), [additional tools](#additional-tools), and
+  [dependency audit](#dependency-audit).
+- Dependency-management requirements are documented in
+  [dependency management](#dependency-management).
+- Error-handling expectations are documented in
+  [error handling](#error-handling).
+- Observability and instrumentation rules are documented in
+  [observability](#observability).
+- Abstraction, port, and helper policy is documented in
+  [abstractions, ports, and helpers](#abstractions-ports-and-helpers).
+
 ### Quality gates
 
 Run the repository gates before committing code changes:
