@@ -158,6 +158,34 @@ The shipped `4.4.1` slice boundary is recorded in
 The Whitaker user's guide remains a tooling guide for the Rust lint runner and
 does not describe these frontend-only APIs.
 
+### Frontend testing infrastructure
+
+The frontend test setup uses separate TypeScript configurations for source and
+test code:
+
+- `frontend-pwa/tsconfig.json` covers source files under `src/`.
+- `frontend-pwa/tsconfig.test.json` extends the base configuration and adds
+  `tests/`, `vite.config.ts`, `vitest.config.ts`, `vitest.a11y.config.ts`, and
+  `playwright.config.ts` to the compilation scope. The `typecheck` script in
+  `package.json` runs both configurations so test-only types are validated
+  independently of the application build.
+
+Accessibility tests use `jest-axe` through Vitest's assertion surface:
+
+- `frontend-pwa/tests/types/jest-axe.d.ts` supplies TypeScript declarations for
+  `AxeRunner`, `configureAxe`, the `axe` runner instance, and the
+  `toHaveNoViolations` matcher. These declarations are required because
+  `jest-axe` does not ship types that cover Vitest's `@vitest/expect`
+  augmentation surface.
+- `frontend-pwa/tests/setup-vitest-a11y.ts` registers the `toHaveNoViolations`
+  matcher with `expect.extend` and augments both the `@vitest/expect` and
+  `vitest` module declarations so `expect(results).toHaveNoViolations()` is
+  type-safe in accessibility test files. The `AxeResults` type from `axe-core`
+  is used to constrain the `this` receiver of the matcher.
+
+Accessibility test files use `vitest.a11y.config.ts` as their Vitest
+configuration and are run separately with `make frontend-test-a11y`.
+
 ## Frontend task slice APIs
 
 ### HTTP API test helpers
