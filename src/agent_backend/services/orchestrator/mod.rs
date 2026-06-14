@@ -348,7 +348,7 @@ where
             self.runtime
                 .teardown_session(params.backend, &runtime_session_id)
                 .await?;
-            self.expire_session(params.ctx, reservation.clone()).await?;
+            self.expire_session(params.ctx, reservation).await?;
             return Err(AgentTurnOrchestrationError::SessionRepository(error));
         }
 
