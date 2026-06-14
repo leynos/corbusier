@@ -124,9 +124,12 @@ where
         let conversation_id = request.turn.conversation_id();
         let backend = self.resolve_backend(ctx, request.backend_id).await?;
 
-        // Hold the per-conversation in-process lock for the entire turn:
-        // session arbitration, runtime execution, tool routing, and persistence
-        // are not database-atomic. See `execution_locks` for the full rationale.
+        // Acquire the per-conversation in-process lock and hold it for the
+        // entire turn.  Session arbitration, runtime execution, tool routing,
+        // and session persistence are not atomic at the database level; a
+        // racing concurrent turn that observes partial state would violate the
+        // single-writer-per-session invariant.  See the `execution_locks`
+        // module documentation for the full rationale.
         let _execution_guard = self
             .execution_locks
             .lock(ctx.tenant_id(), conversation_id)
@@ -245,7 +248,6 @@ where
     ) -> AgentTurnOrchestrationResult<()> {
         let expire_time = self.clock.utc();
         session.mark_expired(expire_time);
-
         self.turn_sessions
             .upsert_session(ctx, session)
             .await
@@ -263,7 +265,6 @@ where
     ) -> AgentTurnOrchestrationResult<()> {
         let completion_time = self.clock.utc();
         session.record_turn(completion_time)?;
-
         self.persist_session_or_cleanup(params, session).await
     }
 
@@ -331,7 +332,6 @@ where
                 return Err(error.into());
             }
         };
-
         if let Err(error) = reservation.activate(runtime_session_id.clone()) {
             self.runtime
                 .teardown_session(params.backend, &runtime_session_id)
