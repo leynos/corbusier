@@ -158,18 +158,24 @@ The shipped `4.4.1` slice boundary is recorded in
 The Whitaker user's guide remains a tooling guide for the Rust lint runner and
 does not describe these frontend-only APIs.
 
-### Frontend accessibility and TypeScript test configuration
+### TypeScript type checking for tests
 
 `frontend-pwa/tsconfig.test.json` extends the base `tsconfig.json` and widens
 the checked surface to include `src/`, `tests/`, `vite.config.ts`,
 `vitest.config.ts`, `vitest.a11y.config.ts`, and `playwright.config.ts`. The
-frontend `typecheck` script runs both `tsc --noEmit` for application types and
+`make frontend-typecheck` target runs `bun run typecheck`, which executes both
+`tsc --noEmit` for application types and
 `tsc --project tsconfig.test.json --noEmit` for test and tooling types.
+
+The separate test pass is required because tests and test configuration use
+different inclusion patterns and ambient types from the production application
+sources, while still depending on the application `src/` tree.
 
 `frontend-pwa/tests/types/jest-axe.d.ts` provides ambient TypeScript
 declarations for the `jest-axe` package because the package does not ship
 bundled types. It exports `AxeRunner`, `configureAxe`, `axe`, and
-`toHaveNoViolations` for the accessibility test setup.
+`toHaveNoViolations`; the test-scoped validation keeps those declarations
+checked alongside the accessibility test setup.
 
 `frontend-pwa/tests/setup-vitest-a11y.ts` registers `toHaveNoViolations` on
 both `@vitest/expect`'s `Assertion<T>` and `vitest`'s `Assertion<T>`
