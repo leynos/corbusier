@@ -17,7 +17,7 @@
     "lint:locale-vars": "bun run scripts/check-locale-vars.ts",
     "localizability:lint": "bun run lint:hardcoded-strings && bun run lint:locale-vars",
     "semantic:lint": "bun run lint && bun run lint:classlist && bun run lint:class-duplicates && bun run lint:hardcoded-strings && uvx semgrep --config tools/semgrep-semantic.yml --include src/**/*.tsx --include tests/**/*.tsx && bunx stylelint 'src/**/*.css' --config tools/stylelint.config.cjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.test.json --noEmit",
     "test": "vitest run",
     "e2e": "playwright test"
   },
