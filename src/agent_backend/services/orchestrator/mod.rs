@@ -124,6 +124,9 @@ where
         let conversation_id = request.turn.conversation_id();
         let backend = self.resolve_backend(ctx, request.backend_id).await?;
 
+        // Hold the per-conversation in-process lock for the entire turn:
+        // session arbitration, runtime execution, tool routing, and persistence
+        // are not database-atomic. See `execution_locks` for the full rationale.
         let _execution_guard = self
             .execution_locks
             .lock(ctx.tenant_id(), conversation_id)
