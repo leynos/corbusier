@@ -7,6 +7,7 @@
 import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/dom';
 import { cleanup } from '@testing-library/react';
+import type { AxeResults } from 'axe-core';
 import { toHaveNoViolations } from 'jest-axe';
 import { afterEach, expect } from 'vitest';
 
@@ -18,17 +19,15 @@ afterEach(() => {
   cleanup();
 });
 
-declare global {
-  namespace Vi {
-    interface JestAssertion<T = unknown> {
-      toHaveNoViolations(): T;
-    }
+declare module '@vitest/expect' {
+  interface Assertion<T> {
+    toHaveNoViolations(this: Assertion<AxeResults>): T;
   }
 }
 
-declare global {
-  interface CustomMatchers<R = unknown> {
-    toHaveNoViolations(): R;
+declare module 'vitest' {
+  interface Assertion<T> {
+    toHaveNoViolations(this: Assertion<AxeResults>): T;
   }
 }
 

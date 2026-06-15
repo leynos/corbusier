@@ -20,8 +20,7 @@ consistent, and easy to maintain across projects.
   - suffix -ogue in words such as _analogue_ and _catalogue_,
   - and so forth.
 - The words **"outwith"** and **"caveat"** are acceptable.
-- Keep United States (US) spelling when used in an external API, command, or
-  library (e.g. `color`).
+- Keep United States (US) spelling when used in an API, for example, `color`.
 - The project uses the filename `LICENSE` for community consistency.
 
 ## Punctuation and grammar
@@ -74,9 +73,10 @@ material, the user's guide explains how to use the project, the developer's
 guide explains how to work on the project, the design document explains why the
 system is shaped the way it is, and the repository layout document explains
 where important things live. For discoverability, use canonical filenames
-unless a stronger repository-specific constraint applies: `docs/contents.md`,
-`docs/users-guide.md`, `docs/developers-guide.md`, `docs/repository-layout.md`,
-and a primary design document with an explicit product or topic name such as
+unless a stronger repository-specific constraint applies. A minimal canonical
+set looks like
+`docs/{contents,users-guide,developers-guide,repository-layout}.md` plus a
+primary design document under `docs/*-design.md`, for example
 `docs/theoremc-design.md` or `docs/query-planner-design.md`.
 
 ### Contents file
@@ -113,8 +113,8 @@ this means operators, end users, or integrators.
 - Introduce the primary workflow early, with a minimal working example that a
   reader can adapt immediately.
 - Put public-facing reference material here when users need it to succeed, for
-  example command-line interface (CLI) usage, configuration keys, file-format
-  rules, or API surface summaries.
+  example CLI usage, configuration keys, file-format rules, or API surface
+  summaries.
 - Present rules, constraints, defaults, and error behaviour near the feature
   they affect, rather than scattering them across the document.
 - Use tables where they clarify field sets, command options, or compatibility
@@ -136,8 +136,9 @@ the existing system, not as the place for the project's primary design document.
 
 - Open with one short paragraph that states the audience and the operational
   scope of the guide.
-- Link early to the design document, accepted decision records, and other
-  normative references that explain architecture or rationale in depth.
+- Link early to the design document, repository layout document, accepted
+  decision records, and other normative references that explain architecture or
+  rationale in depth.
 - Put maintainer-facing implementation guidance here, for example build, test,
   lint, release, debugging, extension, and contribution workflows.
 - Use numbered sections for long-form technical documents to improve
@@ -149,10 +150,13 @@ the existing system, not as the place for the project's primary design document.
 - Keep subsystem descriptions focused on current responsibilities,
   integration points, and operational expectations. Put design rationale, major
   trade-offs, and proposed architecture in design documents instead.
+- Do not embed repository-layout guidance here. The canonical location for
+  file-tree and path-responsibility documentation is
+  `docs/repository-layout.md`.
 - Keep the document synchronized with decision records, roadmap items, and the
   codebase. A stale developer's guide is worse than a shorter one.
 
-### Design document, Architecture Decision Record (ADR), and Request for Comments (RFC)
+### Design document, ADR, and RFC
 
 Use these document types for different jobs. Do not collapse them into one
 catch-all "design note".
@@ -213,7 +217,7 @@ user's guide or developer's guide.
 Use RFCs for proposed changes that need technical review before they become
 binding. Store them under `docs/rfcs/`.
 
-#### RFC naming convention
+### RFC naming convention
 
 Name RFC files using the pattern `0001-short-topic.md`, where `0001` is a
 zero-padded sequence number. Place RFCs in the `docs/rfcs/` directory.
@@ -222,7 +226,7 @@ zero-padded sequence number. Place RFCs in the `docs/rfcs/` directory.
 - Do not renumber existing RFCs after publication. Gaps are acceptable when
   numbers are reserved, drafted on another branch, or intentionally skipped.
 
-#### RFC required sections
+### RFC required sections
 
 Every RFC must include the following sections in order:
 
@@ -237,7 +241,7 @@ Every RFC must include the following sections in order:
   `## Summary`, `## Executive summary`, or `## Problem` are all acceptable if
   used consistently within the document.
 
-#### RFC conditional sections
+### RFC conditional sections
 
 Include these sections as appropriate to the scope and complexity of the
 proposal:
@@ -261,7 +265,7 @@ proposal:
 - **Recommendation:** End with a clear statement of the preferred direction
   when the preceding analysis presents multiple viable choices.
 
-#### RFC formatting guidance
+### RFC formatting guidance
 
 - Use second-level headings (`##`) for major sections.
 - Use third-level headings (`###`) for subsections such as phases, options,
@@ -276,7 +280,7 @@ proposal:
 - Update links when RFC filenames change, especially cross-references from one
   RFC to another.
 
-#### RFC template
+### RFC template
 
 ```markdown
 # RFC 0001: <title>
@@ -400,9 +404,7 @@ Include these sections as appropriate to the decision's complexity:
 - Use second-level headings (`##`) for major sections.
 - Use third-level headings (`###`) for subsections (e.g. phases, option names).
 - Use tables to compare options when multiple dimensions are relevant. Include
-  a caption immediately above the table (e.g.
-  `Table 1.1.1: Trade-offs between X and Y.`) and leave exactly one blank line
-  between the caption and the table header row.
+  a caption below the table (e.g. “_Table 1: Trade-offs between X and Y._”).
 - Include code snippets with language identifiers when illustrating technical
   approaches. Use `no_run` for illustrative Rust code that should not be
   executed.
@@ -411,7 +413,7 @@ Include these sections as appropriate to the decision's complexity:
 
 ### ADR template
 
-```markdown
+```plaintext
 # Architectural decision record (ADR) NNN: <title>
 
 ## Status
@@ -453,11 +455,11 @@ YYYY-MM-DD.
 
 <Description, consequences, and trade-offs.>
 
-Table 1.1.1: Comparison of options.
-
 | Topic     | Option A | Option B |
 | --------- | -------- | -------- |
 | <Factor>  | <Value>  | <Value>  |
+
+_Table 1: Comparison of options._
 
 ## Decision outcome / proposed direction
 
@@ -491,9 +493,9 @@ implementation is required.>
 ### Repository layout document
 
 Use a repository layout document, canonically `docs/repository-layout.md`, to
-explain the shape of the tree and the responsibilities of its major paths. This
-may be a standalone document or a clearly labelled section within the
-developer's guide, provided readers can find it easily from the contents file.
+explain the shape of the tree and the responsibilities of its major paths. Use
+this standalone document as the canonical location for repository-layout
+guidance rather than embedding that material in the developer's guide.
 
 - Document the top-level directories and any critical subdirectories that a new
   contributor must understand quickly.
@@ -507,6 +509,8 @@ developer's guide, provided readers can find it easily from the contents file.
   long-lived reference documents belong.
 - Call out any directories with unusual constraints, such as generated output,
   fixtures, snapshots, or capability-restricted paths.
+- Ensure the contents file links directly to `docs/repository-layout.md` so
+  readers can find it without scanning the developer's guide.
 - Update the layout document when the repository structure changes enough that
   a contributor could otherwise follow outdated guidance.
 
@@ -573,12 +577,107 @@ flowchart TD
 
 _Figure 1: Documentation workflow from draft through merge review._
 
-## Roadmap and planning guidance
+## Roadmap task writing guidelines
 
-Use the repository-specific [roadmap writing guide](roadmap-writing-guide.md)
-for roadmap structure, Goals, Ideas, Steps, and Tasks (GIST)-aligned planning,
-and task-writing conventions. Keeping that material separate lets this style
-guide stay focused on repository-agnostic documentation rules.
+When documenting development roadmap items, write them to be achievable,
+measurable, and structured. This ensures the roadmap functions as a practical
+planning tool rather than a vague wishlist. Do not commit to timeframes in the
+roadmap. Development effort should be roughly consistent from task to task.
+
+### Principles for roadmap tasks
+
+- Define outcomes, not intentions: Phrase tasks in terms of the capability
+  delivered (e.g. “Implement role-based access control for API endpoints”), not
+  aspirations like “Improve security”.
+- Quantify completion criteria: Attach measurable finish lines (e.g. “90%
+  test coverage for new modules”, “response times under 200ms”, “all endpoints
+  migrated”).
+- Break into atomic increments: Ensure tasks can be completed in weeks, not
+  quarters. Large goals should be decomposed into clear, deliverable units.
+- Tie to dependencies and sequencing: Document prerequisites, so tasks can be
+  scheduled realistically (e.g. “Introduce central logging service” before “Add
+  error dashboards”).
+- Bound scope explicitly: Note both in-scope and out-of-scope elements (e.g.
+  “Build analytics dashboard (excluding churn prediction)”).
+
+### Hierarchy of scope
+
+Roadmaps should be expressed in three layers of scope to maintain clarity and
+navigability:
+
+- Phases (strategic milestones) – Broad outcome-driven stages that represent
+  significant capability shifts. Why the work matters.
+- Steps (epics / workstreams) – Mid-sized clusters of related tasks grouped
+  under a phase. What will be built.
+- Tasks (execution units) – Small, measurable pieces of work with clear
+  acceptance criteria. How it gets done.
+
+This hierarchy should align with the GIST framework:
+
+- Phases correspond to strategic themes or milestones.
+- Steps correspond to GIST-style workstreams. A step must describe a coherent
+  body of delivery work with one clear objective, explicit sequencing value,
+  and a practical learning loop. A step is not just a heading used to group
+  unrelated tasks.
+- Tasks correspond to implementation-level execution units. A task should be a
+  concrete build activity, not an aspiration, research topic, or status label.
+
+### Roadmap formatting conventions
+
+- **Dotted numbering:** Number phases, steps, and headline tasks using dotted
+  notation:
+  - Phases: 1, 2, 3, …
+  - Steps: 1.1, 1.2, 1.3, …
+  - Headline tasks: 1.1.1, 1.1.2, 1.1.3, …
+- **Checkboxes:** Precede task and sub-task items with a GitHub Flavored
+  Markdown (GFM) checkbox (`[ ]`) to track completion status.
+- **Dependencies:** Note non-linear dependencies explicitly. Where a task
+  depends on another task outside its immediate sequence, cite the dependency
+  using dotted notation (e.g. “Requires 2.3.1”).
+- **Success criteria:** Include explicit success criteria only where not
+  immediately obvious from the task description.
+- **Design document citations:** Where applicable, cite the relevant design
+  document section for each task (e.g. “See design-doc.md §3.2”).
+
+### Roadmap example
+
+```plaintext
+## 1. Core infrastructure
+
+### 1.1. Logging subsystem
+
+- [ ] 1.1.1. Introduce central logging service
+  - Define log message schema. See design-doc.md §2.1.
+  - Implement log collector daemon.
+  - Add structured logging to API layer.
+- [ ] 1.1.2. Add error dashboards. Requires 1.1.1.
+  - Deploy Grafana instance.
+  - Create error rate dashboard (target: <1% error rate visible within 5 min).
+
+### 1.2. Authentication
+
+- [ ] 1.2.1. Implement role-based access control (RBAC). Requires 1.1.1.
+  - Define role hierarchy. See design-doc.md §4.3.
+  - Add RBAC middleware to API endpoints.
+  - Write integration tests for permission boundaries.
+```
+
+### Writing GIST-aligned steps
+
+When writing a roadmap step, make it function as a real workstream:
+
+- Give the step a concrete objective that describes what will exist when the
+  workstream is complete.
+- State the learning opportunity for the step when that learning affects later
+  sequencing or design choices.
+- Group only tasks that serve the same delivery objective. If the tasks do not
+  share one operational purpose, split the step.
+- Sequence steps so each workstream either unlocks the next one or reduces a
+  specific class of delivery risk.
+
+Avoid using steps as passive document structure. Headings such as “Backend
+changes”, “Frontend work”, or “Other tasks” are not sufficient unless they are
+framed as real workstreams with a defined outcome.
 
 ______________________________________________________________________
 

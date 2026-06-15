@@ -1,4 +1,19 @@
 //! Per-session execution locks for in-process turn serialization.
+//!
+//! Per-session serialization is required because concurrent turns for the same
+//! session race over shared session and conversation state, including message
+//! ordering, domain-event sequence numbers, and task-status transitions. The
+//! guard must span the full async turn-execution sequence from
+//! `resolve_session` through `route_tool_calls` and persistence; releasing the
+//! lock mid-turn and reacquiring it would let a second turn observe partial
+//! state and violate the single-writer-per-session invariant.
+//!
+//! The lock table stores `Arc<Mutex<()>>` values as `Weak` references so entries
+//! are dropped automatically when no turn holds or awaits the mutex, preventing
+//! unbounded map growth. Callers acquire the guard through
+//! `SessionExecutionLocks::lock()` and must hold the returned
+//! `OwnedMutexGuard` for the duration of the turn; dropping it early silently
+//! violates the invariant.
 
 use crate::context::TenantId;
 use std::collections::HashMap;
