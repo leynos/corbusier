@@ -28,28 +28,28 @@ Table 1.0.0: Phase 1 subphases and delivery goals.
 
 Use the shared dependency labels below to keep phase 1 task text readable:
 
-- Phase 1 hosting schema dependency: Podbot Step 1.4, "Hosting schema
+- Phase 1 hosting schema dependency: Podbot Step `1.4`, "Hosting schema
   migration and compatibility matrix".
-- Phase 1 workspace strategy dependency: Podbot Step 4.4, "Workspace
+- Phase 1 workspace strategy dependency: Podbot Step `4.4`, "Workspace
   strategies".
-- Phase 1 hosting core dependencies: Podbot Step 4.5, "Normalized launch
-  contract", Podbot Step 4.6, "Hosted session control plane", and Podbot Step
-  4.7, "MCP wire provisioning and injection".
-- Phase 1 prompt-validation dependencies: Podbot Step 2.6, "ACP capability
-  masking enforcement", and Podbot Step 4.8, "Prompt, bundle, and validation
+- Phase 1 hosting core dependencies: Podbot Step `4.5`, "Normalized launch
+  contract", Podbot Step `4.6`, "Hosted session control plane", and Podbot Step
+  `4.7`, "MCP wire provisioning and injection".
+- Phase 1 prompt-validation dependencies: Podbot Step `2.6`, "ACP capability
+  masking enforcement", and Podbot Step `4.8`, "Prompt, bundle, and validation
   surfaces".
-- Phase 1 hook-recovery dependencies: Podbot Step 4.9, "Hook execution and
-  orchestrator acknowledgement", and Podbot Step 4.10, "Recovery, replay, and
+- Phase 1 hook-recovery dependencies: Podbot Step `4.9`, "Hook execution and
+  orchestrator acknowledgement", and Podbot Step `4.10`, "Recovery, replay, and
   restart safety".
-- Phase 1 conformance dependencies: Podbot Step 4.11, "Gated end-to-end (E2E)
-  orchestration suite", Podbot Step 8.2, "ACP transport conformance harness",
-  Podbot Step 8.3, "Host lifecycle and output-purity tests", and Podbot Step
-  8.4, "Wire, hook, and validation conformance tests".
+- Phase 1 conformance dependencies: Podbot Step `4.11`, "Gated end-to-end (E2E)
+  orchestration suite", Podbot Step `8.2`, "ACP transport conformance harness",
+  Podbot Step `8.3`, "Host lifecycle and output-purity tests", and Podbot Step
+  `8.4`, "Wire, hook, and validation conformance tests".
 
 ### 1.1. Migration governance and runtime boundary
 
-- [x] 1.1.1 Ratify the staged migration boundary and phase gates. Requires
-  the phase 1 hosting schema dependency and Podbot Step 4.5, "Normalized launch
+- [x] 1.1.1. Ratify the staged migration boundary and phase gates. Requires
+  the phase 1 hosting schema dependency and Podbot Step `4.5`, "Normalized launch
   contract". See adr-010-migration-and-coexistence-strategy.md §Decision
   Outcome / Proposed Direction, §Migration Plan, and
   `docs/podbot-migration-review-checklist.md`.
@@ -64,8 +64,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     pull request may claim compatibility, warn-only, or blocking status.
   - [x] Success criteria: ADRs 001 through 005 cite consistent Podbot
     dependencies, and each migration phase has explicit entry and exit gates.
-- [ ] 1.1.2 Establish the Podbot-hosted runtime seam. Requires 2.5.1, Podbot
-  Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted session
+- [ ] 1.1.2. Establish the Podbot-hosted runtime seam. Requires 2.5.1, Podbot
+  Step `4.5`, "Normalized launch contract", and Podbot Step `4.6`, "Hosted session
   control plane". See adr-001-runtime-boundary-between-corbusier-and-podbot.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define a Corbusier port for the Podbot library API and route hosted
@@ -84,9 +84,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.2. Workspace runtime model and source policy
 
-- [ ] 1.2.1 Introduce the canonical workspace runtime record. Requires 2.5.2,
+- [ ] 1.2.1. Introduce the canonical workspace runtime record. Requires 2.5.2,
   the phase 1 hosting schema dependency, the phase 1 workspace strategy
-  dependency, and Podbot Step 4.5, "Normalized launch contract". See
+  dependency, and Podbot Step `4.5`, "Normalized launch contract". See
   adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
   Proposed Direction and adr-006-durable-runtime-state-and-audit-model.md
   §Migration Plan.
@@ -102,9 +102,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: workspace records survive restart, link cleanly to
     hosted sessions, and distinguish logical identity from concrete runtime
     state.
-- [ ] 1.2.2 Replace legacy transport labels with the canonical MCP source
+- [ ] 1.2.2. Replace legacy transport labels with the canonical MCP source
   taxonomy. Requires 1.2.1, the phase 1 hosting schema dependency, and Podbot
-  Step 4.7, "MCP wire provisioning and injection". See
+  Step `4.7`, "MCP wire provisioning and injection". See
   adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define canonical source variants for local stdio, helper-container
@@ -117,11 +117,11 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     legacy records, and which health semantics belong to sources versus wires.
   - [ ] Success criteria: new writes use canonical taxonomy values only, while
     compatibility reads still accept retained legacy transport records.
-- [ ] 1.2.3 Enforce workspace source safety and access policy. Requires 1.2.1,
-  Podbot Step 2.2, "Container creation", Podbot Step 2.3, "Credential
-  injection", Podbot Step 3.1, "App authentication", Podbot Step 3.2,
-  "Installation token acquisition", Podbot Step 3.3, "Token daemon", Podbot
-  Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and the
+- [ ] 1.2.3. Enforce workspace source safety and access policy. Requires 1.2.1,
+  Podbot Step `2.2`, "Container creation", Podbot Step `2.3`, "Credential
+  injection", Podbot Step `3.1`, "App authentication", Podbot Step `3.2`,
+  "Installation token acquisition", Podbot Step `3.3`, "Token daemon", Podbot
+  Step `3.4`, "GIT_ASKPASS mechanism (Git credential helper variable)", and the
   phase 1 workspace strategy dependency. See
   adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
   Proposed Direction and adr-009-security-and-privilege-boundary-defaults.md
@@ -142,8 +142,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.3. Hosted tool plane and hook control
 
-- [ ] 1.3.1 Move hosted MCP attachment onto Podbot-owned wire provisioning.
-  Requires 1.1.2, 1.2.2, Podbot Step 2.5, "Protocol-safe execution (stdio
+- [ ] 1.3.1. Move hosted MCP attachment onto Podbot-owned wire provisioning.
+  Requires 1.1.2, 1.2.2, Podbot Step `2.5`, "Protocol-safe execution (stdio
   proxy)", and the phase 1 hosting core dependencies. See
   adr-003-mcp-wire-model-and-tool-plane-ownership.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
@@ -159,8 +159,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: hosted agents receive workspace-scoped wire
     attachments from Podbot, and stdout remains free of Corbusier-owned
     protocol noise.
-- [ ] 1.3.2 Replace inline hook assumptions with control-channel
-  acknowledgement flow. Requires 1.1.2, Podbot Step 4.6, "Hosted session
+- [ ] 1.3.2. Replace inline hook assumptions with control-channel
+  acknowledgement flow. Requires 1.1.2, Podbot Step `4.6`, "Hosted session
   control plane", and the phase 1 hook-recovery dependencies. See
   adr-005-hook-execution-contract-and-control-channel-semantics.md §Decision
   Outcome / Proposed Direction and §Migration Plan.
@@ -177,10 +177,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: hosted hook flows are restart-safe, duplicate
     deliveries are idempotent, and every completed hook has a matching
     acknowledgement record.
-- [ ] 1.3.3 Align hosted-session launch and command surfaces with the Podbot
-  control plane. Requires 1.3.1, Podbot Step 4.5, "Normalized launch contract",
-  Podbot Step 4.6, "Hosted session control plane", Podbot Step 6.1, "Subcommand
-  dispatch", and Podbot Step 6.5, "Host subcommand". See
+- [ ] 1.3.3. Align hosted-session launch and command surfaces with the Podbot
+  control plane. Requires 1.3.1, Podbot Step `4.5`, "Normalized launch contract",
+  Podbot Step `4.6`, "Hosted session control plane", Podbot Step `6.1`, "Subcommand
+  dispatch", and Podbot Step `6.5`, "Host subcommand". See
   adr-001-runtime-boundary-between-corbusier-and-podbot.md §Migration Plan and
   adr-010-migration-and-coexistence-strategy.md §Podbot roadmap dependencies.
   - [ ] Route hosted launch requests through the same normalized command and
@@ -196,8 +196,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.4. Durable runtime state and audit ingestion
 
-- [ ] 1.4.1 Persist hosted runtime entities with idempotent state machines.
-  Requires 1.2.1, 1.3.1, 1.3.2, Podbot Step 4.6, "Hosted session control
+- [ ] 1.4.1. Persist hosted runtime entities with idempotent state machines.
+  Requires 1.2.1, 1.3.1, 1.3.2, Podbot Step `4.6`, "Hosted session control
   plane", and the phase 1 hook-recovery dependencies. See
   adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome / Proposed
   Direction and §Migration Plan.
@@ -214,7 +214,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: restart recovery replays do not duplicate runtime
     state transitions, and every persisted runtime record links to a tenant,
     task, and hosted session.
-- [ ] 1.4.2 Add retention, cleanup, and conformance gates for runtime state.
+- [ ] 1.4.2. Add retention, cleanup, and conformance gates for runtime state.
   Requires 1.4.1 and the phase 1 conformance dependencies. See
   adr-006-durable-runtime-state-and-audit-model.md §Migration Plan and
   adr-010-migration-and-coexistence-strategy.md §Migration Plan.
@@ -233,9 +233,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.5. Prompt, bundle, validation, and privilege defaults
 
-- [ ] 1.5.1 Define the prompt, skill, and bundle document model. Requires
-  1.4.1, Podbot Step 4.5, "Normalized launch contract", Podbot Step 4.8,
-  "Prompt, bundle, and validation surfaces", and Podbot Step 5.3, "Stabilize
+- [ ] 1.5.1. Define the prompt, skill, and bundle document model. Requires
+  1.4.1, Podbot Step `4.5`, "Normalized launch contract", Podbot Step `4.8`,
+  "Prompt, bundle, and validation surfaces", and Podbot Step `5.3`, "Stabilize
   public library boundaries". See
   adr-007-prompt-skill-and-bundle-document-model.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
@@ -252,9 +252,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: prompt and bundle artefacts render deterministically
     from repository state, and documentation examples match the normative
     schema.
-- [ ] 1.5.2 Implement structured prompt validation with capability
+- [ ] 1.5.2. Implement structured prompt validation with capability
   dispositions. Requires 1.5.1, the phase 1 prompt-validation dependencies, and
-  Podbot Step 4.5, "Normalized launch contract". See
+  Podbot Step `4.5`, "Normalized launch contract". See
   adr-008-prompt-validation-semantics-and-capability-dispositions.md §Decision
   Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed validation request and response shapes, including the
@@ -272,10 +272,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: validation reports deterministic diagnostics for
     supported hosted targets, and fixture coverage includes blocked, degraded,
     and clean outcomes.
-- [ ] 1.5.3 Enforce least-privilege defaults and override controls. Requires
+- [ ] 1.5.3. Enforce least-privilege defaults and override controls. Requires
   1.2.3, 1.3.2, 1.5.2, the phase 1 hosting schema dependency, the phase 1
   workspace strategy dependency, the phase 1 prompt-validation dependencies,
-  Podbot Step 4.7, "MCP wire provisioning and injection", and Podbot Step 4.9,
+  Podbot Step `4.7`, "MCP wire provisioning and injection", and Podbot Step `4.9`,
   "Hook execution and orchestrator acknowledgement". See
   adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
@@ -295,7 +295,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 1.6. Migration closure and legacy retirement
 
-- [ ] 1.6.1 Run staged compatibility, warn-only, and blocking migration gates.
+- [ ] 1.6.1. Run staged compatibility, warn-only, and blocking migration gates.
   Requires 1.1.1, 1.2.2, 1.3.1, 1.4.2, 1.5.2, 1.5.3, the phase 1 hosting schema
   dependency, the phase 1 hosting core dependencies, the phase 1
   prompt-validation dependencies, and the phase 1 hook-recovery dependencies.
@@ -314,7 +314,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   - [ ] Success criteria: compatibility reads still succeed for retained
     history, while new writes and CI gates move onto blocking behaviour in the
     documented order.
-- [ ] 1.6.2 Declare end-of-migration retirement criteria. Requires 1.6.1 and
+- [ ] 1.6.2. Declare end-of-migration retirement criteria. Requires 1.6.1 and
   TBD (non-linear dependency on the final hosted cutover evidence bundle). See
   adr-010-migration-and-coexistence-strategy.md §Migration Plan and
   §Outstanding Decisions.
@@ -336,14 +336,14 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 2.1. Conversation management
 
-- [x] 2.1.1 Implement the canonical message format and validation. See
+- [x] 2.1.1. Implement the canonical message format and validation. See
   corbusier-design.md §2.2.1.
   - [x] Define user, assistant, and tool event schemas. See
     corbusier-design.md §2.2.1.
   - [x] Add versioned schema validation at ingestion boundaries. See
     corbusier-design.md §4.4.2.1.
   - [x] Success criteria: all stored messages conform to the canonical schema.
-- [x] 2.1.2 Persist message history with audit trails. See
+- [x] 2.1.2. Persist message history with audit trails. See
   corbusier-design.md §2.2.1 and §6.2.3.
   - [x] Implement conversation history persistence with immutable ordering. See
     corbusier-design.md §6.2.3.
@@ -351,7 +351,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §2.1.1.
   - [x] Success criteria: conversation history is queryable by conversation id
     with complete audit metadata.
-- [x] 2.1.3 Preserve context across agent handoffs. See
+- [x] 2.1.3. Preserve context across agent handoffs. See
   corbusier-design.md §2.2.1 and §4.1.1.1.
   - [x] Persist handoff metadata between agent turns. See
     corbusier-design.md §4.2.1.1.
@@ -362,7 +362,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 2.2. Task lifecycle management
 
-- [x] 2.2.1 Implement issue-to-task creation and tracking. See
+- [x] 2.2.1. Implement issue-to-task creation and tracking. See
   corbusier-design.md §2.2.2.
   - [x] Map external issue metadata into internal task records. See
     corbusier-design.md §2.2.2.
@@ -370,7 +370,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §4.3.1.2.
   - [x] Success criteria: tasks can be created from issues and retrieved by
     external issue reference.
-- [x] 2.2.2 Associate branches and pull requests with tasks. Requires 2.2.1. See
+- [x] 2.2.2. Associate branches and pull requests with tasks. Requires 2.2.1. See
   corbusier-design.md §2.2.2.
   - [x] Persist branch identifiers alongside task records. See
     corbusier-design.md §2.2.2.
@@ -378,17 +378,20 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §2.2.2 and §4.1.1.2.
   - [x] Success criteria: task records include branch and pull request
     references for all linked work items.
-- [x] 2.2.3 Enforce task state transitions with validation. Requires
-  2.2.1.[^1]
-  - [x] Define allowed transitions and terminal states.[^2]
-  - [x] Reject invalid transitions with typed errors.[^3]
+- [x] 2.2.3. Enforce task state transitions with validation. Requires
+  2.2.1. See [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2
+  and §4.4.1.1.
+  - [x] Define allowed transitions and terminal states. See
+    [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
+  - [x] Reject invalid transitions with typed errors. See
+    [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
   - [x] Success criteria: unit tests cover all 36 source/target transition
     pairs, invalid transitions return typed error variants, and terminal states
     reject all outgoing transitions in tested paths.
 
 ### 2.3. Agent backend orchestration
 
-- [x] 2.3.1 Implement agent backend registration and discovery. See
+- [x] 2.3.1. Implement agent backend registration and discovery. See
   corbusier-design.md §2.2.3.
   - [x] Define backend capability metadata and registration flow. See
     corbusier-design.md §2.2.3.
@@ -396,7 +399,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §6.2.3.
   - [x] Success criteria: at least two backends can be registered and listed
     via the registry API.
-- [x] 2.3.2 Orchestrate agent turn execution and sessions. Requires 3.3.1 and
+- [x] 2.3.2. Orchestrate agent turn execution and sessions. Requires 3.3.1 and
   2.1.1. See corbusier-design.md §2.2.3.
   - [x] Coordinate turn execution with tool calls and responses. See
     corbusier-design.md §4.2.1.1.
@@ -404,7 +407,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §2.2.3.
   - [x] Success criteria: agent turns execute with consistent tool routing and
     session continuity.
-- [ ] 2.3.3 Translate tool schemas per backend. Requires 3.1.1. See
+- [ ] 2.3.3. Translate tool schemas per backend. Requires 3.1.1. See
   corbusier-design.md §2.2.3 and §2.2.4.
   - [ ] Implement schema translation mapping for each backend. See
     corbusier-design.md §2.2.3.
@@ -415,7 +418,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 2.4. Slash command system
 
-- [x] 2.4.1 Deliver slash command parsing and template execution. Requires
+- [x] 2.4.1. Deliver slash command parsing and template execution. Requires
   2.1.1. See corbusier-design.md §2.1.1.
   - [x] Implement command parser and registry. See corbusier-design.md §2.1.1.
   - [x] Add template expansion and parameter validation. See
@@ -425,7 +428,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 2.5. Tenant context and identity isolation
 
-- [x] 2.5.1 Establish tenant primitives and request context plumbing. See
+- [x] 2.5.1. Establish tenant primitives and request context plumbing. See
   corbusier-design.md §2.1.5 and §2.2.5.
   - [x] Add `TenantId`, `TenantSlug`, and `Tenant` domain primitives. See
     corbusier-design.md §2.2.5.
@@ -438,7 +441,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     See corbusier-design.md §2.2.5.
   - [x] Success criteria: repository/service signatures require tenant-aware
     request context for tenant-owned operations.
-- [x] 2.5.2 Deliver tenant-aware schema and constraints. Requires 2.5.1. See
+- [x] 2.5.2. Deliver tenant-aware schema and constraints. Requires 2.5.1. See
   corbusier-design.md §6.2.1 and §6.2.2.
   - [x] Create `tenants` and add `tenant_id` to tenant-owned tables. See
     corbusier-design.md §2.2.5.
@@ -450,7 +453,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     orchestration data, including `tenant_id`, tenant-scoped uniqueness, and
     composite foreign keys; end-to-end two-tenant reuse and isolation proof is
     tracked under 2.5.4 after 2.5.3 delivers full query scoping and RLS.
-- [ ] 2.5.3 Enforce tenant boundaries in adapters and PostgreSQL. Requires
+- [ ] 2.5.3. Enforce tenant boundaries in adapters and PostgreSQL. Requires
   2.5.2. See corbusier-design.md §6.2.2 and §6.2.3. Note: 2.5.1 added
   `&RequestContext` to port signatures; this item makes adapters *use* the
   tenant context for query scoping and Row-Level Security (RLS) enforcement.
@@ -464,7 +467,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §6.2.3.4.
   - [ ] Success criteria: cross-tenant reads/writes are blocked by both Rust
     signatures and PostgreSQL RLS.
-- [ ] 2.5.4 Prove multi-tenant isolation with two-tenant scenarios. Requires
+- [ ] 2.5.4. Prove multi-tenant isolation with two-tenant scenarios. Requires
   2.5.3. See corbusier-design.md §2.2.5.
   - [ ] Add tests where two tenants share the same external issue identifiers
     without violating constraints. See corbusier-design.md §2.2.5.
@@ -479,7 +482,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 3.1. MCP hosting and tool registry
 
-- [x] 3.1.1 Implement MCP server lifecycle management. Requires 2.3.1. See
+- [x] 3.1.1. Implement MCP server lifecycle management. Requires 2.3.1. See
   corbusier-design.md §2.2.4 and §6.1.4.
   - [x] Support MCP server start, stop, and health reporting. See
     corbusier-design.md §2.2.4.
@@ -487,7 +490,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     corbusier-design.md §2.2.4.
   - [x] Success criteria: MCP servers can be started, listed, and queried for
     available tools.
-- [x] 3.1.2 Deliver tool discovery and routing. Requires 3.1.1. See
+- [x] 3.1.2. Deliver tool discovery and routing. Requires 3.1.1. See
   corbusier-design.md §2.2.4 and §6.1.4.
   - [x] Implement tool discovery and catalogue persistence. See
     corbusier-design.md §2.2.4.
@@ -507,7 +510,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 ### 3.2. Weaver file editing integration
 
-- [ ] 3.2.1 Enforce Weaver as the authoritative file editor. Requires 3.1.1. See
+- [ ] 3.2.1. Enforce Weaver as the authoritative file editor. Requires 3.1.1. See
   corbusier-design.md §2.1.2.
   - [ ] Disable direct file edits from agent backends. See
     corbusier-design.md §2.1.2.
@@ -521,7 +524,7 @@ The tasks below establish the current Corbusier-owned hook baseline. Phase 1.3
 extends hosted-session execution onto Podbot control-channel acknowledgement
 flows without regressing existing policy enforcement.
 
-- [x] 3.3.1 Implement hook engine execution. Requires 3.1.2 and TBD
+- [x] 3.3.1. Implement hook engine execution. Requires 3.1.2 and TBD
   (non-linear dependency on future Weaver workflow milestones). See
   corbusier-design.md §2.1.3 and §6.3.3.
   - [x] Define hook triggers for turn start/end, tool use before/after, and
@@ -532,7 +535,7 @@ flows without regressing existing policy enforcement.
     corbusier-design.md §6.3.3.
   - [x] Success criteria: hook execution results are recorded for every
     configured trigger.
-- [x] 3.3.2 Add policy enforcement and audit capture. Requires 3.3.1. See
+- [x] 3.3.2. Add policy enforcement and audit capture. Requires 3.3.1. See
   corbusier-design.md §2.1.3 and §6.4.2.5.
   - [x] Implement policy evaluation at enforcement points. See
     corbusier-design.md §6.4.2.4.
@@ -547,7 +550,7 @@ Phase 1.2 expands this work from generic encapsulation into a canonical
 workspace runtime model shared with Podbot-hosted execution and source-policy
 enforcement.
 
-- [ ] 3.4.1 Implement workspace encapsulation for tool execution. Requires
+- [ ] 3.4.1. Implement workspace encapsulation for tool execution. Requires
   3.1.1. See corbusier-design.md §2.1.3 and §6.2.4.
   - [ ] Provision Podbot-backed workspaces per task. See
     corbusier-design.md §6.2.4.
@@ -560,17 +563,17 @@ enforcement.
 
 ### 4.1. VCS integration and review orchestration
 
-- [ ] 4.1.1 Deliver VCS adapter for GitHub and GitLab. Requires 2.2.3, TBD
-  (non-linear dependency: 3.2.2), Podbot Step 3.1, "App authentication", Podbot
-  Step 3.2, "Installation token acquisition", Podbot Step 3.3, "Token daemon",
-  and Podbot Step 3.4, "GIT_ASKPASS mechanism (Git credential helper
+- [ ] 4.1.1. Deliver VCS adapter for GitHub and GitLab. Requires 2.2.3, TBD
+  (non-linear dependency: 3.2.2), Podbot Step `3.1`, "App authentication", Podbot
+  Step `3.2`, "Installation token acquisition", Podbot Step `3.3`, "Token daemon",
+  and Podbot Step `3.4`, "GIT_ASKPASS mechanism (Git credential helper
   variable)". See corbusier-design.md §2.1.4 and §6.3.1.
   - [ ] Implement branch, pull request, and issue operations. See
     corbusier-design.md §2.1.4.
   - [ ] Map VCS events into task lifecycle updates. See
     corbusier-design.md §4.1.1.2.
   - [ ] Success criteria: tasks remain synchronized with VCS state transitions.
-- [ ] 4.1.2 Introduce the dedicated review bounded context and Frankie adapter
+- [ ] 4.1.2. Introduce the dedicated review bounded context and Frankie adapter
   ports. Requires 4.1.1 and
   adr-011-corbusier-frankie-review-adapter-role-segregation.md. See
   corbusier-design.md §2.1.4 and §6.3.2.
@@ -591,7 +594,7 @@ enforcement.
     - A compile-gate integration test demonstrates `ReviewIntakePort`
       thread-delta ingestion through the Frankie adapter without importing
       any generic VCS port.
-- [ ] 4.1.3 Persist review threads, anchors, checkpoints, and message linkage.
+- [ ] 4.1.3. Persist review threads, anchors, checkpoints, and message linkage.
   Requires 4.1.2. See corbusier-design.md §3.5.2, §6.2.1, and §6.3.2.
   - [ ] Persist tenant-scoped review threads, raw comments, sync checkpoints,
     and verification results keyed by pull request and thread root. See
@@ -617,7 +620,7 @@ enforcement.
       `(pull_request_ref, external_root_comment_id)`.
     - A storage assertion verifies that `review_comments.raw_payload`
       round-trips the original Frankie JSON without data loss.
-- [ ] 4.1.4 Wire Frankie context, verification, and reply execution into the
+- [ ] 4.1.4. Wire Frankie context, verification, and reply execution into the
   governance loop. Requires 4.1.3 and 3.3.2. See corbusier-design.md §6.3.2 and
   §6.3.3.
   - [ ] Materialize time-travel context on demand inside the task workspace
@@ -642,7 +645,7 @@ enforcement.
 
 ### 4.2. HTTP API surface
 
-- [x] 4.2.1 Expose core HTTP APIs for conversations and tasks. Requires 2.2.3.
+- [x] 4.2.1. Expose core HTTP APIs for conversations and tasks. Requires 2.2.3.
   See corbusier-design.md §2.1.4 and §6.2.1.
   - [x] Implement conversation, task, and tool endpoints. See
     corbusier-design.md §6.2.1.
@@ -653,7 +656,7 @@ enforcement.
 
 ### 4.3. Real-time event streaming
 
-- [ ] 4.3.1 Provide real-time event streaming for orchestration updates.
+- [ ] 4.3.1. Provide real-time event streaming for orchestration updates.
   Requires 5.2.1 (non-linear) and 1.4.1. See corbusier-design.md §2.1.4 and
   §6.2.2.
   - [ ] Implement event schema for conversation and task updates. See
@@ -686,47 +689,49 @@ Use the shared dependency labels below to keep this step readable:
 - Phase 4 Frankie review-adapter dependency: Frankie steps 2.1.3–2.1.5, 3.2.7,
   and 4.1.3. Not required for this step.
 
-- [x] 4.4.1 Create the repository-owned `frontend-pwa/` workspace and narrow
+Tasks:
+
+- [x] 4.4.1. Create the repository-owned `frontend-pwa/` workspace and narrow
   task route shell. Requires 4.2.1. See
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
 
-- [x] 4.4.2 Stabilize the slice transport contract and development auth seam.
+- [x] 4.4.2. Stabilize the slice transport contract and development auth seam.
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
   `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
   contracts and `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`
   §5.3–§5.4. Mark this item done only after code, documentation, `check-fmt`,
   `typecheck`, `test`, and `lint` gates all pass.
 
-- [ ] 4.4.3 Implement the live task create → detail → transition path in the
+- [ ] 4.4.3. Implement the live task create → detail → transition path in the
   progressive web app (PWA). Requires 4.4.1 and 4.4.2. See
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and §6.1.
 
-- [ ] 4.4.4 Add task branch and pull-request association actions to the detail
+- [ ] 4.4.4. Add task branch and pull-request association actions to the detail
   view when the current HTTP surface supports them. Requires 4.4.3. See
   `docs/corbusier-api-design.md` §Endpoint inventory — Tasks and
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §6.1.
 
-- [ ] 4.4.5 Prove the slice is independent of hosted-session and review-adapter
+- [ ] 4.4.5. Prove the slice is independent of hosted-session and review-adapter
   services. Requires 4.4.3 and 4.4.4. See
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6 and
   §6.2.
 
-- [ ] 4.4.6 Capture the lessons of the first slice before broadening the
+- [ ] 4.4.6. Capture the lessons of the first slice before broadening the
   interface surface. Requires 4.4.5. See
   `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7, and
   §10.
 
 ### 4.5. Operator and developer user interfaces
 
-- [ ] 4.5.1 Deliver the task management interface. Requires 4.2.1. See
+- [ ] 4.5.1. Deliver the task management interface. Requires 4.2.1. See
   corbusier-design.md §7.2.1 and §7.5.1.
   - [ ] Implement task list, status, and milestone views. See
     corbusier-design.md §7.5.1.
   - [ ] Add task detail panels with audit history. See
     corbusier-design.md §7.2.1.
   - [ ] Success criteria: tasks can be filtered by status, owner, and milestone.
-- [ ] 4.5.2 Deliver the conversation management interface. Requires 4.2.1. See
+- [ ] 4.5.2. Deliver the conversation management interface. Requires 4.2.1. See
   corbusier-design.md §7.2.2 and §7.5.2.
   - [ ] Render canonical message history with tool call metadata. See
     corbusier-design.md §7.2.2.
@@ -739,7 +744,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.1. Security and access control
 
-- [ ] 5.1.1 Implement authentication and session management. Requires 4.2.1. See
+- [ ] 5.1.1. Implement authentication and session management. Requires 4.2.1. See
   corbusier-design.md §6.4.1.
   - [ ] Add identity management and token handling. See
     corbusier-design.md §6.4.1.1 and §6.4.1.4.
@@ -747,7 +752,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-design.md §6.4.1.3.
   - [ ] Success criteria: authenticated sessions expire and rotate according to
     policy.
-- [ ] 5.1.2 Implement RBAC and resource authorisation. Requires 5.1.1. See
+- [ ] 5.1.2. Implement RBAC and resource authorisation. Requires 5.1.1. See
   corbusier-design.md §6.4.2.
   - [ ] Define role hierarchy and permissions. See
     corbusier-design.md §6.4.2.1 and §6.4.2.2.
@@ -758,7 +763,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.2. Observability and monitoring
 
-- [ ] 5.2.1 Implement metrics, logging, and tracing pipelines. Requires 3.3.1.
+- [ ] 5.2.1. Implement metrics, logging, and tracing pipelines. Requires 3.3.1.
   See corbusier-design.md §6.5.1 and §6.5.4.
   - [ ] Instrument core services with metrics and traces. See
     corbusier-design.md §6.5.1.1 and §6.5.1.3.
@@ -766,7 +771,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-design.md §6.5.1.2.
   - [ ] Success criteria: metrics, traces, and logs share a common correlation
     identifier per request.
-- [ ] 5.2.2 Deliver monitoring dashboards and alerting. Requires 5.2.1. See
+- [ ] 5.2.2. Deliver monitoring dashboards and alerting. Requires 5.2.1. See
   corbusier-design.md §6.5.1.5 and §8.5.
   - [ ] Create dashboards for task completion, agent utilisation, and tool
     execution. See corbusier-design.md §8.5.1.
@@ -777,7 +782,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.3. Testing and quality gates
 
-- [ ] 5.3.1 Implement automated unit, integration, and end-to-end test suites.
+- [ ] 5.3.1. Implement automated unit, integration, and end-to-end test suites.
   Requires 3.3.1 and TBD (non-linear dependency on future Weaver workflow test
   harness milestones). See corbusier-design.md §6.6.1.
   - [ ] Add unit tests for domain services and ports. See
@@ -786,7 +791,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-design.md §6.6.1.2.
   - [ ] Success criteria: test suites cover critical workflows without manual
     setup.
-- [ ] 5.3.2 Enforce CI quality gates for formatting, linting, and test runs.
+- [ ] 5.3.2. Enforce CI quality gates for formatting, linting, and test runs.
   Requires 5.3.1. See corbusier-design.md §6.6.2 and §8.4.1.
   - [ ] Configure CI to run formatter, linter, and test pipelines. See
     corbusier-design.md §8.4.1.
@@ -797,7 +802,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.4. Deployment and resilience
 
-- [ ] 5.4.1 Deliver containerised deployment and rollback workflows. Requires
+- [ ] 5.4.1. Deliver containerised deployment and rollback workflows. Requires
   5.3.2. See corbusier-design.md §8.2 and §8.4.3.
   - [ ] Build multi-stage container images with security scanning. See
     corbusier-design.md §8.2.2 and §8.2.5.
@@ -808,7 +813,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.5. Performance and scalability
 
-- [ ] 5.5.1 Validate performance, scalability, and SLA targets. Requires 5.2.2.
+- [ ] 5.5.1. Validate performance, scalability, and SLA targets. Requires 5.2.2.
   See corbusier-design.md §4.5 and §6.2.4.
   - [ ] Execute performance tests against response time targets. See
     corbusier-design.md §4.5.1.1.
@@ -821,7 +826,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 6.1. API contracts and scaffolding
 
-- [ ] 6.1.1 Publish versioned OpenAPI specification and central error schema.
+- [ ] 6.1.1. Publish versioned OpenAPI specification and central error schema.
   Requires 4.2.1. See corbusier-api-design.md §HTTP API surface, pagination,
   SSE, and error contracts.
   - [ ] Define `ErrorCode` enum and `Error` response schema compatible with
@@ -830,7 +835,7 @@ Use the shared dependency labels below to keep this step readable:
     auth contracts.
   - [ ] Success criteria: error responses are validated against the schema in
     contract tests.
-- [ ] 6.1.2 Implement reusable keyset pagination crate. Requires 6.1.1. See
+- [ ] 6.1.2. Implement reusable keyset pagination crate. Requires 6.1.1. See
   corbusier-api-design.md §Pagination semantics.
   - [ ] Implement cursor encoding and decoding with opaque tokens. See
     corbusier-api-design.md §Pagination semantics.
@@ -839,7 +844,7 @@ Use the shared dependency labels below to keep this step readable:
     semantics.
   - [ ] Success criteria: pagination envelope shape matches TanStack Query
     infinite query expectations; absence of `next` indicates end-of-list.
-- [ ] 6.1.3 Add domain event persistence and SSE endpoint skeleton. Requires
+- [ ] 6.1.3. Add domain event persistence and SSE endpoint skeleton. Requires
   6.1.1. See corbusier-api-design.md §SSE event stream and replay semantics.
   - [ ] Create `domain_events` table (`tenant_id`, `aggregate_id`,
     `aggregate_type`, `event_type`, `event_data`, and `occurred_at`). See
@@ -855,7 +860,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 6.2. Project and task read models
 
-- [ ] 6.2.1 Introduce project aggregate and bootstrap default projects.
+- [ ] 6.2.1. Introduce project aggregate and bootstrap default projects.
   Requires 2.5.1. See corbusier-api-design.md §Project domain.
   - [ ] Implement `ProjectAggregate` with slug, localized name and
     description, lead, date range, status, and team membership. See
@@ -864,7 +869,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-api-design.md §Project domain -- Migration.
   - [ ] Success criteria: projects can be created, listed, and retrieved by
     slug with tenant scoping.
-- [ ] 6.2.2 Extend task aggregate with front-end fields. Requires 6.2.1 and
+- [ ] 6.2.2. Extend task aggregate with front-end fields. Requires 6.2.1 and
   2.2.3. See corbusier-api-design.md §Task domain.
   - [ ] Add localization, priority, labels, assignment, scheduling, and
     hierarchy reference fields to task persistence. See
@@ -876,7 +881,7 @@ Use the shared dependency labels below to keep this step readable:
     domain -- Migration strategy from current models.
   - [ ] Success criteria: all task state transition pairs (including `Planned`)
     are unit-tested; existing tasks are retrievable with localized names.
-- [ ] 6.2.3 Deliver task and project projection endpoints. Requires 6.1.2 and
+- [ ] 6.2.3. Deliver task and project projection endpoints. Requires 6.1.2 and
   6.2.2. See corbusier-api-design.md §Endpoint inventory -- Tasks and §Endpoint
   inventory -- Projects.
   - [ ] Implement `TaskCardDto` and `TaskDetailDto` projections. See
@@ -892,7 +897,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 6.3. Conversations, directives, and SSE replay
 
-- [ ] 6.3.1 Add conversation aggregate and message paging. Requires 6.1.2 and
+- [ ] 6.3.1. Add conversation aggregate and message paging. Requires 6.1.2 and
   2.1.2. See corbusier-api-design.md §Conversation domain.
   - [ ] Implement `ConversationAggregate` linking to project and task. See
     corbusier-api-design.md §Conversation domain -- Write-side model.
@@ -903,7 +908,7 @@ Use the shared dependency labels below to keep this step readable:
     Conversations and messages.
   - [ ] Success criteria: conversations are listed and retrieved with message
     paging; content parts render through existing serialization.
-- [ ] 6.3.2 Persist directives and expose registry endpoints. Requires 3.4.1
+- [ ] 6.3.2. Persist directives and expose registry endpoints. Requires 3.4.1
   and 6.2.1. See corbusier-api-design.md §Directives domain.
   - [ ] Implement `DirectiveAggregate` scoped to project and tenant. See
     corbusier-api-design.md §Directives domain -- Write-side model.
@@ -912,7 +917,7 @@ Use the shared dependency labels below to keep this step readable:
     domain -- Migration.
   - [ ] Success criteria: directives are queryable per project; schema
     validation passes at write time.
-- [ ] 6.3.3 Implement SSE replay with `Last-Event-ID` semantics. Requires
+- [ ] 6.3.3. Implement SSE replay with `Last-Event-ID` semantics. Requires
   6.1.3. See corbusier-api-design.md §SSE event stream and replay semantics.
   - [ ] Implement conversation-scoped SSE at
     `GET /api/v1/events/conversations/{conversation_id}`. See
@@ -929,7 +934,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 6.4. Identity, suggestions, and governance
 
-- [ ] 6.4.1 Introduce user aggregate and personnel endpoints. Requires 2.5.1.
+- [ ] 6.4.1. Introduce user aggregate and personnel endpoints. Requires 2.5.1.
   See corbusier-api-design.md §Identity domain.
   - [ ] Implement `UserAggregate` with display name, email, avatar, and role.
     See corbusier-api-design.md §Identity domain -- Write-side model.
@@ -939,7 +944,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-api-design.md §Identity domain -- Migration.
   - [ ] Success criteria: personnel directory lists tenant users; API keys can
     be created and revoked.
-- [ ] 6.4.2 Deliver suggestion lifecycle and accept/dismiss endpoints. Requires
+- [ ] 6.4.2. Deliver suggestion lifecycle and accept/dismiss endpoints. Requires
   6.2.1. See corbusier-api-design.md §Suggestions domain.
   - [ ] Implement `SuggestionAggregate` with priority, confidence, tags, and
     rationale. See corbusier-api-design.md §Suggestions domain -- Write-side
@@ -948,7 +953,7 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-api-design.md §Endpoint inventory -- Suggestions.
   - [ ] Success criteria: accepted suggestions produce tasks in backlog;
     `SuggestionCardDto` matches mockup fields.
-- [ ] 6.4.3 Add governance CRUD and system endpoint hardening. Requires 4.3.1,
+- [ ] 6.4.3. Add governance CRUD and system endpoint hardening. Requires 4.3.1,
   2.3.2, 2.5.3, and 6.4.1. See corbusier-api-design.md §Governance domain.
   - [ ] Implement `PolicyAggregate` and `HookAggregate` with enable/disable
     lifecycle. See corbusier-api-design.md §Governance domain -- Write-side
@@ -964,7 +969,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 7.1. Nile Valley-aligned deployment path
 
-- [x] 7.1.1 Add a runtime health endpoint and Kubernetes-ready container.
+- [x] 7.1.1. Add a runtime health endpoint and Kubernetes-ready container.
   - [x] Introduce the health port and Actix Web adapter. See
     `src/health/mod.rs` and `src/health/actix_adapter.rs`.
   - [x] Replace the stub entry point with an HTTP server exposing
@@ -973,14 +978,14 @@ Use the shared dependency labels below to keep this step readable:
     image builds.
   - [x] Success criteria: the release image runs as non-root and exposes
     stable health endpoints on port 8080.
-- [x] 7.1.2 Add a Helm chart compatible with local preview and GitOps
+- [x] 7.1.2. Add a Helm chart compatible with local preview and GitOps
   (Git-based operations).
   - [x] Create `charts/corbusier` with deployment, service, ingress,
     ConfigMap, ServiceAccount, PDB, and `ExternalSecret` templates.
   - [x] Add a values schema and local preview values file.
   - [x] Success criteria: the chart can render a hostless local ingress and a
     GitOps-friendly explicit-host ingress from the same values contract.
-- [x] 7.1.3 Add a local k3d (Kubernetes in Docker) lifecycle workflow.
+- [x] 7.1.3. Add a local k3d (Kubernetes in Docker) lifecycle workflow.
   - [x] Create `scripts/local_k8s.py` and the supporting `scripts/local_k8s/`
     package using Cyclopts and `plumbum`.
   - [x] Add `make local-k8s-up`, `local-k8s-status`, `local-k8s-logs`, and
@@ -1012,7 +1017,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.1. Fixture-backed screen promotion
 
-- [ ] 8.1.1 Promote all screen families from the mockup into `frontend-pwa/`
+- [ ] 8.1.1. Promote all screen families from the mockup into `frontend-pwa/`
   with fixture adapters. Requires 4.4.1 and 4.4.6. See
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.3 and §5.7.
   - [ ] Promote dashboard, task list, project, conversation, directive,
@@ -1027,7 +1032,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.2. Task and project live projections
 
-- [ ] 8.2.1 Connect task list views to live backend projections. Requires
+- [ ] 8.2.1. Connect task list views to live backend projections. Requires
   8.1.1, 4.4.2, 4.4.3, 6.2.3, and 6.1.2. See
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
   `docs/corbusier-api-design.md` §Task domain.
@@ -1040,7 +1045,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
   - [ ] Success criteria: task list pagination is end-to-end tested; idempotent
     mutations replay deterministically; absence of `next` link correctly
     signals end-of-list.
-- [ ] 8.2.2 Connect project screens to live backend projections. Requires
+- [ ] 8.2.2. Connect project screens to live backend projections. Requires
   8.2.1, 4.4.4, and 6.2.3. See `docs/corbusier-api-design.md` §Project domain.
   - [ ] Replace project list, landing, and Kanban fixtures with live
     `ProjectCardDto`, `ProjectLandingDto`, and `ProjectKanbanDto` projections.
@@ -1049,7 +1054,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.3. Conversation surface
 
-- [ ] 8.3.1 Deliver conversation list and message paging against live data.
+- [ ] 8.3.1. Deliver conversation list and message paging against live data.
   Requires 8.1.1, 4.4.6, and 6.3.1. See `docs/corbusier-api-design.md`
   §Conversation domain.
   - [ ] Replace conversation list and thread fixtures with live
@@ -1061,7 +1066,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.4. Directives, suggestions, and governance screens
 
-- [ ] 8.4.1 Deliver directive registry and suggestion screens against live data.
+- [ ] 8.4.1. Deliver directive registry and suggestion screens against live data.
   Requires 8.1.1, 4.4.5, 4.4.6, 6.3.2, and 6.4.2. See
   `docs/corbusier-api-design.md` §Directives domain and §Suggestions domain.
   - [ ] Replace directive and suggestion fixtures with live projection
@@ -1070,7 +1075,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
     discard draft tasks.
   - [ ] Success criteria: directive registry lists tenant-scoped directives;
     accepted suggestions produce visible backlog tasks.
-- [ ] 8.4.2 Deliver governance policy and hook management screens. Requires
+- [ ] 8.4.2. Deliver governance policy and hook management screens. Requires
   8.4.1 and 6.4.3. See `docs/corbusier-api-design.md` §Governance domain.
   - [ ] Replace governance fixture screens with live `PolicyAggregate` and
     `HookAggregate` projections.
@@ -1079,7 +1084,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.5. SSE live invalidation
 
-- [ ] 8.5.1 Add SSE-backed cache invalidation to streaming screens. Requires
+- [ ] 8.5.1. Add SSE-backed cache invalidation to streaming screens. Requires
   8.2.1, 4.4.2, 4.4.6, 6.3.3, and 4.3.1. See
   `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
   `docs/corbusier-api-design.md` §SSE event stream and replay semantics.
@@ -1096,7 +1101,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 ### 8.6. Settings, identity, and personnel screens
 
-- [ ] 8.6.1 Deliver settings, identity, and personnel screens against live data.
+- [ ] 8.6.1. Deliver settings, identity, and personnel screens against live data.
   Requires 8.1.1, 4.4.6, and 6.4.1. See `docs/corbusier-api-design.md`
   §Identity domain.
   - [ ] Replace personnel directory fixture with live `UserAggregate`
@@ -1105,8 +1110,3 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
     `docs/corbusier-api-design.md` §Identity domain -- Write-side model.
   - [ ] Success criteria: personnel directory lists tenant users; API keys can
     be created, listed, and revoked through the settings screens.
-
-[^1]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2 and
-§4.4.1.1.
-[^2]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.3.1.2.
-[^3]: [docs/corbusier-design.md](docs/corbusier-design.md) §4.4.1.1.
