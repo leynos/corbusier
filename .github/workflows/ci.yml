@@ -44,9 +44,15 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
+      # Dependency audits report advisories against the whole lockfile, so a
+      # newly published advisory would fail every Dependabot PR regardless of
+      # content and deadlock auto-merge. The scheduled audit workflow covers
+      # Dependabot merges instead.
       - name: Install cargo-audit
+        if: github.actor != 'dependabot[bot]'
         run: cargo binstall --no-confirm cargo-audit
       - name: Audit dependencies
+        if: github.actor != 'dependabot[bot]'
         run: make audit
       - name: Frontend lint
         run: make frontend-lint
