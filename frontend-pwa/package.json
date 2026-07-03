@@ -28,10 +28,13 @@
     "react-dom": "^19.2.0"
   },
   "overrides": {
+    "@babel/core": "^7.29.1",
     "esbuild": "^0.28.1",
     "fast-uri": "3.1.2",
+    "js-yaml": "^4.3.0",
     "postcss": "^8.5.13",
-    "ws": "^8.20.1"
+    "vite": "^7.3.6",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
@@ -54,7 +57,7 @@
     "stylelint-declaration-strict-value": "^1.10.11",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3",
-    "vite": "^7.1.11",
+    "vite": "^7.3.6",
     "vitest": "^4.0.3"
   }
 }
