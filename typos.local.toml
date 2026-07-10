@@ -1,0 +1,23 @@
+# Repository-specific identifiers, quotations and deliberate fixtures.
+
+schema = 1
+
+[oxford]
+stems = []
+
+[words]
+accepted = [
+    "ANALYZE", # PostgreSQL EXPLAIN option.
+    "BA",       # Mermaid identifier for Block Actions.
+    "Center",   # Azure Architecture Center publication title.
+    "Flavored", # Formal GitHub Flavored Markdown product name.
+    "RTO",      # Recovery Time Objective abbreviation.
+]
+
+[words.corrections]
+
+[patterns]
+ignore = []
+
+[files]
+exclude = []

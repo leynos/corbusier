@@ -1,6 +1,13 @@
 target/
 **/*.rs.bk
 .grepai/
+.coverage
+.pytest_cache/
+__pycache__/
 frontend-pwa/node_modules/
 frontend-pwa/playwright-report/
 frontend-pwa/test-results/
+
+# Untracked shared spelling-policy cache and freshness metadata.
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

@@ -9,7 +9,7 @@
 ## 1. Summary
 
 Corbusier should deliver a deliberately narrow repository-owned `frontend-pwa/`
-vertical slice centered on task intake and lifecycle.
+vertical slice centred on task intake and lifecycle.
 
 The first slice should let a user:
 
