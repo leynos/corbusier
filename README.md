@@ -92,6 +92,9 @@ make fmt
 # Run linter (cargo doc, Clippy, and Whitaker)
 make lint
 
+# Check Markdown and en-GB-oxendict spelling
+make markdownlint
+
 # Run tests (includes PostgreSQL integration tests)
 make test
 
@@ -141,7 +144,8 @@ The project enforces strict code quality standards:
 - Whitaker Dylint checks layered into `make lint`
 - Mandatory code formatting via `cargo fmt`
 - Full test coverage requirements
-- British English spelling in documentation
+- British English with Oxford spelling in documentation, enforced by a pinned
+  `typos` gate
 
 For local Whitaker installation, see
 [docs/whitaker-users-guide.md](docs/whitaker-users-guide.md).

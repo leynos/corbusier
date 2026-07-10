@@ -532,7 +532,7 @@ Corbusier implements this through:
   - Provides consistent tool execution semantics
 - **User Benefits:**
   - Automatic tool discovery and availability
-  - Consistent tool behavior across different agents
+  - Consistent tool behaviour across different agents
   - Centralized tool access control and auditing
 - **Technical Context:** Registry pattern with pluggable tool providers and
   routing logic that translates between agent-specific and canonical tool call
@@ -554,7 +554,7 @@ Corbusier implements this through:
   - Enables immediate productivity without additional tool configuration
 - **User Benefits:**
   - Ready-to-use development tools without setup
-  - Consistent tool behavior across different projects
+  - Consistent tool behaviour across different projects
   - Integrated tool ecosystem with shared context
 - **Technical Context:** Collection of MCP-compliant tools implemented as
   embedded Rust services with shared workspace context.
@@ -585,7 +585,7 @@ Corbusier implements this through:
   - Provides flexible policy configuration and enforcement
 - **User Benefits:**
   - Automated quality gates and compliance checks
-  - Consistent workflow behavior across different agents
+  - Consistent workflow behaviour across different agents
   - Configurable policies per project or organization
 - **Technical Context:** Event-driven architecture with declarative hook
   definitions supporting multiple contract triggers (PreTurn maps to runtime
@@ -2425,7 +2425,7 @@ diesel = { version = "2.3.5", features = ["postgres", "uuid", "chrono", "serde_j
 
 ##### Development Environment
 
-- **Rust Analyzer**: IDE support for code completion and error checking
+- **`rust-analyzer`**: IDE support for code completion and error checking
 - **Cargo Watch**: Automatic rebuilding during development
 - **Cargo Nextest**: Fast parallel test execution
 - **Criterion**: Performance benchmarking and regression detection
@@ -9803,7 +9803,7 @@ graph TB
         CAPACITY_MONITOR[Capacity Monitoring]
     end
     
-    subgraph "Adaptive Behavior"
+    subgraph "Adaptive Behaviour"
         LOAD_SHEDDING[Load Shedding]
         GRACEFUL_DEGRADATION[Graceful Degradation]
         PRIORITY_QUEUING[Priority Queuing]
@@ -11663,7 +11663,7 @@ sequenceDiagram
     Corbusier->>TestDB: Persist results
     TestDB-->>Corbusier: Confirmation
     Corbusier-->>Test: Workflow complete
-    Test->>Test: Verify end-to-end behavior
+    Test->>Test: Verify end-to-end behaviour
 ```
 <!-- markdownlint-enable MD031 -->
 

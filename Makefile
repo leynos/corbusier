@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -26,6 +26,9 @@ MDLINT ?= $(shell if [ -n "$$HOME" ] && [ -x "$$HOME/.bun/bin/markdownlint-cli2"
 		printf 'markdownlint-cli2'; \
 	fi)
 NIXIE ?= nixie
+TYPOS_VERSION ?= 1.48.0
+TYPOS := uv tool run typos@$(TYPOS_VERSION)
+SPELLING_PYTEST ?= uv run --python 3.13 --with pytest==9.0.2 --with pytest-cov==7.0.0 python -m pytest
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
@@ -36,6 +39,7 @@ all: check-fmt lint test ## Perform a comprehensive check of code
 
 clean: ## Remove build artifacts
 	$(CARGO) clean
+	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
 test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) nextest run $(TEST_FLAGS) $(BUILD_JOBS)
@@ -50,6 +54,7 @@ lint: ## Run Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	+$(MAKE) spelling
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
@@ -76,6 +81,17 @@ check-fmt: ## Verify formatting
 
 markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
+	+$(MAKE) spelling
+
+spelling: spelling-helper-test ## Enforce en-GB-oxendict spelling in Markdown prose
+	@uv run scripts/generate_typos_config.py
+	@git ls-files -z '*.md' | \
+		xargs -0 -r $(TYPOS) --config typos.toml --force-exclude
+
+spelling-helper-test: ## Validate the shared spelling-policy integration
+	@PYTHONPATH=scripts $(SPELLING_PYTEST) scripts/tests/test_typos_rollout.py \
+		--cov=generate_typos_config --cov=typos_rollout \
+		--cov=typos_rollout_cache --cov-fail-under=90
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox

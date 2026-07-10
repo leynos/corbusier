@@ -355,7 +355,7 @@ roadmap 3.1.1 and provides:
 - **Adapters** in `src/tool_registry/adapters/`: `InMemoryMcpServerRegistry`
   (memory repository), `PostgresMcpServerRegistry` (Diesel-backed), and
   `InMemoryMcpServerHost` (deterministic test double tracking running servers,
-  health states, and tool catalogs).
+  health states, and tool catalogues).
 
 - **Service** in `src/tool_registry/services/lifecycle/`:
   `McpServerLifecycleService<R, H, C>` orchestrating register, start, stop,
@@ -1338,7 +1338,7 @@ Table 3.1.3: File manifest — modified files for roadmap 3.1.2
 | `src/tool_registry/domain/error.rs`           | Add 6 new error variants                                                         |
 | `src/tool_registry/domain/mod.rs`             | Add module declarations and re-exports                                           |
 | `src/tool_registry/ports/host.rs`             | Add `call_tool`, change `start` return type, add result structs + error variants |
-| `src/tool_registry/ports/mod.rs`              | Add catalog, policy, and log_store re-exports                                    |
+| `src/tool_registry/ports/mod.rs`              | Add `catalog`, `policy`, and `log_store` re-exports                              |
 | `src/tool_registry/adapters/runtime.rs`       | Add `call_tool` + startup/call stderr to `InMemoryMcpServerHost`                 |
 | `src/tool_registry/adapters/memory/mod.rs`    | Export `InMemoryToolCatalog`                                                     |
 | `src/tool_registry/adapters/postgres/mod.rs`  | Export `PostgresToolCatalog`, `PostgresLogMetadataRepository`                    |

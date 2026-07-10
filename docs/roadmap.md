@@ -747,13 +747,13 @@ Use the shared dependency labels below to keep this step readable:
     corbusier-design.md §6.4.1.3.
   - [ ] Success criteria: authenticated sessions expire and rotate according to
     policy.
-- [ ] 5.1.2 Implement RBAC and resource authorisation. Requires 5.1.1. See
+- [ ] 5.1.2 Implement RBAC and resource authorization. Requires 5.1.1. See
   corbusier-design.md §6.4.2.
   - [ ] Define role hierarchy and permissions. See
     corbusier-design.md §6.4.2.1 and §6.4.2.2.
-  - [ ] Enforce authorisation checks at policy enforcement points. See
+  - [ ] Enforce authorization checks at policy enforcement points. See
     corbusier-design.md §6.4.2.4.
-  - [ ] Success criteria: all API endpoints require explicit authorisation for
+  - [ ] Success criteria: all API endpoints require explicit authorization for
     protected resources.
 
 ### 5.2. Observability and monitoring
@@ -762,13 +762,13 @@ Use the shared dependency labels below to keep this step readable:
   See corbusier-design.md §6.5.1 and §6.5.4.
   - [ ] Instrument core services with metrics and traces. See
     corbusier-design.md §6.5.1.1 and §6.5.1.3.
-  - [ ] Centralise log aggregation with correlation ids. See
+  - [ ] Centralize log aggregation with correlation ids. See
     corbusier-design.md §6.5.1.2.
   - [ ] Success criteria: metrics, traces, and logs share a common correlation
     identifier per request.
 - [ ] 5.2.2 Deliver monitoring dashboards and alerting. Requires 5.2.1. See
   corbusier-design.md §6.5.1.5 and §8.5.
-  - [ ] Create dashboards for task completion, agent utilisation, and tool
+  - [ ] Create dashboards for task completion, agent utilization, and tool
     execution. See corbusier-design.md §8.5.1.
   - [ ] Define alert thresholds and routing. See
     corbusier-design.md §6.5.1.4 and §6.5.3.1.
@@ -797,7 +797,7 @@ Use the shared dependency labels below to keep this step readable:
 
 ### 5.4. Deployment and resilience
 
-- [ ] 5.4.1 Deliver containerised deployment and rollback workflows. Requires
+- [ ] 5.4.1 Deliver containerized deployment and rollback workflows. Requires
   5.3.2. See corbusier-design.md §8.2 and §8.4.3.
   - [ ] Build multi-stage container images with security scanning. See
     corbusier-design.md §8.2.2 and §8.2.5.

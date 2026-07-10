@@ -49,8 +49,9 @@ make test
 ```
 
 `make check-fmt` validates Rust formatting, `make lint` runs documentation
-generation, Clippy, and Whitaker with warnings denied, and `make test` runs the
-workspace test suite through nextest. Documentation changes should also run:
+generation, Clippy, Whitaker, and the spelling policy with warnings denied, and
+`make test` runs the workspace test suite through nextest. Documentation
+changes should also run:
 
 ```sh
 make markdownlint
@@ -231,6 +232,20 @@ Or via npm:
 ```shell
 npm install --global markdownlint-cli2
 ```
+
+### Spelling policy
+
+The lint and Markdown gates run `typos` 1.48.0 with British English and Oxford
+`-ize` conventions. Before checking maintained Markdown, the generator
+refreshes the shared estate dictionary into an untracked local cache only when
+the authority is newer, then merges `typos.local.toml`. The generated
+`typos.toml` is reviewed and committed so a clean, network-restricted checkout
+can still enforce the last known-good policy.
+
+Add repository-only proper names or quoted upstream terms to
+`typos.local.toml`; never edit generated entries in `typos.toml` by hand. The
+spelling gate also runs the helper's Python 3.13 tests with at least 90% line
+coverage.
 
 ### `TaskGatewayProvider` and `useTaskGateway`
 

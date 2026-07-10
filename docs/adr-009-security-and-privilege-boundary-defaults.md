@@ -59,7 +59,7 @@ does not redefine the underlying workspace, wire, or hook models.
 ### Non-Goals
 
 - Eliminate all privileged operations in every environment.
-- Encode organisation-specific approval processes in full detail.
+- Encode organization-specific approval processes in full detail.
 - Replace host operating-system safeguards with application policy alone.
 
 ## Podbot roadmap dependencies
