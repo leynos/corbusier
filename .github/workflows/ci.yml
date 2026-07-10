@@ -15,7 +15,7 @@ jobs:
       BUILD_PROFILE: debug
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
-      WHITAKER_INSTALLER_VERSION: '0.2.1'
+      WHITAKER_INSTALLER_VERSION: '0.2.5'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -80,10 +80,13 @@ jobs:
           key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install Whitaker
         run: |
-          if command -v whitaker-installer >/dev/null 2>&1; then
-            echo "whitaker-installer already present; skipping cargo binstall"
-          else
-            cargo binstall --no-confirm whitaker-installer@${{ env.WHITAKER_INSTALLER_VERSION }}
+          if ! command -v whitaker-installer >/dev/null 2>&1; then
+            if cargo binstall --version >/dev/null 2>&1; then
+              cargo binstall --no-confirm --locked "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"
+            else
+              echo "cargo-binstall unavailable; building whitaker-installer from crates.io"
+              cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
+            fi
           fi
           whitaker-installer
       - name: Lint
