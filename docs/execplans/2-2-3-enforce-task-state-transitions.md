@@ -1,9 +1,8 @@
 # Enforce task state transitions with validation (roadmap 2.2.3)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -200,10 +199,10 @@ metadata.
 ### Key files
 
 - `src/task/domain/task.rs` (254 lines) -- `Task` aggregate root and
-  `TaskState` enum. Currently has six states (`Draft`, `InProgress`,
-  `InReview`, `Paused`, `Done`, `Abandoned`). The only explicit state
-  transition is in `associate_pull_request` (line 232) which unconditionally
-  sets state to `InReview` with a comment deferring validation to 2.2.3.
+  `TaskState` enum. Currently has six states (`Draft`, `InProgress`, `InReview`,
+  `Paused`, `Done`, `Abandoned`). The only explicit state transition is in
+  `associate_pull_request` (line 232) which unconditionally sets state to
+  `InReview` with a comment deferring validation to 2.2.3.
 - `src/task/domain/error.rs` (57 lines) -- `TaskDomainError` enum using
   `thiserror::Error`. Also contains `ParseTaskStateError`.
 - `src/task/domain/mod.rs` (23 lines) -- re-exports from the domain module.
@@ -406,8 +405,8 @@ invalid transition (error), and the state machine table.
 F3. Update the `docs/roadmap.md` 2.2.3 checkbox block: change `- [ ] 2.2.3` to
 `- [x] 2.2.3` and all three sub-checkboxes to `[x]`.
 
-F4. Record design decisions in `docs/corbusier-design.md` noting that 2.2.3
-uses `can_transition_to` predicate on `TaskState` and `InvalidStateTransition`
+F4. Record design decisions in `docs/corbusier-design.md` noting that 2.2.3 uses
+`can_transition_to` predicate on `TaskState` and `InvalidStateTransition`
 error variant, without `TransitionContext` or domain events at this stage.
 
 ### Stage G: final validation
@@ -486,7 +485,7 @@ All steps are safe to re-run. Test runs are inherently idempotent. File edits
 are additive (new methods, new variants, new files). If a step fails partway,
 re-running `make all` from the repository root will identify remaining issues.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### New files (9)
 

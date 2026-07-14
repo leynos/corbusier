@@ -81,10 +81,10 @@ as `some-crate = "1.2.3"`. Avoid wildcard requirements and open-ended
 inequality requirements because they make builds unpredictable. Use tilde
 requirements only when patch-level locking is required for a documented reason.
 
-When adding a dependency, update the relevant design or developer
-documentation if the dependency changes architecture, runtime behaviour,
-operator workflow, or contributor tooling. Run the dependency audit gate when
-the change affects Rust or frontend dependency surfaces:
+When adding a dependency, update the relevant design or developer documentation
+if the dependency changes architecture, runtime behaviour, operator workflow,
+or contributor tooling. Run the dependency audit gate when the change affects
+Rust or frontend dependency surfaces:
 
 ```sh
 make audit
@@ -98,13 +98,13 @@ inspect, retry, or map to an HTTP status. Derive `std::error::Error` with
 application boundaries, logs, and top-level task entry points.
 
 Tests should prefer `.expect(...)` over `.unwrap()` for clearer diagnostics.
-Production code and shared fixtures should return `Result` and propagate
-errors with `?` instead of panicking. Keep the `expect_used` lint strict, and
-remember that test-only lint allowances do not apply to helpers outside
-`#[cfg(test)]` or `#[test]`.
+Production code and shared fixtures should return `Result` and propagate errors
+with `?` instead of panicking. Keep the `expect_used` lint strict, and remember
+that test-only lint allowances do not apply to helpers outside `#[cfg(test)]` or
+`#[test]`.
 
-Fallible `rstest` fixtures should be consumed by tests that return `Result`,
-so fixture setup errors can be propagated with `?`.
+Fallible `rstest` fixtures should be consumed by tests that return `Result`, so
+fixture setup errors can be propagated with `?`.
 
 ### Observability
 
@@ -130,9 +130,9 @@ but applications own global exporter and subscriber initialization.
 Common local tools include `mbake` for Makefile validation, `shellcheck` for
 shell scripts, `difft` for structural diffs, `srgn` for structural search,
 `hyperfine` for benchmarking, and system inspection tools such as `strace`,
-`ltrace`, `gdb`, `lldb`, `lsof`, `htop`, `iotop`, and `ncdu`. Prefer
-repository `make` targets when they exist, and use direct tool invocations for
-diagnosis or focused checks that do not have a Makefile wrapper.
+`ltrace`, `gdb`, `lldb`, `lsof`, `htop`, `iotop`, and `ncdu`. Prefer repository
+`make` targets when they exist, and use direct tool invocations for diagnosis
+or focused checks that do not have a Makefile wrapper.
 
 ### Frontend task slice tooling
 
@@ -178,9 +178,9 @@ bundled types. It exports `AxeRunner`, `configureAxe`, `axe`, and
 `toHaveNoViolations`; the test-scoped validation keeps those declarations
 checked alongside the accessibility test setup.
 
-`frontend-pwa/tests/setup-vitest-a11y.ts` registers `toHaveNoViolations` on
-both `@vitest/expect`'s `Assertion<T>` and `vitest`'s `Assertion<T>`
-interfaces. Tests that call `axe(container)` and then
+`frontend-pwa/tests/setup-vitest-a11y.ts` registers `toHaveNoViolations` on both
+`@vitest/expect`'s `Assertion<T>` and `vitest`'s `Assertion<T>` interfaces.
+Tests that call `axe(container)` and then
 `expect(results).toHaveNoViolations()` rely on this setup file being listed in
 the accessibility Vitest configuration's `setupFiles`.
 
@@ -200,8 +200,8 @@ Rust HTTP API integration tests share helpers in
 ### Markdown linting
 
 Markdown linting uses
-[`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2).
-Run the linting target with:
+[`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2). Run the
+linting target with:
 
 ```shell
 make markdownlint
@@ -249,8 +249,7 @@ coverage.
 
 ### `TaskGatewayProvider` and `useTaskGateway`
 
-Defined in
-`frontend-pwa/src/task_slice/application/task-gateway-context.tsx`.
+Defined in `frontend-pwa/src/task_slice/application/task-gateway-context.tsx`.
 
 `TaskGatewayProvider` injects a `TaskSliceGateway` implementation into React
 context. Wrap the component tree with it in tests and in `AppProviders` to
@@ -271,8 +270,8 @@ component that belongs to the task slice. It throws with the message
 Defined in `frontend-pwa/src/task_slice/ui/task-not-found.tsx`.
 
 Presentational component rendered by the task-detail route when the gateway
-reports a `not_found` error. It displays a localized heading, body text, and
-a navigation link back to `/tasks/new`. It carries no data-fetching or
+reports a `not_found` error. It displays a localized heading, body text, and a
+navigation link back to `/tasks/new`. It carries no data-fetching or
 error-boundary logic.
 
 ## Test utilities
@@ -282,8 +281,8 @@ error-boundary logic.
 Defined in `tests/http_api_test_helpers.rs`.
 
 A newtype wrapper around `String` that represents a bearer token produced by
-`HttpApiAuth::token()`. Use `BearerToken::as_str()` to obtain a `&str`
-suitable for passing to `with_bearer`:
+`HttpApiAuth::token()`. Use `BearerToken::as_str()` to obtain a `&str` suitable
+for passing to `with_bearer`:
 
 ```rust
 let token = BearerToken(auth.token()?);
@@ -291,8 +290,8 @@ let request = with_bearer(TestRequest::get().uri("/api/v1/tasks"), token.as_str(
 ```
 
 Using `BearerToken` rather than a bare `&str` reduces string-argument
-saturation and makes the intended role of each parameter unambiguous at
-call sites.
+saturation and makes the intended role of each parameter unambiguous at call
+sites.
 
 ## Dependency audit
 

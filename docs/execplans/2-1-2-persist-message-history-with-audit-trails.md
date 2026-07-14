@@ -1,9 +1,8 @@
 # Persist message history with audit trails (Roadmap 2.1.2)
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -303,7 +302,7 @@ All steps are re-runnable. If a step fails:
 
 No destructive actions are required. Use git to restore files if necessary.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected files added or modified (names may adjust to fit line limits):
 

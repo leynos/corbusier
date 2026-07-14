@@ -86,7 +86,7 @@ Run all commands from `/home/user/project`.
 - [x] `PATH=/root/.bun/bin:$PATH make markdownlint`
 - [x] `make nixie`
 
-## Artifacts and notes
+## Artefacts and notes
 
 The most important evidence to capture during implementation is the query
 surface itself. Keep short proof points such as:

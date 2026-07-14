@@ -1,9 +1,8 @@
 # Deliver tool discovery and routing (roadmap 3.1.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -232,8 +231,8 @@ cases. The roadmap item 3.1.2 and its sub-bullets are marked done.
   used in the Rust ecosystem. Date/Author: 2026-03-04 / plan author.
 
 - Decision: capture stderr from two lifecycle points: (a) MCP server startup
-  (the `start` operation on `McpServerHost`), and (b) individual tool calls
-  (the `call_tool` operation). Startup logs capture the server's initialization
+  (the `start` operation on `McpServerHost`), and (b) individual tool calls (the
+  `call_tool` operation). Startup logs capture the server's initialization
   output; tool call logs capture per-invocation diagnostic output. Both are
   stored as opaque byte blobs in `object_store` with structured path keys, and
   references (object store paths) are recorded in the principal audit log.
@@ -344,8 +343,8 @@ roadmap 3.1.1 and provides:
 - **Domain types** in `src/tool_registry/domain/`: `McpServerId` and
   `McpServerName` (identity), `McpServerRegistration` (aggregate root with
   lifecycle state machine), `McpServerLifecycleState` (`Registered`, `Running`,
-  `Stopped`), `McpServerHealthSnapshot`, `McpTransport` (stdio/HTTP+SSE
-  config), `McpToolDefinition` (tool name, description, input/output schemas as
+  `Stopped`), `McpServerHealthSnapshot`, `McpTransport` (stdio/HTTP+SSE config),
+  `McpToolDefinition` (tool name, description, input/output schemas as
   `serde_json::Value`), and `ToolRegistryDomainError`.
 
 - **Port traits** in `src/tool_registry/ports/`: `McpServerRegistryRepository`
@@ -452,7 +451,7 @@ builder method `with_stderr_log_path(path)` to attach the log reference.
 
 `validation.rs` defines
 `validate_parameters(input_schema: &Value, parameters: &Value) -> Result<(), ToolRegistryDomainError>`.
- This function checks: (a) if `input_schema` has `"type": "object"`,
+This function checks: (a) if `input_schema` has `"type": "object"`,
 `parameters` must be a JSON object; (b) if `input_schema` has a `"required"`
 array, every listed key must be present in `parameters`. Returns
 `ToolRegistryDomainError::SchemaValidationFailed` on failure.
@@ -493,8 +492,8 @@ In `src/tool_registry/domain/error.rs`, add new variants to
 `AmbiguousToolName { tool_name: String, server_count: usize }`.
 
 In `src/tool_registry/domain/mod.rs`, add `mod` declarations for the six new
-files (`audit`, `catalog`, `log_capture`, `policy`, `routing`, `validation`)
-and `pub use` re-exports for all new public types.
+files (`audit`, `catalog`, `log_capture`, `policy`, `routing`, `validation`) and
+`pub use` re-exports for all new public types.
 
 In `src/tool_registry/ports/`, create three new files:
 
@@ -513,7 +512,7 @@ to its catalogue entry (returning available entries preferentially);
 
 `policy.rs` defines the `ToolPolicyEnforcer` async trait with one method:
 `evaluate(ctx, tool_name, parameters) -> Result<PolicyDecision, ToolPolicyError>`.
- Define `ToolPolicyError` with a single variant
+Define `ToolPolicyError` with a single variant
 `EvaluationFailed { message: String }` and `ToolPolicyResult<T>` type alias.
 
 `log_store.rs` defines the `ToolLogStore` async trait -- the hexagonal port
@@ -527,15 +526,26 @@ wrapping `object_store` operations. Methods:
 truncates at the byte boundary and appends a marker line
 `\n--- truncated at {max_bytes_per_log} bytes ---\n`.
 
-`retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>`
-— reads a log blob by path.
+Read a log blob by path with:
 
-`delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>`
-— deletes a single log blob.
+```rust
+retrieve_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<bytes::Bytes>
+```
 
-`list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>`
-— lists all log blob paths for a server by prefix scan on
-`tool_logs/{tenant_id}/{server_id}/` (tenant extracted from `ctx`).
+Delete a single log blob with:
+
+```rust
+delete_log(&self, ctx: &RequestContext, path: &str) -> ToolLogStoreResult<()>
+```
+
+List all log blob paths for a server by prefix scan with:
+
+```rust
+list_logs_for_server(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolLogStoreResult<Vec<String>>
+```
+
+The scan uses the prefix `tool_logs/{tenant_id}/{server_id}/` (tenant extracted
+from `ctx`).
 
 `sweep_expired(&self, ctx: &RequestContext,`
 `server_id: McpServerId, sweep: &SweepContext<'_>)`
@@ -609,8 +619,8 @@ In `src/tool_registry/adapters/memory/mod.rs`, add `mod catalog;` and
 
 In `src/tool_registry/adapters/policy.rs`, implement `AllowAllPolicy`
 (zero-field struct, `#[derive(Debug, Clone, Default)]`) implementing
-`ToolPolicyEnforcer` by always returning `PolicyDecision::Allow`. Also
-implement `DenyAllPolicy` (for test use) that always returns
+`ToolPolicyEnforcer` by always returning `PolicyDecision::Allow`. Also implement
+`DenyAllPolicy` (for test use) that always returns
 `PolicyDecision::Deny { reason }`.
 
 In `src/tool_registry/adapters/mod.rs`, add `mod policy;` and
@@ -738,28 +748,28 @@ dependencies as `Arc` references (`catalog`, `registry`, `host`, `policy`,
 `ToolDiscoveryRoutingService<Cat, Reg, H, Pol, Log, C>` parameterized over the
 same port types plus `Clock`. The constructor
 `new(ports: ServicePorts<...>, retention_policy: LogRetentionPolicy, clock: Arc<C>)`
- destructures the grouped ports into individual fields. Internally, the service
+destructures the grouped ports into individual fields. Internally, the service
 stores each `Arc` field plus a `LogRetentionPolicy` value and an `Arc<C>` clock.
 
 Public methods:
 
 `discover_and_persist_tools(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
- Load the server from the registry, fail with `NotFound` if it is absent,
+Load the server from the registry, fail with `NotFound` if it is absent,
 verify the lifecycle state allows tool queries, call `host.list_tools()` to get
 tool definitions, map each definition to a `CatalogEntry`, call
 `catalog.sync_server_tools()` to persist the entries, and return them.
 
 `mark_tools_unavailable(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
- Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
+Delegate to `catalog.mark_server_tools_unavailable(server_id)`.
 
 `mark_tools_available(&self, ctx: &RequestContext, server_id) -> ToolDiscoveryRoutingServiceResult<()>`.
- Delegate to `catalog.mark_server_tools_available(server_id)`.
+Delegate to `catalog.mark_server_tools_available(server_id)`.
 
 `list_catalog(&self, ctx: &RequestContext) -> ToolDiscoveryRoutingServiceResult<Vec<CatalogEntry>>`.
- Delegate to `catalog.list_all()`.
+Delegate to `catalog.list_all()`.
 
 `call_tool(&self, ctx: &RequestContext, request: &ToolCallRequest) -> ToolDiscoveryRoutingServiceResult<ToolCallResult>`.
- This is the core routing method. Its flow is:
+This is the core routing method. Its flow is:
 
 1. Resolve: `catalog.find_by_tool_name(request.tool_name())`. Fail with
    `ToolNotFound` if `None`.
@@ -796,7 +806,7 @@ tool definitions, map each definition to a `CatalogEntry`, call
 9. Return `ToolCallResult`.
 
 `store_startup_stderr(&self, ctx, server_id, stderr) -> ToolDiscoveryRoutingServiceResult<LogEntryMetadata>`.
- Store startup stderr captured from `McpServerHost::start`. The caller invokes
+Store startup stderr captured from `McpServerHost::start`. The caller invokes
 this after `lifecycle_service.start()` returns a `LifecycleStartResult` with
 non-empty `startup_stderr`. Build
 `LogEntryMetadata::for_startup(server_id, byte_count, &LogCaptureContext)`,
@@ -805,7 +815,7 @@ return the metadata. This method also triggers `sweep_expired` for the server
 to enforce rotation.
 
 `sweep_expired_logs(&self, ctx: &RequestContext, server_id: McpServerId) -> ToolDiscoveryRoutingServiceResult<usize>`.
- Trigger a retention sweep for a specific server. Delegate to
+Trigger a retention sweep for a specific server. Delegate to
 `log_store.sweep_expired(server_id, &SweepContext { … })` and return the count
 of deleted log entries.
 
@@ -965,7 +975,7 @@ In `tests/tool_discovery_routing_steps/` (directory module with `mod.rs`,
 `given.rs`, `when.rs`, `then.rs`, `world.rs`), implement step definitions
 following the pattern established in `tests/mcp_server_lifecycle_steps.rs`: a
 `ToolDiscoveryWorld` struct holding shared state, `run_async` helper,
-`#[given]`/`#[when]`/`#[then]` step functions, and `#[scenario]` bindings.
+`#[given]` /`#[when]`/`#[then]` step functions, and `#[scenario]` bindings.
 
 Go/no-go checkpoint: run `make all`. Must pass with all new and existing tests.
 
@@ -1135,12 +1145,12 @@ New external crate dependencies (authorized):
   `LocalFileSystem` and `InMemory` backends. Part of the Apache Arrow
   ecosystem. Used for stderr log blob storage behind the `ToolLogStore` port.
 - `bytes = "1.10.1"` -- byte buffer type used in the `ToolLogStore` and
-  `McpServerHost` port APIs. Already a transitive dependency via
-  `object_store`, `diesel`, and `tokio`, but declared explicitly since it
-  appears in public port signatures.
+  `McpServerHost` port APIs. Already a transitive dependency via `object_store`,
+  `diesel`, and `tokio`, but declared explicitly since it appears in public
+  port signatures.
 
-All other implementations use existing workspace crates: `serde_json`,
-`chrono`, `uuid`, `async-trait`, `thiserror`, `diesel`, `mockable`, `tokio`.
+All other implementations use existing workspace crates: `serde_json`, `chrono`,
+`uuid`, `async-trait`, `thiserror`, `diesel`, `mockable`, `tokio`.
 
 ### New port traits
 
@@ -1353,7 +1363,7 @@ Table 3.1.3: File manifest — modified files for roadmap 3.1.2
 | `docs/users-guide.md`                         | Add tool discovery/routing + log capture section                                 |
 | `docs/roadmap.md`                             | Mark 3.1.2 items as done                                                         |
 
-## Artifacts and notes
+## Artefacts and notes
 
 (To be populated with validation evidence during implementation.)
 

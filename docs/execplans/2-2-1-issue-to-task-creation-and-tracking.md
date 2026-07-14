@@ -327,10 +327,10 @@ Quality criteria:
   - revert the current migration and schema/model changes together,
   - re-run formatter/lint/tests before retrying.
 - If behavioural tests fail due to stale generated step bindings:
-  - clean build artifacts and rerun targeted scenario tests before broader
+  - clean build artefacts and rerun targeted scenario tests before broader
     suites.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected implementation touchpoints:
 

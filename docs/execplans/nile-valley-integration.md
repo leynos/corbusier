@@ -1,9 +1,8 @@
 # Local k3d (Kubernetes in Docker) preview and Nile Valley integration for Corbusier
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -246,8 +245,8 @@ Create `src/health/actix_adapter.rs` — the driving adapter that wires the
 - Accepts an `Arc<dyn HealthCheck>` as Actix Web application data.
 - Defines handler functions for `GET /health/live` and
   `GET /health/ready` that delegate to the port trait methods and map
-  `HealthStatus` to HTTP status codes (200 for `Healthy`, 503 for
-  `Degraded`/`Unhealthy`).
+  `HealthStatus` to HTTP status codes (200 for `Healthy`, 503 for `Degraded`/
+  `Unhealthy`).
 - Exposes a `pub fn health_routes(cfg: &mut web::ServiceConfig)` that
   registers both routes, keeping the adapter self-contained.
 
@@ -623,7 +622,7 @@ Quality method (how we check):
 - If any step fails partway, running `make local-k8s-down` followed by
   `make local-k8s-up` provides a clean restart.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### Nile Valley `example-app` chart conventions to adopt
 

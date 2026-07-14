@@ -1,9 +1,8 @@
 # Implement agent backend registration and discovery (Roadmap 2.3.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -763,7 +762,7 @@ database and re-run; the template creation is idempotent.
 If `make all` fails after partial changes, fix the issue and re-run. No manual
 cleanup is needed.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key reference files for pattern replication:
 

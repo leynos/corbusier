@@ -1,9 +1,8 @@
 # Ratify the staged migration boundary and phase gates (roadmap 1.1.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -378,8 +377,9 @@ Validate the documentation change and capture evidence:
 - run `make nixie`;
 - if implementation added any automation or code, run the relevant Rust gates
   and tests, including `rstest` and `rstest-bdd` coverage where applicable;
-- update this ExecPlan's `Progress`, `Decision Log`, and `Outcomes &
-  Retrospective` sections with the final evidence and any deviations;
+- update this ExecPlan's `Progress`, `Decision Log`, and
+  `Outcomes & Retrospective` sections with the final evidence and any
+  deviations;
 - only then mark roadmap item `1.1.1` done.
 
 Expected command pattern for gate execution:
