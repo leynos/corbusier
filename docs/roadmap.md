@@ -11,7 +11,7 @@ with Podbot-hosted execution while renumbering the subsequent roadmap and
 execplan references to keep the sequence contiguous. External Podbot
 dependencies refer to the
 [Podbot development roadmap](https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md).
- It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
+It sits ahead of phases 2 through 7: phase 1 establishes the runtime,
 workspace, wire, validation, and security boundaries that the later
 orchestration, API, and operator-facing phases assume.
 
@@ -994,8 +994,8 @@ Use the shared dependency labels below to keep this step readable:
 
 This phase extends the first vertical slice delivered in §4.4 by promoting the
 remaining Corbusier screen families from
-[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) into
-the `frontend-pwa/` workspace, replacing fixtures with live backend projections
+[`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) into the
+`frontend-pwa/` workspace, replacing fixtures with live backend projections
 one family at a time. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md`
 §5.7 and §7.
 

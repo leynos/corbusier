@@ -124,8 +124,8 @@ The proposed contract is:
   workspace identifier, trigger name, requested access mode, and artefact
   reference.
 - Corbusier evaluates policy and replies with an idempotent acknowledgement
-  that specifies `approved`, `skip`, `fail-current-step`, or `abort-session` for
-  the request.
+  that specifies `approved`, `skip`, `fail-current-step`, or `abort-session`
+  for the request.
 - Podbot suspends the relevant hosted execution path until it receives that
   acknowledgement or a timeout occurs.
 - Podbot executes the hook only after approval and reports completion or
@@ -208,8 +208,7 @@ rules.
   `post-tool-call` hooks. The acknowledgement may be deferred or omitted; if
   omitted, Podbot treats it as `approved` by default.
 - **Timeout and resume rules:** no timeout is enforced for `post-tool-call`
-  hooks. Podbot continues execution immediately after emitting the hook
-  request.
+  hooks. Podbot continues execution immediately after emitting the hook request.
 
 #### PreCommit
 
@@ -282,8 +281,8 @@ share an unambiguous contract:
   in the delivery sequence without marking the current step or session as
   failed. The hook delivery sequence resumes at the next scheduled trigger for
   the same session. Downstream components must treat a `skip` denial as
-  non-terminal: the session remains active and the step that triggered the
-  hook remains unaffected.
+  non-terminal: the session remains active and the step that triggered the hook
+  remains unaffected.
 - **`fail-current-step`** — The hook is not executed. Podbot must mark the
   current logical step as failed but continue the session. Subsequent hooks
   whose trigger depends on a step that is now failed must be suppressed; hooks
@@ -293,8 +292,8 @@ share an unambiguous contract:
 - **`abort-session`** — The hook is not executed. Podbot must terminate the
   session immediately, discard any pending hook requests, and transition the
   hosted session to a terminal state. No further hook delivery occurs for this
-  session. Downstream components must release all resources associated with
-  the session and finalize the audit trail.
+  session. Downstream components must release all resources associated with the
+  session and finalize the audit trail.
 
 These denial outcomes map to the REVIEW gates defined in ADR 010 and
 `docs/podbot-migration-review-checklist.md`: a `skip` denial is a warn-only

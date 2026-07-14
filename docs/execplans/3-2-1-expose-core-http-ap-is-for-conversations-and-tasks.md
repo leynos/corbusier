@@ -1,9 +1,8 @@
 # Expose core HTTP APIs for conversations and tasks (roadmap 4.2.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED
 
@@ -226,8 +225,8 @@ context.
 
 Validation evidence captured during implementation:
 
-- Targeted HTTP adapter coverage passed with `cargo nextest run --all-targets
-  --all-features http_api_surface --no-fail-fast`.
+- Targeted HTTP adapter coverage passed with
+  `cargo nextest run --all-targets --all-features http_api_surface --no-fail-fast`.
 - Full repository quality gates passed on 2026-03-30:
   `make check-fmt`, `make lint`,
   `make test TEST_FLAGS='--profile long --all-targets --all-features'`,
@@ -528,9 +527,10 @@ Quality criteria:
 - Behavioural tests use `rstest-bdd` where the HTTP contract is better
   expressed as user-observable scenarios.
 - Postgres-backed tests run locally with `pg-embed-setup-unpriv`.
-- `make check-fmt`, `make lint`, `make test TEST_FLAGS='--profile long
-  --all-targets --all-features'`, `make fmt`, `PATH=/root/.bun/bin:$PATH make
-  markdownlint`, and `make nixie` all pass.
+- `make check-fmt`, `make lint`,
+  `make test TEST_FLAGS='--profile long --all-targets --all-features'`,
+  `make fmt`, `PATH=/root/.bun/bin:$PATH make markdownlint`, and `make nixie`
+  all pass.
 
 ## Idempotence and recovery
 
@@ -570,7 +570,7 @@ Initial auth expectation for v1:
 If the implementation needs broader auth semantics than this, trigger
 escalation instead of silently widening roadmap scope.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Implementation must capture evidence in this document as work proceeds:
 

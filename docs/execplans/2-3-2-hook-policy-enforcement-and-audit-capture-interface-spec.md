@@ -133,6 +133,6 @@ impl ToolExecutionScope {
 
 ## Dependency notes
 
-The only infrastructure dependencies needed are the existing Diesel,
-PostgreSQL, `mockable`, `rstest`, `rstest-bdd`, and `pg-embedded-setup-unpriv`
-tooling already present in the repository.
+The only infrastructure dependencies needed are the existing Diesel, PostgreSQL,
+`mockable`, `rstest`, `rstest-bdd`, and `pg-embedded-setup-unpriv` tooling
+already present in the repository.

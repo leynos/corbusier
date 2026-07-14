@@ -1,9 +1,8 @@
 # Deliver slash command parsing and template execution (roadmap 2.4.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -370,9 +369,9 @@ Quality acceptance:
 - If a tolerance threshold is crossed, stop and record escalation options in
   `Decision Log` before continuing.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected new/updated artifact groups:
+Expected new/updated artefact groups:
 
 - Slash command domain/ports/services/adapters in `src/message/...`.
 - Unit tests under `src/message/tests/...`.

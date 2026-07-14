@@ -1,9 +1,8 @@
 # Deliver tenant-aware schema and constraints (roadmap 1.5.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -32,9 +31,9 @@ at the database layer. Observable success is:
 2. Behaviour tests written with `rstest-bdd` prove the service-level workflow
    for same-reference and same-name reuse across two tenants where that
    behaviour is user-visible.
-3. `make check-fmt`, `make lint`, `make test TEST_FLAGS='--profile long
-   --all-targets --all-features'`, `make fmt`, `make markdownlint`, and `make
-   nixie` all pass.
+3. `make check-fmt`, `make lint`,
+   `make test TEST_FLAGS='--profile long --all-targets --all-features'`,
+   `make fmt`, `make markdownlint`, and `make nixie` all pass.
 4. `docs/corbusier-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
    are updated, and roadmap item 1.5.2 is marked done only after every quality
    gate passes.
@@ -217,10 +216,10 @@ query scoping or PostgreSQL Row-Level Security (RLS); those remain the work of
   author.
 
 - Decision: reuse the pattern already proven by
-  `migrations/2026-03-11-000000_tenant_scope_mcp_servers/`: add `tenant_id`,
-  add `UNIQUE (id, tenant_id)` on parent tables, then replace child foreign
-  keys with composite foreign keys. Rationale: that migration already solved
-  the same class of tenant-consistency problem for the `tool_registry` bounded
+  `migrations/2026-03-11-000000_tenant_scope_mcp_servers/`: add `tenant_id`, add
+  `UNIQUE (id, tenant_id)` on parent tables, then replace child foreign keys
+  with composite foreign keys. Rationale: that migration already solved the
+  same class of tenant-consistency problem for the `tool_registry` bounded
   context. Date/Author: 2026-03-21 / plan author.
 
 - Decision: keep BDD focused on user-observable tenant reuse scenarios, and
@@ -608,7 +607,7 @@ If `make fmt` rewrites unrelated markdown files, restore the unrelated churn
 before finalizing. The final diff should include only the migration, adapter,
 test, and documentation files relevant to 1.5.2.
 
-## Artifacts and notes
+## Artefacts and notes
 
 The most useful quick checks during implementation are:
 

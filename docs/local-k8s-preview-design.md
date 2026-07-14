@@ -9,8 +9,7 @@ operations) pipeline.
 
 ## Goals
 
-- Provide a single-command local preview workflow driven by `make
-  local-k8s-up`.
+- Provide a single-command local preview workflow driven by `make local-k8s-up`.
 - Keep the Corbusier chart compatible with FluxCD `HelmRelease` resources and
   Kustomize overlays.
 - Reuse the same deployment contract locally and in Nile Valley so preview and

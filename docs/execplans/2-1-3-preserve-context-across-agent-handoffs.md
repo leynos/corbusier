@@ -253,8 +253,8 @@ Run `diesel print-schema` to regenerate table definitions.
 
 ### 4.3 Create `adapters/models/session_models.rs` (~150 lines)
 
-Diesel models: `AgentSessionRow`, `NewAgentSession`, `HandoffRow`,
-`NewHandoff`, `ContextSnapshotRow`, `NewContextSnapshot`.
+Diesel models: `AgentSessionRow`, `NewAgentSession`, `HandoffRow`, `NewHandoff`,
+`ContextSnapshotRow`, `NewContextSnapshot`.
 
 ______________________________________________________________________
 

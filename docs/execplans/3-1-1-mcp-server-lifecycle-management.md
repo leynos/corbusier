@@ -1,9 +1,8 @@
 # Implement MCP server lifecycle management (roadmap 3.1.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -103,8 +102,8 @@ cases.
   tests, behavioural tests (`rstest-bdd`), and PostgreSQL integration tests for
   lifecycle and tool-query behaviour.
 - [x] (2026-02-28 00:00Z) Implemented lifecycle service operations:
-  `register`, `start`, `stop`, `refresh_health`, `list_all`, `find_by_name`,
-  and `list_tools`.
+  `register`, `start`, `stop`, `refresh_health`, `list_all`, `find_by_name`, and
+  `list_tools`.
 - [x] (2026-02-28 00:00Z) Ran core code gates successfully:
   `make check-fmt`, `make lint`, and `make test`.
 - [x] (2026-02-28 00:00Z) Ran documentation gates after final doc updates:
@@ -418,7 +417,7 @@ No new external dependency is assumed in this plan. If MCP transport handling
 cannot be implemented cleanly with current dependencies, trigger tolerance
 escalation and document options.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Implementation should capture concise evidence in this document during
 execution (for example, key test-pass summaries and final gate command results)

@@ -1,9 +1,8 @@
 # Stabilize the slice transport contract and development auth seam (roadmap 4.4.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED
 
@@ -83,7 +82,8 @@ Observable success means:
     clearer than low-level adapter assertions;
   - PostgreSQL-backed tests must use the `pg-embedded-setup-unpriv` fixtures;
   - update `docs/corbusier-design.md` with the transport/auth design decisions;
-  - update `docs/whitaker-users-guide.md` with the repeatable local preview path;
+  - update `docs/whitaker-users-guide.md` with the repeatable local preview
+    path;
   - mark roadmap item `4.4.2` done in `docs/roadmap.md` only after all feature
     and documentation gates pass.
 
@@ -99,8 +99,8 @@ Observable success means:
   a production-grade login flow, cookie/session issuance, or persistent browser
   credential storage.
 - Churn: stop and escalate if the work exceeds roughly 48 changed files or
-  2,400 net lines before `4.4.3` begins. This tolerance deliberately covers
-  the known approximately 40-file baseline for backend contract code, frontend
+  2,400 net lines before `4.4.3` begins. This tolerance deliberately covers the
+  known approximately 40-file baseline for backend contract code, frontend
   adapter code, golden fixtures, PostgreSQL-backed tests, BDD tests,
   documentation, and lint-driven test-helper repairs. It does not cover
   deferred work: full `4.4.3` live UI controls, SSE, pagination, production
@@ -152,8 +152,8 @@ Observable success means:
 - [x] (2026-04-10 00:00Z) Authored the initial ExecPlan draft in this file.
 - [x] (2026-04-13 00:00Z) User approved implementation and execution began.
 - [x] (2026-04-13 00:00Z) Resolved the phase 4 dependency pin to upstream
-  `actix-v2a` commit `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe`
-  (upstream: github.com/leynos/actix-v2a).
+  `actix-v2a` commit `7cc8d8c7aff4fcc333f6cf38a81207b1e27fe8fe` (upstream:
+  github.com/leynos/actix-v2a).
 - [x] (2026-04-13 00:00Z) Stage A contract decision recorded: adopt
   `actix-v2a` shared error payloads and idempotency-header parsing directly,
   while retaining Corbusier-owned success envelopes and deferring durable
@@ -176,8 +176,8 @@ Observable success means:
   `make test TEST_FLAGS="--profile long --all-targets --all-features"`,
   `make audit`, `make frontend-typecheck`, `make frontend-lint`,
   `make frontend-test`, `make frontend-test-a11y`,
-  `make frontend-localizability`, `make frontend-semantic`,
-  `make frontend-e2e`, `make markdownlint`, and `make nixie`.
+  `make frontend-localizability`, `make frontend-semantic`, `make frontend-e2e`,
+  `make markdownlint`, and `make nixie`.
 - [x] (2026-04-15 00:00Z) Post-context-reset verification confirmed that the
   repository still matches this execplan: the backend task contract, frontend
   HTTP seam, golden fixtures, and documentation updates are present in-tree, so

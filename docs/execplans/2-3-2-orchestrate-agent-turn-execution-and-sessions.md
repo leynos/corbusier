@@ -1,9 +1,8 @@
 # Orchestrate agent turn execution and sessions (roadmap 2.3.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -433,7 +432,7 @@ Quality criteria:
   `Surprises & Discoveries`.
 - Migration changes must be additive; do not alter historical migration files.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Store verification logs at:
 

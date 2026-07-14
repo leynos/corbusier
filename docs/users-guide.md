@@ -606,8 +606,8 @@ having Vite proxy `/api/*` requests to the backend and inject the
 local preview plus browser-path testing before the production browser-auth
 model is settled.
 
-For installation conventions and consumer-facing configuration guidance, see
-the [Whitaker user's guide](./whitaker-users-guide.md).
+For installation conventions and consumer-facing configuration guidance, see the
+[Whitaker user's guide](./whitaker-users-guide.md).
 
 The development server listens on `http://127.0.0.1:4173`.
 

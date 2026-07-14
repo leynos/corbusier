@@ -173,7 +173,7 @@ This direction keeps the Corbusier record rich enough for orchestration,
 restart recovery, and audit, while avoiding a second runtime implementation. It
 also gives later ADRs a stable unit of attachment for wires, hooks, and prompt
 validation. The design boundaries in this ADR trace back to the companion
-design[^1].
+design [^1].
 
 [^1]: The companion design is
     `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`. The

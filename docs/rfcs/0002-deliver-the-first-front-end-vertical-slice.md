@@ -444,8 +444,8 @@ Use the shared dependency labels below to keep this step readable:
     navigate, transition, and reload against the running Corbusier API.
 
 - [ ] **4.4.4. Add task branch and pull-request association actions to the
-  detail view when the current HTTP surface supports them.** Requires 4.4.3.
-  See [API Design](docs/corbusier-api-design.md) §Endpoint inventory — Tasks.
+  detail view when the current HTTP surface supports them.** Requires 4.4.3. See
+  [API Design](docs/corbusier-api-design.md) §Endpoint inventory — Tasks.
 
   - Reuse the existing task-detail screen rather than creating a second
     workflow entry point.

@@ -11,8 +11,8 @@ slash-command metadata, a directives registry, AI suggestions, and "System"
 registry pages (personnel, agent backends, Model Context Protocol (MCP) tool
 registry, hooks and policies, monitoring, and tenant management).
 
-The repository-level adoption strategy for that frontend contract is proposed
-in [RFC 0001](rfcs/0001-adopt-corbusier-front-end-pwa.md).
+The repository-level adoption strategy for that frontend contract is proposed in
+[RFC 0001](rfcs/0001-adopt-corbusier-front-end-pwa.md).
 
 The existing Corbusier backend already has several strong anchors: a task
 aggregate with a typed state machine and origin metadata, a message subsystem
@@ -1030,8 +1030,8 @@ Reuse Wildside's centralized error payload pattern:
 ```
 
 Wildside defines a stable enum of error codes (`invalid_request`,
-`unauthorized`, `forbidden`, `not_found`, `conflict`, `service_unavailable`,
-and `internal_error`) and an Error schema with `code`, `message`, optional
+`unauthorized`, `forbidden`, `not_found`, `conflict`, `service_unavailable`, and
+`internal_error`) and an Error schema with `code`, `message`, optional
 `traceId`, and optional `details`.
 
 Recommendation: define `corbusier_api::ErrorCode` as a superset of Wildside's
@@ -1258,9 +1258,8 @@ incrementally:
   design: cursor encoding and decoding, links builder, and key traits. Public
   API: `Cursor<K>`, `Direction`, `Paginated<T>`, and `PaginationLinks`.
 - `crates/corbusier_events` -- domain event store interfaces, event identifier
-  type, SSE formatting and replay logic. Public API: `EventId`,
-  `EventEnvelope`, `EventStore` trait, SSE helpers, and `Last-Event-ID`
-  handling.
+  type, SSE formatting and replay logic. Public API: `EventId`, `EventEnvelope`,
+  `EventStore` trait, SSE helpers, and `Last-Event-ID` handling.
 - `crates/corbusier_projections` -- read-side query services and DTO assembly;
   depends on domain crates but avoids circular dependencies. Public API:
   `TaskQueries`, `ProjectQueries`, `ConversationQueries`, and others.
@@ -1329,15 +1328,15 @@ flowchart LR
   succeeds on existing data; `TaskStateV2` transition matrix unit tests pass
   for all valid and invalid pairs. See corbusier-api-design.md §"Task domain".
 - [ ] **2.3** Implement task and project projection endpoints. Deliver
-  `GET /api/v1/tasks` (paginated `TaskCardDto[]`),
-  `GET /api/v1/tasks/{task_id}` (`TaskDetailDto`), `GET /api/v1/projects`
-  (paginated `ProjectCardDto[]`), `GET /api/v1/projects/{slug}`
-  (`ProjectLandingDto`), and `GET /api/v1/projects/{slug}/kanban`
-  (`ProjectKanbanDto`). Depends on 1.2 (`corbusier_pagination` crate) and 2.2
-  (v2 task fields). Success criteria: contract tests validate each DTO shape
-  against golden JSON fixtures; pagination cursor round-trips correctly in
-  integration tests. See corbusier-api-design.md §"Endpoint inventory — Tasks"
-  and §"Endpoint inventory — Projects".
+  `GET /api/v1/tasks` (paginated `TaskCardDto[]`), `GET /api/v1/tasks/{task_id}`
+  (`TaskDetailDto`), `GET /api/v1/projects` (paginated `ProjectCardDto[]`),
+  `GET /api/v1/projects/{slug}` (`ProjectLandingDto`), and
+  `GET /api/v1/projects/{slug}/kanban` (`ProjectKanbanDto`). Depends on 1.2
+  (`corbusier_pagination` crate) and 2.2 (v2 task fields). Success criteria:
+  contract tests validate each DTO shape against golden JSON fixtures;
+  pagination cursor round-trips correctly in integration tests. See
+  corbusier-api-design.md §"Endpoint inventory — Tasks" and §"Endpoint
+  inventory — Projects".
 - [ ] **2.4** Add dependency graph storage and task hierarchy nodes. Deliver
   edges table for task dependencies and hierarchy node records (goal, idea, and
   step). Deliver `GET /api/v1/tasks/{task_id}/dependencies`

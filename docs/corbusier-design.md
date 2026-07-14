@@ -454,7 +454,7 @@ Corbusier implements this through:
 - Deterministic tool-call identifiers are generated from a canonical payload
   string with this exact order and encoding:
   `command=<value>;index=<value>;tool_name=<value>;parameters=<k=v;...>;arguments=<json>`.
-   Parameter entries are emitted in sorted key order from `BTreeMap`, values
+  Parameter entries are emitted in sorted key order from `BTreeMap`, values
   use JSON stringification (`serde_json::Value::to_string()`), and the
   canonical payload is encoded as UTF-8 bytes before hashing.
 - Hash algorithm decision: use SHA-256, take the first 8 digest bytes
@@ -1141,8 +1141,8 @@ erDiagram
 ```
 <!-- markdownlint-enable MD031 -->
 
-For screen readers: The following sequence diagram shows the high-level flow
-for `execute_turn`, from backend lookup and session arbitration through message
+For screen readers: The following sequence diagram shows the high-level flow for
+`execute_turn`, from backend lookup and session arbitration through message
 loading, runtime execution, scripted tool routing, and persistence of either
 success or failure outcomes.
 
@@ -1716,8 +1716,8 @@ Table 2.2.5.1: Tenancy and identity requirement matrix.
 - Roadmap item 1.5.2 introduced a `tenants` root table plus `tenant_id` on the
   core orchestration tables: `tasks`, `backend_registrations`, `conversations`,
   `messages`, `agent_sessions`, `handoffs`, and `context_snapshots`. A
-  deterministic default tenant row (`00000000-0000-0000-0000-000000000001`,
-  slug `default`) backfills legacy rows safely during migration.
+  deterministic default tenant row (`00000000-0000-0000-0000-000000000001`, slug
+  `default`) backfills legacy rows safely during migration.
 - Task issue-origin uniqueness is now tenant-scoped via a partial unique index
   over `tenant_id` plus the provider/repository/issue-number tuple when
   `origin.type = 'issue'`. Backend registration names are now unique per tenant
@@ -2367,7 +2367,7 @@ graph TB
 
 - **Workspace Files**: Encapsulated file system access through Podbot
 - **Change Logs**: Weaver-generated change sets and diffs
-- **Temporary Files**: Tool execution artifacts and build outputs
+- **Temporary Files**: Tool execution artefacts and build outputs
 
 ##### Object storage
 
@@ -2378,7 +2378,7 @@ graph TB
   `tool_log_metadata` table indexes these blobs for retention sweeps, while
   `tool_call_audit_log` records the structured call audit trail (the two tables
   serve distinct purposes and should not be conflated)
-- **Artifact Storage** (future): Large tool outputs and build artifacts
+- **Artefact Storage** (future): Large tool outputs and build artefacts
 - **Backup Storage** (future): Database backups and disaster recovery
 - **Static Assets** (future): Documentation and configuration templates
 
@@ -2460,17 +2460,17 @@ graph LR
         SC[Source Code]
         LT[Lint & Test]
         SEC[Security Scan]
-        BUILD[Build Artifacts]
+        BUILD[Build Artefacts]
         IMG[Container Images]
     end
-    
+
     subgraph "Quality Gates"
         UT[Unit Tests]
         IT[Integration Tests]
         BT[Benchmark Tests]
         SA[Security Audit]
     end
-    
+
     SC --> LT
     LT --> UT
     LT --> IT
@@ -2571,42 +2571,42 @@ flowchart TD
         SC[Slash Command Parser]
         MSG[Message Append]
     end
-    
+
     subgraph "Task Management"
         TC[Task Creation]
         TS[Task State Management]
         BC[Branch Creation]
         WS[Workspace Setup]
     end
-    
+
     subgraph "Agent Orchestration"
         AS[Agent Selection]
         TR[Tool Registry]
         AE[Agent Execution]
         TC_LOOP[Tool Call Loop]
     end
-    
+
     subgraph "Tool Execution"
         MCP_MUX[MCP Multiplexer]
         WEAVER[Weaver File Editor]
         TOOLS[Batteries Tools]
         PODBOT[Podbot Workspace]
     end
-    
+
     subgraph "Governance & Quality"
         HE[Hook Engine]
         GATES[Quality Gates]
         POLICY[Policy Enforcement]
         AUDIT[Audit Logging]
     end
-    
+
     subgraph "VCS Integration"
         BRANCH[Branch Management]
         COMMIT[Commit Operations]
         PR[Pull Request]
         REVIEW[Review Integration]
     end
-    
+
     UI --> SC
     SC --> MSG
     MSG --> TC
@@ -2629,7 +2629,7 @@ flowchart TD
     BRANCH --> COMMIT
     COMMIT --> PR
     PR --> REVIEW
-    
+
     TC_LOOP --> TC_LOOP
     GATES --> AE
     REVIEW --> MSG
@@ -2645,19 +2645,19 @@ flowchart TD
         COMMENT_NORM[Comment Normalization]
         REVIEW_QUEUE[Review Queue]
     end
-    
+
     subgraph "Context Integration"
         CONV_UPDATE[Conversation Update]
         TASK_LINK[Task Linking]
         AGENT_NOTIFY[Agent Notification]
     end
-    
+
     subgraph "Response Generation"
         AGENT_TURN[Agent Turn]
         CHANGE_GEN[Change Generation]
         REVIEW_REPLY[Review Reply]
     end
-    
+
     VCS_HOOK --> FRANKIE
     FRANKIE --> COMMENT_NORM
     COMMENT_NORM --> REVIEW_QUEUE
@@ -2680,19 +2680,19 @@ flowchart LR
         AGENT_ORCH[Agent Orchestrator]
         TOOL_REG[Tool Registry]
     end
-    
+
     subgraph "Agent Adapters"
         CLAUDE[Claude Code SDK]
         CODEX[Codex CLI App Server]
         FUTURE[Future Agents]
     end
-    
+
     subgraph "Tool Plane"
         MCP_SERV[MCP Servers]
         WEAVER_MCP[Weaver MCP]
         BATT_TOOLS[Battery Tools]
     end
-    
+
     CONV --> AGENT_ORCH
     AGENT_ORCH --> CLAUDE
     AGENT_ORCH --> CODEX
@@ -2701,7 +2701,7 @@ flowchart LR
     TOOL_REG --> MCP_SERV
     MCP_SERV --> WEAVER_MCP
     MCP_SERV --> BATT_TOOLS
-    
+
     CLAUDE --> TOOL_REG
     CODEX --> TOOL_REG
     FUTURE --> TOOL_REG
@@ -2727,7 +2727,7 @@ sequenceDiagram
     participant MCP as MCP Multiplexer
     participant Tool as Tool Server
     participant Workspace as Podbot Workspace
-    
+
     Agent->>Corbusier: Request Tool Execution
     Corbusier->>MCP: Route Tool Call
     MCP->>Tool: JSON-RPC 2.0 Call
@@ -2746,19 +2746,19 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     START[Task Request] --> TASK_TYPE{Task Type?}
-    
+
     TASK_TYPE -->|Code Generation| CODE_COMPLEX{Code Complexity?}
     TASK_TYPE -->|Documentation| DOC_TYPE{Documentation Type?}
     TASK_TYPE -->|Review| REVIEW_SCOPE{Review Scope?}
-    
+
     CODE_COMPLEX -->|High| CLAUDE[Claude Code SDK]
     CODE_COMPLEX -->|Medium| CODEX[Codex CLI App Server]
     CODE_COMPLEX -->|Low| DEFAULT[Default Agent]
-    
+
     DOC_TYPE -->|Technical| CLAUDE
     DOC_TYPE -->|User Guide| CODEX
     DOC_TYPE -->|API Docs| DEFAULT
-    
+
     REVIEW_SCOPE -->|Architecture| CLAUDE
     REVIEW_SCOPE -->|Code Quality| CODEX
     REVIEW_SCOPE -->|Style| DEFAULT
@@ -2769,10 +2769,10 @@ flowchart TD
 ```mermaid
 flowchart TD
     TOOL_CALL[Tool Call Request] --> FILE_OP{File Operation?}
-    
+
     FILE_OP -->|Yes| WEAVER[Route to Weaver]
     FILE_OP -->|No| TOOL_TYPE{Tool Type?}
-    
+
     TOOL_TYPE -->|VCS| VCS_TOOL[VCS Adapter]
     TOOL_TYPE -->|Search| SEARCH_TOOL[Semantic Search]
     TOOL_TYPE -->|Test| TEST_TOOL[Test Runner]
@@ -2792,7 +2792,7 @@ flowchart TD
         TOOL_EXEC[Tool Execution]
         TURN_END[Turn End]
     end
-    
+
     subgraph "Error Handling"
         AGENT_ERROR{Agent Error?}
         TOOL_ERROR{Tool Error?}
@@ -2801,32 +2801,32 @@ flowchart TD
         FALLBACK[Fallback Agent]
         ERROR_MSG[Error Message]
     end
-    
+
     subgraph "Recovery Actions"
         CONTEXT_RESTORE[Context Restore]
         STATE_ROLLBACK[State Rollback]
         USER_NOTIFY[User Notification]
         AUDIT_LOG[Audit Logging]
     end
-    
+
     TURN_START --> AGENT_CALL
     AGENT_CALL --> AGENT_ERROR
     AGENT_ERROR -->|Yes| RETRY_LOGIC
     AGENT_ERROR -->|No| TOOL_EXEC
-    
+
     TOOL_EXEC --> TOOL_ERROR
     TOOL_ERROR -->|Yes| CONTEXT_RESTORE
     TOOL_ERROR -->|No| TURN_END
-    
+
     RETRY_LOGIC --> TIMEOUT_ERROR
     TIMEOUT_ERROR -->|Yes| FALLBACK
     TIMEOUT_ERROR -->|No| AGENT_CALL
-    
+
     FALLBACK --> CONTEXT_RESTORE
     CONTEXT_RESTORE --> STATE_ROLLBACK
     STATE_ROLLBACK --> USER_NOTIFY
     USER_NOTIFY --> AUDIT_LOG
-    
+
     ERROR_MSG --> USER_NOTIFY
 ```
 
@@ -2839,13 +2839,13 @@ flowchart TD
         HOOK_EVAL[Hook Evaluation]
         HOOK_ACTION[Hook Action]
     end
-    
+
     subgraph "Error States"
         EVAL_FAIL{Evaluation Failed?}
         ACTION_FAIL{Action Failed?}
         TIMEOUT{Timeout?}
     end
-    
+
     subgraph "Recovery Strategies"
         SKIP_HOOK[Skip Hook]
         RETRY_HOOK[Retry Hook]
@@ -2853,19 +2853,19 @@ flowchart TD
         WARN_USER[Warn User]
         AUDIT_FAILURE[Audit Failure]
     end
-    
+
     HOOK_TRIGGER --> HOOK_EVAL
     HOOK_EVAL --> EVAL_FAIL
     EVAL_FAIL -->|Yes| SKIP_HOOK
     EVAL_FAIL -->|No| HOOK_ACTION
-    
+
     HOOK_ACTION --> ACTION_FAIL
     ACTION_FAIL -->|Yes| TIMEOUT
     ACTION_FAIL -->|No| AUDIT_FAILURE
-    
+
     TIMEOUT -->|Yes| BLOCK_TURN
     TIMEOUT -->|No| RETRY_HOOK
-    
+
     SKIP_HOOK --> WARN_USER
     RETRY_HOOK --> HOOK_EVAL
     BLOCK_TURN --> WARN_USER
@@ -2886,40 +2886,40 @@ flowchart LR
         REVIEW[Review Comments]
         HOOKS[Hook Results]
     end
-    
+
     subgraph "Processing Layer"
         PARSER[Message Parser]
         TEMPLATE[Template Engine]
         VALIDATOR[Message Validator]
         ENRICHER[Context Enricher]
     end
-    
+
     subgraph "Storage Layer"
         CONV_STORE[Conversation Store]
         EVENT_STORE[Event Store]
         AUDIT_STORE[Audit Store]
     end
-    
+
     subgraph "Output Destinations"
         AGENT[Agent Backend]
         API[HTTP API]
         STREAM[Event Stream]
         ARCHIVE[Archive Storage]
     end
-    
+
     USER --> PARSER
     SLASH --> TEMPLATE
     REVIEW --> PARSER
     HOOKS --> ENRICHER
-    
+
     PARSER --> VALIDATOR
     TEMPLATE --> VALIDATOR
     VALIDATOR --> ENRICHER
     ENRICHER --> CONV_STORE
-    
+
     CONV_STORE --> EVENT_STORE
     EVENT_STORE --> AUDIT_STORE
-    
+
     CONV_STORE --> AGENT
     EVENT_STORE --> API
     AUDIT_STORE --> STREAM
@@ -2940,30 +2940,30 @@ flowchart TD
         MCP_CALL[MCP JSON-RPC Call]
         TOOL_EXEC[Tool Execution]
     end
-    
+
     subgraph "Workspace Integration"
         PODBOT_MOUNT[Podbot Mount]
         FILE_ACCESS[File System Access]
         NETWORK_POLICY[Network Policy]
         RESOURCE_LIMITS[Resource Limits]
     end
-    
+
     subgraph "Result Processing"
         TOOL_RESULT[Tool Result]
         CHANGE_LOG[Change Logging]
         HOOK_TRIGGER[Hook Triggers]
         RESPONSE_FORMAT[Response Formatting]
     end
-    
+
     AGENT_REQ --> TOOL_ROUTER
     TOOL_ROUTER --> MCP_CALL
     MCP_CALL --> TOOL_EXEC
-    
+
     TOOL_EXEC --> PODBOT_MOUNT
     PODBOT_MOUNT --> FILE_ACCESS
     FILE_ACCESS --> NETWORK_POLICY
     NETWORK_POLICY --> RESOURCE_LIMITS
-    
+
     RESOURCE_LIMITS --> TOOL_RESULT
     TOOL_RESULT --> CHANGE_LOG
     CHANGE_LOG --> HOOK_TRIGGER
@@ -2988,17 +2988,17 @@ sequenceDiagram
     participant GitHub as GitHub API
     participant Frankie as Frankie Adapter
     participant Webhook as Webhook Handler
-    
+
     Corbusier->>VCS: Create Task from Issue
     VCS->>GitHub: GET /repos/{owner}/{repo}/issues/{issue_number}
     GitHub-->>VCS: Issue Details
     VCS-->>Corbusier: Task Metadata
-    
+
     Corbusier->>VCS: Create Branch
     VCS->>GitHub: POST /repos/{owner}/{repo}/git/refs
     GitHub-->>VCS: Branch Reference
     VCS-->>Corbusier: Branch Created
-    
+
     GitHub->>Webhook: PR Review Event
     Webhook->>Corbusier: Review Notification
     Corbusier->>Frankie: Sync review threads
@@ -3024,19 +3024,19 @@ sequenceDiagram
     participant Client as MCP Client
     participant Server as MCP Server
     participant Tool as Tool Implementation
-    
+
     Client->>Server: initialize
     Server-->>Client: initialized
-    
+
     Client->>Server: tools/list
     Server-->>Client: tools/list response
-    
+
     Client->>Server: tools/call
     Note over Server: Validate parameters
     Server->>Tool: Execute tool logic
     Tool-->>Server: Execution result
     Server-->>Client: tools/call response
-    
+
     Client->>Server: notifications/cancelled
     Server->>Tool: Cancel execution
 ```
@@ -3054,30 +3054,30 @@ flowchart TD
         HOOK_EVENTS[Hook Events]
         VCS_EVENTS[VCS Events]
     end
-    
+
     subgraph "Event Processing"
         EVENT_BUS[Event Bus]
         FILTER[Event Filter]
         TRANSFORM[Event Transform]
         ROUTE[Event Router]
     end
-    
+
     subgraph "Event Consumers"
         HTTP_STREAM[HTTP SSE Stream]
         WEBSOCKET[WebSocket Stream]
         AUDIT_LOG[Audit Logger]
         METRICS[Metrics Collector]
     end
-    
+
     TURN_EVENTS --> EVENT_BUS
     TOOL_EVENTS --> EVENT_BUS
     HOOK_EVENTS --> EVENT_BUS
     VCS_EVENTS --> EVENT_BUS
-    
+
     EVENT_BUS --> FILTER
     FILTER --> TRANSFORM
     TRANSFORM --> ROUTE
-    
+
     ROUTE --> HTTP_STREAM
     ROUTE --> WEBSOCKET
     ROUTE --> AUDIT_LOG
@@ -3109,14 +3109,14 @@ flowchart TD
         PRE_DEPLOY[PreDeploy]
         POST_DEPLOY[PostDeploy]
     end
-    
+
     subgraph "Hook Engine"
         TRIGGER_MATCH[Trigger Matching]
         PREDICATE_EVAL[Predicate Evaluation]
         ACTION_EXEC[Action Execution]
         RESULT_COLLECT[Result Collection]
     end
-    
+
     subgraph "Hook Actions"
         QUALITY_GATE[Quality Gate]
         POLICY_CHECK[Policy Check]
@@ -3124,7 +3124,7 @@ flowchart TD
         BLOCK_ACTION[Block Action]
         REMEDIATION[Remediation]
     end
-    
+
     PRE_TURN --> TRIGGER_MATCH
     POST_TURN --> TRIGGER_MATCH
     PRE_TOOL_CALL --> TRIGGER_MATCH
@@ -3139,11 +3139,11 @@ flowchart TD
     POST_PUSH --> TRIGGER_MATCH
     PRE_DEPLOY --> TRIGGER_MATCH
     POST_DEPLOY --> TRIGGER_MATCH
-    
+
     TRIGGER_MATCH --> PREDICATE_EVAL
     PREDICATE_EVAL --> ACTION_EXEC
     ACTION_EXEC --> RESULT_COLLECT
-    
+
     ACTION_EXEC --> QUALITY_GATE
     ACTION_EXEC --> POLICY_CHECK
     ACTION_EXEC --> NOTIFICATION
@@ -3163,30 +3163,30 @@ flowchart LR
         HOOK_LOGS[Hook Results]
         VCS_LOGS[VCS Operations]
     end
-    
+
     subgraph "Processing Pipeline"
         AGGREGATE[Data Aggregation]
         NORMALIZE[Data Normalization]
         ENRICH[Context Enrichment]
         VALIDATE[Data Validation]
     end
-    
+
     subgraph "Output Generation"
         COMPLIANCE[Compliance Reports]
         METRICS[Performance Metrics]
         ALERTS[Alert Generation]
         ARCHIVE[Long-term Archive]
     end
-    
+
     CONV_LOGS --> AGGREGATE
     TOOL_LOGS --> AGGREGATE
     HOOK_LOGS --> AGGREGATE
     VCS_LOGS --> AGGREGATE
-    
+
     AGGREGATE --> NORMALIZE
     NORMALIZE --> ENRICH
     ENRICH --> VALIDATE
-    
+
     VALIDATE --> COMPLIANCE
     VALIDATE --> METRICS
     VALIDATE --> ALERTS
@@ -3207,7 +3207,7 @@ flowchart TD
         HOOKS_PRE[Pre-Turn Hooks]
         AGENT_SELECT[Agent Selection]
     end
-    
+
     subgraph "Agent Execution"
         AGENT_CALL[Agent Backend Call]
         STREAM_START[Start Response Stream]
@@ -3215,42 +3215,42 @@ flowchart TD
         TOOL_EXEC[Execute Tools]
         RESPONSE_COMPLETE{Response Complete?}
     end
-    
+
     subgraph "Post-Processing"
         HOOKS_POST[Post-Turn Hooks]
         CHANGE_LOG[Log Changes]
         STATE_UPDATE[Update State]
         PERSIST[Persist Messages]
     end
-    
+
     subgraph "Error Handling"
         ERROR_CHECK{Error Occurred?}
         RETRY_LOGIC[Retry Logic]
         FALLBACK[Fallback Strategy]
         ERROR_LOG[Error Logging]
     end
-    
+
     START --> CONTEXT
     CONTEXT --> HOOKS_PRE
     HOOKS_PRE --> AGENT_SELECT
     AGENT_SELECT --> AGENT_CALL
-    
+
     AGENT_CALL --> ERROR_CHECK
     ERROR_CHECK -->|Yes| RETRY_LOGIC
     ERROR_CHECK -->|No| STREAM_START
-    
+
     STREAM_START --> TOOL_CALLS
     TOOL_CALLS -->|Yes| TOOL_EXEC
     TOOL_CALLS -->|No| RESPONSE_COMPLETE
-    
+
     TOOL_EXEC --> RESPONSE_COMPLETE
     RESPONSE_COMPLETE -->|No| TOOL_CALLS
     RESPONSE_COMPLETE -->|Yes| HOOKS_POST
-    
+
     HOOKS_POST --> CHANGE_LOG
     CHANGE_LOG --> STATE_UPDATE
     STATE_UPDATE --> PERSIST
-    
+
     RETRY_LOGIC --> FALLBACK
     FALLBACK --> ERROR_LOG
     ERROR_LOG --> AGENT_CALL
@@ -3263,29 +3263,29 @@ stateDiagram-v2
     [*] --> Draft: Create Task
     Draft --> InProgress: Start Task
     Draft --> Abandoned: Cancel Task
-    
+
     InProgress --> InReview: Create PR
     InProgress --> Abandoned: Cancel Task
     InProgress --> InProgress: Continue Work
-    
+
     InReview --> InProgress: Request Changes
     InReview --> Done: Approve & Merge
     InReview --> Abandoned: Close PR
-    
+
     Done --> [*]
     Abandoned --> [*]
-    
+
     note right of Draft
         Task created from issue
         Branch not yet created
     end note
-    
+
     note right of InProgress
         Branch created
         Active development
         Tools available
     end note
-    
+
     note right of InReview
         PR created
         Review process active
@@ -3305,21 +3305,21 @@ flowchart TB
         AGENTS[AI Agent Services]
         REVIEW[Review Tools]
     end
-    
+
     subgraph "Corbusier Platform"
         subgraph "API Layer"
             HTTP[HTTP API]
             WS[WebSocket/SSE]
             WEBHOOK[Webhook Handlers]
         end
-        
+
         subgraph "Core Services"
             CONV[Conversation Service]
             TASK[Task Service]
             AGENT_ORCH[Agent Orchestrator]
             TOOL_REG[Tool Registry]
         end
-        
+
         subgraph "Infrastructure"
             MCP[MCP Multiplexer]
             HOOKS[Hook Engine]
@@ -3327,35 +3327,35 @@ flowchart TB
             PERSIST[Persistence Layer]
         end
     end
-    
+
     subgraph "Tool Ecosystem"
         WEAVER[Weaver Editor]
         PODBOT[Podbot Containers]
         BATTERIES[Battery Tools]
         CUSTOM[Custom Tools]
     end
-    
+
     USER --> HTTP
     USER --> WS
     VCS --> WEBHOOK
     AGENTS --> AGENT_ORCH
     REVIEW --> WEBHOOK
-    
+
     HTTP --> CONV
     HTTP --> TASK
     WS --> CONV
     WEBHOOK --> TASK
-    
+
     CONV --> AGENT_ORCH
     TASK --> AGENT_ORCH
     AGENT_ORCH --> TOOL_REG
     TOOL_REG --> MCP
-    
+
     MCP --> WEAVER
     MCP --> BATTERIES
     MCP --> CUSTOM
     ENCAP --> PODBOT
-    
+
     HOOKS --> PERSIST
     CONV --> PERSIST
     TASK --> PERSIST
@@ -3397,46 +3397,46 @@ flowchart TD
         ERROR_RESP{Error Response?}
         CONN_FAIL{Connection Failed?}
     end
-    
+
     subgraph "Recovery Strategy"
         RETRY_COUNT{Retry Count < Max?}
         BACKOFF[Exponential Backoff]
         FALLBACK_AGENT[Switch to Fallback Agent]
         CONTEXT_TRANSFER[Transfer Context]
     end
-    
+
     subgraph "User Communication"
         NOTIFY_USER[Notify User of Issue]
         PROGRESS_UPDATE[Update Progress Status]
         MANUAL_INTERVENTION[Request Manual Intervention]
     end
-    
+
     subgraph "System Recovery"
         STATE_RESTORE[Restore Previous State]
         AUDIT_LOG[Log Recovery Event]
         HEALTH_CHECK[Health Check]
         RESUME_OPERATION[Resume Operation]
     end
-    
+
     AGENT_CALL --> TIMEOUT
     AGENT_CALL --> ERROR_RESP
     AGENT_CALL --> CONN_FAIL
-    
+
     TIMEOUT -->|Yes| RETRY_COUNT
     ERROR_RESP -->|Yes| RETRY_COUNT
     CONN_FAIL -->|Yes| RETRY_COUNT
-    
+
     RETRY_COUNT -->|Yes| BACKOFF
     RETRY_COUNT -->|No| FALLBACK_AGENT
-    
+
     BACKOFF --> AGENT_CALL
     FALLBACK_AGENT --> CONTEXT_TRANSFER
     CONTEXT_TRANSFER --> NOTIFY_USER
-    
+
     NOTIFY_USER --> PROGRESS_UPDATE
     PROGRESS_UPDATE --> MANUAL_INTERVENTION
     MANUAL_INTERVENTION --> STATE_RESTORE
-    
+
     STATE_RESTORE --> AUDIT_LOG
     AUDIT_LOG --> HEALTH_CHECK
     HEALTH_CHECK --> RESUME_OPERATION
@@ -3453,14 +3453,14 @@ flowchart TD
         TIMEOUT_ERROR{Execution Timeout?}
         VALIDATION_ERROR{Input Validation Failed?}
     end
-    
+
     subgraph "Error Classification"
         RETRYABLE{Retryable Error?}
         USER_ERROR{User Input Error?}
         SYSTEM_ERROR{System Error?}
         FATAL_ERROR{Fatal Error?}
     end
-    
+
     subgraph "Recovery Actions"
         RETRY_TOOL[Retry Tool Execution]
         REQUEST_INPUT[Request User Input]
@@ -3468,26 +3468,26 @@ flowchart TD
         ABORT_TURN[Abort Turn]
         ALTERNATIVE_TOOL[Use Alternative Tool]
     end
-    
+
     TOOL_START --> PERMISSION_ERROR
     TOOL_START --> RESOURCE_ERROR
     TOOL_START --> TIMEOUT_ERROR
     TOOL_START --> VALIDATION_ERROR
-    
+
     PERMISSION_ERROR --> RETRYABLE
     RESOURCE_ERROR --> RETRYABLE
     TIMEOUT_ERROR --> RETRYABLE
     VALIDATION_ERROR --> USER_ERROR
-    
+
     RETRYABLE -->|Yes| RETRY_TOOL
     RETRYABLE -->|No| SYSTEM_ERROR
     USER_ERROR -->|Yes| REQUEST_INPUT
     SYSTEM_ERROR -->|Yes| ESCALATE
-    
+
     SYSTEM_ERROR --> FATAL_ERROR
     FATAL_ERROR -->|Yes| ABORT_TURN
     FATAL_ERROR -->|No| ALTERNATIVE_TOOL
-    
+
     RETRY_TOOL --> TOOL_START
     REQUEST_INPUT --> TOOL_START
     ALTERNATIVE_TOOL --> TOOL_START
@@ -3511,7 +3511,7 @@ stateDiagram-v2
     Paused --> Active: User Resume
     Active --> Archived: Archive Conversation
     Archived --> [*]
-    
+
     AgentProcessing --> Error: Agent Failure
     ToolExecution --> Error: Tool Failure
     Error --> Active: Recovery Complete
@@ -3528,21 +3528,21 @@ flowchart TD
         SNAPSHOT[State Snapshots]
         RECOVERY[Recovery Points]
     end
-    
+
     subgraph "State Transitions"
         VALIDATE[Validate Transition]
         EXECUTE[Execute Transition]
         PERSIST[Persist State]
         NOTIFY[Notify Subscribers]
     end
-    
+
     subgraph "Consistency Checks"
         INVARIANT[Check Invariants]
         CONFLICT[Resolve Conflicts]
         ROLLBACK[Rollback on Failure]
         AUDIT[Audit Changes]
     end
-    
+
     TASK_STATE --> VALIDATE
     VALIDATE --> INVARIANT
     INVARIANT --> EXECUTE
@@ -3550,12 +3550,12 @@ flowchart TD
     PERSIST --> EVENT_LOG
     EVENT_LOG --> SNAPSHOT
     SNAPSHOT --> NOTIFY
-    
+
     INVARIANT --> CONFLICT
     CONFLICT --> ROLLBACK
     EXECUTE --> ROLLBACK
     ROLLBACK --> RECOVERY
-    
+
     NOTIFY --> AUDIT
     AUDIT --> TASK_STATE
 ```
@@ -3572,42 +3572,42 @@ flowchart LR
         TOOL_ACTION[Tool Actions]
         SYSTEM_ACTION[System Actions]
     end
-    
+
     subgraph "Event Processing"
         EVENT_STREAM[Event Stream]
         VALIDATION[Event Validation]
         ENRICHMENT[Event Enrichment]
         ORDERING[Event Ordering]
     end
-    
+
     subgraph "Persistence Layer"
         EVENT_STORE[Event Store]
         SNAPSHOT_STORE[Snapshot Store]
         READ_MODEL[Read Models]
         ARCHIVE[Archive Storage]
     end
-    
+
     subgraph "Query Layer"
         PROJECTION[Event Projections]
         MATERIALIZED[Materialized Views]
         CACHE[Query Cache]
         API_LAYER[API Layer]
     end
-    
+
     USER_ACTION --> EVENT_STREAM
     AGENT_ACTION --> EVENT_STREAM
     TOOL_ACTION --> EVENT_STREAM
     SYSTEM_ACTION --> EVENT_STREAM
-    
+
     EVENT_STREAM --> VALIDATION
     VALIDATION --> ENRICHMENT
     ENRICHMENT --> ORDERING
     ORDERING --> EVENT_STORE
-    
+
     EVENT_STORE --> SNAPSHOT_STORE
     EVENT_STORE --> READ_MODEL
     SNAPSHOT_STORE --> ARCHIVE
-    
+
     READ_MODEL --> PROJECTION
     PROJECTION --> MATERIALIZED
     MATERIALIZED --> CACHE
@@ -3625,35 +3625,35 @@ flowchart TD
         PERSIST_CHANGES[Persist Changes]
         COMMIT_TX[Commit Transaction]
     end
-    
+
     subgraph "Rollback Scenarios"
         VALIDATION_FAIL[Validation Failed]
         LOGIC_ERROR[Business Logic Error]
         PERSISTENCE_ERROR[Persistence Error]
         ROLLBACK[Rollback Transaction]
     end
-    
+
     subgraph "Consistency Guarantees"
         ACID_CHECK[ACID Compliance]
         ISOLATION[Isolation Level]
         DURABILITY[Durability Check]
         CONSISTENCY[Consistency Validation]
     end
-    
+
     BEGIN_TX --> VALIDATE_INPUT
     VALIDATE_INPUT --> VALIDATION_FAIL
     VALIDATE_INPUT --> BUSINESS_LOGIC
-    
+
     BUSINESS_LOGIC --> LOGIC_ERROR
     BUSINESS_LOGIC --> PERSIST_CHANGES
-    
+
     PERSIST_CHANGES --> PERSISTENCE_ERROR
     PERSIST_CHANGES --> COMMIT_TX
-    
+
     VALIDATION_FAIL --> ROLLBACK
     LOGIC_ERROR --> ROLLBACK
     PERSISTENCE_ERROR --> ROLLBACK
-    
+
     COMMIT_TX --> ACID_CHECK
     ACID_CHECK --> ISOLATION
     ISOLATION --> DURABILITY
@@ -3672,43 +3672,43 @@ flowchart TD
         POLICY_CACHE[Policy Cache]
         TEMPLATE_CACHE[Template Cache]
     end
-    
+
     subgraph "Data Cache"
         CONVERSATION_CACHE[Conversation Cache]
         TASK_CACHE[Task Cache]
         USER_CACHE[User Context Cache]
         METADATA_CACHE[Metadata Cache]
     end
-    
+
     subgraph "External Cache"
         VCS_CACHE[VCS Data Cache]
         AGENT_RESP_CACHE[Agent Response Cache]
         TOOL_RESULT_CACHE[Tool Result Cache]
         REVIEW_CACHE[Review Data Cache]
     end
-    
+
     subgraph "Cache Management"
         TTL[Time-to-Live]
         INVALIDATION[Cache Invalidation]
         WARMING[Cache Warming]
         EVICTION[Cache Eviction]
     end
-    
+
     TOOL_CACHE --> TTL
     AGENT_CACHE --> TTL
     POLICY_CACHE --> TTL
     TEMPLATE_CACHE --> TTL
-    
+
     CONVERSATION_CACHE --> INVALIDATION
     TASK_CACHE --> INVALIDATION
     USER_CACHE --> INVALIDATION
     METADATA_CACHE --> INVALIDATION
-    
+
     VCS_CACHE --> WARMING
     AGENT_RESP_CACHE --> WARMING
     TOOL_RESULT_CACHE --> WARMING
     REVIEW_CACHE --> WARMING
-    
+
     TTL --> EVICTION
     INVALIDATION --> EVICTION
     WARMING --> EVICTION
@@ -3726,7 +3726,7 @@ flowchart TD
         RETRY_CONDITIONS[Retry Conditions]
         CIRCUIT_BREAKER[Circuit Breaker]
     end
-    
+
     subgraph "Retry Logic"
         ATTEMPT[Execute Attempt]
         SUCCESS{Success?}
@@ -3734,29 +3734,29 @@ flowchart TD
         RETRY_COUNT{Retry Count < Max?}
         BACKOFF_WAIT[Wait with Backoff]
     end
-    
+
     subgraph "Failure Handling"
         PERMANENT_FAIL[Permanent Failure]
         CIRCUIT_OPEN[Open Circuit]
         FALLBACK[Execute Fallback]
         ERROR_LOG[Log Error]
     end
-    
+
     MAX_RETRIES --> RETRY_COUNT
     BACKOFF_STRATEGY --> BACKOFF_WAIT
     RETRY_CONDITIONS --> RETRYABLE
     CIRCUIT_BREAKER --> CIRCUIT_OPEN
-    
+
     ATTEMPT --> SUCCESS
     SUCCESS -->|No| RETRYABLE
     SUCCESS -->|Yes| CIRCUIT_BREAKER
-    
+
     RETRYABLE -->|Yes| RETRY_COUNT
     RETRYABLE -->|No| PERMANENT_FAIL
-    
+
     RETRY_COUNT -->|Yes| BACKOFF_WAIT
     RETRY_COUNT -->|No| PERMANENT_FAIL
-    
+
     BACKOFF_WAIT --> ATTEMPT
     PERMANENT_FAIL --> FALLBACK
     CIRCUIT_OPEN --> FALLBACK
@@ -3773,43 +3773,43 @@ flowchart TD
         PRIMARY_VCS[Primary VCS]
         PRIMARY_STORAGE[Primary Storage]
     end
-    
+
     subgraph "Fallback Systems"
         FALLBACK_AGENT[Fallback Agent]
         FALLBACK_TOOL[Alternative Tool]
         FALLBACK_VCS[Backup VCS]
         FALLBACK_STORAGE[Backup Storage]
     end
-    
+
     subgraph "Degraded Mode"
         LIMITED_FEATURES[Limited Features]
         CACHED_DATA[Cached Data Only]
         MANUAL_MODE[Manual Intervention]
         OFFLINE_MODE[Offline Mode]
     end
-    
+
     subgraph "Recovery Process"
         HEALTH_CHECK[Health Monitoring]
         AUTO_RECOVERY[Automatic Recovery]
         GRADUAL_RESTORE[Gradual Restoration]
         FULL_RESTORE[Full Service Restore]
     end
-    
+
     PRIMARY_AGENT --> FALLBACK_AGENT
     PRIMARY_TOOL --> FALLBACK_TOOL
     PRIMARY_VCS --> FALLBACK_VCS
     PRIMARY_STORAGE --> FALLBACK_STORAGE
-    
+
     FALLBACK_AGENT --> LIMITED_FEATURES
     FALLBACK_TOOL --> CACHED_DATA
     FALLBACK_VCS --> MANUAL_MODE
     FALLBACK_STORAGE --> OFFLINE_MODE
-    
+
     LIMITED_FEATURES --> HEALTH_CHECK
     CACHED_DATA --> HEALTH_CHECK
     MANUAL_MODE --> HEALTH_CHECK
     OFFLINE_MODE --> HEALTH_CHECK
-    
+
     HEALTH_CHECK --> AUTO_RECOVERY
     AUTO_RECOVERY --> GRADUAL_RESTORE
     GRADUAL_RESTORE --> FULL_RESTORE
@@ -3838,31 +3838,31 @@ flowchart TD
         TOOLS_READY{Tools Ready?}
         PERMISSIONS{Permissions OK?}
     end
-    
+
     subgraph "During-Turn Validation"
         TOOL_PARAMS{Tool Parameters Valid?}
         RESOURCE_LIMITS{Within Resource Limits?}
         POLICY_COMPLIANCE{Policy Compliant?}
         TIMEOUT_CHECK{Within Timeout?}
     end
-    
+
     subgraph "Post-Turn Validation"
         RESPONSE_VALID{Response Valid?}
         CHANGES_APPROVED{Changes Approved?}
         HOOKS_PASSED{Hooks Passed?}
         STATE_CONSISTENT{State Consistent?}
     end
-    
+
     CONTEXT_VALID -->|No| REJECT_TURN[Reject Turn]
     AGENT_AVAILABLE -->|No| QUEUE_TURN[Queue Turn]
     TOOLS_READY -->|No| WAIT_TOOLS[Wait for Tools]
     PERMISSIONS -->|No| REQUEST_AUTH[Request Authorization]
-    
+
     TOOL_PARAMS -->|No| INVALID_PARAMS[Invalid Parameters Error]
     RESOURCE_LIMITS -->|No| RESOURCE_ERROR[Resource Limit Error]
     POLICY_COMPLIANCE -->|No| POLICY_VIOLATION[Policy Violation]
     TIMEOUT_CHECK -->|No| TIMEOUT_ERROR[Timeout Error]
-    
+
     RESPONSE_VALID -->|No| RESPONSE_ERROR[Response Error]
     CHANGES_APPROVED -->|No| REJECT_CHANGES[Reject Changes]
     HOOKS_PASSED -->|No| HOOK_FAILURE[Hook Failure]
@@ -3881,26 +3881,26 @@ flowchart TD
         CONTENT_PARTS[Content Parts Array]
         TIMESTAMP[Timestamp Required]
     end
-    
+
     subgraph "Content Validation"
         TEXT_CONTENT[Text Content Validation]
         TOOL_CALLS[Tool Call Validation]
         ATTACHMENTS[Attachment Validation]
         METADATA[Metadata Validation]
     end
-    
+
     subgraph "Business Rules"
         CONVERSATION_CONTEXT[Conversation Context]
         SEQUENCE_ORDER[Message Sequence]
         DUPLICATE_CHECK[Duplicate Detection]
         SIZE_LIMITS[Size Limits]
     end
-    
+
     MSG_ID --> TEXT_CONTENT
     ROLE_VALID --> TOOL_CALLS
     CONTENT_PARTS --> ATTACHMENTS
     TIMESTAMP --> METADATA
-    
+
     TEXT_CONTENT --> CONVERSATION_CONTEXT
     TOOL_CALLS --> SEQUENCE_ORDER
     ATTACHMENTS --> DUPLICATE_CHECK
@@ -3923,31 +3923,31 @@ flowchart TD
         PARAM_TYPES{Parameter Types Valid?}
         REQUIRED_PARAMS{Required Parameters Present?}
     end
-    
+
     subgraph "Authorization Validation"
         TOOL_PERMISSIONS{Tool Permissions?}
         WORKSPACE_ACCESS{Workspace Access?}
         RESOURCE_QUOTA{Resource Quota?}
         POLICY_ALLOWED{Policy Allows?}
     end
-    
+
     subgraph "Runtime Validation"
         TOOL_AVAILABLE{Tool Available?}
         DEPENDENCIES{Dependencies Met?}
         PRECONDITIONS{Preconditions Met?}
         CONTEXT_VALID{Context Valid?}
     end
-    
+
     TOOL_EXISTS -->|No| TOOL_NOT_FOUND[Tool Not Found Error]
     SCHEMA_MATCH -->|No| SCHEMA_ERROR[Schema Validation Error]
     PARAM_TYPES -->|No| TYPE_ERROR[Parameter Type Error]
     REQUIRED_PARAMS -->|No| MISSING_PARAM[Missing Parameter Error]
-    
+
     TOOL_PERMISSIONS -->|No| PERMISSION_DENIED[Permission Denied]
     WORKSPACE_ACCESS -->|No| ACCESS_DENIED[Access Denied]
     RESOURCE_QUOTA -->|No| QUOTA_EXCEEDED[Quota Exceeded]
     POLICY_ALLOWED -->|No| POLICY_BLOCKED[Policy Blocked]
-    
+
     TOOL_AVAILABLE -->|No| TOOL_UNAVAILABLE[Tool Unavailable]
     DEPENDENCIES -->|No| DEPENDENCY_ERROR[Dependency Error]
     PRECONDITIONS -->|No| PRECONDITION_FAILED[Precondition Failed]
@@ -3966,38 +3966,38 @@ flowchart TD
         USER_PERMISSIONS[User Permissions]
         SESSION_VALID[Session Validation]
     end
-    
+
     subgraph "Resource Level"
         RESOURCE_OWNER[Resource Ownership]
         RESOURCE_POLICY[Resource Policy]
         RESOURCE_SCOPE[Resource Scope]
         RESOURCE_STATE[Resource State]
     end
-    
+
     subgraph "Operation Level"
         OPERATION_TYPE[Operation Type]
         OPERATION_CONTEXT[Operation Context]
         OPERATION_IMPACT[Operation Impact]
         OPERATION_AUDIT[Operation Audit]
     end
-    
+
     subgraph "System Level"
         SYSTEM_POLICY[System Policy]
         RATE_LIMITS[Rate Limits]
         QUOTA_LIMITS[Quota Limits]
         MAINTENANCE_MODE[Maintenance Mode]
     end
-    
+
     USER_AUTH --> RESOURCE_OWNER
     USER_ROLES --> RESOURCE_POLICY
     USER_PERMISSIONS --> RESOURCE_SCOPE
     SESSION_VALID --> RESOURCE_STATE
-    
+
     RESOURCE_OWNER --> OPERATION_TYPE
     RESOURCE_POLICY --> OPERATION_CONTEXT
     RESOURCE_SCOPE --> OPERATION_IMPACT
     RESOURCE_STATE --> OPERATION_AUDIT
-    
+
     OPERATION_TYPE --> SYSTEM_POLICY
     OPERATION_CONTEXT --> RATE_LIMITS
     OPERATION_IMPACT --> QUOTA_LIMITS
@@ -4016,42 +4016,42 @@ flowchart LR
         TOOL_EXECUTIONS[Tool Executions]
         STATE_CHANGES[State Changes]
     end
-    
+
     subgraph "Audit Processing"
         EVENT_CAPTURE[Event Capture]
         DATA_ENRICHMENT[Data Enrichment]
         INTEGRITY_CHECK[Integrity Check]
         RETENTION_POLICY[Retention Policy]
     end
-    
+
     subgraph "Compliance Validation"
         COMPLETENESS[Completeness Check]
         IMMUTABILITY[Immutability Verification]
         ACCESSIBILITY[Accessibility Validation]
         PRIVACY_COMPLIANCE[Privacy Compliance]
     end
-    
+
     subgraph "Reporting"
         AUDIT_REPORTS[Audit Reports]
         COMPLIANCE_DASHBOARD[Compliance Dashboard]
         VIOLATION_ALERTS[Violation Alerts]
         EXPORT_CAPABILITY[Export Capability]
     end
-    
+
     USER_ACTIONS --> EVENT_CAPTURE
     SYSTEM_EVENTS --> EVENT_CAPTURE
     TOOL_EXECUTIONS --> EVENT_CAPTURE
     STATE_CHANGES --> EVENT_CAPTURE
-    
+
     EVENT_CAPTURE --> DATA_ENRICHMENT
     DATA_ENRICHMENT --> INTEGRITY_CHECK
     INTEGRITY_CHECK --> RETENTION_POLICY
-    
+
     RETENTION_POLICY --> COMPLETENESS
     COMPLETENESS --> IMMUTABILITY
     IMMUTABILITY --> ACCESSIBILITY
     ACCESSIBILITY --> PRIVACY_COMPLIANCE
-    
+
     PRIVACY_COMPLIANCE --> AUDIT_REPORTS
     AUDIT_REPORTS --> COMPLIANCE_DASHBOARD
     COMPLIANCE_DASHBOARD --> VIOLATION_ALERTS
@@ -4082,26 +4082,26 @@ flowchart TD
         TOOL_CALLS[500 Tool Calls/Minute]
         VCS_OPS[100 VCS Operations/Minute]
     end
-    
+
     subgraph "Resource Scaling"
         AUTO_SCALE[Auto Scaling Triggers]
         LOAD_BALANCE[Load Balancing]
         RESOURCE_POOL[Resource Pool Management]
         QUEUE_MANAGEMENT[Queue Management]
     end
-    
+
     subgraph "Performance Monitoring"
         METRICS[Performance Metrics]
         ALERTS[Performance Alerts]
         CAPACITY_PLANNING[Capacity Planning]
         OPTIMIZATION[Performance Optimization]
     end
-    
+
     CONVERSATIONS --> AUTO_SCALE
     AGENT_TURNS --> LOAD_BALANCE
     TOOL_CALLS --> RESOURCE_POOL
     VCS_OPS --> QUEUE_MANAGEMENT
-    
+
     AUTO_SCALE --> METRICS
     LOAD_BALANCE --> ALERTS
     RESOURCE_POOL --> CAPACITY_PLANNING
@@ -4140,30 +4140,30 @@ flowchart TD
         ESCALATION[Escalation Procedures]
         INCIDENT_RESPONSE[Incident Response]
     end
-    
+
     subgraph "Recovery Procedures"
         FAILOVER[Automatic Failover]
         DATA_RECOVERY[Data Recovery]
         SERVICE_RESTORE[Service Restoration]
         VALIDATION[Recovery Validation]
     end
-    
+
     subgraph "Business Continuity"
         BACKUP_SYSTEMS[Backup Systems]
         DEGRADED_MODE[Degraded Mode Operation]
         COMMUNICATION[Stakeholder Communication]
         POST_INCIDENT[Post-Incident Review]
     end
-    
+
     HEALTH_MONITOR --> ALERT_SYSTEM
     ALERT_SYSTEM --> ESCALATION
     ESCALATION --> INCIDENT_RESPONSE
-    
+
     INCIDENT_RESPONSE --> FAILOVER
     FAILOVER --> DATA_RECOVERY
     DATA_RECOVERY --> SERVICE_RESTORE
     SERVICE_RESTORE --> VALIDATION
-    
+
     FAILOVER --> BACKUP_SYSTEMS
     DATA_RECOVERY --> DEGRADED_MODE
     SERVICE_RESTORE --> COMMUNICATION
@@ -4182,38 +4182,38 @@ flowchart LR
         API_GATEWAY[API Gateway]
         RATE_LIMITER[Rate Limiter]
     end
-    
+
     subgraph "Service Scaling"
         CONVERSATION_SVC[Conversation Service Instances]
         AGENT_SVC[Agent Orchestrator Instances]
         TOOL_SVC[Tool Service Instances]
         HOOK_SVC[Hook Engine Instances]
     end
-    
+
     subgraph "Data Scaling"
         DB_SHARDING[Database Sharding]
         CACHE_CLUSTER[Cache Cluster]
         EVENT_STREAM[Event Stream Partitioning]
         STORAGE_TIER[Storage Tiering]
     end
-    
+
     subgraph "Auto Scaling"
         METRICS_COLLECTION[Metrics Collection]
         SCALING_POLICIES[Scaling Policies]
         RESOURCE_PROVISIONING[Resource Provisioning]
         HEALTH_CHECKS[Health Checks]
     end
-    
+
     LOAD_BALANCER --> CONVERSATION_SVC
     SERVICE_MESH --> AGENT_SVC
     API_GATEWAY --> TOOL_SVC
     RATE_LIMITER --> HOOK_SVC
-    
+
     CONVERSATION_SVC --> DB_SHARDING
     AGENT_SVC --> CACHE_CLUSTER
     TOOL_SVC --> EVENT_STREAM
     HOOK_SVC --> STORAGE_TIER
-    
+
     DB_SHARDING --> METRICS_COLLECTION
     CACHE_CLUSTER --> SCALING_POLICIES
     EVENT_STREAM --> RESOURCE_PROVISIONING
@@ -4425,7 +4425,7 @@ sequenceDiagram
     participant Tool as Tool Registry
     participant MCP as MCP Server
     participant Hook as Hook Engine
-    
+
     User->>Conv: POST /conversations/{id}/messages
     Conv->>Agent: Execute Turn Request
     Agent->>Tool: Route Tool Call
@@ -4446,24 +4446,24 @@ stateDiagram-v2
     [*] --> Created: Initialize Task
     Created --> InProgress: Start Development
     Created --> Abandoned: Cancel Task
-    
+
     InProgress --> InReview: Create Pull Request
     InProgress --> Abandoned: Cancel Development
     InProgress --> InProgress: Continue Work
-    
+
     InReview --> InProgress: Request Changes
     InReview --> Done: Approve & Merge
     InReview --> Abandoned: Close PR
-    
+
     Done --> [*]
     Abandoned --> [*]
-    
+
     note right of InProgress
         Branch created
         Workspace active
         Tools available
     end note
-    
+
     note right of InReview
         PR created
         Review hooks active
@@ -4600,30 +4600,30 @@ flowchart TD
         MAINT[Maintainability Goals]
         SECURITY[Security Requirements]
     end
-    
+
     subgraph "Architecture Evaluation"
         LAYERED[Layered Architecture]
         MICRO[Microservices]
         HEX[Hexagonal Architecture]
         EVENT[Event-Driven Architecture]
     end
-    
+
     subgraph "Decision Outcome"
         CHOSEN[Hexagonal + Event-Driven Hybrid]
         RATIONALE[Technology Agnostic Core + Loose Coupling]
         TRADEOFFS[Complexity vs Flexibility]
     end
-    
+
     REQ --> HEX
     SCALE --> EVENT
     MAINT --> HEX
     SECURITY --> HEX
-    
+
     LAYERED --> CHOSEN
     MICRO --> CHOSEN
     HEX --> CHOSEN
     EVENT --> CHOSEN
-    
+
     CHOSEN --> RATIONALE
     RATIONALE --> TRADEOFFS
 ```
@@ -4761,35 +4761,35 @@ flowchart TD
         ERROR_TYPE{Error Type?}
         SEVERITY{Error Severity?}
     end
-    
+
     subgraph "Recovery Actions"
         RETRY[Retry with Backoff]
         CIRCUIT_BREAK[Open Circuit Breaker]
         FALLBACK[Execute Fallback]
         ESCALATE[Escalate to Admin]
     end
-    
+
     subgraph "User Communication"
         LOG_ERROR[Log Error Details]
         NOTIFY_USER[Notify User]
         UPDATE_STATUS[Update System Status]
         AUDIT_TRAIL[Create Audit Trail]
     end
-    
+
     SERVICE_ERROR --> ERROR_TYPE
     ERROR_TYPE -->|Transient| SEVERITY
     ERROR_TYPE -->|Permanent| CIRCUIT_BREAK
     ERROR_TYPE -->|Unknown| ESCALATE
-    
+
     SEVERITY -->|Low| RETRY
     SEVERITY -->|High| FALLBACK
     SEVERITY -->|Critical| CIRCUIT_BREAK
-    
+
     RETRY --> LOG_ERROR
     CIRCUIT_BREAK --> NOTIFY_USER
     FALLBACK --> UPDATE_STATUS
     ESCALATE --> AUDIT_TRAIL
-    
+
     LOG_ERROR --> AUDIT_TRAIL
     NOTIFY_USER --> AUDIT_TRAIL
     UPDATE_STATUS --> AUDIT_TRAIL
@@ -4823,41 +4823,41 @@ graph TB
         CP[Context Preservator]
         AH[Agent Handoff Manager]
     end
-    
+
     subgraph "Inbound Ports"
         CIP[Conversation Input Port]
         SCP[Slash Command Port]
         AHP[Agent Handoff Port]
     end
-    
+
     subgraph "Outbound Ports"
         PSP[Persistence Store Port]
         EBP[Event Bus Port]
         AOP[Agent Orchestrator Port]
         SSP[Stream Service Port]
     end
-    
+
     subgraph "Adapters"
         HTA[HTTP API Adapter]
         WSA[WebSocket Adapter]
         DBA[Database Adapter]
         MBA[Message Bus Adapter]
     end
-    
+
     CIP --> CM
     SCP --> SC
     AHP --> AH
-    
+
     CM --> MH
     MH --> CP
     SC --> CM
     AH --> CM
-    
+
     CM --> PSP
     CM --> EBP
     CM --> AOP
     CM --> SSP
-    
+
     HTA --> CIP
     WSA --> CIP
     PSP --> DBA
@@ -4914,28 +4914,28 @@ stateDiagram-v2
     [*] --> Draft: Create from Issue/Milestone
     Draft --> InProgress: Start Development
     Draft --> Abandoned: Cancel Task
-    
+
     InProgress --> InReview: Create Pull Request
     InProgress --> Abandoned: Cancel Development
     InProgress --> Paused: Pause Work
-    
+
     Paused --> InProgress: Resume Work
     Paused --> Abandoned: Cancel Task
-    
+
     InReview --> InProgress: Request Changes
     InReview --> Done: Approve & Merge
     InReview --> Abandoned: Close PR
-    
+
     Done --> [*]
     Abandoned --> [*]
-    
+
     note right of InProgress
         Branch created
         Workspace active
         Tools available
         Agent sessions allowed
     end note
-    
+
     note right of InReview
         PR created
         Review hooks active
@@ -4962,7 +4962,7 @@ associated VCS objects.
 impl Task {
     pub fn transition_to(&mut self, target_state: TaskState, context: TransitionContext) -> Result<Vec<DomainEvent>> {
         let transition = StateTransition::new(self.state, target_state, context.timestamp);
-        
+
         match (self.state, target_state) {
             (TaskState::Draft, TaskState::InProgress) => {
                 self.validate_branch_creation(&context)?;
@@ -4978,7 +4978,7 @@ impl Task {
             },
             _ => return Err(TaskError::InvalidTransition(transition))
         }
-        
+
         self.state = target_state;
         self.record_transition(transition);
         Ok(self.collect_domain_events())
@@ -5009,38 +5009,38 @@ graph TB
         TS[Tool Schema Translator]
         CB[Circuit Breaker]
     end
-    
+
     subgraph "Agent Backend Adapters"
         CAD[Claude Code SDK Adapter]
         CASA[Codex CLI App Server Adapter]
         FAD[Future Agent Adapter]
     end
-    
+
     subgraph "Tool Integration"
         MCP_MUX[MCP Multiplexer]
         TOOL_REG[Tool Registry]
         SCHEMA_MAP[Schema Mapper]
     end
-    
+
     subgraph "Session Management"
         SESSION_POOL[Session Pool]
         CONTEXT_CACHE[Context Cache]
         RESOURCE_LIMITER[Resource Limiter]
     end
-    
+
     AO --> SM
     AO --> TR
     TR --> TS
     TR --> CB
-    
+
     SM --> SESSION_POOL
     SM --> CONTEXT_CACHE
     SM --> RESOURCE_LIMITER
-    
+
     TR --> CAD
     TR --> CASA
     TR --> FAD
-    
+
     TS --> MCP_MUX
     MCP_MUX --> TOOL_REG
     TOOL_REG --> SCHEMA_MAP
@@ -5107,21 +5107,21 @@ graph TB
         TL[Tool Lifecycle Manager]
         ER[Execution Router]
     end
-    
+
     subgraph "MCP Server Management"
         MCP_HOST[MCP Server Host]
         STDIO_MGR[STDIO Manager]
         HTTP_MGR[HTTP+SSE Manager]
         HEALTH_MON[Health Monitor]
     end
-    
+
     subgraph "Tool Execution"
         EXEC_CTX[Execution Context]
         PARAM_VAL[Parameter Validator]
         RESULT_PROC[Result Processor]
         TIMEOUT_MGR[Timeout Manager]
     end
-    
+
     subgraph "Built-in Tools"
         WEAVER[Weaver File Editor]
         MEMORY[Memory Service]
@@ -5129,21 +5129,21 @@ graph TB
         VCS_TOOL[VCS Operations]
         TEST_RUNNER[Test Runner]
     end
-    
+
     TR --> TD
     TR --> TL
     TR --> ER
-    
+
     TL --> MCP_HOST
     MCP_HOST --> STDIO_MGR
     MCP_HOST --> HTTP_MGR
     MCP_HOST --> HEALTH_MON
-    
+
     ER --> EXEC_CTX
     EXEC_CTX --> PARAM_VAL
     EXEC_CTX --> RESULT_PROC
     EXEC_CTX --> TIMEOUT_MGR
-    
+
     MCP_HOST --> WEAVER
     MCP_HOST --> MEMORY
     MCP_HOST --> SEARCH
@@ -5267,42 +5267,42 @@ graph TB
         CORS_MW[CORS Middleware]
         LOG_MW[Logging Middleware]
     end
-    
+
     subgraph "REST Endpoints"
         CONV_API[Conversation API]
         TASK_API[Task API]
         TOOL_API[Tool API]
         ADMIN_API[Admin API]
     end
-    
+
     subgraph "Streaming Services"
         SSE_SVC[Server-Sent Events]
         WS_SVC[WebSocket Service]
         STREAM_MGR[Stream Manager]
     end
-    
+
     subgraph "Request Processing"
         REQ_VAL[Request Validator]
         RESP_FMT[Response Formatter]
         ERR_HAND[Error Handler]
         AUDIT_LOG[Audit Logger]
     end
-    
+
     API_GW --> AUTH_MW
     AUTH_MW --> RATE_LIM
     RATE_LIM --> CORS_MW
     CORS_MW --> LOG_MW
-    
+
     LOG_MW --> CONV_API
     LOG_MW --> TASK_API
     LOG_MW --> TOOL_API
     LOG_MW --> ADMIN_API
-    
+
     CONV_API --> SSE_SVC
     TASK_API --> WS_SVC
     SSE_SVC --> STREAM_MGR
     WS_SVC --> STREAM_MGR
-    
+
     CONV_API --> REQ_VAL
     REQ_VAL --> RESP_FMT
     RESP_FMT --> ERR_HAND
@@ -5351,11 +5351,11 @@ pub async fn append_message(
 ) -> Result<impl Responder, ApiError> {
     let conversation_id = path.into_inner();
     let message_request = payload.into_inner();
-    
+
     let result = conversation_service
         .append_message(conversation_id, message_request, auth.user_id)
         .await?;
-    
+
     Ok(web::Json(ApiResponse::success(result)))
 }
 ```
@@ -5383,22 +5383,22 @@ sequenceDiagram
     participant ConvSvc as Conversation Service
     participant AgentOrch as Agent Orchestrator
     participant ToolExec as Tool Executor
-    
+
     Client->>SSE: Connect to /events/conversations/{id}
     SSE->>EventBus: Subscribe to conversation events
-    
+
     ConvSvc->>EventBus: Publish TurnStarted event
     EventBus->>SSE: Forward event
     SSE->>Client: Send turn_started event
-    
+
     AgentOrch->>EventBus: Publish ToolCallInitiated event
     EventBus->>SSE: Forward event
     SSE->>Client: Send tool_call_initiated event
-    
+
     ToolExec->>EventBus: Publish ToolExecutionComplete event
     EventBus->>SSE: Forward event
     SSE->>Client: Send tool_execution_complete event
-    
+
     ConvSvc->>EventBus: Publish TurnCompleted event
     EventBus->>SSE: Forward event
     SSE->>Client: Send turn_completed event
@@ -5469,44 +5469,44 @@ graph TB
         QUERY_BUILD[Query Builder]
         MIGRATION_MGR[Migration Manager]
     end
-    
+
     subgraph "Repository Pattern"
         CONV_REPO[Conversation Repository]
         TASK_REPO[Task Repository]
         EVENT_REPO[Event Repository]
         AUDIT_REPO[Audit Repository]
     end
-    
+
     subgraph "Database Adapters"
         PG_ADAPTER[PostgreSQL Adapter]
         SQLITE_ADAPTER[SQLite Adapter]
         MEMORY_ADAPTER[In-memory Adapter]
         CACHE_ADAPTER[Cache Adapter]
     end
-    
+
     subgraph "Data Models"
         CONV_MODEL[Conversation Model]
         MSG_MODEL[Message Model]
         TASK_MODEL[Task Model]
         EVENT_MODEL[Event Model]
     end
-    
+
     REPO_MGR --> CONN_POOL
     REPO_MGR --> QUERY_BUILD
     REPO_MGR --> MIGRATION_MGR
-    
+
     REPO_MGR --> CONV_REPO
     REPO_MGR --> TASK_REPO
     REPO_MGR --> EVENT_REPO
     REPO_MGR --> AUDIT_REPO
-    
+
     CONV_REPO --> PG_ADAPTER
     CONV_REPO --> SQLITE_ADAPTER
     TASK_REPO --> PG_ADAPTER
     TASK_REPO --> SQLITE_ADAPTER
     EVENT_REPO --> MEMORY_ADAPTER
     AUDIT_REPO --> CACHE_ADAPTER
-    
+
     PG_ADAPTER --> CONV_MODEL
     PG_ADAPTER --> MSG_MODEL
     PG_ADAPTER --> TASK_MODEL
@@ -5519,8 +5519,7 @@ graph TB
 ##### Schema Design
 
 ```sql
--- Tenant root table
-CREATE TABLE tenants (
+-- Tenant root table CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug VARCHAR(64) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
@@ -5530,13 +5529,12 @@ CREATE TABLE tenants (
     CONSTRAINT tenants_status_check CHECK (status IN ('active', 'disabled'))
 );
 
--- Deterministic default tenant for migration safety and single-tenant dev mode.
-INSERT INTO tenants (id, slug, name, status)
-VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active')
+-- Deterministic default tenant for migration safety and single-tenant dev
+mode. INSERT INTO tenants (id, slug, name, status) VALUES
+('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active')
 ON CONFLICT (id) DO NOTHING;
 
--- Tasks with tenant scoping
-CREATE TABLE tasks (
+-- Tasks with tenant scoping CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     origin JSONB NOT NULL,
@@ -5550,8 +5548,8 @@ CREATE TABLE tasks (
     UNIQUE (id, tenant_id)
 );
 
--- Conversations table with JSONB context and tenant consistency
-CREATE TABLE conversations (
+-- Conversations table with JSONB context and tenant consistency CREATE TABLE
+conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     task_id UUID,
@@ -5563,8 +5561,8 @@ CREATE TABLE conversations (
     FOREIGN KEY (task_id, tenant_id) REFERENCES tasks(id, tenant_id)
 );
 
--- Messages with append-only design and composite tenant FK
-CREATE TABLE messages (
+-- Messages with append-only design and composite tenant FK CREATE TABLE
+messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     conversation_id UUID NOT NULL,
@@ -5578,8 +5576,8 @@ CREATE TABLE messages (
     UNIQUE (tenant_id, conversation_id, sequence_number)
 );
 
--- Backend registrations are unique within a tenant, not globally
-CREATE TABLE backend_registrations (
+-- Backend registrations are unique within a tenant, not globally CREATE TABLE
+backend_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     name VARCHAR(100) NOT NULL,
@@ -5591,8 +5589,8 @@ CREATE TABLE backend_registrations (
     UNIQUE (tenant_id, name)
 );
 
--- Review threads are first-class orchestration records.
-CREATE TABLE review_threads (
+-- Review threads are first-class orchestration records. CREATE TABLE
+review_threads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     task_id UUID NOT NULL,
@@ -5667,8 +5665,8 @@ CREATE TABLE review_verification_results (
     CONSTRAINT review_verification_status_check CHECK (status IN ('pending', 'verified', 'rejected', 'error'))
 );
 
--- Event sourcing for audit trails with tenant attribution
-CREATE TABLE domain_events (
+-- Event sourcing for audit trails with tenant attribution CREATE TABLE
+domain_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     aggregate_id UUID NOT NULL,
@@ -5953,42 +5951,42 @@ graph TB
         RM[Resource Manager]
         SM[Security Manager]
     end
-    
+
     subgraph "Podbot Integration"
         PA[Podbot Adapter]
         CC[Container Controller]
         NP[Network Policy]
         VM[Volume Manager]
     end
-    
+
     subgraph "Workspace Resources"
         FS[File System Mount]
         ENV[Environment Variables]
         NET[Network Access]
         PROC[Process Limits]
     end
-    
+
     subgraph "Tool Execution"
         TE[Tool Executor]
         CMD[Command Runner]
         LOG[Log Collector]
         MON[Resource Monitor]
     end
-    
+
     WM --> LC
     WM --> RM
     WM --> SM
-    
+
     LC --> PA
     PA --> CC
     PA --> NP
     PA --> VM
-    
+
     CC --> FS
     CC --> ENV
     CC --> NET
     CC --> PROC
-    
+
     RM --> TE
     TE --> CMD
     TE --> LOG
@@ -6053,40 +6051,40 @@ graph TB
         OP_ROUTER[Operation Router]
         WEBHOOK_HAND[Webhook Handler]
     end
-    
+
     subgraph "Provider Adapters"
         GH_ADAPTER[GitHub Adapter]
         GL_ADAPTER[GitLab Adapter]
         BB_ADAPTER[Bitbucket Adapter]
         GENERIC_ADAPTER[Generic Git Adapter]
     end
-    
+
     subgraph "VCS Operations"
         ISSUE_MGR[Issue Manager]
         BRANCH_MGR[Branch Manager]
         PR_MGR[Pull Request Manager]
     end
-    
+
     subgraph "Webhook Processing"
         EVENT_PARSER[Event Parser]
         EVENT_ROUTER[Event Router]
         EVENT_HANDLER[Event Handler]
         RETRY_MGR[Retry Manager]
     end
-    
+
     VCS_MGR --> PROV_REG
     VCS_MGR --> OP_ROUTER
     VCS_MGR --> WEBHOOK_HAND
-    
+
     OP_ROUTER --> GH_ADAPTER
     OP_ROUTER --> GL_ADAPTER
     OP_ROUTER --> BB_ADAPTER
     OP_ROUTER --> GENERIC_ADAPTER
-    
+
     GH_ADAPTER --> ISSUE_MGR
     GH_ADAPTER --> BRANCH_MGR
     GH_ADAPTER --> PR_MGR
-    
+
     WEBHOOK_HAND --> EVENT_PARSER
     EVENT_PARSER --> EVENT_ROUTER
     EVENT_ROUTER --> EVENT_HANDLER
@@ -6398,21 +6396,21 @@ graph TB
         PE[Predicate Evaluator]
         AE[Action Executor]
     end
-    
+
     subgraph "Hook Definitions"
         HD[Hook Definitions]
         TR[Trigger Registry]
         PR[Predicate Registry]
         AR[Action Registry]
     end
-    
+
     subgraph "Execution Context"
         EC[Execution Context]
         RM[Resource Manager]
         TM[Timeout Manager]
         RL[Result Logger]
     end
-    
+
     subgraph "Hook Actions"
         QG[Quality Gates]
         PC[Policy Checks]
@@ -6420,21 +6418,21 @@ graph TB
         BA[Block Actions]
         RM_ACTION[Remediation]
     end
-    
+
     HE --> HM
     HM --> PE
     PE --> AE
-    
+
     HM --> HD
     HD --> TR
     HD --> PR
     HD --> AR
-    
+
     AE --> EC
     EC --> RM
     EC --> TM
     EC --> RL
-    
+
     AE --> QG
     AE --> PC
     AE --> NT
@@ -6544,42 +6542,42 @@ graph TB
         ES[Event Store]
         EF[Event Filter]
     end
-    
+
     subgraph "Event Publishers"
         CONV_PUB[Conversation Publisher]
         TASK_PUB[Task Publisher]
         TOOL_PUB[Tool Publisher]
         HOOK_PUB[Hook Publisher]
     end
-    
+
     subgraph "Event Subscribers"
         AUDIT_SUB[Audit Subscriber]
         STREAM_SUB[Stream Subscriber]
         HOOK_SUB[Hook Subscriber]
         METRIC_SUB[Metrics Subscriber]
     end
-    
+
     subgraph "Event Processing"
         EP[Event Processor]
         EV[Event Validator]
         ET[Event Transformer]
         ED[Event Dispatcher]
     end
-    
+
     CONV_PUB --> EB
     TASK_PUB --> EB
     TOOL_PUB --> EB
     HOOK_PUB --> EB
-    
+
     EB --> ER
     ER --> ES
     ER --> EF
-    
+
     EF --> AUDIT_SUB
     EF --> STREAM_SUB
     EF --> HOOK_SUB
     EF --> METRIC_SUB
-    
+
     ER --> EP
     EP --> EV
     EV --> ET
@@ -6609,7 +6607,7 @@ impl ServiceContainer {
     pub fn register<T: 'static + Send + Sync>(&mut self, service: T) {
         self.services.insert(TypeId::of::<T>(), Box::new(service));
     }
-    
+
     pub fn register_factory<T: 'static + Send + Sync, F>(&mut self, factory: F)
     where
         F: Fn(&ServiceContainer) -> T + 'static + Send + Sync,
@@ -6619,27 +6617,27 @@ impl ServiceContainer {
             Box::new(move |container| Box::new(factory(container))),
         );
     }
-    
+
     pub fn resolve<T: 'static + Send + Sync + Clone>(&self) -> Result<T> {
         if let Some(service) = self.services.get(&TypeId::of::<T>()) {
             return Ok(service.downcast_ref::<T>().unwrap().clone());
         }
-        
+
         if let Some(singleton) = self.singletons.get(&TypeId::of::<T>()) {
             return Ok(singleton.downcast_ref::<T>().unwrap().clone());
         }
-        
+
         if let Some(factory) = self.factories.get(&TypeId::of::<T>()) {
             let instance = factory.create(self);
             return Ok(*instance.downcast::<T>().unwrap());
         }
-        
+
         Err(ServiceResolutionError::ServiceNotFound(TypeId::of::<T>()))
     }
 }
 
-// Service registration example
-pub fn configure_services(container: &mut ServiceContainer) {
+// Service registration example pub fn configure_services(container: &mut
+ServiceContainer) {
     // Core services
     container.register_factory(|c| {
         ConversationService::new(
@@ -6647,12 +6645,12 @@ pub fn configure_services(container: &mut ServiceContainer) {
             c.resolve::<Arc<dyn EventBus>>().unwrap(),
         )
     });
-    
+
     // Infrastructure adapters
     container.register_singleton(Arc::new(PostgresConversationRepository::new(
         container.resolve::<ConnectionPool>().unwrap()
     )));
-    
+
     // Agent backends
     container.register(ClaudeCodeSdkAdapter::new(
         container.resolve::<ClaudeConfig>().unwrap()
@@ -6680,14 +6678,14 @@ pub async fn execute_turn(&self, request: TurnRequest) -> Result<TurnResult> {
         agent_backend = %self.backend_name(),
         tool_count = request.available_tools.len()
     );
-    
+
     async move {
         tracing::info!("Starting agent turn execution");
-        
+
         let start_time = Instant::now();
         let result = self.internal_execute_turn(request).await;
         let duration = start_time.elapsed();
-        
+
         match &result {
             Ok(turn_result) => {
                 tracing::info!(
@@ -6705,13 +6703,12 @@ pub async fn execute_turn(&self, request: TurnRequest) -> Result<TurnResult> {
                 );
             }
         }
-        
+
         result
     }.instrument(span).await
 }
 
-// Security aspect for MCP tool execution
-pub struct SecurityAspect {
+// Security aspect for MCP tool execution pub struct SecurityAspect {
     policy_engine: Arc<dyn PolicyEngine>,
     audit_logger: Arc<dyn AuditLogger>,
 }
@@ -6729,16 +6726,16 @@ impl SecurityAspect {
             subject: context.user_id,
             context: context.clone(),
         };
-        
+
         let result = self.policy_engine.evaluate(authorization_request).await?;
-        
+
         self.audit_logger.log_authorization_decision(
             context.user_id,
             tool_name,
             &result,
             context.request_context.clone(),
         ).await?;
-        
+
         Ok(result)
     }
 }
@@ -6806,45 +6803,45 @@ graph TB
             MH[Message Handler]
             SC[Slash Command Processor]
         end
-        
+
         subgraph "Task Management Module"
             TM[Task Manager]
             WF[Workflow Engine]
             VCS[VCS Integration]
         end
-        
+
         subgraph "Agent Orchestration Module"
             AO[Agent Orchestrator]
             AB[Agent Backends]
             TR[Tool Router]
         end
-        
+
         subgraph "Tool Execution Module"
             MCP[MCP Multiplexer]
             WV[Weaver Integration]
             BT[Battery Tools]
         end
-        
+
         subgraph "Governance Module"
             HE[Hook Engine]
             PE[Policy Engine]
             AU[Audit Logger]
         end
     end
-    
+
     subgraph "Infrastructure Layer"
         HTTP[HTTP API]
         DB[Database]
         FS[File System]
         EXT[External Services]
     end
-    
+
     CM --> TM
     TM --> AO
     AO --> TR
     TR --> MCP
     HE --> AU
-    
+
     CM --> HTTP
     TM --> DB
     MCP --> FS
@@ -6882,7 +6879,7 @@ sequenceDiagram
     participant Agent as Agent Module
     participant Tool as Tool Module
     participant Gov as Governance Module
-    
+
     User->>Conv: HTTP Request
     Conv->>Task: Get Task Context
     Task-->>Conv: Task Information
@@ -6922,20 +6919,20 @@ graph LR
             WS[Work Stealing]
             CP[Connection Pooling]
         end
-        
+
         subgraph "Memory Management"
             OM[Ownership Model]
             ZC[Zero-Copy Operations]
             MM[Memory Mapping]
         end
-        
+
         subgraph "I/O Optimization"
             AI[Async I/O]
             ST[Streaming]
             BF[Buffering]
         end
     end
-    
+
     TR --> OM
     WS --> ZC
     CP --> MM
@@ -6968,26 +6965,26 @@ graph TB
             HM[Health Monitoring]
             FB[Fallback Mechanisms]
         end
-        
+
         subgraph "Retry Logic"
             EB[Exponential Backoff]
             RL[Retry Limits]
             TC[Timeout Control]
         end
-        
+
         subgraph "Error Isolation"
             EH[Error Handling]
             GD[Graceful Degradation]
             ER[Error Recovery]
         end
-        
+
         subgraph "Data Consistency"
             TX[Transaction Management]
             ES[Event Sourcing]
             AL[Audit Logging]
         end
     end
-    
+
     CB --> EB
     HM --> RL
     FB --> TC
@@ -7018,20 +7015,20 @@ graph TB
             WAL[Write-Ahead Logging]
             PITR[Point-in-Time Recovery]
         end
-        
+
         subgraph "Backup Systems"
             REP[Read Replicas]
             SNAP[Automated Snapshots]
             ARCH[Archive Storage]
         end
-        
+
         subgraph "Recovery Procedures"
             AUTO[Automated Recovery]
             MAN[Manual Intervention]
             VAL[Data Validation]
         end
     end
-    
+
     PG --> WAL
     WAL --> PITR
     PG --> REP
@@ -7064,26 +7061,26 @@ graph TB
             LC[Loose Coupling]
             HC[High Cohesion]
         end
-        
+
         subgraph "Operational Readiness"
             MON[Monitoring Capabilities]
             DEP[Deployment Automation]
             TEST[Testing Infrastructure]
         end
-        
+
         subgraph "Team Readiness"
             EXP[Distributed Systems Experience]
             OPS[Operations Capability]
             GOV[Governance Processes]
         end
-        
+
         subgraph "Business Justification"
             SCALE[Scaling Requirements]
             TEAM[Team Autonomy Needs]
             TECH[Technology Diversity]
         end
     end
-    
+
     WDB --> MON
     LC --> DEP
     HC --> TEST
@@ -7163,7 +7160,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    
+
     MESSAGES {
         uuid id PK
         uuid conversation_id FK
@@ -7173,7 +7170,7 @@ erDiagram
         timestamptz created_at
         bigserial sequence_number
     }
-    
+
     TASKS {
         uuid id PK
         jsonb origin
@@ -7184,7 +7181,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    
+
     DOMAIN_EVENTS {
         uuid id PK
         uuid aggregate_id
@@ -7194,7 +7191,7 @@ erDiagram
         integer event_version
         timestamptz occurred_at
     }
-    
+
     WORKSPACES {
         uuid id PK
         uuid task_id FK
@@ -7204,7 +7201,7 @@ erDiagram
         timestamptz created_at
         timestamptz destroyed_at
     }
-    
+
     MCP_TOOL_EXECUTIONS {
         uuid id PK
         uuid conversation_id FK
@@ -7216,7 +7213,7 @@ erDiagram
         timestamptz started_at
         timestamptz completed_at
     }
-    
+
     HOOK_EXECUTIONS {
         uuid id PK
         uuid trigger_context_id
@@ -7227,7 +7224,7 @@ erDiagram
         varchar status
         timestamptz executed_at
     }
-    
+
     CONVERSATIONS ||--o{ MESSAGES : contains
     TASKS ||--o| CONVERSATIONS : has
     TASKS ||--o| WORKSPACES : uses
@@ -7255,9 +7252,7 @@ querying it. In most cases, when you work with JSON in PostgreSQL, you should
 be using JSONB.
 
 ```sql
--- Message content structure
-{
-  "parts": [
+-- Message content structure { "parts": [
     {
       "type": "text",
       "content": "User message content"
@@ -7265,13 +7260,12 @@ be using JSONB.
     {
       "type": "tool_call",
       "tool_name": "weaver_edit",
-      "parameters": {...}
+      "parameters": {…}
     }
-  ],
-  "metadata": {
+  ], "metadata": {
     "agent_backend": "claude_code_sdk",
     "turn_id": "uuid",
-    "slash_command_expansion": {...},
+    "slash_command_expansion": {…},
     "tool_call_audits": [
       {
         "call_id": "call-123",
@@ -7284,36 +7278,26 @@ be using JSONB.
       "response_id": "resp-456",
       "model": "claude-3-opus"
     }
-  }
-}
+  } }
 
--- Task origin structure
-{
-  "type": "issue",
-  "issue_ref": {
+-- Task origin structure { "type": "issue", "issue_ref": {
     "provider": "github",
     "repository": "owner/repo",
     "issue_number": 123
-  },
-  "metadata": {
+  }, "metadata": {
     "title": "Issue title",
     "labels": ["bug", "priority-high"],
     "assignees": ["user1"]
-  }
-}
+  } }
 
--- Conversation context structure
-{
-  "agent_backend": "claude_code_sdk",
-  "tool_policy": {
+-- Conversation context structure { "agent_backend": "claude_code_sdk",
+"tool_policy": {
     "allowed_tools": ["weaver", "memory", "search"],
     "file_edit_policy": "weaver_only"
-  },
-  "workspace_config": {
+  }, "workspace_config": {
     "language_runtime": "rust",
     "toolchain_version": "1.75"
-  }
-}
+  } }
 ```
 
 ###### Audit metadata schema
@@ -7356,8 +7340,8 @@ classDiagram
         -MessageMetadata metadata
         -DateTime~Utc~ created_at
         -SequenceNumber sequence_number
-        +new(...) Result
-        +new_with_id(...) Result
+        +new(…) Result
+        +new_with_id(…) Result
         +id() MessageId
         +conversation_id() ConversationId
         +role() Role
@@ -7365,7 +7349,7 @@ classDiagram
         +metadata() MessageMetadata
         +created_at() DateTime~Utc~
         +sequence_number() SequenceNumber
-        +builder(...) MessageBuilder
+        +builder(…) MessageBuilder
     }
 
     class MessageBuilder {
@@ -7375,7 +7359,7 @@ classDiagram
         -Vec~ContentPart~ content
         -MessageMetadata metadata
         -SequenceNumber sequence_number
-        +new(...) MessageBuilder
+        +new(…) MessageBuilder
         +with_id(id) MessageBuilder
         +with_content(part) MessageBuilder
         +with_content_parts(parts) MessageBuilder
@@ -7594,18 +7578,20 @@ classes" are provided, offering different performance and flexibility
 trade-offs.
 
 ```sql
--- GIN indexes for JSONB columns
-CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
-CREATE INDEX idx_conversations_context_gin ON conversations USING GIN (context);
-CREATE INDEX idx_tasks_origin_gin ON tasks USING GIN (origin);
+-- GIN indexes for JSONB columns CREATE INDEX idx_messages_content_gin ON
+messages USING GIN (content); CREATE INDEX idx_conversations_context_gin ON
+conversations USING GIN (context); CREATE INDEX idx_tasks_origin_gin ON tasks
+USING GIN (origin);
 
--- Expression indexes for frequently queried JSONB fields
-CREATE INDEX idx_messages_agent_backend ON messages USING BTREE ((metadata->>'agent_backend'));
-CREATE INDEX idx_tasks_issue_number ON tasks USING BTREE (((origin->'issue_ref'->>'issue_number')::bigint));
-CREATE INDEX idx_conversations_agent ON conversations USING BTREE ((context->>'agent_backend'));
+-- Expression indexes for frequently queried JSONB fields CREATE INDEX
+idx_messages_agent_backend ON messages USING BTREE
+((metadata->>'agent_backend')); CREATE INDEX idx_tasks_issue_number ON tasks
+USING BTREE (((origin->'issue_ref'->>'issue_number')::bigint)); CREATE INDEX
+idx_conversations_agent ON conversations USING BTREE
+((context->>'agent_backend'));
 
--- Composite indexes for tenant-aware queries
-CREATE INDEX idx_messages_tenant_conversation_role
+-- Composite indexes for tenant-aware queries CREATE INDEX
+idx_messages_tenant_conversation_role
     ON messages (tenant_id, conversation_id, role, created_at);
 CREATE INDEX idx_domain_events_tenant_aggregate
     ON domain_events (tenant_id, aggregate_type, aggregate_id, occurred_at);
@@ -7622,8 +7608,8 @@ CREATE INDEX idx_review_verification_results_tenant_thread_status_time
 CREATE INDEX idx_review_verification_results_evidence_gin
     ON review_verification_results USING GIN (evidence);
 
--- Tenant-scoped uniqueness guards
-CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
+-- Tenant-scoped uniqueness guards CREATE UNIQUE INDEX
+idx_tasks_issue_origin_unique_per_tenant
     ON tasks (
         tenant_id,
         (origin->'issue_ref'->>'provider'),
@@ -7641,12 +7627,12 @@ The jsonb_path_ops operator class also supports @>, @?, and @@ operators, it
 has notable performance advantages over the default operator class jsonb_ops.
 
 ```sql
--- Optimized GIN indexes using jsonb_path_ops for containment queries
-CREATE INDEX idx_messages_content_path_ops ON messages USING GIN (content jsonb_path_ops);
-CREATE INDEX idx_tool_executions_params ON tool_executions USING GIN (parameters jsonb_path_ops);
+-- Optimized GIN indexes using jsonb_path_ops for containment queries CREATE
+INDEX idx_messages_content_path_ops ON messages USING GIN (content
+jsonb_path_ops); CREATE INDEX idx_tool_executions_params ON tool_executions
+USING GIN (parameters jsonb_path_ops);
 
--- Partial indexes for active records
-CREATE INDEX idx_tasks_active
+-- Partial indexes for active records CREATE INDEX idx_tasks_active
     ON tasks (tenant_id, created_at)
     WHERE state IN ('draft', 'in_progress', 'in_review');
 CREATE INDEX idx_conversations_active
@@ -7663,8 +7649,8 @@ an append-only event stream. Thus, event streams will contain an entire history
 of changes.
 
 ```sql
--- Partition domain_events by month for efficient archival
-CREATE TABLE domain_events (
+-- Partition domain_events by month for efficient archival CREATE TABLE
+domain_events (
     id UUID DEFAULT gen_random_uuid(),
     aggregate_id UUID NOT NULL,
     aggregate_type VARCHAR(100) NOT NULL,
@@ -7674,15 +7660,15 @@ CREATE TABLE domain_events (
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ) PARTITION BY RANGE (occurred_at);
 
--- Create monthly partitions
-CREATE TABLE domain_events_2024_01 PARTITION OF domain_events
+-- Create monthly partitions CREATE TABLE domain_events_2024_01 PARTITION OF
+domain_events
     FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
 
 CREATE TABLE domain_events_2024_02 PARTITION OF domain_events
     FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
 
--- Partition tool_executions by date for performance
-CREATE TABLE tool_executions (
+-- Partition tool_executions by date for performance CREATE TABLE
+tool_executions (
     id UUID DEFAULT gen_random_uuid(),
     conversation_id UUID NOT NULL,
     turn_id UUID NOT NULL,
@@ -7709,19 +7695,13 @@ CREATE TABLE tool_executions (
 ###### Streaming Replication Configuration
 
 ```sql
--- Primary database configuration
--- postgresql.conf
-wal_level = replica
-max_wal_senders = 3
-max_replication_slots = 3
-synchronous_commit = on
+-- Primary database configuration -- postgresql.conf wal_level = replica
+max_wal_senders = 3 max_replication_slots = 3 synchronous_commit = on
 synchronous_standby_names = 'replica1'
 
--- Replica configuration
--- recovery.conf
-standby_mode = 'on'
-primary_conninfo = 'host=primary-db port=5432 user=replicator'
-trigger_file = '/tmp/postgresql.trigger'
+-- Replica configuration -- recovery.conf standby_mode = 'on' primary_conninfo
+= 'host=primary-db port=5432 user=replicator' trigger_file =
+'/tmp/postgresql.trigger'
 ```
 
 ##### 6.2.1.6 Backup Architecture
@@ -7735,25 +7715,25 @@ graph TB
             WAL[WAL Archiving]
             PITR[Point-in-Time Recovery]
         end
-        
+
         subgraph "Scheduled Backups"
             DAILY[Daily Full Backup]
             HOURLY[Hourly Incremental]
         end
-        
+
         subgraph "Long-term Storage"
             WEEKLY[Weekly Archive]
             MONTHLY[Monthly Archive]
             YEARLY[Yearly Archive]
         end
     end
-    
+
     subgraph "Storage Locations"
         LOCAL[Local Storage]
         S3[Object Storage]
         GLACIER[Cold Storage]
     end
-    
+
     WAL --> LOCAL
     PITR --> LOCAL
     DAILY --> S3
@@ -7780,13 +7760,12 @@ Migrations are managed through the Diesel CLI (`diesel migration`), which
 generates timestamped migration directories with `up.sql` and `down.sql` files.
 
 ```rust
-// Illustrative example - Migration management with Diesel CLI
-// Run from command line: diesel migration run
-// Generate new migration: diesel migration generate create_messages
+// Illustrative example - Migration management with Diesel CLI // Run from
+command line: diesel migration run // Generate new migration: diesel migration
+generate create_messages
 
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::PgConnection;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel::r2d2::{ConnectionManager, Pool}; use diesel::PgConnection; use
+diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
@@ -7822,16 +7801,15 @@ impl MigrationManager {
 ###### Migration File Structure
 
 ```sql
--- 20240115_001_initial_schema.sql
--- Create core tables with proper constraints and indexes
+-- 20240115_001_initial_schema.sql -- Create core tables with proper
+constraints and indexes
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS
+"pg_trgm";
 
--- Conversations table
-CREATE TABLE tenants (
+-- Conversations table CREATE TABLE tenants (
     id UUID PRIMARY KEY,
     slug VARCHAR(64) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
@@ -7841,8 +7819,8 @@ CREATE TABLE tenants (
     CONSTRAINT tenants_status_check CHECK (status IN ('active', 'disabled'))
 );
 
-INSERT INTO tenants (id, slug, name, status)
-VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active');
+INSERT INTO tenants (id, slug, name, status) VALUES
+('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant', 'active');
 
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -7896,9 +7874,9 @@ CREATE TABLE backend_registrations (
     UNIQUE (tenant_id, name)
 );
 
-CREATE INDEX idx_conversations_tenant_task ON conversations(tenant_id, task_id);
-CREATE INDEX idx_messages_content_gin ON messages USING GIN (content);
-CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
+CREATE INDEX idx_conversations_tenant_task ON conversations(tenant_id,
+task_id); CREATE INDEX idx_messages_content_gin ON messages USING GIN
+(content); CREATE UNIQUE INDEX idx_tasks_issue_origin_unique_per_tenant
     ON tasks (
         tenant_id,
         (origin->'issue_ref'->>'provider'),
@@ -7956,7 +7934,7 @@ impl EventUpgrader for MessageCreatedUpgrader {
             _ => Err(anyhow::anyhow!("Unsupported version: {}", event.version))
         }
     }
-    
+
     fn supported_versions(&self) -> Vec<u32> {
         vec![1, 2]
     }
@@ -7975,19 +7953,19 @@ graph LR
         COLD[Cold Storage<br/>2+ years]
         ARCHIVE[Archive<br/>7+ years]
     end
-    
+
     subgraph "Storage Tiers"
         POSTGRES[PostgreSQL<br/>Primary]
         PARTITION[Partitioned Tables<br/>Historical]
         S3[Object Storage<br/>Compressed]
         GLACIER[Glacier<br/>Long-term]
     end
-    
+
     ACTIVE --> POSTGRES
     WARM --> PARTITION
     COLD --> S3
     ARCHIVE --> GLACIER
-    
+
     ACTIVE -->|90 days| WARM
     WARM -->|2 years| COLD
     COLD -->|7 years| ARCHIVE
@@ -7996,16 +7974,14 @@ graph LR
 ###### Automated Archival Process
 
 ```sql
--- Archival stored procedure
-CREATE OR REPLACE FUNCTION archive_old_events()
-RETURNS void AS $$
-DECLARE
+-- Archival stored procedure CREATE OR REPLACE FUNCTION archive_old_events()
+RETURNS void AS $$ DECLARE
     cutoff_date TIMESTAMPTZ;
     archived_count INTEGER;
 BEGIN
     -- Archive events older than 2 years
     cutoff_date := NOW() - INTERVAL '2 years';
-    
+
     -- Move to archive table
     WITH archived AS (
         DELETE FROM domain_events 
@@ -8014,15 +7990,14 @@ BEGIN
     )
     INSERT INTO domain_events_archive 
     SELECT * FROM archived;
-    
-    GET DIAGNOSTICS archived_count = ROW_COUNT;
-    
-    RAISE NOTICE 'Archived % events older than %', archived_count, cutoff_date;
-END;
-$$ LANGUAGE plpgsql;
 
--- Schedule archival job
-SELECT cron.schedule('archive-events', '0 2 * * 0', 'SELECT archive_old_events();');
+    GET DIAGNOSTICS archived_count = ROW_COUNT;
+
+    RAISE NOTICE 'Archived % events older than %', archived_count, cutoff_date;
+END; $$ LANGUAGE plpgsql;
+
+-- Schedule archival job SELECT cron.schedule('archive-events', '0 2 * * 0',
+'SELECT archive_old_events();');
 ```
 
 ##### 6.2.2.4 Data Storage and Retrieval Mechanisms
@@ -8035,9 +8010,8 @@ made to wait until a connection becomes available. The connection limit, and
 other parameters, are configurable via `Pool::builder()`.
 
 ```rust
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::PgConnection;
-use std::time::Duration;
+use diesel::r2d2::{ConnectionManager, Pool}; use diesel::PgConnection; use
+std::time::Duration;
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
@@ -8064,10 +8038,9 @@ the actual implementation. Tenant scoping is established per operation with
 protected statements, ensuring connection-pool reuse cannot bypass RLS.
 
 ```rust
-// Illustrative pseudocode - see src/message/adapters/postgres.rs for implementation
-use async_trait::async_trait;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
+// Illustrative pseudocode - see src/message/adapters/postgres.rs for
+implementation use async_trait::async_trait; use diesel::prelude::*; use
+diesel::r2d2::{ConnectionManager, Pool};
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
@@ -8186,10 +8159,8 @@ frequently queried attributes and JSONB for variable parts of your data.
 | Result Cache      | Redis (future)    | 30 minutes          | Expensive query results         |
 
 ```rust
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use std::time::{Duration, Instant};
+use std::collections::HashMap; use std::sync::Arc; use tokio::sync::RwLock; use
+std::time::{Duration, Instant};
 
 pub struct ConversationCache {
     cache: Arc<RwLock<HashMap<ConversationId, CachedConversation>>>,
@@ -8209,7 +8180,7 @@ impl ConversationCache {
             ttl,
         }
     }
-    
+
     pub async fn get(&self, id: ConversationId) -> Option<Conversation> {
         let cache = self.cache.read().await;
         if let Some(cached) = cache.get(&id) {
@@ -8219,7 +8190,7 @@ impl ConversationCache {
         }
         None
     }
-    
+
     pub async fn put(&self, conversation: Conversation) {
         let mut cache = self.cache.write().await;
         cache.insert(
@@ -8230,7 +8201,7 @@ impl ConversationCache {
             },
         );
     }
-    
+
     pub async fn invalidate(&self, id: ConversationId) {
         let mut cache = self.cache.write().await;
         cache.remove(&id);
@@ -8257,36 +8228,32 @@ implementing audit trail.
 ###### Retention Policy Implementation
 
 ```sql
--- Data retention policy table
-CREATE TABLE data_retention_policies (
+-- Data retention policy table CREATE TABLE data_retention_policies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     table_name VARCHAR(100) NOT NULL,
     retention_period INTERVAL NOT NULL,
     action VARCHAR(50) NOT NULL, -- 'archive', 'delete', 'anonymize'
     last_executed TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT retention_action_check CHECK (action IN ('archive', 'delete', 'anonymize'))
 );
 
--- Insert retention policies
-INSERT INTO data_retention_policies (table_name, retention_period, action) VALUES
-('messages', INTERVAL '7 years', 'archive'),
-('tool_executions', INTERVAL '3 years', 'archive'),
-('hook_executions', INTERVAL '2 years', 'delete'),
-('domain_events', INTERVAL '100 years', 'archive'); -- Effectively permanent
+-- Insert retention policies INSERT INTO data_retention_policies (table_name,
+retention_period, action) VALUES ('messages', INTERVAL '7 years', 'archive'),
+('tool_executions', INTERVAL '3 years', 'archive'), ('hook_executions',
+INTERVAL '2 years', 'delete'), ('domain_events', INTERVAL '100 years',
+'archive'); -- Effectively permanent
 
--- Automated retention enforcement
-CREATE OR REPLACE FUNCTION enforce_retention_policies()
-RETURNS void AS $$
-DECLARE
+-- Automated retention enforcement CREATE OR REPLACE FUNCTION
+enforce_retention_policies() RETURNS void AS $$ DECLARE
     policy RECORD;
     cutoff_date TIMESTAMPTZ;
     affected_rows INTEGER;
 BEGIN
     FOR policy IN SELECT * FROM data_retention_policies LOOP
         cutoff_date := NOW() - policy.retention_period;
-        
+
         CASE policy.action
             WHEN 'archive' THEN
                 EXECUTE format('SELECT archive_table_data(%L, %L)', policy.table_name, cutoff_date);
@@ -8295,15 +8262,14 @@ BEGIN
             WHEN 'anonymize' THEN
                 EXECUTE format('SELECT anonymize_table_data(%L, %L)', policy.table_name, cutoff_date);
         END CASE;
-        
+
         UPDATE data_retention_policies 
         SET last_executed = NOW() 
         WHERE id = policy.id;
-        
+
         RAISE NOTICE 'Applied % retention policy for table %', policy.action, policy.table_name;
     END LOOP;
-END;
-$$ LANGUAGE plpgsql;
+END; $$ LANGUAGE plpgsql;
 ```
 
 ##### 6.2.3.2 Backup and Fault Tolerance Policies
@@ -8318,26 +8284,26 @@ graph TB
         WEEKLY[Weekly Verification]
         MONTHLY[Monthly DR Test]
     end
-    
+
     subgraph "Verification Process"
         RESTORE[Restore to Test Environment]
         VALIDATE[Data Integrity Check]
         PERFORMANCE[Performance Validation]
         REPORT[Backup Health Report]
     end
-    
+
     subgraph "Fault Tolerance"
         REPLICATION[Streaming Replication]
         FAILOVER[Automatic Failover]
         MONITORING[Health Monitoring]
         ALERTING[Alert System]
     end
-    
+
     CONTINUOUS --> RESTORE
     DAILY --> VALIDATE
     WEEKLY --> PERFORMANCE
     MONTHLY --> REPORT
-    
+
     REPLICATION --> FAILOVER
     MONITORING --> ALERTING
 ```
@@ -8360,8 +8326,7 @@ easy to trace who performed which action and when, improving both transparency
 and accountability.
 
 ```sql
--- Data classification table
-CREATE TABLE data_classifications (
+-- Data classification table CREATE TABLE data_classifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     table_name VARCHAR(100) NOT NULL,
     column_name VARCHAR(100) NOT NULL,
@@ -8369,16 +8334,15 @@ CREATE TABLE data_classifications (
     encryption_required BOOLEAN NOT NULL DEFAULT false,
     anonymization_method VARCHAR(50), -- 'hash', 'mask', 'remove'
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT classification_check CHECK (classification IN ('public', 'internal', 'confidential', 'restricted'))
 );
 
--- Privacy-aware query functions
-CREATE OR REPLACE FUNCTION get_conversation_with_privacy(
+-- Privacy-aware query functions CREATE OR REPLACE FUNCTION
+get_conversation_with_privacy(
     p_conversation_id UUID,
     p_user_role VARCHAR(50)
-) RETURNS JSONB AS $$
-DECLARE
+) RETURNS JSONB AS $$ DECLARE
     result JSONB;
 BEGIN
     SELECT 
@@ -8390,28 +8354,24 @@ BEGIN
     INTO result
     FROM conversations c
     WHERE c.id = p_conversation_id;
-    
-    RETURN result;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Data anonymization for GDPR compliance
-CREATE OR REPLACE FUNCTION anonymize_user_data(p_user_id UUID)
-RETURNS void AS $$
-BEGIN
+    RETURN result;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Data anonymization for GDPR compliance CREATE OR REPLACE FUNCTION
+anonymize_user_data(p_user_id UUID) RETURNS void AS $$ BEGIN
     -- Anonymize messages
     UPDATE messages 
     SET metadata = metadata || jsonb_build_object('user_id', 'anonymized')
     WHERE metadata->>'user_id' = p_user_id::text;
-    
+
     -- Anonymize domain events
     UPDATE domain_events 
     SET event_data = event_data || jsonb_build_object('user_id', 'anonymized')
     WHERE event_data->>'user_id' = p_user_id::text;
-    
+
     RAISE NOTICE 'Anonymized data for user %', p_user_id;
-END;
-$$ LANGUAGE plpgsql;
+END; $$ LANGUAGE plpgsql;
 ```
 
 ##### 6.2.3.4 Audit Mechanisms
@@ -8422,8 +8382,7 @@ Metadata tracks important context: user ID, correlation ID, causation ID. This
 audit trail proves invaluable for debugging and compliance.
 
 ```sql
--- Audit log table for all database operations
-CREATE TABLE audit_logs (
+-- Audit log table for all database operations CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     table_name VARCHAR(100) NOT NULL,
@@ -8439,21 +8398,19 @@ CREATE TABLE audit_logs (
     ip_address INET,
     user_agent TEXT,
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT audit_operation_check CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE'))
 );
 
--- Audit trigger function
-CREATE OR REPLACE FUNCTION audit_trigger_function()
-RETURNS TRIGGER AS $$
-DECLARE
+-- Audit trigger function CREATE OR REPLACE FUNCTION audit_trigger_function()
+RETURNS TRIGGER AS $$ DECLARE
     audit_row audit_logs%ROWTYPE;
     excluded_cols TEXT[] := ARRAY['updated_at'];
 BEGIN
     audit_row.table_name := TG_TABLE_NAME;
     audit_row.operation := TG_OP;
     audit_row.occurred_at := NOW();
-    
+
     -- Extract user context from application
     audit_row.tenant_id := current_setting('app.tenant_id', true)::UUID;
     audit_row.user_id := current_setting('app.user_id', true)::UUID;
@@ -8463,7 +8420,7 @@ BEGIN
     audit_row.application_name := current_setting('application_name', true);
     audit_row.ip_address := current_setting('app.ip_address', true)::INET;
     audit_row.user_agent := current_setting('app.user_agent', true);
-    
+
     IF TG_OP = 'DELETE' THEN
         audit_row.row_id := OLD.id;
         audit_row.old_values := to_jsonb(OLD);
@@ -8481,13 +8438,12 @@ BEGIN
         INSERT INTO audit_logs SELECT audit_row.*;
         RETURN NEW;
     END IF;
-    
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
 
--- Apply audit triggers to critical tables
-CREATE TRIGGER conversations_audit_trigger
+    RETURN NULL;
+END; $$ LANGUAGE plpgsql;
+
+-- Apply audit triggers to critical tables CREATE TRIGGER
+conversations_audit_trigger
     AFTER INSERT OR UPDATE OR DELETE ON conversations
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
@@ -8509,30 +8465,26 @@ CREATE TRIGGER backend_registrations_audit_trigger
 ###### Row-Level Security Implementation
 
 ```sql
--- Enable row-level security
-ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE backend_registrations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE review_threads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE review_comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE review_verification_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE domain_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+-- Enable row-level security ALTER TABLE conversations ENABLE ROW LEVEL
+SECURITY; ALTER TABLE messages ENABLE ROW LEVEL SECURITY; ALTER TABLE tasks
+ENABLE ROW LEVEL SECURITY; ALTER TABLE backend_registrations ENABLE ROW LEVEL
+SECURITY; ALTER TABLE review_threads ENABLE ROW LEVEL SECURITY; ALTER TABLE
+review_comments ENABLE ROW LEVEL SECURITY; ALTER TABLE
+review_verification_results ENABLE ROW LEVEL SECURITY; ALTER TABLE
+domain_events ENABLE ROW LEVEL SECURITY; ALTER TABLE audit_logs ENABLE ROW
+LEVEL SECURITY;
 
--- Force RLS so table-owner paths cannot bypass tenant isolation.
-ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
-ALTER TABLE messages FORCE ROW LEVEL SECURITY;
-ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
-ALTER TABLE backend_registrations FORCE ROW LEVEL SECURITY;
-ALTER TABLE review_threads FORCE ROW LEVEL SECURITY;
-ALTER TABLE review_comments FORCE ROW LEVEL SECURITY;
-ALTER TABLE review_verification_results FORCE ROW LEVEL SECURITY;
-ALTER TABLE domain_events FORCE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+-- Force RLS so table-owner paths cannot bypass tenant isolation. ALTER TABLE
+conversations FORCE ROW LEVEL SECURITY; ALTER TABLE messages FORCE ROW LEVEL
+SECURITY; ALTER TABLE tasks FORCE ROW LEVEL SECURITY; ALTER TABLE
+backend_registrations FORCE ROW LEVEL SECURITY; ALTER TABLE review_threads
+FORCE ROW LEVEL SECURITY; ALTER TABLE review_comments FORCE ROW LEVEL SECURITY;
+ALTER TABLE review_verification_results FORCE ROW LEVEL SECURITY; ALTER TABLE
+domain_events FORCE ROW LEVEL SECURITY; ALTER TABLE audit_logs FORCE ROW LEVEL
+SECURITY;
 
--- Tenant isolation policies
-CREATE POLICY conversations_access_policy ON conversations
+-- Tenant isolation policies CREATE POLICY conversations_access_policy ON
+conversations
     FOR ALL TO authenticated_users
     USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
@@ -8562,7 +8514,8 @@ CREATE POLICY review_comments_access_policy ON review_comments
     USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
 
-CREATE POLICY review_verification_results_access_policy ON review_verification_results
+CREATE POLICY review_verification_results_access_policy ON
+review_verification_results
     FOR ALL TO authenticated_users
     USING (tenant_id = current_setting('app.tenant_id', true)::UUID)
     WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::UUID);
@@ -8597,45 +8550,33 @@ processing the operations. PostgreSQL can use indexes for the text results as
 compare operands.
 
 ```sql
--- Optimized queries using proper indexing
--- Instead of: SELECT * FROM messages WHERE content->>'type' = 'tool_call'
--- Use expression index:
-CREATE INDEX idx_messages_content_type ON messages ((content->>'type'));
+-- Optimized queries using proper indexing -- Instead of: SELECT * FROM
+messages WHERE content->>'type' = 'tool_call' -- Use expression index: CREATE
+INDEX idx_messages_content_type ON messages ((content->>'type'));
 
--- Query with index usage
-EXPLAIN (ANALYZE, BUFFERS) 
-SELECT m.id, m.content, m.created_at
-FROM messages m
-WHERE content->>'type' = 'tool_call'
-  AND created_at > NOW() - INTERVAL '1 day'
-ORDER BY created_at DESC
-LIMIT 100;
+-- Query with index usage EXPLAIN (ANALYZE, BUFFERS) SELECT m.id, m.content,
+m.created_at FROM messages m WHERE content->>'type' = 'tool_call' AND
+created_at > NOW() - INTERVAL '1 day' ORDER BY created_at DESC LIMIT 100;
 
--- Optimized containment queries using GIN indexes
--- Instead of: WHERE content->'metadata'->>'agent' = 'claude'
--- Use containment operator:
-SELECT * FROM messages 
-WHERE content @> '{"metadata": {"agent": "claude"}}';
+-- Optimized containment queries using GIN indexes -- Instead of: WHERE
+content->'metadata'->>'agent' = 'claude' -- Use containment operator: SELECT *
+FROM messages WHERE content @> '{"metadata": {"agent": "claude"}}';
 
--- Complex JSONB queries with proper indexing
-SELECT 
+-- Complex JSONB queries with proper indexing SELECT
     c.id,
     c.context->>'agent_backend' as agent,
     COUNT(m.id) as message_count,
     MAX(m.created_at) as last_message
-FROM conversations c
-JOIN messages m ON c.id = m.conversation_id
-WHERE c.context @> '{"agent_backend": "claude_code_sdk"}'
-  AND m.created_at > NOW() - INTERVAL '7 days'
-GROUP BY c.id, c.context->>'agent_backend'
-ORDER BY last_message DESC;
+FROM conversations c JOIN messages m ON c.id = m.conversation_id WHERE
+c.context @> '{"agent_backend": "claude_code_sdk"}' AND m.created_at > NOW() -
+INTERVAL '7 days' GROUP BY c.id, c.context->>'agent_backend' ORDER BY
+last_message DESC;
 ```
 
 ###### Query Performance Monitoring
 
 ```sql
--- Query performance tracking
-CREATE TABLE query_performance_log (
+-- Query performance tracking CREATE TABLE query_performance_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query_hash TEXT NOT NULL,
     query_text TEXT NOT NULL,
@@ -8649,14 +8590,12 @@ CREATE TABLE query_performance_log (
     application_name VARCHAR(100)
 );
 
--- Function to log slow queries
-CREATE OR REPLACE FUNCTION log_slow_query(
+-- Function to log slow queries CREATE OR REPLACE FUNCTION log_slow_query(
     p_query_text TEXT,
     p_execution_time_ms NUMERIC,
     p_rows_examined BIGINT DEFAULT NULL,
     p_rows_returned BIGINT DEFAULT NULL
-) RETURNS void AS $$
-BEGIN
+) RETURNS void AS $$ BEGIN
     -- Only log queries slower than 1 second
     IF p_execution_time_ms > 1000 THEN
         INSERT INTO query_performance_log (
@@ -8677,8 +8616,7 @@ BEGIN
             current_setting('application_name', true)
         );
     END IF;
-END;
-$$ LANGUAGE plpgsql;
+END; $$ LANGUAGE plpgsql;
 ```
 
 ##### 6.2.4.2 Caching Strategy
@@ -8686,9 +8624,8 @@ $$ LANGUAGE plpgsql;
 ###### Application-Level Caching
 
 ```rust
-use redis::AsyncCommands;
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use redis::AsyncCommands; use serde::{Deserialize, Serialize}; use
+std::time::Duration;
 
 pub struct CacheManager {
     redis_client: redis::Client,
@@ -8703,14 +8640,14 @@ impl CacheManager {
             default_ttl,
         })
     }
-    
+
     pub async fn get<T>(&self, key: &str) -> Result<Option<T>, Box<dyn std::error::Error>>
     where
         T: for<'de> Deserialize<'de>,
     {
         let mut conn = self.redis_client.get_async_connection().await?;
         let cached_data: Option<String> = conn.get(key).await?;
-        
+
         match cached_data {
             Some(data) => {
                 let deserialized: T = serde_json::from_str(&data)?;
@@ -8719,7 +8656,7 @@ impl CacheManager {
             None => Ok(None),
         }
     }
-    
+
     pub async fn set<T>(&self, key: &str, value: &T, ttl: Option<Duration>) -> Result<(), Box<dyn std::error::Error>>
     where
         T: Serialize,
@@ -8727,39 +8664,38 @@ impl CacheManager {
         let mut conn = self.redis_client.get_async_connection().await?;
         let serialized = serde_json::to_string(value)?;
         let ttl = ttl.unwrap_or(self.default_ttl);
-        
+
         conn.set_ex(key, serialized, ttl.as_secs()).await?;
         Ok(())
     }
-    
+
     pub async fn invalidate_pattern(&self, pattern: &str) -> Result<(), redis::RedisError> {
         let mut conn = self.redis_client.get_async_connection().await?;
         let keys: Vec<String> = conn.keys(pattern).await?;
-        
+
         if !keys.is_empty() {
             conn.del(keys).await?;
         }
-        
+
         Ok(())
     }
 }
 
-// Cache key strategies
-pub struct CacheKeys;
+// Cache key strategies pub struct CacheKeys;
 
 impl CacheKeys {
     pub fn conversation(id: &ConversationId) -> String {
         format!("conversation:{}", id)
     }
-    
+
     pub fn conversation_messages(id: &ConversationId, limit: usize) -> String {
         format!("conversation:{}:messages:{}", id, limit)
     }
-    
+
     pub fn task(id: &TaskId) -> String {
         format!("task:{}", id)
     }
-    
+
     pub fn user_conversations(user_id: &UserId) -> String {
         format!("user:{}:conversations", user_id)
     }
@@ -8776,9 +8712,8 @@ applications which may want to connect to the same database (or even multiple
 instances of the same application in high-availability deployments).
 
 ```rust
-use diesel::r2d2::{ConnectionManager, Pool, CustomizeConnection};
-use diesel::PgConnection;
-use std::time::Duration;
+use diesel::r2d2::{ConnectionManager, Pool, CustomizeConnection}; use
+diesel::PgConnection; use std::time::Duration;
 
 pub struct DatabaseConfig {
     pub max_size: u32,
@@ -8844,9 +8779,8 @@ pub fn create_optimized_pool(
 ###### Database Connection Routing
 
 ```rust
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::PgConnection;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use diesel::r2d2::{ConnectionManager, Pool}; use diesel::PgConnection; use
+std::sync::atomic::{AtomicUsize, Ordering};
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
@@ -8912,9 +8846,8 @@ PostgreSQL 14+, SSD storage, batch inserts of 100 events). The append-only
 nature contributes to performance—no updates, no deletes, just inserts.
 
 ```rust
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use std::time::Duration;
+use diesel::prelude::*; use diesel::r2d2::{ConnectionManager, Pool}; use
+std::time::Duration;
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
@@ -9023,7 +8956,7 @@ sequenceDiagram
     participant Corbusier as Corbusier Core
     participant MCP as MCP Multiplexer
     participant Tool as Tool Server
-    
+
     Agent->>Corbusier: Tool Call Request
     Corbusier->>MCP: Route via JSON-RPC 2.0
     MCP->>Tool: tools/list
@@ -9069,16 +9002,11 @@ this section. `v1` currently exposes:
 Every response uses a stable JSON envelope:
 
 ```json
-{
-  "success": true,
-  "data": {},
-  "error": null,
-  "metadata": {
+{ "success": true, "data": {}, "error": null, "metadata": {
     "version": "v1",
     "request_id": "<correlation-id>",
     "timestamp": "<RFC3339 timestamp>"
-  }
-}
+  } }
 ```
 
 Error responses keep the same envelope shape and populate `error.code` plus
@@ -9107,7 +9035,7 @@ graph TB
         JWT_GEN[JWT Token Generation]
         TOKEN_RESP[Token Response]
     end
-    
+
     subgraph "Request Authorization"
         REQ[API Request]
         TOKEN_EXTRACT[Extract Bearer Token]
@@ -9115,22 +9043,22 @@ graph TB
         CLAIMS_EXTRACT[Extract Claims]
         AUTHZ[Authorization Check]
     end
-    
+
     subgraph "Token Management"
         REFRESH[Token Refresh]
         REVOKE[Token Revocation]
         EXPIRE[Token Expiration]
     end
-    
+
     LOGIN --> VALIDATE
     VALIDATE --> JWT_GEN
     JWT_GEN --> TOKEN_RESP
-    
+
     REQ --> TOKEN_EXTRACT
     TOKEN_EXTRACT --> TOKEN_VERIFY
     TOKEN_VERIFY --> CLAIMS_EXTRACT
     CLAIMS_EXTRACT --> AUTHZ
-    
+
     TOKEN_RESP --> REFRESH
     REFRESH --> REVOKE
     REVOKE --> EXPIRE
@@ -9197,13 +9125,13 @@ graph TB
         WORKSPACE_SCOPE[Workspace Scope Check]
         RESOURCE_PERM[Resource Permissions]
     end
-    
+
     subgraph "Policy Enforcement"
         POLICY_ENGINE[Policy Engine]
         ACCESS_DECISION[Access Decision]
         AUDIT_LOG[Audit Logging]
     end
-    
+
     USER_AUTH --> ROLE_CHECK
     ROLE_CHECK --> WORKSPACE_SCOPE
     WORKSPACE_SCOPE --> RESOURCE_PERM
@@ -9249,9 +9177,9 @@ impl RateLimiter {
     ) -> Result<RateLimitResult> {
         let limit = self.limits.get(limit_type)
             .ok_or_else(|| anyhow::anyhow!("Unknown limit type"))?;
-        
+
         let current_count = self.get_current_count(key, limit.window_duration).await?;
-        
+
         if current_count >= limit.requests_per_window {
             Ok(RateLimitResult::Exceeded {
                 retry_after: self.calculate_retry_after(key, limit).await?,
@@ -9313,24 +9241,24 @@ graph LR
         SCHEMA[JSON Schema Definitions]
         EXAMPLES[Example Requests/Responses]
     end
-    
+
     subgraph "Generation Tools"
         OPENAPI[OpenAPI Generator]
         POSTMAN[Postman Collection Generator]
         MCP_DOC[MCP Documentation Generator]
     end
-    
+
     subgraph "Output Formats"
         SWAGGER[Swagger UI]
         REDOC[ReDoc Documentation]
         POSTMAN_COLL[Postman Collections]
         MCP_SPEC[MCP Tool Specifications]
     end
-    
+
     RUST --> OPENAPI
     SCHEMA --> OPENAPI
     EXAMPLES --> POSTMAN
-    
+
     OPENAPI --> SWAGGER
     OPENAPI --> REDOC
     POSTMAN --> POSTMAN_COLL
@@ -9358,14 +9286,14 @@ graph TB
         VCS_EVENTS[VCS Webhook Events]
         HOOK_EVENTS[Hook Execution Events]
     end
-    
+
     subgraph "Event Processing Pipeline"
         EVENT_BUS[Event Bus]
         EVENT_FILTER[Event Filtering]
         EVENT_TRANSFORM[Event Transformation]
         EVENT_ROUTE[Event Routing]
     end
-    
+
     subgraph "Event Consumers"
         STREAM_CLIENTS[Streaming Clients]
         HOOK_ENGINE[Hook Engine]
@@ -9373,17 +9301,17 @@ graph TB
         METRICS_COLLECTOR[Metrics Collector]
         NOTIFICATION_SVC[Notification Service]
     end
-    
+
     USER_EVENTS --> EVENT_BUS
     AGENT_EVENTS --> EVENT_BUS
     TOOL_EVENTS --> EVENT_BUS
     VCS_EVENTS --> EVENT_BUS
     HOOK_EVENTS --> EVENT_BUS
-    
+
     EVENT_BUS --> EVENT_FILTER
     EVENT_FILTER --> EVENT_TRANSFORM
     EVENT_TRANSFORM --> EVENT_ROUTE
-    
+
     EVENT_ROUTE --> STREAM_CLIENTS
     EVENT_ROUTE --> HOOK_ENGINE
     EVENT_ROUTE --> AUDIT_LOGGER
@@ -9416,30 +9344,30 @@ graph TB
         TOOL_EXECUTORS[Tool Executors]
         WEBHOOK_HANDLERS[Webhook Handlers]
     end
-    
+
     subgraph "Message Queue Layer"
         TOKIO_CHANNELS[Tokio Channels]
         BROADCAST_CHAN[Broadcast Channels]
         MPSC_CHAN[MPSC Channels]
         ONESHOT_CHAN[Oneshot Channels]
     end
-    
+
     subgraph "Message Consumers"
         EVENT_PROCESSORS[Event Processors]
         STREAM_HANDLERS[Stream Handlers]
         PERSISTENCE_SVC[Persistence Service]
         NOTIFICATION_SVC[Notification Service]
     end
-    
+
     HTTP_HANDLERS --> TOKIO_CHANNELS
     AGENT_ADAPTERS --> TOKIO_CHANNELS
     TOOL_EXECUTORS --> TOKIO_CHANNELS
     WEBHOOK_HANDLERS --> TOKIO_CHANNELS
-    
+
     TOKIO_CHANNELS --> BROADCAST_CHAN
     TOKIO_CHANNELS --> MPSC_CHAN
     TOKIO_CHANNELS --> ONESHOT_CHAN
-    
+
     BROADCAST_CHAN --> EVENT_PROCESSORS
     MPSC_CHAN --> STREAM_HANDLERS
     ONESHOT_CHAN --> PERSISTENCE_SVC
@@ -9476,12 +9404,12 @@ impl EventStreamManager {
     ) -> impl Stream<Item = Result<Event, Infallible>> {
         let mut rx = self.broadcast_tx.subscribe();
         let connection_id = ConnectionId::new();
-        
+
         self.register_connection(connection_id, user_id, filters.clone()).await;
-        
+
         async_stream::stream! {
             yield Ok(Event::default().event("connected").data("Stream established"));
-            
+
             while let Ok(event) = rx.recv().await {
                 if filters.matches(&event) && self.authorize_event(&event, user_id).await {
                     yield Ok(Event::default()
@@ -9515,19 +9443,19 @@ graph LR
         BUFFER[Batch Buffer]
         TRIGGER[Batch Trigger]
     end
-    
+
     subgraph "Batch Processing"
         VALIDATE[Batch Validation]
         TRANSFORM[Batch Transformation]
         PERSIST[Batch Persistence]
     end
-    
+
     subgraph "Result Handling"
         SUCCESS[Success Handling]
         ERROR[Error Handling]
         RETRY[Retry Logic]
     end
-    
+
     EVENTS --> BUFFER
     BUFFER --> TRIGGER
     TRIGGER --> VALIDATE
@@ -9560,31 +9488,31 @@ graph TB
         BATCH_ERROR[Batch Processing Error]
         TIMEOUT_ERROR[Timeout Error]
     end
-    
+
     subgraph "Error Classification"
         TRANSIENT[Transient Error]
         PERMANENT[Permanent Error]
         SYSTEM[System Error]
         USER[User Error]
     end
-    
+
     subgraph "Recovery Strategies"
         RETRY[Exponential Backoff Retry]
         DLQ[Dead Letter Queue]
         FALLBACK[Fallback Processing]
         ALERT[Alert Generation]
     end
-    
+
     MSG_ERROR --> TRANSIENT
     STREAM_ERROR --> PERMANENT
     BATCH_ERROR --> SYSTEM
     TIMEOUT_ERROR --> USER
-    
+
     TRANSIENT --> RETRY
     PERMANENT --> DLQ
     SYSTEM --> FALLBACK
     USER --> ALERT
-    
+
     RETRY --> DLQ
     FALLBACK --> ALERT
 ```
@@ -9614,28 +9542,28 @@ graph TB
         CODEX_ADAPTER[Codex CLI App Server Adapter]
         FUTURE_ADAPTER[Future Agent Adapters]
     end
-    
+
     subgraph "Adapter Interface"
         AGENT_PORT[AgentHostPort Trait]
         SESSION_MGR[Session Management]
         TOOL_TRANSLATION[Tool Schema Translation]
         STREAM_HANDLER[Response Stream Handling]
     end
-    
+
     subgraph "Core Integration"
         AGENT_ORCHESTRATOR[Agent Orchestrator]
         TOOL_ROUTER[Tool Router]
         CONVERSATION_SVC[Conversation Service]
     end
-    
+
     CLAUDE_ADAPTER --> AGENT_PORT
     CODEX_ADAPTER --> AGENT_PORT
     FUTURE_ADAPTER --> AGENT_PORT
-    
+
     AGENT_PORT --> SESSION_MGR
     AGENT_PORT --> TOOL_TRANSLATION
     AGENT_PORT --> STREAM_HANDLER
-    
+
     SESSION_MGR --> AGENT_ORCHESTRATOR
     TOOL_TRANSLATION --> TOOL_ROUTER
     STREAM_HANDLER --> CONVERSATION_SVC
@@ -9669,14 +9597,14 @@ sequenceDiagram
     participant Encap as Encapsulation Adapter
     participant Podbot as Podbot Runtime
     participant Workspace as Workspace Container
-    
+
     Task->>Encap: Create Workspace Request
     Encap->>Podbot: Pod Creation API Call
     Podbot->>Workspace: Initialize Container
     Workspace-->>Podbot: Container Ready
     Podbot-->>Encap: Pod Status Response
     Encap-->>Task: Workspace Created
-    
+
     Task->>Encap: Execute Tool Command
     Encap->>Podbot: Command Execution Request
     Podbot->>Workspace: Execute in Container
@@ -9709,30 +9637,30 @@ graph TB
         CLI_CLIENT[CLI Clients]
         THIRD_PARTY[Third-party Integrations]
     end
-    
+
     subgraph "API Gateway Layer"
         LOAD_BALANCER[Load Balancer]
         RATE_LIMITER[Rate Limiter]
         AUTH_MIDDLEWARE[Authentication Middleware]
         CORS_HANDLER[CORS Handler]
     end
-    
+
     subgraph "Corbusier Services"
         CONVERSATION_API[Conversation API]
         TASK_API[Task API]
         TOOL_API[Tool API]
         ADMIN_API[Admin API]
     end
-    
+
     WEB_CLIENT --> LOAD_BALANCER
     MOBILE_CLIENT --> LOAD_BALANCER
     CLI_CLIENT --> LOAD_BALANCER
     THIRD_PARTY --> LOAD_BALANCER
-    
+
     LOAD_BALANCER --> RATE_LIMITER
     RATE_LIMITER --> AUTH_MIDDLEWARE
     AUTH_MIDDLEWARE --> CORS_HANDLER
-    
+
     CORS_HANDLER --> CONVERSATION_API
     CORS_HANDLER --> TASK_API
     CORS_HANDLER --> TOOL_API
@@ -9769,14 +9697,14 @@ graph LR
         ERROR_TRACKING[Error Rate Tracking]
         SLA_DASHBOARD[SLA Dashboard]
     end
-    
+
     subgraph "Enforcement"
         CIRCUIT_BREAKER[Circuit Breaker]
         FALLBACK_LOGIC[Fallback Logic]
         ALERT_SYSTEM[Alert System]
         AUTO_RECOVERY[Auto Recovery]
     end
-    
+
     HEALTH_CHECK --> CIRCUIT_BREAKER
     PERF_MONITOR --> FALLBACK_LOGIC
     ERROR_TRACKING --> ALERT_SYSTEM
@@ -9802,26 +9730,26 @@ graph TB
         ERROR_RATES[Error Rate Tracking]
         CAPACITY_MONITOR[Capacity Monitoring]
     end
-    
+
     subgraph "Adaptive Behaviour"
         LOAD_SHEDDING[Load Shedding]
         GRACEFUL_DEGRADATION[Graceful Degradation]
         PRIORITY_QUEUING[Priority Queuing]
         RESOURCE_THROTTLING[Resource Throttling]
     end
-    
+
     subgraph "Recovery Mechanisms"
         AUTO_SCALING[Auto Scaling]
         FAILOVER[Automatic Failover]
         CACHE_WARMING[Cache Warming]
         SERVICE_DISCOVERY[Service Discovery]
     end
-    
+
     HEALTH_MONITOR --> LOAD_SHEDDING
     PERF_METRICS --> GRACEFUL_DEGRADATION
     ERROR_RATES --> PRIORITY_QUEUING
     CAPACITY_MONITOR --> RESOURCE_THROTTLING
-    
+
     LOAD_SHEDDING --> AUTO_SCALING
     GRACEFUL_DEGRADATION --> FAILOVER
     PRIORITY_QUEUING --> CACHE_WARMING
@@ -9867,28 +9795,28 @@ graph TB
         OAUTH[OAuth 2.1 Providers]
         ENTERPRISE[Enterprise SSO]
     end
-    
+
     subgraph "Identity Processing"
         AUTH_SVC[Authentication Service]
         TOKEN_GEN[Token Generator]
         CLAIM_BUILDER[Claims Builder]
         SESSION_MGR[Session Manager]
     end
-    
+
     subgraph "Identity Storage"
         USER_STORE[User Repository]
         SESSION_STORE[Session Store]
         TOKEN_CACHE[Token Cache]
     end
-    
+
     LOCAL --> AUTH_SVC
     OAUTH --> AUTH_SVC
     ENTERPRISE --> AUTH_SVC
-    
+
     AUTH_SVC --> TOKEN_GEN
     TOKEN_GEN --> CLAIM_BUILDER
     CLAIM_BUILDER --> SESSION_MGR
-    
+
     SESSION_MGR --> USER_STORE
     SESSION_MGR --> SESSION_STORE
     SESSION_MGR --> TOKEN_CACHE
@@ -9937,7 +9865,7 @@ impl SessionManager {
         let session_id = SessionId::new();
         let access_token = self.generate_access_token(user_id, session_id, &claims).await?;
         let refresh_token = self.generate_refresh_token(user_id, session_id).await?;
-        
+
         self.session_store.store_session(Session {
             id: session_id,
             user_id,
@@ -9946,7 +9874,7 @@ impl SessionManager {
             expires_at: Utc::now() + self.config.access_token_ttl,
             claims: claims.clone(),
         }).await?;
-        
+
         Ok(SessionTokens { access_token, refresh_token })
     }
 }
@@ -9982,7 +9910,7 @@ sequenceDiagram
     participant TokenSvc as Token Service
     participant SessionStore as Session Store
     participant UserStore as User Repository
-    
+
     Client->>Middleware: Request with Bearer Token
     Middleware->>TokenSvc: Validate Token
     TokenSvc->>TokenSvc: Verify Signature
@@ -10026,35 +9954,35 @@ graph TB
         DEVELOPER[Developer]
         VIEWER[Viewer]
     end
-    
+
     subgraph "Permission Categories"
         SYSTEM_PERMS[System Permissions]
         WORKSPACE_PERMS[Workspace Permissions]
         TASK_PERMS[Task Permissions]
         TOOL_PERMS[Tool Permissions]
     end
-    
+
     subgraph "Resource Scoping"
         GLOBAL[Global Resources]
         WORKSPACE[Workspace Resources]
         TASK[Task Resources]
         USER[User Resources]
     end
-    
+
     ADMIN --> SYSTEM_PERMS
     ADMIN --> WORKSPACE_PERMS
     ADMIN --> TASK_PERMS
     ADMIN --> TOOL_PERMS
-    
+
     TEAM_LEAD --> WORKSPACE_PERMS
     TEAM_LEAD --> TASK_PERMS
     TEAM_LEAD --> TOOL_PERMS
-    
+
     DEVELOPER --> TASK_PERMS
     DEVELOPER --> TOOL_PERMS
-    
+
     VIEWER --> TASK_PERMS
-    
+
     SYSTEM_PERMS --> GLOBAL
     WORKSPACE_PERMS --> WORKSPACE
     TASK_PERMS --> TASK
@@ -10119,16 +10047,16 @@ impl PermissionEngine {
         context: AuthorizationContext,
     ) -> Result<AuthorizationDecision> {
         let cache_key = format!("{}:{}:{}", user_id, permission.resource, permission.action);
-        
+
         if let Some(cached) = self.get_cached_permission(&cache_key).await {
             if !cached.is_expired() {
                 return Ok(cached.decision);
             }
         }
-        
+
         let decision = self.evaluate_permission(user_id, permission, context).await?;
         self.cache_permission(cache_key, decision.clone()).await;
-        
+
         Ok(decision)
     }
 }
@@ -10161,32 +10089,32 @@ flowchart TD
         RESOURCE[Resource Identifier]
         ACTION[Requested Action]
     end
-    
+
     subgraph "Permission Evaluation"
         ROLE_CHECK[Role Verification]
         SCOPE_CHECK[Scope Verification]
         POLICY_EVAL[Policy Evaluation]
         CONDITION_CHECK[Condition Evaluation]
     end
-    
+
     subgraph "Decision Engine"
         PERMIT[Permit]
         DENY[Deny]
         CONDITIONAL[Conditional Permit]
     end
-    
+
     REQ --> USER_CTX
     REQ --> RESOURCE
     REQ --> ACTION
-    
+
     USER_CTX --> ROLE_CHECK
     RESOURCE --> SCOPE_CHECK
     ACTION --> POLICY_EVAL
-    
+
     ROLE_CHECK --> CONDITION_CHECK
     SCOPE_CHECK --> CONDITION_CHECK
     POLICY_EVAL --> CONDITION_CHECK
-    
+
     CONDITION_CHECK --> PERMIT
     CONDITION_CHECK --> DENY
     CONDITION_CHECK --> CONDITIONAL
@@ -10346,11 +10274,11 @@ pub struct ApiGatewayPEP {
 impl PolicyEnforcementPoint for ApiGatewayPEP {
     async fn enforce(&self, request: AuthorizationRequest) -> Result<EnforcementResult> {
         let start_time = Instant::now();
-        
+
         let decision = self.permission_engine
             .check_permission(request.user_id, request.permission, request.context)
             .await?;
-        
+
         let enforcement_result = match decision {
             AuthorizationDecision::Permit => EnforcementResult::Allow,
             AuthorizationDecision::Deny(reason) => EnforcementResult::Deny(reason),
@@ -10358,14 +10286,14 @@ impl PolicyEnforcementPoint for ApiGatewayPEP {
                 EnforcementResult::Conditional(conditions)
             }
         };
-        
+
         self.audit_logger.log_authorization_decision(
             request.user_id,
             &request.permission,
             &enforcement_result,
             start_time.elapsed(),
         ).await?;
-        
+
         Ok(enforcement_result)
     }
 }
@@ -10426,30 +10354,30 @@ graph TB
         DEK[Data Encryption Keys]
         ROTATION[Key Rotation Service]
     end
-    
+
     subgraph "Data Encryption"
         DB_ENCRYPT[Database Encryption]
         FILE_ENCRYPT[File System Encryption]
         TOKEN_ENCRYPT[Token Encryption]
         TRANSIT_ENCRYPT[Transport Encryption]
     end
-    
+
     subgraph "Certificate Management"
         CA[Certificate Authority]
         CERT_STORE[Certificate Store]
         CERT_RENEWAL[Certificate Renewal]
     end
-    
+
     KMS --> KEK
     KEK --> DEK
     DEK --> DB_ENCRYPT
     DEK --> FILE_ENCRYPT
     DEK --> TOKEN_ENCRYPT
-    
+
     CA --> CERT_STORE
     CERT_STORE --> TRANSIT_ENCRYPT
     CERT_RENEWAL --> CERT_STORE
-    
+
     ROTATION --> KEK
     ROTATION --> CERT_RENEWAL
 ```
@@ -10477,23 +10405,23 @@ pub struct EncryptionKey {
 impl KeyManager {
     pub async fn get_encryption_key(&self, usage: KeyUsage) -> Result<EncryptionKey> {
         let key_id = self.get_current_key_id(usage).await?;
-        
+
         if let Some(cached_key) = self.get_cached_key(&key_id).await {
             if !cached_key.is_expired() {
                 return Ok(cached_key.key);
             }
         }
-        
+
         let key = self.kms_client.retrieve_key(key_id).await?;
         self.cache_key(key.clone()).await;
-        
+
         Ok(key)
     }
-    
+
     pub async fn rotate_key(&self, usage: KeyUsage) -> Result<EncryptionKey> {
         let new_key = self.kms_client.generate_key(usage).await?;
         self.rotation_scheduler.schedule_old_key_cleanup(usage).await?;
-        
+
         Ok(new_key)
     }
 }
@@ -10554,26 +10482,26 @@ graph TB
         SCOPE_VALIDATION[Scope Validation]
         TOKEN_AUDIENCE[Token Audience Validation]
     end
-    
+
     subgraph "MCP Server Security"
         REQUEST_VALIDATION[Request Validation]
         AUTHORIZATION_CHECK[Authorization Check]
         TOOL_SANDBOXING[Tool Execution Sandboxing]
         AUDIT_LOGGING[Comprehensive Audit Logging]
     end
-    
+
     subgraph "Client Security"
         PKCE[PKCE Implementation]
         TOKEN_STORAGE[Secure Token Storage]
         SCOPE_MINIMIZATION[Scope Minimization]
         CONSENT_MANAGEMENT[Consent Management]
     end
-    
+
     OAUTH --> REQUEST_VALIDATION
     RESOURCE_INDICATORS --> AUTHORIZATION_CHECK
     SCOPE_VALIDATION --> TOOL_SANDBOXING
     TOKEN_AUDIENCE --> AUDIT_LOGGING
-    
+
     PKCE --> OAUTH
     TOKEN_STORAGE --> RESOURCE_INDICATORS
     SCOPE_MINIMIZATION --> SCOPE_VALIDATION
@@ -10627,19 +10555,19 @@ impl SecureToolExecutor {
         // Pre-execution security checks
         self.validate_tool_permissions(&tool_call, &context).await?;
         self.enforce_resource_limits(&context).await?;
-        
+
         // Create isolated execution environment
         let workspace = self.encapsulation_provider
             .create_workspace(context.workspace_id, context.resource_limits)
             .await?;
-        
+
         // Execute tool with monitoring
         let execution_start = Instant::now();
         let result = timeout(
             context.execution_timeout,
             self.execute_in_workspace(&workspace, tool_call)
         ).await??;
-        
+
         // Post-execution audit
         self.audit_logger.log_tool_execution(
             &tool_call,
@@ -10647,7 +10575,7 @@ impl SecureToolExecutor {
             execution_start.elapsed(),
             &context,
         ).await?;
-        
+
         Ok(result)
     }
 }
@@ -10680,21 +10608,21 @@ graph TB
             APPARMOR[AppArmor/SELinux]
             CAPABILITIES[Dropped Capabilities]
         end
-        
+
         subgraph "Network Security"
             NET_POLICY[Network Policies]
             FIREWALL[Container Firewall]
             DNS_FILTER[DNS Filtering]
             EGRESS_CONTROL[Egress Control]
         end
-        
+
         subgraph "Storage Security"
             VOLUME_ENCRYPTION[Volume Encryption]
             READ_ONLY_FS[Read-Only File System]
             MOUNT_RESTRICTIONS[Mount Restrictions]
             QUOTA_LIMITS[Storage Quotas]
         end
-        
+
         subgraph "Runtime Security"
             RESOURCE_LIMITS[Resource Limits]
             EXECUTION_TIMEOUT[Execution Timeouts]
@@ -10702,17 +10630,17 @@ graph TB
             AUDIT_TRAIL[Audit Trail]
         end
     end
-    
+
     USER_NS --> NET_POLICY
     SECCOMP --> FIREWALL
     APPARMOR --> DNS_FILTER
     CAPABILITIES --> EGRESS_CONTROL
-    
+
     NET_POLICY --> VOLUME_ENCRYPTION
     FIREWALL --> READ_ONLY_FS
     DNS_FILTER --> MOUNT_RESTRICTIONS
     EGRESS_CONTROL --> QUOTA_LIMITS
-    
+
     VOLUME_ENCRYPTION --> RESOURCE_LIMITS
     READ_ONLY_FS --> EXECUTION_TIMEOUT
     MOUNT_RESTRICTIONS --> MONITORING
@@ -10743,19 +10671,19 @@ flowchart TD
         TRIAGE[Alert Triage]
         CLASSIFICATION[Incident Classification]
     end
-    
+
     subgraph "Response Phase"
         CONTAINMENT[Containment Actions]
         INVESTIGATION[Forensic Investigation]
         REMEDIATION[Remediation Actions]
     end
-    
+
     subgraph "Recovery Phase"
         SYSTEM_RESTORE[System Restoration]
         MONITORING[Enhanced Monitoring]
         LESSONS_LEARNED[Lessons Learned]
     end
-    
+
     ALERT --> TRIAGE
     TRIAGE --> CLASSIFICATION
     CLASSIFICATION --> CONTAINMENT
@@ -10808,43 +10736,43 @@ graph TB
         TOOL[Tool Executor]
         HOOK[Hook Engine]
     end
-    
+
     subgraph "Metrics Collection"
         TRACING[Tracing Framework]
         OTEL[OpenTelemetry SDK]
         METRICS_RS[Metrics-rs]
         ACTIX_METRICS[Actix-Web Metrics]
     end
-    
+
     subgraph "Metrics Processing"
         PROMETHEUS[Prometheus Exporter]
         AGGREGATION[Metrics Aggregation]
         FILTERING[Metrics Filtering]
     end
-    
+
     subgraph "Storage & Visualization"
         PROM_SERVER[Prometheus Server]
         GRAFANA[Grafana Dashboards]
         ALERTMANAGER[Alert Manager]
     end
-    
+
     HTTP --> TRACING
     AGENT --> TRACING
     TOOL --> TRACING
     HOOK --> TRACING
-    
+
     TRACING --> OTEL
     TRACING --> METRICS_RS
     HTTP --> ACTIX_METRICS
-    
+
     OTEL --> PROMETHEUS
     METRICS_RS --> PROMETHEUS
     ACTIX_METRICS --> PROMETHEUS
-    
+
     PROMETHEUS --> AGGREGATION
     AGGREGATION --> FILTERING
     FILTERING --> PROM_SERVER
-    
+
     PROM_SERVER --> GRAFANA
     PROM_SERVER --> ALERTMANAGER
 ```
@@ -10876,31 +10804,31 @@ graph LR
         TOOL_LOGS[Tool Execution Logs]
         AUDIT_LOGS[Audit Logs]
     end
-    
+
     subgraph "Log Processing"
         TRACING_SUB[Tracing Subscriber]
         JSON_FORMAT[JSON Formatter]
         CORRELATION[Correlation ID Injection]
         FILTERING[Log Level Filtering]
     end
-    
+
     subgraph "Log Storage"
         FILE_OUTPUT[File Output]
         STDOUT[Standard Output]
         SYSLOG[Syslog Integration]
         EXTERNAL[External Log Systems]
     end
-    
+
     APP_LOGS --> TRACING_SUB
     ACCESS_LOGS --> TRACING_SUB
     AGENT_LOGS --> TRACING_SUB
     TOOL_LOGS --> TRACING_SUB
     AUDIT_LOGS --> TRACING_SUB
-    
+
     TRACING_SUB --> JSON_FORMAT
     JSON_FORMAT --> CORRELATION
     CORRELATION --> FILTERING
-    
+
     FILTERING --> FILE_OUTPUT
     FILTERING --> STDOUT
     FILTERING --> SYSLOG
@@ -10941,7 +10869,7 @@ sequenceDiagram
     participant Agent as Agent Orchestrator
     participant Tool as Tool Executor
     participant MCP as MCP Server
-    
+
     User->>HTTP: POST /conversations/{id}/messages
     Note over HTTP: Span: http_request
     HTTP->>Conv: Process Message
@@ -10986,30 +10914,30 @@ graph TB
         CUSTOM_ALERTS[Custom Alerts]
         HEALTH_CHECKS[Health Check Failures]
     end
-    
+
     subgraph "Alert Processing"
         ALERTMANAGER[Alert Manager]
         GROUPING[Alert Grouping]
         ROUTING[Alert Routing]
         SILENCING[Alert Silencing]
     end
-    
+
     subgraph "Notification Channels"
         SLACK[Slack Integration]
         EMAIL[Email Notifications]
         WEBHOOK[Webhook Endpoints]
         PAGERDUTY[PagerDuty Integration]
     end
-    
+
     PROM_RULES --> ALERTMANAGER
     GRAFANA_ALERTS --> ALERTMANAGER
     CUSTOM_ALERTS --> ALERTMANAGER
     HEALTH_CHECKS --> ALERTMANAGER
-    
+
     ALERTMANAGER --> GROUPING
     GROUPING --> ROUTING
     ROUTING --> SILENCING
-    
+
     SILENCING --> SLACK
     SILENCING --> EMAIL
     SILENCING --> WEBHOOK
@@ -11118,28 +11046,28 @@ graph LR
         TOOL_SUCCESS[Tool Success Rate]
         USER_SATISFACTION[User Satisfaction Score]
     end
-    
+
     subgraph "System Performance Metrics"
         RESPONSE_TIME[Response Time]
         THROUGHPUT[Request Throughput]
         ERROR_RATE[Error Rate]
         AVAILABILITY[System Availability]
     end
-    
+
     subgraph "Resource Utilization"
         CPU_USAGE[CPU Utilization]
         MEMORY_USAGE[Memory Usage]
         DB_CONNECTIONS[Database Connections]
         AGENT_SESSIONS[Active Agent Sessions]
     end
-    
+
     subgraph "Business KPIs"
         DAILY_ACTIVE_USERS[Daily Active Users]
         TASKS_PER_USER[Tasks per User]
         AGENT_UTILIZATION[Agent Utilization]
         COST_PER_TASK[Cost per Task]
     end
-    
+
     TASK_COMPLETION --> BUSINESS_KPIs
     TURN_SUCCESS --> BUSINESS_KPIs
     RESPONSE_TIME --> BUSINESS_KPIs
@@ -11175,27 +11103,27 @@ graph TB
         TOOL_EXECUTIONS[Tool Executions]
         DB_CONNECTIONS[Database Connections]
     end
-    
+
     subgraph "Capacity Analysis"
         TREND_ANALYSIS[Trend Analysis]
         PEAK_DETECTION[Peak Detection]
         GROWTH_PROJECTION[Growth Projection]
         BOTTLENECK_ID[Bottleneck Identification]
     end
-    
+
     subgraph "Capacity Planning"
         SCALING_TRIGGERS[Auto-scaling Triggers]
         RESOURCE_ALLOCATION[Resource Allocation]
         PERFORMANCE_TUNING[Performance Tuning]
         CAPACITY_ALERTS[Capacity Alerts]
     end
-    
+
     CONCURRENT_USERS --> TREND_ANALYSIS
     ACTIVE_TASKS --> PEAK_DETECTION
     AGENT_SESSIONS --> GROWTH_PROJECTION
     TOOL_EXECUTIONS --> BOTTLENECK_ID
     DB_CONNECTIONS --> TREND_ANALYSIS
-    
+
     TREND_ANALYSIS --> SCALING_TRIGGERS
     PEAK_DETECTION --> RESOURCE_ALLOCATION
     GROWTH_PROJECTION --> PERFORMANCE_TUNING
@@ -11238,7 +11166,7 @@ graph TB
         HEALTH_CHECKS[Health Check Failures]
         CUSTOM[Custom Alerts]
     end
-    
+
     subgraph "Alert Manager Processing"
         RECEIVE[Alert Reception]
         GROUPING[Alert Grouping]
@@ -11246,7 +11174,7 @@ graph TB
         SILENCING[Alert Silencing]
         ROUTING[Alert Routing]
     end
-    
+
     subgraph "Notification Channels"
         PAGERDUTY[PagerDuty]
         SLACK_CRITICAL[Slack #critical-alerts]
@@ -11254,17 +11182,17 @@ graph TB
         EMAIL[Email Notifications]
         WEBHOOK[Custom Webhooks]
     end
-    
+
     PROMETHEUS --> RECEIVE
     GRAFANA --> RECEIVE
     HEALTH_CHECKS --> RECEIVE
     CUSTOM --> RECEIVE
-    
+
     RECEIVE --> GROUPING
     GROUPING --> INHIBITION
     INHIBITION --> SILENCING
     SILENCING --> ROUTING
-    
+
     ROUTING --> PAGERDUTY
     ROUTING --> SLACK_CRITICAL
     ROUTING --> SLACK_GENERAL
@@ -11294,28 +11222,28 @@ graph LR
         CLASSIFICATION[Alert Classification]
         SEVERITY[Severity Assessment]
     end
-    
+
     subgraph "Runbook Selection"
         RUNBOOK_DB[Runbook Database]
         MATCHING[Pattern Matching]
         SELECTION[Runbook Selection]
     end
-    
+
     subgraph "Automated Response"
         DIAGNOSTIC[Diagnostic Commands]
         REMEDIATION[Automated Remediation]
         VALIDATION[Validation Checks]
         NOTIFICATION[Status Notification]
     end
-    
+
     ALERT --> CLASSIFICATION
     CLASSIFICATION --> SEVERITY
     SEVERITY --> RUNBOOK_DB
-    
+
     RUNBOOK_DB --> MATCHING
     MATCHING --> SELECTION
     SELECTION --> DIAGNOSTIC
-    
+
     DIAGNOSTIC --> REMEDIATION
     REMEDIATION --> VALIDATION
     VALIDATION --> NOTIFICATION
@@ -11342,38 +11270,38 @@ graph TB
         ROOT_CAUSE[Root Cause Analysis]
         CONTRIBUTING[Contributing Factors]
     end
-    
+
     subgraph "Analysis Process"
         DATA_COLLECTION[Data Collection]
         STAKEHOLDER_INPUT[Stakeholder Input]
         TECHNICAL_REVIEW[Technical Review]
         PROCESS_REVIEW[Process Review]
     end
-    
+
     subgraph "Improvement Actions"
         ACTION_ITEMS[Action Items]
         OWNERSHIP[Owner Assignment]
         TIMELINE_PLAN[Timeline Planning]
         TRACKING[Progress Tracking]
     end
-    
+
     subgraph "Knowledge Sharing"
         DOCUMENTATION[Documentation Update]
         TEAM_SHARING[Team Sharing Session]
         RUNBOOK_UPDATE[Runbook Updates]
         MONITORING_IMPROVEMENT[Monitoring Improvements]
     end
-    
+
     TIMELINE --> DATA_COLLECTION
     IMPACT --> STAKEHOLDER_INPUT
     ROOT_CAUSE --> TECHNICAL_REVIEW
     CONTRIBUTING --> PROCESS_REVIEW
-    
+
     DATA_COLLECTION --> ACTION_ITEMS
     STAKEHOLDER_INPUT --> OWNERSHIP
     TECHNICAL_REVIEW --> TIMELINE_PLAN
     PROCESS_REVIEW --> TRACKING
-    
+
     ACTION_ITEMS --> DOCUMENTATION
     OWNERSHIP --> TEAM_SHARING
     TIMELINE_PLAN --> RUNBOOK_UPDATE
@@ -11398,15 +11326,12 @@ graph TB
 ###### Prometheus Scrape Configuration
 
 ```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+global: scrape_interval: 15s evaluation_interval: 15s
 
 rule_files:
   - "corbusier_rules.yml"
 
-alerting:
-  alertmanagers:
+alerting: alertmanagers:
     - static_configs:
         - targets:
           - alertmanager:9093
@@ -11417,13 +11342,13 @@ scrape_configs:
       - targets: ['corbusier:8080']
     metrics_path: '/metrics'
     scrape_interval: 10s
-    
+
   - job_name: 'corbusier-health'
     static_configs:
       - targets: ['corbusier:8080']
     metrics_path: '/health/metrics'
     scrape_interval: 30s
-    
+
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
@@ -11441,21 +11366,21 @@ graph TB
         TASK_COMPLETION[Task Completion Rate]
         SYSTEM_HEALTH[System Health Overview]
     end
-    
+
     subgraph "Operational Dashboard"
         REQUEST_RATE[Request Rate]
         RESPONSE_TIME[Response Time]
         ERROR_RATE[Error Rate]
         RESOURCE_USAGE[Resource Usage]
     end
-    
+
     subgraph "Component Dashboard"
         AGENT_METRICS[Agent Metrics]
         TOOL_METRICS[Tool Metrics]
         DB_METRICS[Database Metrics]
         VCS_METRICS[VCS Metrics]
     end
-    
+
     subgraph "Troubleshooting Dashboard"
         ERROR_LOGS[Error Log Analysis]
         TRACE_ANALYSIS[Trace Analysis]
@@ -11480,7 +11405,7 @@ groups:
         annotations:
           summary: "High error rate detected"
           description: "Error rate is {{ $value }} errors per second"
-          
+
       - alert: AgentBackendDown
         expr: up{job="agent-backend"} == 0
         for: 1m
@@ -11489,7 +11414,7 @@ groups:
         annotations:
           summary: "Agent backend is down"
           description: "Agent backend {{ $labels.instance }} is not responding"
-          
+
       - alert: DatabaseConnectionPoolExhausted
         expr: db_connections_active / db_connections_max > 0.95
         for: 30s
@@ -11539,14 +11464,14 @@ graph TB
             ADAPTER_TESTS[Adapter Tests]
             UTIL_TESTS[Utility Tests]
         end
-        
+
         subgraph "Test Modules"
             CONV_TESTS[Conversation Tests]
             TASK_TESTS[Task Tests]
             AGENT_TESTS[Agent Orchestrator Tests]
             TOOL_TESTS[Tool Registry Tests]
         end
-        
+
         subgraph "Mock Objects"
             AGENT_MOCKS[Agent Backend Mocks]
             VCS_MOCKS[VCS Provider Mocks]
@@ -11554,12 +11479,12 @@ graph TB
             DB_MOCKS[Database Mocks]
         end
     end
-    
+
     DOMAIN_TESTS --> CONV_TESTS
     SERVICE_TESTS --> TASK_TESTS
     ADAPTER_TESTS --> AGENT_TESTS
     UTIL_TESTS --> TOOL_TESTS
-    
+
     CONV_TESTS --> AGENT_MOCKS
     TASK_TESTS --> VCS_MOCKS
     AGENT_TESTS --> MCP_MOCKS
@@ -11596,7 +11521,7 @@ is mock!
 mod tests {
     use super::*;
     use mockall::predicate::*;
-    
+
     // Test naming: test_[component]_[scenario]_[expected_outcome]
     #[tokio::test]
     async fn test_conversation_service_append_message_success() {
@@ -11606,13 +11531,13 @@ mod tests {
             .with(eq(conversation_id), always())
             .times(1)
             .returning(|_, _| Ok(()));
-        
+
         // Act & Assert
         let service = ConversationService::new(Arc::new(mock_repo));
         let result = service.append_message(conversation_id, message).await;
         assert!(result.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_agent_orchestrator_turn_execution_with_tool_calls() {
         // Test implementation
@@ -11651,7 +11576,7 @@ sequenceDiagram
     participant MockAgent as Mock Agent Backend
     participant MockVCS as Mock VCS Provider
     participant TestDB as Test Database
-    
+
     Test->>TestDB: Setup test data
     Test->>MockAgent: Configure expectations
     Test->>MockVCS: Setup mock responses
@@ -11736,25 +11661,25 @@ graph TB
         MOCK_SERVICES[Mock Service Startup]
         CLEANUP[Cleanup Procedures]
     end
-    
+
     subgraph "Environment Types"
         UNIT_ENV[Unit Test Environment]
         INTEGRATION_ENV[Integration Test Environment]
         E2E_ENV[End-to-End Test Environment]
     end
-    
+
     subgraph "Resource Management"
         DB_SETUP[Database Setup]
         CONTAINER_MGMT[Container Management]
         NETWORK_CONFIG[Network Configuration]
         FILE_SYSTEM[File System Isolation]
     end
-    
+
     ENV_CONFIG --> UNIT_ENV
     TEST_DATA --> INTEGRATION_ENV
     MOCK_SERVICES --> E2E_ENV
     CLEANUP --> UNIT_ENV
-    
+
     UNIT_ENV --> DB_SETUP
     INTEGRATION_ENV --> CONTAINER_MGMT
     E2E_ENV --> NETWORK_CONFIG
@@ -11784,7 +11709,7 @@ async fn test_complete_task_workflow_e2e() {
     // Setup test environment
     let test_env = TestEnvironment::new().await;
     let client = test_env.create_client();
-    
+
     // Create task from issue
     let task_request = CreateTaskRequest {
         origin: TaskOrigin::Issue(IssueRef {
@@ -11793,30 +11718,30 @@ async fn test_complete_task_workflow_e2e() {
             issue_number: 123,
         }),
     };
-    
+
     let task = client.create_task(task_request).await
         .expect("Failed to create task");
-    
+
     // Start task (creates branch and workspace)
     client.start_task(task.id).await
         .expect("Failed to start task");
-    
+
     // Execute agent turn with tool calls
     let message = CreateMessageRequest {
         role: MessageRole::User,
         content: "Implement the feature described in the issue".to_string(),
     };
-    
+
     let turn_result = client.append_message(task.conversation_id, message).await
         .expect("Failed to execute turn");
-    
+
     // Verify tool executions occurred
     assert!(!turn_result.tool_calls.is_empty());
-    
+
     // Create pull request
     client.create_pull_request(task.id).await
         .expect("Failed to create PR");
-    
+
     // Verify final task state
     let final_task = client.get_task(task.id).await
         .expect("Failed to get final task");
@@ -11864,27 +11789,27 @@ graph LR
         SCHEDULE[Scheduled Run]
         MANUAL[Manual Trigger]
     end
-    
+
     subgraph "Test Execution"
         UNIT[Unit Tests]
         INTEGRATION[Integration Tests]
         E2E[End-to-End Tests]
         PERFORMANCE[Performance Tests]
     end
-    
+
     subgraph "Quality Gates"
         COVERAGE[Coverage Check]
         LINT[Code Linting]
         SECURITY[Security Scan]
         DOCS[Documentation Check]
     end
-    
+
     PR --> UNIT
     PR --> INTEGRATION
     PUSH --> E2E
     SCHEDULE --> PERFORMANCE
     MANUAL --> E2E
-    
+
     UNIT --> COVERAGE
     INTEGRATION --> LINT
     E2E --> SECURITY
@@ -11912,15 +11837,11 @@ features, supports XML and JSON output.
 
 ```yaml
 # .config/nextest.toml
-[profile.ci]
-fail-fast = false
+[profile.ci] fail-fast = false
 
-[profile.ci.junit]
-path = "test-results.xml"
+[profile.ci.junit] path = "test-results.xml"
 
-[profile.ci.reporter]
-verbose = true
-status-level = "all"
+[profile.ci.reporter] verbose = true status-level = "all"
 ```
 
 ###### Failed Test Handling
@@ -11947,13 +11868,13 @@ environment variable to control concurrency.
 async fn test_potentially_flaky_operation() {
     // Use deterministic test patterns
     tokio::time::pause(); // Control time in tests
-    
+
     // Implement proper cleanup
     let _guard = TestGuard::new(); // Ensures cleanup
-    
+
     // Use fixed ports or ephemeral port allocation
     let server = TestServer::bind_ephemeral().await;
-    
+
     // Test implementation with proper isolation
 }
 ```
@@ -11970,30 +11891,30 @@ graph TB
         SERVICES[Service Startup]
         VALIDATION[Environment Validation]
     end
-    
+
     subgraph "Test Execution"
         SETUP[Test Setup]
         EXECUTION[Test Execution]
         TEARDOWN[Test Teardown]
         REPORTING[Result Reporting]
     end
-    
+
     subgraph "Resource Management"
         CONTAINERS[Container Management]
         DATABASES[Database Provisioning]
         NETWORKS[Network Configuration]
         CLEANUP[Resource Cleanup]
     end
-    
+
     CONFIG --> DEPS
     DEPS --> SERVICES
     SERVICES --> VALIDATION
     VALIDATION --> SETUP
-    
+
     SETUP --> EXECUTION
     EXECUTION --> TEARDOWN
     TEARDOWN --> REPORTING
-    
+
     SERVICES --> CONTAINERS
     CONTAINERS --> DATABASES
     DATABASES --> NETWORKS
@@ -12048,26 +11969,26 @@ graph LR
         LINT[Code Linting]
         SECURITY[Security Scan]
     end
-    
+
     subgraph "Quality Gates"
         UNIT_GATE[Unit Test Gate]
         INTEGRATION_GATE[Integration Gate]
         COVERAGE_GATE[Coverage Gate]
         SECURITY_GATE[Security Gate]
     end
-    
+
     subgraph "Actions"
         PASS[Allow Merge]
         BLOCK[Block Merge]
         WARN[Warning Only]
         MANUAL[Manual Review]
     end
-    
+
     TESTS --> UNIT_GATE
     TESTS --> INTEGRATION_GATE
     COVERAGE --> COVERAGE_GATE
     SECURITY --> SECURITY_GATE
-    
+
     UNIT_GATE --> PASS
     INTEGRATION_GATE --> BLOCK
     COVERAGE_GATE --> WARN
@@ -12093,53 +12014,53 @@ flowchart TD
         BUILD[Build Project]
         LINT[Run Linting]
     end
-    
+
     subgraph "Test Execution Phase"
         UNIT[Unit Tests]
         INTEGRATION[Integration Tests]
         E2E[End-to-End Tests]
         PERFORMANCE[Performance Tests]
     end
-    
+
     subgraph "Post-Test Phase"
         COVERAGE[Coverage Analysis]
         REPORTS[Generate Reports]
-        ARTIFACTS[Store Artifacts]
+        ARTEFACTS[Store Artefacts]
         NOTIFICATION[Send Notifications]
     end
-    
+
     subgraph "Quality Gates"
         GATE1{Unit Tests Pass?}
         GATE2{Coverage > 85%?}
         GATE3{Security Scan Clean?}
         GATE4{Performance OK?}
     end
-    
+
     CHECKOUT --> DEPS
     DEPS --> BUILD
     BUILD --> LINT
     LINT --> UNIT
-    
+
     UNIT --> GATE1
     GATE1 -->|Yes| INTEGRATION
     GATE1 -->|No| NOTIFICATION
-    
+
     INTEGRATION --> E2E
     E2E --> PERFORMANCE
     PERFORMANCE --> COVERAGE
-    
+
     COVERAGE --> GATE2
     GATE2 -->|Yes| GATE3
     GATE2 -->|No| NOTIFICATION
-    
+
     GATE3 -->|Yes| GATE4
     GATE3 -->|No| NOTIFICATION
-    
+
     GATE4 -->|Yes| REPORTS
     GATE4 -->|No| NOTIFICATION
-    
-    REPORTS --> ARTIFACTS
-    ARTIFACTS --> NOTIFICATION
+
+    REPORTS --> ARTEFACTS
+    ARTEFACTS --> NOTIFICATION
 ```
 
 This comprehensive testing strategy ensures that Corbusier maintains high
@@ -12282,29 +12203,29 @@ graph TB
         WORKFLOW_VIS[Workflow Visualization]
         STATUS_TRACK[Status Tracking]
     end
-    
+
     subgraph "Real-time Updates"
         SSE_STREAM[SSE Event Stream]
         STATUS_UPDATES[Status Updates]
         PROGRESS_INDICATORS[Progress Indicators]
         NOTIFICATION_PANEL[Notification Panel]
     end
-    
+
     subgraph "Action Controls"
         START_TASK[Start Task Button]
         AGENT_SELECT[Agent Selection]
         TOOL_CONFIG[Tool Configuration]
         HOOK_SETTINGS[Hook Settings]
     end
-    
+
     TASK_LIST --> TASK_DETAIL
     TASK_DETAIL --> WORKFLOW_VIS
     WORKFLOW_VIS --> STATUS_TRACK
-    
+
     SSE_STREAM --> STATUS_UPDATES
     STATUS_UPDATES --> PROGRESS_INDICATORS
     PROGRESS_INDICATORS --> NOTIFICATION_PANEL
-    
+
     TASK_DETAIL --> START_TASK
     START_TASK --> AGENT_SELECT
     AGENT_SELECT --> TOOL_CONFIG
@@ -12346,21 +12267,21 @@ graph TB
         SYSTEM_HEALTH[System Health Score]
         PERFORMANCE_KPI[Performance KPIs]
     end
-    
+
     subgraph "Operational Metrics"
         AGENT_UTILIZATION[Agent Utilization]
         TOOL_EXECUTION[Tool Execution Stats]
         ERROR_RATES[Error Rate Trends]
         RESPONSE_TIMES[Response Time Distribution]
     end
-    
+
     subgraph "Resource Monitoring"
         CPU_USAGE[CPU Usage]
         MEMORY_USAGE[Memory Usage]
         DB_CONNECTIONS[Database Connections]
         WORKSPACE_STATUS[Workspace Status]
     end
-    
+
     subgraph "Alert Management"
         ACTIVE_ALERTS[Active Alerts]
         ALERT_HISTORY[Alert History]
@@ -12391,28 +12312,23 @@ workflows and infrastructure, with feature-wise support for human-in-the-loop
 workflows.
 
 ```typescript
-// SSE Integration Example
-interface StreamEvent {
-  event_type: 'turn_started' | 'tool_executed' | 'turn_completed' | 'error';
-  conversation_id: string;
-  data: {
+// SSE Integration Example interface StreamEvent { event_type: 'turn_started' |
+'tool_executed' | 'turn_completed' | 'error'; conversation_id: string; data: {
     timestamp: string;
     details: Record<string, any>;
-  };
-}
+  }; }
 
-class EventStreamManager {
-  private eventSource: EventSource;
-  
+class EventStreamManager { private eventSource: EventSource;
+
   connect(conversationId: string) {
     this.eventSource = new EventSource(`/api/v1/events/conversations/${conversationId}`);
-    
+
     this.eventSource.onmessage = (event) => {
       const streamEvent: StreamEvent = JSON.parse(event.data);
       this.handleStreamEvent(streamEvent);
     };
   }
-  
+
   private handleStreamEvent(event: StreamEvent) {
     switch (event.event_type) {
       case 'turn_started':
@@ -12425,8 +12341,7 @@ class EventStreamManager {
         this.updateTurnStatus('completed');
         break;
     }
-  }
-}
+  } }
 ```
 
 #### 7.3.2 State Management Architecture
@@ -12447,74 +12362,48 @@ class EventStreamManager {
 ##### Task Interface Schema
 
 ```typescript
-interface Task {
-  id: string;
-  origin: TaskOrigin;
-  state: 'draft' | 'in_progress' | 'in_review' | 'done' | 'abandoned';
-  branch_ref?: string;
-  pull_request_ref?: string;
-  conversation_id?: string;
-  workspace_id?: string;
-  created_at: string;
-  updated_at: string;
-  metadata: {
+interface Task { id: string; origin: TaskOrigin; state: 'draft' | 'in_progress'
+| 'in_review' | 'done' | 'abandoned'; branch_ref?: string; pull_request_ref?: |
+string; conversation_id?: string; workspace_id?: string; created_at: string;
+updated_at: string; metadata: {
     title: string;
     description: string;
     labels: string[];
     assignees: string[];
-  };
-}
+  }; }
 
-interface TaskOrigin {
-  type: 'issue' | 'milestone' | 'ad_hoc';
-  issue_ref?: {
+interface TaskOrigin { type: 'issue' | 'milestone' | 'ad_hoc'; issue_ref?: {
     provider: string;
     repository: string;
     issue_number: number;
-  };
-  milestone_ref?: {
+  }; milestone_ref?: {
     name: string;
     roadmap_path: string;
-  };
-}
+  }; }
 ```
 
 ##### Conversation Interface Schema
 
 ```typescript
-interface Conversation {
-  id: string;
-  task_id?: string;
-  messages: Message[];
-  context: ConversationContext;
-  state: 'active' | 'paused' | 'archived';
-  created_at: string;
-  updated_at: string;
-}
+interface Conversation { id: string; task_id?: string; messages: Message[];
+context: ConversationContext; state: 'active' | 'paused' | 'archived';
+created_at: string; updated_at: string; }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'tool' | 'system';
-  content: ContentPart[];
-  metadata: {
+interface Message { id: string; role: 'user' | 'assistant' | 'tool' | 'system';
+content: ContentPart[]; metadata: {
     timestamp: string;
     agent_backend?: string;
     tool_calls?: ToolCall[];
     slash_command_expansion?: Record<string, any>;
-  };
-}
+  }; }
 
-interface ConversationContext {
-  agent_backend: string;
-  tool_policy: {
+interface ConversationContext { agent_backend: string; tool_policy: {
     allowed_tools: string[];
     file_edit_policy: 'weaver_only' | 'agent_native';
-  };
-  workspace_config: {
+  }; workspace_config: {
     language_runtime: string;
     toolchain_version: string;
-  };
-}
+  }; }
 ```
 
 #### 7.4.2 Real-time Event Schemas
@@ -12522,36 +12411,24 @@ interface ConversationContext {
 ##### Stream Event Types
 
 ```typescript
-type StreamEventType = 
-  | 'turn_started'
-  | 'tool_call_initiated'
-  | 'tool_execution_complete'
-  | 'turn_completed'
-  | 'hook_executed'
-  | 'error';
+type StreamEventType =
+  | 'turn_started' | 'tool_call_initiated' | 'tool_execution_complete' | 'turn_completed' | 'hook_executed' | 'error'; |
 
-interface BaseStreamEvent {
-  event_type: StreamEventType;
-  conversation_id: string;
-  timestamp: string;
-}
+interface BaseStreamEvent { event_type: StreamEventType; conversation_id:
+string; timestamp: string; }
 
-interface TurnStartedEvent extends BaseStreamEvent {
-  event_type: 'turn_started';
-  data: {
+interface TurnStartedEvent extends BaseStreamEvent { event_type:
+'turn_started'; data: {
     turn_id: string;
     agent_backend: string;
-  };
-}
+  }; }
 
-interface ToolExecutionCompleteEvent extends BaseStreamEvent {
-  event_type: 'tool_execution_complete';
-  data: {
+interface ToolExecutionCompleteEvent extends BaseStreamEvent { event_type:
+'tool_execution_complete'; data: {
     tool_name: string;
     execution_time_ms: number;
     result: ToolResult;
-  };
-}
+  }; }
 ```
 
 ### 7.5 Screen Specifications
@@ -12568,22 +12445,22 @@ graph TB
         USER_PROFILE[User Profile]
         NOTIFICATIONS[Notifications]
     end
-    
+
     subgraph "Main Content Area"
         SIDEBAR[Task Sidebar]
         TASK_GRID[Task Grid View]
         DETAIL_PANEL[Task Detail Panel]
     end
-    
+
     subgraph "Status Bar"
         SYSTEM_STATUS[System Status]
         ACTIVE_AGENTS[Active Agents]
         RESOURCE_USAGE[Resource Usage]
     end
-    
+
     HEADER --> MAIN_CONTENT
     MAIN_CONTENT --> STATUS_BAR
-    
+
     SIDEBAR --> TASK_GRID
     TASK_GRID --> DETAIL_PANEL
 ```
@@ -12660,24 +12537,14 @@ The system provides an intelligent command interface with auto-completion and
 template expansion.
 
 ```typescript
-interface SlashCommand {
-  command: string;
-  description: string;
-  parameters: CommandParameter[];
-  template: string;
-}
+interface SlashCommand { command: string; description: string; parameters:
+CommandParameter[]; template: string; }
 
-interface CommandParameter {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'select';
-  required: boolean;
-  options?: string[];
-  placeholder?: string;
-}
+interface CommandParameter { name: string; type: 'string' | 'number' |
+'boolean' | 'select'; required: boolean; options?: string[]; placeholder?:
+string; }
 
-// Example slash commands
-const SLASH_COMMANDS: SlashCommand[] = [
-  {
+// Example slash commands const SLASH_COMMANDS: SlashCommand[] = [ {
     command: '/task',
     description: 'Create or manage tasks',
     parameters: [
@@ -12685,16 +12552,14 @@ const SLASH_COMMANDS: SlashCommand[] = [
       { name: 'issue', type: 'string', required: false, placeholder: 'Issue reference' }
     ],
     template: '/task {action} {issue}'
-  },
-  {
+  }, {
     command: '/review',
     description: 'Review and comment management',
     parameters: [
       { name: 'action', type: 'select', required: true, options: ['sync', 'respond', 'summary'] }
     ],
     template: '/review {action}'
-  }
-];
+  } ];
 ```
 
 #### 7.6.3 Responsive Design Considerations
@@ -12831,29 +12696,29 @@ graph TB
         NETWORK[Network Configuration]
         SECURITY[Security Groups/Policies]
     end
-    
+
     subgraph "Application Deployment"
         HELM[Helm Charts]
         KUSTOMIZE[Kustomize Overlays]
         MANIFESTS[Kubernetes Manifests]
         SECRETS[Secret Management]
     end
-    
+
     subgraph "Configuration Management"
         CONFIGMAPS[ConfigMaps]
         ENV_VARS[Environment Variables]
         FEATURE_FLAGS[Feature Flags]
         POLICIES[Policy Configuration]
     end
-    
+
     TERRAFORM --> CLOUD_PROVIDER
     TERRAFORM --> NETWORK
     TERRAFORM --> SECURITY
-    
+
     HELM --> MANIFESTS
     KUSTOMIZE --> MANIFESTS
     MANIFESTS --> CONFIGMAPS
-    
+
     CONFIGMAPS --> ENV_VARS
     ENV_VARS --> FEATURE_FLAGS
     FEATURE_FLAGS --> POLICIES
@@ -12877,19 +12742,19 @@ graph LR
         DEV_DEPLOY[Deploy to Dev]
         DEV_VALIDATE[Validation Tests]
     end
-    
+
     subgraph "Staging"
         STAGE_PROMOTE[Promote to Staging]
         STAGE_TEST[Integration Tests]
         STAGE_PERF[Performance Tests]
     end
-    
+
     subgraph "Production"
         PROD_APPROVE[Manual Approval]
         PROD_DEPLOY[Blue-Green Deploy]
         PROD_MONITOR[Production Monitoring]
     end
-    
+
     DEV_BUILD --> DEV_DEPLOY
     DEV_DEPLOY --> DEV_VALIDATE
     DEV_VALIDATE --> STAGE_PROMOTE
@@ -12945,8 +12810,7 @@ image size and attack surface.
 
 ```dockerfile
 # Build stage
-FROM rust:1.75-bookworm AS builder
-WORKDIR /app
+FROM rust:1.75-bookworm AS builder WORKDIR /app
 
 #### Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -12956,19 +12820,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 #### Copy dependency files first for better caching
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
+COPY Cargo.toml Cargo.lock ./ RUN mkdir src && echo "fn main() {}" >
+src/main.rs RUN cargo build --release RUN rm -rf src
 
 #### Copy source code and build
-COPY src ./src
-RUN touch src/main.rs
-RUN cargo build --release
+COPY src ./src RUN touch src/main.rs RUN cargo build --release
 
 #### Runtime stage
-FROM debian:bookworm-slim AS runtime
-WORKDIR /app
+FROM debian:bookworm-slim AS runtime WORKDIR /app
 
 #### Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -12982,14 +12841,13 @@ RUN apt-get update && apt-get install -y \
 RUN useradd --create-home --shell /bin/bash corbusier
 
 #### Copy binary from builder stage
-COPY --from=builder /app/target/release/corbusier /usr/local/bin/corbusier
-RUN chmod +x /usr/local/bin/corbusier
+COPY --from=builder /app/target/release/corbusier /usr/local/bin/corbusier RUN
+chmod +x /usr/local/bin/corbusier
 
 #### Switch to non-root user
 USER corbusier
 
-EXPOSE 8080
-CMD ["corbusier"]
+EXPOSE 8080 CMD ["corbusier"]
 ```
 
 #### 8.2.3 Image Versioning Approach
@@ -13013,30 +12871,30 @@ graph TB
         RELEASE[Release Branch]
         TAG[Git Tag]
     end
-    
+
     subgraph "Image Building"
         BUILD[Docker Build]
         SCAN[Security Scan]
         TEST[Image Test]
         PUSH[Registry Push]
     end
-    
+
     subgraph "Image Tags"
         LATEST[latest]
         VERSION[v1.2.3]
         SHA[dev-abc123]
         RC[v1.2.3-rc.1]
     end
-    
+
     MAIN --> BUILD
     FEATURE --> BUILD
     RELEASE --> BUILD
     TAG --> BUILD
-    
+
     BUILD --> SCAN
     SCAN --> TEST
     TEST --> PUSH
-    
+
     MAIN --> LATEST
     TAG --> VERSION
     FEATURE --> SHA
@@ -13076,26 +12934,26 @@ graph LR
         SECRET_SCAN[Secret Detection]
         POLICY_CHECK[Policy Compliance]
     end
-    
+
     subgraph "Scan Tools"
         TRIVY[Trivy Scanner]
         SNYK[Snyk Security]
         CLAIR[Clair Scanner]
         OPA[Open Policy Agent]
     end
-    
+
     subgraph "Actions"
         BLOCK[Block Deployment]
         WARN[Generate Warning]
         APPROVE[Approve Deployment]
         QUARANTINE[Quarantine Image]
     end
-    
+
     BASE_SCAN --> TRIVY
     VULN_SCAN --> SNYK
     SECRET_SCAN --> CLAIR
     POLICY_CHECK --> OPA
-    
+
     TRIVY --> BLOCK
     SNYK --> WARN
     CLAIR --> APPROVE
@@ -13150,31 +13008,31 @@ graph TB
         SCHEDULER[Scheduler]
         CONTROLLER[Controller Manager]
     end
-    
+
     subgraph "Worker Nodes"
         subgraph "Application Tier"
             CORBUSIER[Corbusier Pods]
             AGENTS[Agent Backend Pods]
             TOOLS[Tool Server Pods]
         end
-        
+
         subgraph "Data Tier"
             POSTGRES[PostgreSQL Pods]
             REDIS[Redis Pods]
             STORAGE[Persistent Storage]
         end
-        
+
         subgraph "Infrastructure Tier"
             INGRESS[Ingress Controllers]
             MONITORING[Monitoring Stack]
             LOGGING[Logging Stack]
         end
     end
-    
+
     API_SERVER --> CORBUSIER
     API_SERVER --> POSTGRES
     API_SERVER --> INGRESS
-    
+
     CORBUSIER --> AGENTS
     AGENTS --> TOOLS
     POSTGRES --> STORAGE
@@ -13213,26 +13071,26 @@ graph TB
         DEST_RULES[Destination Rules]
         POLICIES[Security Policies]
     end
-    
+
     subgraph "Application Services"
         CORBUSIER_SVC[Corbusier Service]
         AGENT_SVC[Agent Services]
         TOOL_SVC[Tool Services]
         DB_SVC[Database Service]
     end
-    
+
     subgraph "Cross-Cutting Concerns"
         TLS[mTLS Encryption]
         TELEMETRY[Telemetry Collection]
         TRAFFIC[Traffic Management]
         SECURITY[Security Policies]
     end
-    
+
     GATEWAY --> CORBUSIER_SVC
     VIRTUAL_SVC --> AGENT_SVC
     DEST_RULES --> TOOL_SVC
     POLICIES --> DB_SVC
-    
+
     TLS --> TELEMETRY
     TELEMETRY --> TRAFFIC
     TRAFFIC --> SECURITY
@@ -13252,12 +13110,8 @@ graph TB
 ##### Vertical Pod Autoscaler (VPA) Configuration
 
 ```yaml
-apiVersion: autoscaling.k8s.io/v1
-kind: VerticalPodAutoscaler
-metadata:
-  name: corbusier-vpa
-spec:
-  targetRef:
+apiVersion: autoscaling.k8s.io/v1 kind: VerticalPodAutoscaler metadata: name:
+corbusier-vpa spec: targetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: corbusier
@@ -13294,23 +13148,23 @@ graph TB
         BURSTABLE[Burstable]
         BESTEFFORT[Best Effort]
     end
-    
+
     subgraph "Workload Assignment"
         CRITICAL[Critical Services]
         STANDARD[Standard Services]
         BATCH[Batch Jobs]
     end
-    
+
     subgraph "Resource Allocation"
         HIGH_PRIORITY[High Priority]
         MEDIUM_PRIORITY[Medium Priority]
         LOW_PRIORITY[Low Priority]
     end
-    
+
     CRITICAL --> GUARANTEED
     STANDARD --> BURSTABLE
     BATCH --> BESTEFFORT
-    
+
     GUARANTEED --> HIGH_PRIORITY
     BURSTABLE --> MEDIUM_PRIORITY
     BESTEFFORT --> LOW_PRIORITY
@@ -13334,7 +13188,7 @@ graph LR
         TAG[Git Tag]
         SCHEDULE[Scheduled Build]
     end
-    
+
     subgraph "Build Stages"
         CHECKOUT[Checkout Code]
         DEPS[Install Dependencies]
@@ -13343,25 +13197,25 @@ graph LR
         BUILD[Build Binary]
         PACKAGE[Package Container]
     end
-    
+
     subgraph "Quality Gates"
         COVERAGE[Coverage Check]
         SECURITY[Security Scan]
         PERF[Performance Test]
         APPROVE[Manual Approval]
     end
-    
+
     PUSH --> CHECKOUT
     PR --> CHECKOUT
     TAG --> CHECKOUT
     SCHEDULE --> CHECKOUT
-    
+
     CHECKOUT --> DEPS
     DEPS --> LINT
     LINT --> TEST
     TEST --> BUILD
     BUILD --> PACKAGE
-    
+
     PACKAGE --> COVERAGE
     COVERAGE --> SECURITY
     SECURITY --> PERF
@@ -13387,26 +13241,24 @@ deployment and creating a deployment pipeline.
 # .github/workflows/ci.yml
 name: CI/CD Pipeline
 
-on:
-  push:
+on: push:
     branches: [main, develop]
   pull_request:
     branches: [main]
   release:
     types: [published]
 
-jobs:
-  test:
+jobs: test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.75.0
           components: rustfmt, clippy
-          
+
       - name: Cache Dependencies
         uses: actions/cache@v3
         with:
@@ -13415,13 +13267,13 @@ jobs:
             ~/.cargo/git
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          
+
       - name: Run Tests
         run: cargo test --all-features
-        
+
       - name: Check Formatting
         run: cargo fmt -- --check
-        
+
       - name: Run Clippy
         run: cargo clippy -- -D warnings
 ```
@@ -13446,30 +13298,30 @@ graph TB
         DEV_TEST[Smoke Tests]
         DEV_APPROVE[Auto Approve]
     end
-    
+
     subgraph "Staging"
         STAGE_DEPLOY[Deploy to Staging]
         INTEGRATION_TEST[Integration Tests]
         PERF_TEST[Performance Tests]
         STAGE_APPROVE[QA Approval]
     end
-    
+
     subgraph "Production"
         CANARY_DEPLOY[Canary Deployment]
         MONITOR[Monitor Metrics]
         FULL_DEPLOY[Full Deployment]
         PROD_VALIDATE[Production Validation]
     end
-    
+
     DEV_DEPLOY --> DEV_TEST
     DEV_TEST --> DEV_APPROVE
     DEV_APPROVE --> STAGE_DEPLOY
-    
+
     STAGE_DEPLOY --> INTEGRATION_TEST
     INTEGRATION_TEST --> PERF_TEST
     PERF_TEST --> STAGE_APPROVE
     STAGE_APPROVE --> CANARY_DEPLOY
-    
+
     CANARY_DEPLOY --> MONITOR
     MONITOR --> FULL_DEPLOY
     FULL_DEPLOY --> PROD_VALIDATE
@@ -13496,28 +13348,28 @@ graph TB
         LOGS[Error Logs]
         ALERTS[Alert System]
     end
-    
+
     subgraph "Decision Engine"
         EVALUATE[Evaluate Conditions]
         THRESHOLD[Check Thresholds]
         DECISION[Rollback Decision]
     end
-    
+
     subgraph "Rollback Actions"
         AUTO_ROLLBACK[Automatic Rollback]
         MANUAL_ROLLBACK[Manual Rollback]
         PARTIAL_ROLLBACK[Partial Rollback]
         EMERGENCY_STOP[Emergency Stop]
     end
-    
+
     HEALTH --> EVALUATE
     METRICS --> EVALUATE
     LOGS --> EVALUATE
     ALERTS --> EVALUATE
-    
+
     EVALUATE --> THRESHOLD
     THRESHOLD --> DECISION
-    
+
     DECISION --> AUTO_ROLLBACK
     DECISION --> MANUAL_ROLLBACK
     DECISION --> PARTIAL_ROLLBACK
@@ -13644,7 +13496,8 @@ REPORTS --> CAPACITY
 ##### Custom Metrics Implementation
 
 ```rust
-use prometheus::{Counter, Histogram, Gauge, register_counter, register_histogram, register_gauge};
+use prometheus::{Counter, Histogram, Gauge, register_counter,
+register_histogram, register_gauge};
 
 pub struct CorbuiserMetrics {
     pub agent_turns_total: Counter,
@@ -13703,26 +13556,26 @@ graph TB
         FORECAST[Cost Forecasting]
         BUDGETS[Budget Alerts]
     end
-    
+
     subgraph "Optimization Actions"
         RIGHTSIZING[Right-sizing Recommendations]
         SCHEDULING[Workload Scheduling]
         AUTOSCALING[Auto-scaling Policies]
         CLEANUP[Resource Cleanup]
     end
-    
+
     subgraph "Reporting"
         DASHBOARDS[Cost Dashboards]
         REPORTS[Monthly Reports]
         RECOMMENDATIONS[Optimization Recommendations]
         ALERTS[Budget Alerts]
     end
-    
+
     BILLING --> RIGHTSIZING
     USAGE --> SCHEDULING
     FORECAST --> AUTOSCALING
     BUDGETS --> CLEANUP
-    
+
     RIGHTSIZING --> DASHBOARDS
     SCHEDULING --> REPORTS
     AUTOSCALING --> RECOMMENDATIONS
@@ -13752,30 +13605,30 @@ graph LR
         K8S_LOGS[Kubernetes Audit Logs]
         APP_LOGS[Application Audit Logs]
     end
-    
+
     subgraph "Log Processing"
         COLLECTION[Log Collection]
         PARSING[Log Parsing]
         ENRICHMENT[Data Enrichment]
         CORRELATION[Event Correlation]
     end
-    
+
     subgraph "Compliance Reporting"
         RETENTION[Data Retention]
         REPORTS[Compliance Reports]
         EXPORT[Data Export]
         ARCHIVAL[Long-term Archival]
     end
-    
+
     API_LOGS --> COLLECTION
     DB_LOGS --> COLLECTION
     K8S_LOGS --> COLLECTION
     APP_LOGS --> COLLECTION
-    
+
     COLLECTION --> PARSING
     PARSING --> ENRICHMENT
     ENRICHMENT --> CORRELATION
-    
+
     CORRELATION --> RETENTION
     RETENTION --> REPORTS
     REPORTS --> EXPORT

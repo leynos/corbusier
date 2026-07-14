@@ -1,9 +1,8 @@
 # Establish tenant primitives and request context plumbing (Roadmap 2.5.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -680,7 +679,7 @@ All stages create or modify source files only. No database state is changed
 idempotently. If a stage fails partway, fix the issue and re-run `make all`
 from the repository root.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key type signatures after completion:
 
