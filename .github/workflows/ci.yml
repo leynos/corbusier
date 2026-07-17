@@ -15,7 +15,7 @@ jobs:
       BUILD_PROFILE: debug
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
-      WHITAKER_INSTALLER_VERSION: '0.2.5'
+      WHITAKER_INSTALLER_VERSION: '0.2.6'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
