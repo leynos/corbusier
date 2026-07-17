@@ -12,6 +12,9 @@ import { TaskGatewayError } from '../task_slice/ports/task-slice-gateway';
 import { TaskDetailCard } from '../task_slice/ui/task-detail-card';
 import { TaskNotFound } from '../task_slice/ui/task-not-found';
 
+/**
+ * Load and render the task identified by the route's `taskId` param.
+ */
 export function TaskDetailPage() {
   const { t } = useI18n();
   const { taskId } = useParams({ from: '/tasks/$taskId' });

@@ -6,19 +6,34 @@
  */
 import type { CreateTaskRequest, IssueProvider } from './task';
 
+/**
+ * Form-local draft of a task-create request; every field is a raw string
+ * so controlled inputs can hold in-progress, possibly invalid, text.
+ */
 export interface TaskCreateDraft {
+  /** Issue provider selected for the new task. */
   provider: IssueProvider;
+  /** Owner-qualified repository text, for example `owner/repository`. */
   repository: string;
+  /** Raw issue number text, parsed and range-checked on validation. */
   issueNumber: string;
+  /** Task title; required, so validation rejects blank text. */
   title: string;
+  /** Task description; optional, so an empty string is valid. */
   description: string;
+  /** Comma-delimited labels, split by {@link splitDelimitedValues}. */
   labels: string;
+  /** Comma-delimited assignees, split by {@link splitDelimitedValues}. */
   assignees: string;
+  /** Milestone name; optional, so an empty string is valid. */
   milestone: string;
 }
 
+/** A key of {@link TaskCreateDraft}, identifying one form field. */
 export type TaskCreateField = keyof TaskCreateDraft;
+/** Per-field validation messages, present only for invalid fields. */
 export type TaskCreateErrors = Partial<Record<TaskCreateField, string>>;
+/** Issue providers offered in the task-create form. */
 export const SUPPORTED_PROVIDERS: readonly IssueProvider[] = [
   'github',
   'gitlab',
@@ -34,6 +49,7 @@ const ERROR_PRECEDENCE: readonly TaskCreateField[] = [
   'milestone',
 ];
 
+/** Empty draft used to seed the task-create form on first render. */
 export const initialTaskCreateDraft: TaskCreateDraft = {
   provider: SUPPORTED_PROVIDERS[0],
   repository: '',
@@ -45,6 +61,9 @@ export const initialTaskCreateDraft: TaskCreateDraft = {
   milestone: '',
 };
 
+/**
+ * Split a comma-delimited form field into trimmed, non-empty entries.
+ */
 export function splitDelimitedValues(raw: string) {
   return raw
     .split(',')
@@ -52,6 +71,10 @@ export function splitDelimitedValues(raw: string) {
     .filter(Boolean);
 }
 
+/**
+ * Validate a task-create draft, returning a message per invalid field.
+ * An empty result indicates the draft is ready for submission.
+ */
 export function validateTaskCreateDraft(
   draft: TaskCreateDraft,
 ): TaskCreateErrors {
@@ -98,6 +121,12 @@ function assertValidDraft(draft: TaskCreateDraft): void {
   }
 }
 
+/**
+ * Convert a validated draft into the domain `CreateTaskRequest` shape,
+ * trimming strings and dropping optional fields left blank.
+ *
+ * @throws {Error} When the draft fails validation.
+ */
 export function toCreateTaskRequest(draft: TaskCreateDraft): CreateTaskRequest {
   assertValidDraft(draft);
 
