@@ -19,6 +19,9 @@ import {
 } from '../task_slice/domain/task-form';
 import { TaskCreateForm } from '../task_slice/ui/task-create-form';
 
+/**
+ * Own the task creation form's local state and submit-then-navigate flow.
+ */
 export function TaskCreatePage() {
   const { t } = useI18n();
   const navigate = useNavigate();

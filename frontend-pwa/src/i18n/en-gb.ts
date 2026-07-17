@@ -3,6 +3,8 @@
  *
  * The runtime provider loads these keys as the default locale and components
  * should treat this file as the canonical fallback message set.
+ *
+ * @internal
  */
 export const enGbMessages = {
   'app.title': 'Corbusier',
@@ -60,4 +62,5 @@ export const enGbMessages = {
     'The fixture gateway rejected this submission. Adjust the input and retry.',
 };
 
+/** Union of every translation key; keeps `t()` calls checked against the canonical catalogue. */
 export type MessageKey = keyof typeof enGbMessages;
