@@ -58,6 +58,8 @@ jobs:
         run: make frontend-lint
       - name: Frontend typecheck
         run: make frontend-typecheck
+      - name: Frontend documentation gate
+        run: make frontend-docs-check
       - name: Frontend tests
         run: make frontend-test
       - name: Frontend accessibility tests

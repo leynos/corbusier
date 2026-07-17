@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -104,6 +104,9 @@ frontend-lint: ## Lint the frontend workspace
 
 frontend-typecheck: ## Type-check the frontend workspace
 	cd $(FRONTEND_DIR) && $(BUN) run typecheck
+
+frontend-docs-check: ## Run the zero-tolerance TypeDoc documentation gate over frontend-pwa/src
+	cd $(FRONTEND_DIR) && $(BUN) run docs:check
 
 frontend-test: ## Run frontend unit and component tests
 	cd $(FRONTEND_DIR) && $(BUN) run test

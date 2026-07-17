@@ -171,6 +171,15 @@ The separate test pass is required because tests and test configuration use
 different inclusion patterns and ambient types from the production application
 sources, while still depending on the application `src/` tree.
 
+`make frontend-docs-check` runs `bun run docs:check` inside `frontend-pwa`:
+TypeDoc's `notDocumented` validation over `frontend-pwa/src`
+(`frontend-pwa/typedoc.json`), requiring a JSDoc block on every exported
+declaration, treating validation warnings as errors, and emitting no
+documentation artefacts. The `en-gb` message catalogue is tagged `@internal`
+so its keys stay out of the documented surface. The frontend CI path runs
+this gate after `frontend-typecheck`; the Rust documentation gate is
+unaffected.
+
 `frontend-pwa/tests/types/jest-axe.d.ts` provides ambient TypeScript
 declarations for the `jest-axe` package because the package does not ship
 bundled types. It exports `AxeRunner`, `configureAxe`, `axe`, and
