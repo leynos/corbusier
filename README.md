@@ -1,5 +1,8 @@
 # Corbusier
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/corbusier)
+
 **The "best room," not the smartest agent.**
 
 Corbusier is an AI agent orchestration platform that lets multiple specialized
