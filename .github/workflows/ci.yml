@@ -25,7 +25,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/setup-rust@074f7d8ba75a6e5d18532b72cbe38fccbda4e9c6
       - name: Install frontend dependencies and browser
         run: FRONTEND_INSTALL_FLAGS=--frozen-lockfile make frontend-install
       - name: Refresh apt package index
