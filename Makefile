@@ -58,23 +58,7 @@ lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
-	if command -v fd >/dev/null 2>&1; then \
-		fd --print0 --type f --extension md --extension markdown --extension mdx \
-			--exclude node_modules --exclude .venv --exclude target . | \
-			xargs -0 mdtablefix --wrap --renumber --breaks --ellipsis --fences --in-place; \
-		fd --print0 --type f --extension md --extension markdown --extension mdx \
-			--exclude node_modules --exclude .venv --exclude target . | \
-			xargs -0 $(MDLINT) --fix; \
-	else \
-		find . \
-			\( -path '*/node_modules/*' -o -path '*/.venv/*' -o -path '*/target/*' \) -prune -o \
-			-type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdx' \) -print0 | \
-			xargs -0 mdtablefix --wrap --renumber --breaks --ellipsis --fences --in-place; \
-		find . \
-			\( -path '*/node_modules/*' -o -path '*/.venv/*' -o -path '*/target/*' \) -prune -o \
-			-type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdx' \) -print0 | \
-			xargs -0 $(MDLINT) --fix; \
-	fi
+	mdformat-all
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check

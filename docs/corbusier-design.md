@@ -5936,8 +5936,8 @@ later phase 1 delivery work:
   by ADR 010, not permission to split runtime ownership back across both
   systems.
 - Reviewers must provide evidence from
-  `docs/podbot-migration-review-checklist.md` when a pull
-  request claims phase advancement or legacy-path retirement.
+  `docs/podbot-migration-review-checklist.md` when a pull request claims phase
+  advancement or legacy-path retirement.
 
 This section is normative for hosted-session ownership even where older target
 state passages in this design document still describe inline routing or local
@@ -12142,7 +12142,7 @@ narrow:
 
 The shipped `4.4.1` path is fixture-first. See the
 [canonical execplan for roadmap `4.4.1`](./execplans/4-4-1-create-the-repository-owned-frontend-pwa.md)
- and the [User's guide](./users-guide.md) for rollout and operator guidance.
+and the [User's guide](./users-guide.md) for rollout and operator guidance.
 `frontend-pwa/` renders the task create route and task detail route against a
 fixture adapter that mirrors the current `POST /api/v1/tasks` and
 `GET /api/v1/tasks/{task_id}` contract. Roadmap item `4.4.2` stabilizes the
@@ -12168,11 +12168,11 @@ variable.
 
 Table 7.1.3.1: Frontend task gateway modes for VITE_TASK_GATEWAY_MODE
 
-| Allowed value | Default | Behaviour |
-| --- | --- | --- |
-| `fixture` | **Yes** | Shipped path: fixture-backed task gateway mirroring HTTP contract semantics without network I/O. |
-| `http` | No | Real HTTP adapter against the backend task endpoints (conventional API client behind the slice port). |
-| `vite-proxy` | No | Development-only: same-origin Vite dev proxy injects bearer authentication server-side before upstreaming to the backend task API. |
+| Allowed value | Default | Behaviour                                                                                                                          |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `fixture`     | **Yes** | Shipped path: fixture-backed task gateway mirroring HTTP contract semantics without network I/O.                                   |
+| `http`        | No      | Real HTTP adapter against the backend task endpoints (conventional API client behind the slice port).                              |
+| `vite-proxy`  | No      | Development-only: same-origin Vite dev proxy injects bearer authentication server-side before upstreaming to the backend task API. |
 
 If unset, the build behaves as **`fixture`** (fixture adapter is the default).
 
