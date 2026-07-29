@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::hex::to_lower_hex_prefix;
 use crate::message::domain::{
     PlannedToolCall, SlashCommandError, SlashCommandExecution, SlashCommandExpansion,
     SlashCommandInvocation, ToolCallAudit, ToolCallStatus,
@@ -168,35 +169,15 @@ fn build_expansion(
 fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
     let canonical = canonical_call_id_payload(input);
     let digest = Sha256::digest(canonical.as_bytes());
-    let mut hash_suffix = String::with_capacity(16);
-    for byte in digest.iter().take(8) {
-        hash_suffix.push(hex_nibble_character(byte >> 4));
-        hash_suffix.push(hex_nibble_character(byte & 0x0f));
-    }
+    let hash_suffix = to_lower_hex_prefix(&digest, CALL_ID_DIGEST_BYTES);
     format!("sc-{}-{hash_suffix}", input.index)
 }
 
-const fn hex_nibble_character(nibble: u8) -> char {
-    match nibble {
-        0 => '0',
-        1 => '1',
-        2 => '2',
-        3 => '3',
-        4 => '4',
-        5 => '5',
-        6 => '6',
-        7 => '7',
-        8 => '8',
-        9 => '9',
-        10 => 'a',
-        11 => 'b',
-        12 => 'c',
-        13 => 'd',
-        14 => 'e',
-        15 => 'f',
-        _ => '?',
-    }
-}
+/// Number of leading digest bytes rendered into a slash-command call ID.
+///
+/// Sixty-four bits of digest keeps identifiers short while leaving collisions
+/// implausible for the number of tool calls a single command can plan.
+const CALL_ID_DIGEST_BYTES: usize = 8;
 
 fn canonical_call_id_payload(input: &DeterministicCallIdInput<'_>) -> String {
     let mut canonical = String::new();
