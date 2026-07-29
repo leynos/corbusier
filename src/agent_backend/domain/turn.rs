@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::hex::to_lower_hex;
+
 /// Domain errors for turn-execution value validation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum TurnDomainError {
@@ -247,7 +249,7 @@ pub fn deterministic_tool_call_id(tool_call: &ToolCallRequest, index: usize) -> 
     .to_string();
     let mut hasher = Sha256::new();
     hasher.update(payload.as_bytes());
-    format!("call-{:x}", hasher.finalize())
+    format!("call-{}", to_lower_hex(&hasher.finalize()))
 }
 
 fn canonical_json_value(value: &Value) -> Value {

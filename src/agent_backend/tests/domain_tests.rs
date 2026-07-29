@@ -2,10 +2,12 @@
 
 use crate::agent_backend::domain::{
     AgentBackendRegistration, AgentCapabilities, BackendDomainError, BackendInfo, BackendName,
-    BackendStatus, ParseBackendStatusError,
+    BackendStatus, ParseBackendStatusError, ToolCallRequest, TurnDomainError,
+    deterministic_tool_call_id,
 };
 use mockable::DefaultClock;
 use rstest::rstest;
+use serde_json::{Value, json};
 
 /// Helper to create a test registration with sensible defaults.
 fn create_test_registration(
@@ -220,4 +222,80 @@ fn capabilities_defaults_have_empty_content_types_and_no_window() {
     assert!(!caps.supports_tool_calls());
     assert!(caps.supported_content_types().is_empty());
     assert!(caps.max_context_window().is_none());
+}
+
+// ── Deterministic tool-call identifiers ────────────────────────────
+
+/// Pins the identifier for a fixed tool call to a digest computed outside this
+/// crate (`sha256sum` over the canonical payload). Call IDs are persisted and
+/// compared across turns, so any change to hashing or hex rendering — such as
+/// the move off `sha2`'s `{:x}` formatting — must not shift them.
+#[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn call_id_matches_externally_computed_digest() -> Result<(), TurnDomainError> {
+    let tool_call = ToolCallRequest::new("search", json!({"query": "rust"}))?;
+
+    assert_eq!(
+        deterministic_tool_call_id(&tool_call, 0),
+        "call-c58e8f52a1330a1f7f8da5a36babb52e7f8a9065ec286f74d73f68dc6194fcb9",
+    );
+    Ok(())
+}
+
+/// The identifier must always carry a full SHA-256 rendered as 64 lowercase
+/// hex digits, whatever the payload; a shorter rendering would signal a
+/// dropped leading zero.
+/// Asserts `call_id` is the `call-` prefix plus a full SHA-256 rendered as 64
+/// lowercase hex digits.
+///
+/// A missing prefix degrades to an empty digest so the length assertion
+/// reports it, keeping the helper free of panicking accessors. The assertions
+/// live here rather than in the caller so the parameterized test can propagate
+/// construction errors with `?` without also tripping
+/// `clippy::panic_in_result_fn`, whose expectation does not reach the functions
+/// `rstest` generates per case.
+fn assert_call_id_is_full_lowercase_hex(call_id: &str) {
+    let digest = call_id.strip_prefix("call-").unwrap_or_default();
+    assert_eq!(digest.len(), 64, "expected a full SHA-256 in {call_id}");
+    assert!(
+        digest
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)),
+        "expected lowercase hex digits in {call_id}",
+    );
+}
+
+#[rstest]
+#[case::empty_parameters("read_file", json!({}), 0)]
+#[case::nested_parameters("write", json!({"b": [1, {"a": null}], "a": "x"}), 7)]
+#[case::unicode_parameters("echo", json!({"text": "café ☕"}), 3)]
+fn call_id_is_prefixed_full_length_lowercase_hex(
+    #[case] tool_name: &str,
+    #[case] parameters: Value,
+    #[case] index: usize,
+) -> Result<(), TurnDomainError> {
+    let tool_call = ToolCallRequest::new(tool_name, parameters)?;
+
+    assert_call_id_is_full_lowercase_hex(&deterministic_tool_call_id(&tool_call, index));
+    Ok(())
+}
+
+/// Distinct call sites within a turn must not collide, so the index has to
+/// feed the digest rather than merely decorate the prefix.
+#[rstest]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Test uses assertions for verification while returning Result for error propagation"
+)]
+fn call_id_varies_with_index() -> Result<(), TurnDomainError> {
+    let tool_call = ToolCallRequest::new("search", json!({"query": "rust"}))?;
+
+    assert_ne!(
+        deterministic_tool_call_id(&tool_call, 0),
+        deterministic_tool_call_id(&tool_call, 1),
+    );
+    Ok(())
 }
