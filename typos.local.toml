@@ -16,8 +16,7 @@ accepted = [
 
 [patterns]
 ignore = [
-    # Inline code spans were masked by the previous dictionary snapshot; kept until the shared dictionary rules on it
-    "`[^`\\n]+`",
+    "`[^`\\n]+`", # Inline code spans contain API identifiers, not prose.
 ]
 
 [files]
