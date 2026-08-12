@@ -8,6 +8,8 @@
     "**/*.d.ts",
     "**/*.gen.*",
     "**/*.generated.*",
+    "**/*.spec.*",
+    "**/*.test.*",
     "**/__generated__/**",
     "**/tests/**",
     "**/test/**",

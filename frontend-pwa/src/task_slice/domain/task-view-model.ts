@@ -26,6 +26,9 @@ const toneMap: Record<TaskState, TaskStateTone> = {
 
 /**
  * Render an issue origin as `provider/repository/#number` for display.
+ *
+ * @example
+ * `formatIssueOrigin(origin)` returns `github/leynos/corbusier/#42`.
  */
 export function formatIssueOrigin(origin: TaskOrigin) {
   const issueRef = origin.issue_ref;
@@ -34,6 +37,9 @@ export function formatIssueOrigin(origin: TaskOrigin) {
 
 /**
  * Combine a localized label with the tone assigned to `state`.
+ *
+ * @example
+ * `formatTaskState('in_review', t)` returns its localized label and `steady` tone.
  *
  * @param t - Translation function keyed by `task.state.<state>`.
  */
@@ -47,6 +53,9 @@ export function formatTaskState(
 /**
  * Format an ISO 8601 timestamp for display, or an empty string if
  * `value` cannot be parsed as a date.
+ *
+ * @example
+ * `formatTimestamp('invalid')` returns an empty string.
  */
 export function formatTimestamp(value: string, locale = 'en-GB') {
   const date = new Date(value);
@@ -64,6 +73,9 @@ export function formatTimestamp(value: string, locale = 'en-GB') {
 /**
  * Render a branch reference as `provider:repository:branch`, or
  * `undefined` when no branch exists yet.
+ *
+ * @example
+ * `formatBranchRef()` returns `undefined`.
  */
 export function formatBranchRef(branchRef?: BranchRef) {
   return branchRef
@@ -74,6 +86,9 @@ export function formatBranchRef(branchRef?: BranchRef) {
 /**
  * Render a pull request reference as `provider:repository:number`, or
  * `undefined` when no pull request exists yet.
+ *
+ * @example
+ * `formatPullRequestRef()` returns `undefined`.
  */
 export function formatPullRequestRef(pullRequestRef?: PullRequestRef) {
   return pullRequestRef

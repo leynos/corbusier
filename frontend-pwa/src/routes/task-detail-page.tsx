@@ -14,6 +14,9 @@ import { TaskNotFound } from '../task_slice/ui/task-not-found';
 
 /**
  * Load and render the task identified by the route's `taskId` param.
+ *
+ * @example
+ * `<TaskDetailPage />` renders the task selected by the active detail route.
  */
 export function TaskDetailPage() {
   const { t } = useI18n();
