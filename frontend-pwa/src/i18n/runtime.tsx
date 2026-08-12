@@ -19,6 +19,9 @@ const I18nContext = createContext({
 
 /**
  * Supply the locale context to descendant components.
+ *
+ * @example
+ * `<I18nProvider><App /></I18nProvider>` makes en-GB messages available to `App`.
  */
 export function I18nProvider({ children }: PropsWithChildren) {
   const messages: Messages = enGbMessages;
@@ -32,6 +35,9 @@ export function I18nProvider({ children }: PropsWithChildren) {
 
 /**
  * Read the active locale and translation function from context.
+ *
+ * @example
+ * `useI18n().t('app.title')` returns the localized application title.
  */
 export function useI18n() {
   return useContext(I18nContext);

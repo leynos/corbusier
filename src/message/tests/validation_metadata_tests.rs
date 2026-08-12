@@ -10,6 +10,7 @@ use crate::message::{
     error::ValidationError,
     ports::validator::MessageValidator,
 };
+use eyre::Context;
 use mockable::DefaultClock;
 use rstest::rstest;
 
@@ -64,7 +65,7 @@ fn assert_invalid_metadata(result: Result<(), ValidationError>, expected_fragmen
 fn validate_metadata_accepts_audit_records(
     clock: DefaultClock,
     default_validator: crate::message::validation::service::DefaultMessageValidator,
-) {
+) -> eyre::Result<()> {
     let metadata = MessageMetadata::empty()
         .with_tool_call_audit(ToolCallAudit::new(
             "call-1",
@@ -75,60 +76,62 @@ fn validate_metadata_accepts_audit_records(
             AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("resp-1"),
         );
 
-    let message =
-        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
+    let message = build_message_with_metadata(&clock, metadata)?;
 
-    assert!(default_validator.validate_structure(&message).is_ok());
+    default_validator
+        .validate_structure(&message)
+        .context("metadata validation should accept audit records")?;
+    Ok(())
 }
 
 #[rstest]
 fn validate_metadata_rejects_empty_tool_call_id(
     clock: DefaultClock,
     default_validator: crate::message::validation::service::DefaultMessageValidator,
-) {
+) -> Result<(), MessageBuilderError> {
     let metadata = MessageMetadata::empty().with_tool_call_audit(ToolCallAudit::new(
         "",
         "read_file",
         ToolCallStatus::Queued,
     ));
 
-    let message =
-        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
+    let message = build_message_with_metadata(&clock, metadata)?;
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "call_id");
+    Ok(())
 }
 
 #[rstest]
 fn validate_metadata_rejects_empty_tool_name(
     clock: DefaultClock,
     default_validator: crate::message::validation::service::DefaultMessageValidator,
-) {
+) -> Result<(), MessageBuilderError> {
     let metadata = MessageMetadata::empty().with_tool_call_audit(ToolCallAudit::new(
         "call-1",
         "",
         ToolCallStatus::Queued,
     ));
 
-    let message =
-        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
+    let message = build_message_with_metadata(&clock, metadata)?;
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "tool_name");
+    Ok(())
 }
 
 #[rstest]
 fn validate_metadata_rejects_empty_response_id(
     clock: DefaultClock,
     default_validator: crate::message::validation::service::DefaultMessageValidator,
-) {
+) -> Result<(), MessageBuilderError> {
     let metadata = MessageMetadata::empty().with_agent_response_audit(
         AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id(""),
     );
 
-    let message =
-        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
+    let message = build_message_with_metadata(&clock, metadata)?;
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "response_id");
+    Ok(())
 }
