@@ -63,6 +63,9 @@ export const initialTaskCreateDraft: TaskCreateDraft = {
 
 /**
  * Split a comma-delimited form field into trimmed, non-empty entries.
+ *
+ * @example
+ * `splitDelimitedValues('bug, urgent')` returns `['bug', 'urgent']`.
  */
 export function splitDelimitedValues(raw: string) {
   return raw
@@ -74,6 +77,9 @@ export function splitDelimitedValues(raw: string) {
 /**
  * Validate a task-create draft, returning a message per invalid field.
  * An empty result indicates the draft is ready for submission.
+ *
+ * @example
+ * `validateTaskCreateDraft(validDraft)` returns `{}` for a valid draft.
  */
 export function validateTaskCreateDraft(
   draft: TaskCreateDraft,
@@ -124,6 +130,9 @@ function assertValidDraft(draft: TaskCreateDraft): void {
 /**
  * Convert a validated draft into the domain `CreateTaskRequest` shape,
  * trimming strings and dropping optional fields left blank.
+ *
+ * @example
+ * `toCreateTaskRequest(validDraft)` returns a normalized API request.
  *
  * @throws {Error} When the draft fails validation.
  */

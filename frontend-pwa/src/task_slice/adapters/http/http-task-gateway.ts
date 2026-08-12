@@ -209,6 +209,9 @@ function mutationInit(body: unknown, method: 'POST' | 'PUT'): RequestInit {
 /**
  * Build the `TaskSliceGateway` adapter backed by the live task API.
  *
+ * @example
+ * `createHttpTaskGateway('/api/v1').getTask('task-1')` fetches task `task-1`.
+ *
  * @param baseUrl - API root; overridable for non-default deployments.
  * @param fetchFn - Injectable `fetch` implementation for testing.
  */
