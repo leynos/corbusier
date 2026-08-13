@@ -436,7 +436,7 @@ Corbusier implements this through:
 - **Dependencies:**
   - Prerequisite Features: F-001 (Conversation Management)
   - System Dependencies: Template engine, command parser
-  - External Dependencies: `minijinja`, `sha2` (0.10.9, SHA-256 for
+  - External Dependencies: `minijinja`, `sha2` (0.11.0, SHA-256 for
     deterministic call-ID generation per the F-004 implementation decision)
   - Integration Requirements: Task service integration, VCS workflow hooks
 
@@ -458,7 +458,9 @@ Corbusier implements this through:
   use JSON stringification (`serde_json::Value::to_string()`), and the
   canonical payload is encoded as UTF-8 bytes before hashing.
 - Hash algorithm decision: use SHA-256, take the first 8 digest bytes
-  (big-endian) as a `u64`, and format as `sc-<index>-<16-hex>`.
+  (big-endian) as a `u64`, and format as `sc-<index>-<16-hex>`. The hex suffix
+  is rendered by the shared `src/hex.rs` encoder, which supersedes the local
+  nibble-mapping helper this service previously carried.
 - Compatibility note: existing audit records remain immutable. Readers should
   treat historical call IDs as opaque and accept both legacy and
   SHA-256-derived ID forms without migration.
@@ -1046,6 +1048,11 @@ Table 2.1.5.1: Tenancy and identity feature catalogue.
   sequence order, and each call ID is generated from a delimiter-safe canonical
   payload encoded as UTF-8 bytes before hashing:
   `sha256({"index":<usize>,"tool_name":"<name>","parameters":<canonical-json>})`.
+- Digest bytes are rendered by the shared `src/hex.rs` encoder rather than by
+  `sha2`'s `LowerHex` implementation, which `sha2` 0.11 removed. The rendered
+  identifiers are byte-identical to those produced before the 0.11 adoption, so
+  persisted call IDs remain stable; a unit test pins the identifier for a fixed
+  tool call to a digest computed outside the crate.
 - Tool routing failures are surfaced as typed
   `AgentTurnOrchestrationError::ToolRouting` values and stop turn completion
   before turn-count persistence is incremented.
@@ -2164,7 +2171,7 @@ Table 3.3.1-1: Core dependencies.
 | chrono       | 0.4.43  | Date/time handling                           | crates.io |
 | uuid         | 1.19.0  | UUID generation                              | crates.io |
 | thiserror    | 2.0.17  | Error derive macros                          | crates.io |
-| sha2         | 0.10.9  | SHA-256 deterministic call IDs               | crates.io |
+| sha2         | 0.11.0  | SHA-256 deterministic call IDs               | crates.io |
 | minijinja    | 2.16.0  | Template rendering                           | crates.io |
 | async-trait  | 0.1.89  | Async trait support                          | crates.io |
 | mockable     | 3.0.0   | Clock abstraction for testing                | crates.io |
