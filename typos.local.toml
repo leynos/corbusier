@@ -17,7 +17,9 @@ accepted = [
 [words.corrections]
 
 [patterns]
-ignore = []
+ignore = [
+    "`[^`\\n]+`", # Inline code spans contain API identifiers, not prose.
+]
 
 [files]
 exclude = []

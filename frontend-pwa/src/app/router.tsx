@@ -42,6 +42,14 @@ const routeTree = rootRoute.addChildren([
   taskDetailRoute,
 ]);
 
+/**
+ * Build the router instance from the assembled route tree.
+ *
+ * A factory is used so tests can create isolated router instances per case.
+ *
+ * @example
+ * `const router = createAppRouter()` creates a router for the application routes.
+ */
 export function createAppRouter() {
   return createRouter({ routeTree });
 }

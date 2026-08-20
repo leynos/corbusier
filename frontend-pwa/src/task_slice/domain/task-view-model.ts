@@ -24,11 +24,25 @@ const toneMap: Record<TaskState, TaskStateTone> = {
   abandoned: 'warning',
 };
 
+/**
+ * Render an issue origin as `provider/repository/#number` for display.
+ *
+ * @example
+ * `formatIssueOrigin(origin)` returns `github/leynos/corbusier/#42`.
+ */
 export function formatIssueOrigin(origin: TaskOrigin) {
   const issueRef = origin.issue_ref;
   return `${issueRef.provider}/${issueRef.repository}/#${issueRef.issue_number}`;
 }
 
+/**
+ * Combine a localized label with the tone assigned to `state`.
+ *
+ * @example
+ * `formatTaskState('in_review', t)` returns its localized label and `steady` tone.
+ *
+ * @param t - Translation function keyed by `task.state.<state>`.
+ */
 export function formatTaskState(
   state: TaskState,
   t: (key: TaskStateMessageKey) => string,
@@ -36,6 +50,13 @@ export function formatTaskState(
   return { label: t(`task.state.${state}`), tone: toneMap[state] };
 }
 
+/**
+ * Format an ISO 8601 timestamp for display, or an empty string if
+ * `value` cannot be parsed as a date.
+ *
+ * @example
+ * `formatTimestamp('invalid')` returns an empty string.
+ */
 export function formatTimestamp(value: string, locale = 'en-GB') {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -49,12 +70,26 @@ export function formatTimestamp(value: string, locale = 'en-GB') {
   }).format(date);
 }
 
+/**
+ * Render a branch reference as `provider:repository:branch`, or
+ * `undefined` when no branch exists yet.
+ *
+ * @example
+ * `formatBranchRef()` returns `undefined`.
+ */
 export function formatBranchRef(branchRef?: BranchRef) {
   return branchRef
     ? `${branchRef.provider}:${branchRef.repository}:${branchRef.branch_name}`
     : undefined;
 }
 
+/**
+ * Render a pull request reference as `provider:repository:number`, or
+ * `undefined` when no pull request exists yet.
+ *
+ * @example
+ * `formatPullRequestRef()` returns `undefined`.
+ */
 export function formatPullRequestRef(pullRequestRef?: PullRequestRef) {
   return pullRequestRef
     ? `${pullRequestRef.provider}:${pullRequestRef.repository}:${pullRequestRef.pull_request_number}`
