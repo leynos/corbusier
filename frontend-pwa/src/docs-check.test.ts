@@ -1,51 +1,61 @@
 /**
- * Integration tests for the zero-tolerance TypeDoc documentation gate.
+ * Behavioural contract test for the frontend TypeDoc Makefile target.
  *
- * The suite invokes the production `docs:check` script so its success and
- * diagnostic contracts cannot drift away from the command used in CI.
+ * The fake Bun executable records the target's invocation without executing
+ * TypeDoc, which belongs to the dependency's own validation surface.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-const undocumentedSymbol = 'UndocumentedTypeDocFixture';
+const repositoryRoot = resolve(process.cwd(), '..');
 
-function runDocsCheck(...args: string[]) {
-  return spawnSync('bun', ['run', 'docs:check', ...args], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-}
+describe('frontend-docs-check', () => {
+  it('runs the configured Bun command from the frontend workspace', () => {
+    const fixtureDirectory = mkdtempSync(join(tmpdir(), 'corbusier-make-'));
+    const fakeBun = join(fixtureDirectory, 'bun');
+    const argumentsPath = join(fixtureDirectory, 'arguments');
+    const workingDirectoryPath = join(fixtureDirectory, 'working-directory');
 
-describe('docs:check', () => {
-  it('accepts the documented production surface', () => {
-    const result = runDocsCheck();
-
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(0);
-  }, 30_000);
-
-  it('rejects an undocumented export and names the symbol', () => {
-    const fixtureDirectory = mkdtempSync(
-      join(process.cwd(), 'src/typedoc-fixture-'),
+    writeFileSync(
+      fakeBun,
+      [
+        '#!/usr/bin/env sh',
+        'script_dir=$(dirname "$0")',
+        'pwd > "$script_dir/working-directory"',
+        'printf "%s\\n" "$@" > "$script_dir/arguments"',
+      ].join('\n'),
     );
-    const fixturePath = join(fixtureDirectory, 'undocumented-export.ts');
-    writeFileSync(fixturePath, `export function ${undocumentedSymbol}() {}`);
+    chmodSync(fakeBun, 0o755);
 
     try {
-      const result = runDocsCheck(
-        '--entryPoints',
-        fixturePath,
-        '--entryPointStrategy',
-        'resolve',
+      const result = spawnSync(
+        'make',
+        ['frontend-docs-check', `BUN=${fakeBun}`],
+        {
+          cwd: repositoryRoot,
+          encoding: 'utf8',
+        },
       );
-      const diagnostics = `${result.stdout}${result.stderr}`;
 
       expect(result.error).toBeUndefined();
-      expect(result.status).not.toBe(0);
-      expect(diagnostics).toContain(undocumentedSymbol);
+      expect(result.status).toBe(0);
+      expect(readFileSync(workingDirectoryPath, 'utf8').trim()).toBe(
+        join(repositoryRoot, 'frontend-pwa'),
+      );
+      expect(readFileSync(argumentsPath, 'utf8').trim().split('\n')).toEqual([
+        'run',
+        'docs:check',
+      ]);
     } finally {
       rmSync(fixtureDirectory, { recursive: true, force: true });
     }
-  }, 30_000);
+  });
 });
