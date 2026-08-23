@@ -17,7 +17,14 @@ accepted = [
 [words.corrections]
 
 [patterns]
-ignore = []
+# The estate-wide base already exempts fenced code blocks. Inline code spans
+# carry the same content — identifiers, attributes, and API names quoted from
+# source — so spell-checking them as prose flags legitimate US-spelled
+# identifiers such as `color`, `flavor`, and `CatalogEntry`. Prose outside
+# backticks is still checked, which is what the en-GB-oxendict policy is for;
+# see the convention noted in docs/users-guide.md, where the code identifier is
+# backticked and the surrounding prose uses the British spelling.
+ignore = ['`[^`\n]+`']
 
 [files]
 exclude = []
