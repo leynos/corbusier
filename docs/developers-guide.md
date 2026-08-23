@@ -329,3 +329,22 @@ cargo binstall cargo-audit
 
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
+
+### Frontend advisory overrides
+
+Transitive frontend packages are pinned up to a patched version through the
+`overrides` block in `frontend-pwa/package.json`. Express each entry as a caret
+range whose floor is the advisory's first patched version, for example
+`"postcss": "^8.5.18"` for an advisory patched in 8.5.18.
+
+Do not pin an override to an exact version. An exact pin cannot pick up the
+next patch release, so the package silently stays vulnerable when a later
+advisory lands against the pinned version — which is precisely how `fast-uri`
+became stuck on 3.1.2 while 3.1.4 carried the fix. A caret floor records the
+security requirement and still allows subsequent fixes in.
+
+An override is only appropriate while the direct dependency's own range still
+admits the patched version. When it does not, upgrade the direct dependency
+instead, or record a time-boxed entry in
+`frontend-pwa/security/audit-exceptions.json`; every ledger entry must carry an
+`expiresAt` date, and `bun run audit` fails once it lapses.
