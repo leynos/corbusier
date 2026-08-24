@@ -16,6 +16,7 @@ mod message_tests;
 mod models_tests;
 mod role_tests;
 mod row_to_message_tests;
+mod slash_command_call_id_tests;
 mod slash_command_tests;
 mod validation_config_tests;
 mod validation_content_tests;
