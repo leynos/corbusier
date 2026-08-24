@@ -1,0 +1,29 @@
+# `cargo-audit` configuration.
+#
+# Entries here suppress advisories that cannot currently be resolved by
+# upgrading. Each one must record why no upgrade path exists and when it should
+# next be revisited. Remove an entry as soon as its upgrade path lands; do not
+# extend a review date without re-checking the dependency tree.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2026-0258 — h2 unbounded empty DATA frames (low severity DoS).
+    #
+    # Patched in h2 0.4.16, but h2 reaches this tree only through
+    # actix-http, which requires `h2 ^0.3.27` even at its latest release
+    # (3.13.3, checked 2026-08-24). actix-web 4.x has no version that uses
+    # h2 0.4, so there is no upgrade path short of an actix major release.
+    #
+    # Disabling actix-web's default `http2` feature does not help: `actix_v2a`
+    # depends on `actix-web = "4"` with default features, which re-enable
+    # `http2` through feature unification, and `Cargo.lock` records optional
+    # dependencies regardless of feature selection. Verified empirically on
+    # 2026-08-24.
+    #
+    # Exposure: the server binds plain TCP with no TLS (`src/main.rs`), so
+    # HTTP/2 is reachable only via h2c prior knowledge, and deployments
+    # terminate TLS at the ingress.
+    #
+    # review-by: 2026-11-30 — re-check whether actix-http has moved to h2 0.4.
+    "RUSTSEC-2026-0258",
+]

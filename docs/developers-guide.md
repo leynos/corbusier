@@ -330,6 +330,27 @@ cargo binstall cargo-audit
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
 
+### Rust advisory exceptions
+
+`cargo-audit` reads `.cargo/audit.toml`. Prefer upgrading; only add an entry to
+its `ignore` list when no upgrade path exists. Every entry must record why the
+advisory cannot be resolved, what the exposure is, and a `review-by` date.
+
+`RUSTSEC-2026-0258` (`h2` unbounded empty DATA frames, low-severity denial of
+service) is currently suppressed. It is patched in `h2` 0.4.16, but `h2` enters
+the tree only through `actix-http`, which requires `h2 ^0.3.27` even at its
+latest release, so no actix-web 4.x version resolves the advisory.
+
+Disabling actix-web's default `http2` feature does not remove the crate:
+`actix_v2a` depends on `actix-web = "4"` with default features, which re-enable
+`http2` through feature unification, and `Cargo.lock` records optional
+dependencies regardless of feature selection. Both were verified empirically
+before the exception was added.
+
+Unlike the frontend ledger, `cargo-audit` has no native expiry, so the
+`review-by` date is a convention rather than a gate. Re-check the entry on that
+date and delete it as soon as `actix-http` moves to `h2` 0.4.
+
 ### Frontend advisory overrides
 
 Transitive frontend packages are pinned up to a patched version through the
