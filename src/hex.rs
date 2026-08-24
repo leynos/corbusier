@@ -56,6 +56,12 @@ pub(crate) fn to_lower_hex_prefix(bytes: &[u8], byte_limit: usize) -> String {
 /// The nibble is masked here rather than by the caller so the mapping is total
 /// over every `u8`; deriving the digit arithmetically also avoids a lookup
 /// table, which would need a bounds check under this crate's lint policy.
+///
+/// ```ignore
+/// assert_eq!(nibble_digit(0x03), '3');
+/// assert_eq!(nibble_digit(0x0a), 'a');
+/// assert_eq!(nibble_digit(0x2a), 'a');
+/// ```
 const fn nibble_digit(byte: u8) -> char {
     let nibble = byte & 0x0f;
     let ascii = if nibble < 10 {
