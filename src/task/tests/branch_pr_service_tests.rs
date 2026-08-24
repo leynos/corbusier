@@ -69,35 +69,42 @@ fn assert_pr_already_associated_error<T: std::fmt::Debug>(result: Result<T, Task
     }
 }
 
+/// Asserts `found` holds exactly the task identified by `expected_id`.
+///
+/// Comparing collected IDs rather than indexing keeps the helper free of
+/// panicking accessors while still reporting the whole set on failure.
 fn assert_single_task_found(found: &[Task], expected_id: TaskId) {
-    assert_eq!(found.len(), 1, "expected exactly one task");
+    let found_ids = found.iter().map(Task::id).collect::<Vec<_>>();
     assert_eq!(
-        found.first().expect("already asserted non-empty").id(),
-        expected_id,
-        "task ID should match"
+        found_ids,
+        vec![expected_id],
+        "expected exactly one task with the requested ID"
     );
 }
 
 /// Helper to test that duplicate associations are rejected.
+///
+/// The first association is arrangement, so its failure is propagated for the
+/// calling test to surface rather than panicking here.
 async fn assert_duplicate_association_rejected<F1, F2, Fut1, Fut2, E>(
     task_id: TaskId,
     first_association: F1,
     duplicate_association: F2,
     assert_error: E,
-) where
+) -> Result<(), TaskLifecycleError>
+where
     F1: FnOnce(TaskId) -> Fut1,
     F2: FnOnce(TaskId) -> Fut2,
     Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     Fut2: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     E: FnOnce(Result<Task, TaskLifecycleError>),
 {
-    first_association(task_id)
-        .await
-        .expect("first association should succeed");
+    first_association(task_id).await?;
 
     let result = duplicate_association(task_id).await;
 
     assert_error(result);
+    Ok(())
 }
 
 // ── Branch association tests ────────────────────────────────────────
@@ -132,7 +139,7 @@ async fn associate_branch_persists_and_is_retrievable(service: TestService, ctx:
 async fn associate_branch_rejects_duplicate_on_same_task(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let task = create_test_task(&service, &ctx, 501, "Task")
         .await
         .expect("task creation should succeed");
@@ -153,7 +160,7 @@ async fn associate_branch_rejects_duplicate_on_same_task(
         },
         assert_branch_already_associated_error,
     )
-    .await;
+    .await
 }
 
 #[rstest]
@@ -238,7 +245,7 @@ async fn associate_pull_request_persists_and_transitions_to_in_review(
 async fn associate_pull_request_rejects_duplicate_on_same_task(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let task = create_test_task(&service, &ctx, 601, "Task")
         .await
         .expect("task creation should succeed");
@@ -259,30 +266,29 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(
         },
         assert_pr_already_associated_error,
     )
-    .await;
+    .await
 }
 
 /// Helper to test that multiple tasks can share the same reference.
+///
+/// The associations and the lookup are arrangement, so their failures are
+/// propagated for the calling test to surface rather than panicking here.
 async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
     tasks: [Task; 2],
     associate_fn: impl Fn(TaskId) -> Fut1,
     lookup_fn: F,
-) where
+) -> Result<(), TaskLifecycleError>
+where
     F: FnOnce() -> Fut2,
     Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     Fut2: std::future::Future<Output = Result<Vec<Task>, TaskLifecycleError>>,
 {
     let [ref first, ref second] = tasks;
 
-    associate_fn(first.id())
-        .await
-        .expect("first task association should succeed");
+    associate_fn(first.id()).await?;
+    associate_fn(second.id()).await?;
 
-    associate_fn(second.id())
-        .await
-        .expect("second task association should succeed");
-
-    let found = lookup_fn().await.expect("lookup should succeed");
+    let found = lookup_fn().await?;
 
     assert_eq!(found.len(), 2, "expected exactly two tasks");
     let ids: Vec<_> = found.iter().map(Task::id).collect();
@@ -291,13 +297,17 @@ async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
         ids.contains(&second.id()),
         "second task should be in results"
     );
+    Ok(())
 }
 
 // ── Many-to-many branch sharing ─────────────────────────────────────
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: RequestContext) {
+async fn multiple_tasks_sharing_branch_all_returned(
+    service: TestService,
+    ctx: RequestContext,
+) -> Result<(), TaskLifecycleError> {
     let branch_ref =
         BranchRef::from_parts("github", "owner/repo", "shared/branch").expect("valid branch ref");
     let tasks = [
@@ -319,7 +329,7 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: R
         },
         || service.find_by_branch_ref(&ctx, &branch_ref),
     )
-    .await;
+    .await
 }
 
 #[rstest]
@@ -327,7 +337,7 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: R
 async fn multiple_tasks_sharing_pull_request_all_returned(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let pr_ref = PullRequestRef::from_parts("github", "owner/repo", 99).expect("valid PR ref");
     let tasks = [
         create_test_task(&service, &ctx, 800, "PR share 1")
@@ -348,5 +358,5 @@ async fn multiple_tasks_sharing_pull_request_all_returned(
         },
         || service.find_by_pull_request_ref(&ctx, &pr_ref),
     )
-    .await;
+    .await
 }

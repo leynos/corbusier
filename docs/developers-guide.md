@@ -74,6 +74,23 @@ Use [`contents.md`](contents.md) to choose the right documentation destination.
 Substantive architectural decisions belong in an ADR or the relevant design
 document, not only in code comments.
 
+#### Hexadecimal digest rendering
+
+`src/hex.rs` owns the crate's only hexadecimal encoder. `to_lower_hex` renders
+every byte as two lowercase digits, and `to_lower_hex_prefix` renders at most a
+requested number of leading bytes for callers that want a truncated digest
+suffix. Both are `pub(crate)`: identifier rendering is an implementation
+detail, not part of the public contract.
+
+Call these instead of `format!("{:x}", digest)` or a hand-rolled nibble loop.
+`sha2` 0.11 returns `hybrid_array::Array<u8, _>` from `finalize` and `digest`,
+and that type does not implement `core::fmt::LowerHex`, so `{:x}` does not
+compile; `&digest` coerces to `&[u8]` through `Deref`, so the encoder accepts a
+finalized digest directly. The encoder holds no digest knowledge — callers
+hash, then encode. Prefer `to_lower_hex_prefix` over indexing or slicing a
+digest, because `clippy::indexing_slicing` and `clippy::string_slice` are
+denied.
+
 ### Dependency management
 
 Cargo dependencies must use explicit SemVer-compatible caret requirements such
@@ -312,3 +329,43 @@ cargo binstall cargo-audit
 
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
+
+### Rust advisory exceptions
+
+`cargo-audit` reads `.cargo/audit.toml`. Prefer upgrading; only add an entry to
+its `ignore` list when no upgrade path exists. Every entry must record why the
+advisory cannot be resolved, what the exposure is, and a `review-by` date.
+
+`RUSTSEC-2026-0258` (`h2` unbounded empty DATA frames, low-severity denial of
+service) is currently suppressed. It is patched in `h2` 0.4.16, but `h2` enters
+the tree only through `actix-http`, which requires `h2 ^0.3.27` even at its
+latest release, so no actix-web 4.x version resolves the advisory.
+
+Disabling actix-web's default `http2` feature does not remove the crate:
+`actix_v2a` depends on `actix-web = "4"` with default features, which re-enable
+`http2` through feature unification, and `Cargo.lock` records optional
+dependencies regardless of feature selection. Both were verified empirically
+before the exception was added.
+
+Unlike the frontend ledger, `cargo-audit` has no native expiry, so the
+`review-by` date is a convention rather than a gate. Re-check the entry on that
+date and delete it as soon as `actix-http` moves to `h2` 0.4.
+
+### Frontend advisory overrides
+
+Transitive frontend packages are pinned up to a patched version through the
+`overrides` block in `frontend-pwa/package.json`. Express each entry as a caret
+range whose floor is the advisory's first patched version, for example
+`"postcss": "^8.5.18"` for an advisory patched in 8.5.18.
+
+Do not pin an override to an exact version. An exact pin cannot pick up the
+next patch release, so the package silently stays vulnerable when a later
+advisory lands against the pinned version — which is precisely how `fast-uri`
+became stuck on 3.1.2 while 3.1.4 carried the fix. A caret floor records the
+security requirement and still allows subsequent fixes in.
+
+An override is only appropriate while the direct dependency's own range still
+admits the patched version. When it does not, upgrade the direct dependency
+instead, or record a time-boxed entry in
+`frontend-pwa/security/audit-exceptions.json`; every ledger entry must carry an
+`expiresAt` date, and `bun run audit` fails once it lapses.
