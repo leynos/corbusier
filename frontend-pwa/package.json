@@ -10,6 +10,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "audit": "bun run scripts/run-audit.mjs",
     "lint": "biome check .",
+    "docs:check": "typedoc --options typedoc.json",
     "test:a11y": "vitest --run --config vitest.a11y.config.ts",
     "lint:classlist": "bun run scripts/check-classlist-length.ts",
     "lint:class-duplicates": "bun run scripts/find-near-duplicate-classes.ts",
@@ -56,6 +57,7 @@
     "stylelint": "^17.14.0",
     "stylelint-declaration-strict-value": "^1.10.11",
     "tailwindcss": "^4.3.2",
+    "typedoc": "^0.28.20",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
     "vitest": "^4.1.9"
