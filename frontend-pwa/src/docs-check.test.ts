@@ -1,5 +1,5 @@
 /**
- * Behavioural contract test for the frontend TypeDoc Makefile target.
+ * @file Behavioural contract test for the frontend TypeDoc Makefile target.
  *
  * The fake Bun executable records the target's invocation without executing
  * TypeDoc, which belongs to the dependency's own validation surface.
@@ -20,22 +20,23 @@ const repositoryRoot = resolve(process.cwd(), '..');
 describe('frontend-docs-check', () => {
   it('runs the configured Bun command from the frontend workspace', () => {
     const fixtureDirectory = mkdtempSync(join(tmpdir(), 'corbusier-make-'));
-    const fakeBun = join(fixtureDirectory, 'bun');
-    const argumentsPath = join(fixtureDirectory, 'arguments');
-    const workingDirectoryPath = join(fixtureDirectory, 'working-directory');
-
-    writeFileSync(
-      fakeBun,
-      [
-        '#!/usr/bin/env sh',
-        'script_dir=$(dirname "$0")',
-        'pwd > "$script_dir/working-directory"',
-        'printf "%s\\n" "$@" > "$script_dir/arguments"',
-      ].join('\n'),
-    );
-    chmodSync(fakeBun, 0o755);
 
     try {
+      const fakeBun = join(fixtureDirectory, 'bun');
+      const argumentsPath = join(fixtureDirectory, 'arguments');
+      const workingDirectoryPath = join(fixtureDirectory, 'working-directory');
+
+      writeFileSync(
+        fakeBun,
+        [
+          '#!/usr/bin/env sh',
+          'script_dir=$(dirname "$0")',
+          'pwd > "$script_dir/working-directory"',
+          'printf "%s\\n" "$@" > "$script_dir/arguments"',
+        ].join('\n'),
+      );
+      chmodSync(fakeBun, 0o755);
+
       const result = spawnSync(
         'make',
         ['frontend-docs-check', `BUN=${fakeBun}`],
