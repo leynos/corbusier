@@ -10,6 +10,7 @@ use crate::message::{
     error::ValidationError,
     ports::validator::MessageValidator,
 };
+use eyre::Context;
 use mockable::DefaultClock;
 use rstest::rstest;
 
@@ -71,10 +72,9 @@ fn validate_metadata_accepts_audit_records(
 
     let message = build_message_with_metadata(&clock, metadata)?;
 
-    eyre::ensure!(
-        default_validator.validate_structure(&message).is_ok(),
-        "metadata validation should accept audit records"
-    );
+    default_validator
+        .validate_structure(&message)
+        .context("metadata validation should accept audit records")?;
     Ok(())
 }
 

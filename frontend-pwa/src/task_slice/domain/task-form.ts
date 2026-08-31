@@ -7,8 +7,9 @@
 import type { CreateTaskRequest, IssueProvider } from './task';
 
 /**
- * Form-local draft of a task-create request; every field is a raw string
- * so controlled inputs can hold in-progress, possibly invalid, text.
+ * Form-local draft of a task-create request. Most fields are raw strings so
+ * controlled inputs can hold in-progress, possibly invalid, text, while the
+ * provider is constrained to supported {@link IssueProvider} values.
  */
 export interface TaskCreateDraft {
   /** Issue provider selected for the new task. */
