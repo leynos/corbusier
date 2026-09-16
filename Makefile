@@ -11,6 +11,14 @@ WHITAKER ?= $(shell command -v whitaker 2>/dev/null || \
 	else \
 		printf '%s/.cargo/bin/whitaker' "$$HOME"; \
 	fi)
+# `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
+# Markdown files Git tracks and `--include-untracked` adds the untracked files
+# Git does not ignore, so a new document is formatted before it is staged.
+# Both modes need mdtablefix 0.6.0 or later; CI pins the version at the
+# install-mdtablefix step.
+MDTABLEFIX ?= mdtablefix
+MDTABLEFIX_SELECT = --git --include-untracked
+MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 BUN ?= bun
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
@@ -18,13 +26,7 @@ RUSTDOC_FLAGS ?=
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
-MDLINT ?= $(shell if [ -n "$$HOME" ] && [ -x "$$HOME/.bun/bin/markdownlint-cli2" ]; then \
-		printf '%s/.bun/bin/markdownlint-cli2' "$$HOME"; \
-	elif command -v markdownlint-cli2 >/dev/null 2>&1; then \
-		command -v markdownlint-cli2; \
-	else \
-		printf 'markdownlint-cli2'; \
-	fi)
+MDLINT ?= $(shell command -v markdownlint-cli2 2>/dev/null || printf '%s' "$$HOME/.bun/bin/markdownlint-cli2")
 NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
@@ -58,10 +60,12 @@ lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
-	mdformat-all
+	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
+	@unset FORCE_COLOR; $(MDLINT) --fix "**/*.md"
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
+	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
