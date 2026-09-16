@@ -235,17 +235,15 @@ npm install --global markdownlint-cli2
 
 ### Spelling policy
 
-The lint and Markdown gates run `typos` 1.48.0 with British English and Oxford
-`-ize` conventions. Before checking maintained Markdown, the generator
-refreshes the shared estate dictionary into an untracked local cache only when
-the authority is newer, then merges `typos.local.toml`. The generated
-`typos.toml` is reviewed and committed so a clean, network-restricted checkout
-can still enforce the last known-good policy.
+The lint and Markdown gates enforce British English in the Oxford `-ize` style
+through `typos-config-builder gate`. Run it on its own with `make spelling`.
+Every run regenerates `typos.toml` from the live shared dictionary and the
+repository overlay, then checks the maintained Markdown, so the generated file
+is never drift-checked in continuous integration.
 
 Add repository-only proper names or quoted upstream terms to
-`typos.local.toml`; never edit generated entries in `typos.toml` by hand. The
-spelling gate also runs the helper's Python 3.13 tests with at least 90% line
-coverage.
+`typos.local.toml`, which holds the en-GB-oxendict overlay; never edit
+generated entries in `typos.toml` by hand.
 
 ### `TaskGatewayProvider` and `useTaskGateway`
 
