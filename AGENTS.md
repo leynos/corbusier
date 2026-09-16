@@ -310,10 +310,11 @@ project:
 
 - Validate Markdown files using `make markdownlint`; this also runs the pinned
   en-GB-oxendict `typos` spelling gate.
-- The spelling configuration `typos.toml` is generated. Put narrow
-  repository-only exceptions in `typos.local.toml`, then regenerate with
-  `uv run scripts/generate_typos_config.py`; never edit generated entries by
-  hand.
+- Run the spelling gate on its own with `make spelling`. Every run regenerates
+  `typos.toml` from the live shared dictionary and the repository overlay, so
+  the generated file is never drift-checked in continuous integration.
+- Put narrow repository-only exceptions in `typos.local.toml`
+  (en-GB-oxendict); never edit generated entries in `typos.toml` by hand.
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.
