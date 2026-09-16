@@ -216,10 +216,9 @@ make markdownlint
 The `MDLINT` variable resolves the executable automatically:
 
 1. If `markdownlint-cli2` is found on `PATH`, that executable is used.
-2. Otherwise, if `~/.bun/bin/markdownlint-cli2` exists and is executable, that
-   fallback is used.
-3. If neither lookup succeeds, `MDLINT` resolves to `markdownlint-cli2` and the
-   shell reports the missing command when the target runs.
+2. Otherwise, `MDLINT` resolves to `$HOME/.bun/bin/markdownlint-cli2`, the
+   path a global `bun install -g markdownlint-cli2` creates; no existence check
+   is made, so the shell reports the missing command when the target runs.
 
 Override the resolved path explicitly if needed:
 
