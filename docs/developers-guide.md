@@ -310,3 +310,16 @@ cargo binstall cargo-audit
 
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
+
+Neither half of the gate may be silenced casually. An advisory with no
+reachable fixed release is suppressed only through the mechanism for its
+ecosystem, and only alongside a document that records the rationale, the
+exposure, and the trigger for re-review:
+
+- Node.js advisories are suppressed by an entry in
+  `frontend-pwa/security/audit-exceptions.json`, which requires an expiry date
+  and is enforced by `frontend-pwa/scripts/run-audit.mjs`.
+- Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`,
+  paired with a dependency-policy exception document under `docs/`. See
+  [Dependency policy exception: h2 empty DATA frames](dependency-policy-exception-h2-empty-data-frames.md)
+  for the current example.
