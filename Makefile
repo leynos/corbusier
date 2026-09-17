@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test audit-exceptions audit-exceptions-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -120,12 +120,23 @@ frontend-semantic: ## Run semantic frontend linting and styling checks
 frontend-e2e: ## Run frontend browser-path tests
 	cd $(FRONTEND_DIR) && $(BUN) run e2e
 
-audit: audit-node rust-audit ## Audit frontend and Rust dependencies for known vulnerabilities
+# Both halves always run and both report. As Make prerequisites the first
+# failure stopped the target, so 24 frontend advisories masked
+# RUSTSEC-2026-0258 for weeks. One failure must not hide another.
+audit: ## Audit frontend and Rust dependencies, reporting both
+	uv run scripts/run_audits.py
 
 audit-node: ## Audit frontend dependencies for known vulnerabilities
 	cd $(FRONTEND_DIR) && $(BUN) run audit
 
-rust-audit: ## Audit every Rust manifest for known vulnerabilities
+audit-exceptions: audit-exceptions-test ## Refuse an ignored advisory that is undated or expired
+	uv run scripts/rust_audit_exceptions.py
+
+audit-exceptions-test: ## Drive the exception rule over dates this tree is not on
+	@PYTHONPATH=scripts $(SPELLING_PYTEST) \
+		scripts/tests/test_rust_audit_exceptions.py
+
+rust-audit: audit-exceptions ## Audit every Rust manifest for known vulnerabilities
 	find . \
 		\( -path '*/target/*' -o -path '*/node_modules/*' -o -path '*/.venv/*' \) -prune -o \
 		-name Cargo.toml -exec sh -c 'set -e; for manifest do \
