@@ -338,3 +338,100 @@ in this order, and stop at the first step that works:
 
 Raising a declared dependency across a major version to clear an advisory is a
 separate change with its own review; it is not part of clearing the advisory.
+
+## Workflow contracts
+
+The workflow files carry rules that nothing else can enforce. A pull
+request changing a workflow is reviewed by reading it, and each of the
+three rules below exists because reading it was not enough. Run them
+with:
+
+```sh
+make workflow-contracts
+```
+
+CI runs the same target, as an unguarded step in `ci.yml`, and one of the
+contracts asserts that: a contract nothing runs is a comment. That
+assertion names the command rather than the step's name, because a step
+keeps its name when its `run:` changes; it matches a command line of the
+`run:` block rather than a substring of it, because `echo make
+workflow-contracts` contains the command and runs nothing; and it reads
+the `if:` on the owning job as well as on the step, because a step with
+no guard inside a job carrying one is dead code whenever that guard is
+false.
+
+The contracts are invoked twice, and that is deliberate. A single
+invocation is a single thing to delete, and the pull request that
+deleted it would be the one the contracts existed to read. `lint`
+therefore takes `workflow-contracts` as a prerequisite, and `ci.yml`
+runs `make lint` as a step of its own, so deleting either invocation
+leaves the other. The Makefile prerequisite is itself asserted.
+
+References to `leynos/shared-actions` are matched with the owner and
+repository name folded to lower case, because GitHub resolves both
+case-insensitively. Matched exactly, `Leynos/shared-actions/...@main`
+is not a reference at all: none of the three pin rules would see it,
+the assertions would stay green on the lowercase references beside it,
+and a mutable ref would reach every Rust job. The path within the
+repository is left as written, since only the owner and repository name
+are case-insensitive.
+
+### One commit, and not a wrapper-less one
+
+Every `leynos/shared-actions` reference in every workflow file names one
+40-hex commit, and never one of the named pins whose `setup-rust`
+exports no `RUSTC_WRAPPER`.
+
+Both halves come from a real proposal. Dependabot's #167 moved every
+reference in this repository to `57a33fa6`, a commit 37 commits behind
+the one they should be on, in a routine group bump. At that pin
+`setup-rust` installs sccache and exports no wrapper, so Cargo routes no
+compilation through it: the cache is downloaded on every Rust job and
+caches nothing, while the pull request reads as pins being brought up to
+date. Before this change the references sat on two commits two months
+apart, and nothing said so.
+
+The references are matched by repository prefix rather than by an
+enumerated list of action paths. An enumeration goes stale the moment a
+workflow adopts another action from the same repository, and the
+reference it misses is the one nobody thought to add. Both spellings are
+read, a step's `uses:` and a job's, because the Dependabot automerge
+caller is a reusable workflow and has to move with the rest.
+
+### The coverage watchdog is stated, not inherited
+
+Every job invoking `generate-coverage` declares
+`RUN_RUST_CARGO_WAIT_TIMEOUT` at job level, and the contract pins the
+value at 1,800 s rather than accepting any value. That is the action's
+own default, so the declaration changes no behaviour today; what it
+changes is that a later change to the action's default cannot move this
+repository's budget silently. The variable takes precedence over the
+action's `cargo-wait-timeout` input, which is why it is set as an
+environment variable.
+
+The value is 1,800 s against a measured worst case of 479 s for the
+coverage step, across the six most recent runs of both lanes. A blank
+declaration is refused as well as a missing one: `VAR: ""` parses to the
+empty string and a valueless `VAR:` parses to `None`, and both mask the
+outer scope.
+
+### No runner placement carries a line break
+
+A folded scalar whose continuation line is indented more deeply than its
+first line keeps the line break rather than folding it into a space. A
+`runs-on` written that way carries a newline inside the expression, and
+GitHub evaluates it as written, so the run is green and nothing says
+otherwise. The contract reads every job's `runs-on` from the parsed
+document and refuses a line break anywhere inside the value, including
+inside a list of labels or a `group`/`labels` mapping, and reports the
+raw declaration beside it.
+
+Every job here names a literal runner today, so this rule cannot be
+proved by these files: parametrized over four correct documents it would
+pass whether or not it discriminated anything. It is written as a
+function over a parsed value and driven directly in
+`scripts/tests/test_runner_placement_rule.py`, with the fork-fallback
+lane folded correctly, the same lane indented one level deeper, and the
+three shapes GitHub accepts. Refusing what the rule exists to permit is
+as much a failure as accepting what it exists to refuse, and both
+directions are asserted.

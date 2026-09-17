@@ -16,6 +16,15 @@ jobs:
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
       WHITAKER_INSTALLER_VERSION: '0.2.6'
+      # Pinned rather than inherited. `generate-coverage` defaults the
+      # cargo watchdog to 1800 s, sized for a cold sccache store; this
+      # declares that same value here so a later change to the action's
+      # default cannot silently move the budget this repository runs
+      # under. The measured worst case for the coverage step is 479 s
+      # (run 32735096736), so 1800 s is about 3.75 times the worst seen.
+      # The environment variable wins over the action's
+      # `cargo-wait-timeout` input, which is why it is set here.
+      RUN_RUST_CARGO_WAIT_TIMEOUT: '1800'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -25,7 +34,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@074f7d8ba75a6e5d18532b72cbe38fccbda4e9c6
+        uses: leynos/shared-actions/.github/actions/setup-rust@0e3c4d24e43aa48b511d94f3b902711eb02138df
       - name: Install frontend dependencies and browser
         run: FRONTEND_INSTALL_FLAGS=--frozen-lockfile make frontend-install
       - name: Refresh apt package index
@@ -39,6 +48,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
       - name: Format
         run: make check-fmt
+      - name: Workflow contracts
+        run: make workflow-contracts
       - name: Markdown lint
         uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e
         with:
@@ -116,7 +127,7 @@ jobs:
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/generate-coverage@0e3c4d24e43aa48b511d94f3b902711eb02138df
         with:
           output-path: lcov.info
           format: lcov
@@ -125,7 +136,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@0e3c4d24e43aa48b511d94f3b902711eb02138df
         with:
           format: lcov
           mode: check

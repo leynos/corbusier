@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test workflow-contracts nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -29,13 +29,14 @@ NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
 SPELLING_PYTEST ?= uv run --python 3.13 --with pytest==9.0.2 --with pytest-cov==7.0.0 python -m pytest
+WORKFLOW_PYTEST ?= uv run --python 3.13 --with pytest==9.0.2 --with pyyaml==6.0.3 python -m pytest
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
-all: check-fmt lint test ## Perform a comprehensive check of code
+all: check-fmt lint workflow-contracts test ## Perform a comprehensive check of code
 
 clean: ## Remove build artifacts
 	$(CARGO) clean
@@ -50,7 +51,11 @@ typecheck: ## Run cargo type checks across the workspace
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
 
-lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
+# `workflow-contracts` is a prerequisite here as well as a CI step of its own,
+# so that deleting the step does not stop the contracts running. A contract
+# nothing runs is a comment, and a single invocation is a single thing to
+# delete.
+lint: workflow-contracts ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
@@ -76,6 +81,10 @@ spelling-helper-test: ## Validate the shared spelling-policy integration
 	@PYTHONPATH=scripts $(SPELLING_PYTEST) scripts/tests/test_typos_rollout.py \
 		--cov=generate_typos_config --cov=typos_rollout \
 		--cov=typos_rollout_cache --cov-fail-under=90
+
+workflow-contracts: ## Assert what the workflow files must say
+	$(WORKFLOW_PYTEST) scripts/tests/test_workflow_contracts.py \
+		scripts/tests/test_runner_placement_rule.py
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
