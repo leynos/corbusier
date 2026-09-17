@@ -313,10 +313,38 @@ cargo binstall cargo-audit
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
 
-`make audit` runs its two halves as Make prerequisites, so a failing
-`audit-node` stops the target before `rust-audit` runs. A green frontend audit
-is therefore the only state in which the Rust half has been read at all, and a
-newly cleared frontend advisory can reveal a Rust one that was there all along.
+`make audit` runs both halves and reports both. They used to be Make
+prerequisites, so a failing `audit-node` stopped the target before `rust-audit`
+ran, and 24 frontend advisories masked RUSTSEC-2026-0258 for weeks. One failure
+must not hide another, so `scripts/run_audits.py` runs each half, prints a
+per-half summary, and exits with the worse of the two statuses.
+
+### Clearing a Rust advisory
+
+`cargo-audit` takes a bare list of advisory identifiers in `.cargo/audit.toml`
+and rejects any key it does not know, so an expiry date and a justification
+cannot be fields of that file. They live in a fixed comment block above the
+list:
+
+```toml
+# advisory: RUSTSEC-0000-0000
+# expires-at: 2026-12-17
+# justification: one or more lines saying why it cannot be cleared here.
+
+[advisories]
+ignore = ["RUSTSEC-0000-0000"]
+```
+
+`make audit-exceptions`, which `rust-audit` takes as a prerequisite, makes that
+block load-bearing rather than decorative. It refuses an ignore that carries no
+block, a block that names no expiry or no justification, an expiry that has
+passed, and a block left behind for an advisory no longer ignored. The expiry
+is inclusive through its own day. An entry is a deferral, not a fix, and the
+same rule the frontend ledger applies.
+
+Prefer clearing the advisory. An ignore is right only when no version inside
+the resolved major fixes it and the remedy is upstream, which is the single
+entry there today.
 
 ### Clearing a frontend advisory
 
