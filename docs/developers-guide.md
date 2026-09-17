@@ -329,6 +329,32 @@ exposure, and the trigger for re-review:
   [Dependency policy exception: h2 empty DATA frames](dependency-policy-exception-h2-empty-data-frames.md)
   for the current example.
 
+`make audit` runs its two halves as Make prerequisites, so a failing
+`audit-node` stops the target before `rust-audit` runs. A green frontend audit
+is therefore the only state in which the Rust half has been read at all, and a
+newly cleared frontend advisory can reveal a Rust one that was there all along.
+
+### Clearing a frontend advisory
+
+`make audit-node` runs `frontend-pwa/scripts/run-audit.mjs`, which fails on any
+advisory `bun audit` reports that the exception ledger at
+`frontend-pwa/security/audit-exceptions.json` does not cover. Clear an advisory
+in this order, and stop at the first step that works:
+
+1. Refresh the lockfile. `bun update <package>` moves a transitive dependency
+   inside the range its parent already allows, and changes no manifest.
+2. Add or raise an entry in `overrides` in `frontend-pwa/package.json`. The
+   floor named there is a security floor: it exists to keep the resolved
+   version above the advisory's fixed version, so lowering one reopens the
+   advisory it closed.
+3. Only where neither works, add a ledger entry. Each carries an `expiresAt`
+   date and a justification, and the gate fails once that date passes, so an
+   accepted risk cannot sit there indefinitely. An entry is a deferral, not a
+   fix.
+
+Raising a declared dependency across a major version to clear an advisory is a
+separate change with its own review; it is not part of clearing the advisory.
+
 ## Coverage publication and CodeScene
 
 CodeScene belongs to one workflow, `.github/workflows/coverage-main.yml`, which
