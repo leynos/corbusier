@@ -1,13 +1,27 @@
-# `cargo audit` configuration.
+# Rust dependency-audit exceptions.
 #
-# Every ignored advisory must have a corresponding dependency-policy exception
-# document under `docs/`, and must be re-reviewed when that document's review
-# trigger fires.
+# Every advisory listed in `ignore` below carries a dated, justified block in
+# this header. The format is fixed rather than free prose because
+# `scripts/rust_audit_exceptions.py` parses it, and `make rust-audit` refuses
+# to run while an ignore is undated, malformed, expired, or listed here
+# without a matching block. An accepted risk cannot sit here unnoticed, which
+# is the same rule `frontend-pwa/security/audit-exceptions.json` applies to the
+# frontend.
+#
+# An entry is a deferral, not a fix. Removing the cause removes the entry.
+#
+# advisory: RUSTSEC-2026-0258
+# expires-at: 2026-12-17
+# justification: h2 0.3.27, unbounded empty DATA frames, fixed in 0.4.16.
+#   `actix-http` is the only dependent and every 3.x release through the
+#   current 3.13.6 requires `h2 ^0.3.27`, so no lockfile move and no in-major
+#   bump reaches 0.4. This repository also pins `actix-http` to 3.12.1 under
+#   the dependency-policy exception recorded in
+#   `docs/dependency-policy-exception-actix-v2a.md`. The remedy is upstream;
+#   the request is drafted and this entry expires three months from
+#   2026-09-17 so the wait is re-examined rather than forgotten.
+#   The full rationale is
+#   `docs/dependency-policy-exception-h2-empty-data-frames.md`.
 
 [advisories]
-ignore = [
-    # h2 0.3.27 unbounded empty DATA frames. No fixed release is reachable
-    # while the server runs on actix-web 4; see
-    # docs/dependency-policy-exception-h2-empty-data-frames.md.
-    "RUSTSEC-2026-0258",
-]
+ignore = ["RUSTSEC-2026-0258"]
