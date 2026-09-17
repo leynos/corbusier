@@ -32,15 +32,12 @@ files are asserted separately.
 from __future__ import annotations
 
 import re
-import sys
 import typing as typ
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from workflow_contracts import (  # noqa: E402
+from workflow_contracts import (
     COVERAGE_ACTION,
     WATCHDOG_VARIABLE,
     WRAPPER_LESS_PINS,
@@ -48,19 +45,71 @@ from workflow_contracts import (  # noqa: E402
     of_type,
     shared_actions_references,
 )
-from workflow_contracts import parse as parse_workflow  # noqa: E402
-from workflow_contracts import coverage_jobs as coverage_jobs_in  # noqa: E402
-from workflow_placement import (  # noqa: E402
+from workflow_contracts import parse as parse_workflow
+from workflow_contracts import coverage_jobs as coverage_jobs_in
+from workflow_placement import (
     line_break_fault,
     runs_on_declarations,
 )
 
 #: A 40-hex commit, which is the only form a reference may take. A tag or
 #: a branch is mutable, and a short SHA is ambiguous.
-COMMIT_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
+COMMIT_SHA: typ.Final[re.Pattern[str]] = re.compile(r"\A[0-9a-f]{40}\Z")
 
-#: The command CI must run to execute the contracts in this directory.
-CONTRACT_COMMAND: typ.Final[str] = "make workflow-contracts"
+#: The Make target that executes the contracts in this directory.
+CONTRACT_TARGET: typ.Final[str] = "workflow-contracts"
+
+#: The command CI must run to execute them.
+CONTRACT_COMMAND: typ.Final[str] = f"make {CONTRACT_TARGET}"
+
+#: The second, independently retained invocation. `lint` takes the
+#: contract target as a prerequisite, so this command runs them too.
+LINT_COMMAND: typ.Final[str] = "make lint"
+
+#: The repository root, for reading the Makefile.
+REPO_ROOT: typ.Final[Path] = Path(__file__).resolve().parents[2]
+
+
+class _Step(typ.NamedTuple):
+    """One workflow step with the job that owns it.
+
+    Attributes
+    ----------
+    job_name : str
+        The job's identifier, for the failure message.
+    job : dict[str, object]
+        The parsed job, read for its own `if:`.
+    step : dict[str, object]
+        The parsed step.
+    """
+
+    job_name: str
+    job: dict[str, object]
+    step: dict[str, object]
+
+
+def _make_target_line(target: str) -> str:
+    """Return the Makefile line declaring `target` and its prerequisites.
+
+    Parameters
+    ----------
+    target : str
+        The Make target's name.
+
+    Returns
+    -------
+    str
+        The declaration line, without its newline.
+
+    Raises
+    ------
+    AssertionError
+        If the Makefile declares no such target.
+    """
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    found = re.search(rf"^{re.escape(target)}:[^\n]*$", makefile, flags=re.MULTILINE)
+    assert found, f"the Makefile declares no {target} target"
+    return found.group(0)
 
 #: The budget this repository runs its coverage steps under, in seconds.
 #: It is the action's current default, declared here so that a later
@@ -170,30 +219,87 @@ def test_every_coverage_job_states_its_watchdog(
         )
 
 
+def _steps_running(document: dict[str, object], command: str) -> list[_Step]:
+    """Return every step whose `run:` block executes `command` as a command.
+
+    A command line is matched rather than a substring. `run: echo make
+    workflow-contracts` contains the text and runs nothing, and a step
+    written that way would satisfy a containment test while asserting
+    nothing at all.
+
+    Parameters
+    ----------
+    document : dict[str, object]
+        The parsed workflow.
+    command : str
+        The command a step must run.
+
+    Returns
+    -------
+    list[_Step]
+        Each matching step with the name of the job that owns it.
+    """
+    found: list[_Step] = []
+    for job_name, raw_job in of_type(document.get("jobs"), dict).items():
+        job = of_type(raw_job, dict)
+        for raw_step in of_type(job.get("steps"), list):
+            step = of_type(raw_step, dict)
+            lines = [line.strip() for line in str(step.get("run", "")).splitlines()]
+            if command in lines:
+                found.append(_Step(str(job_name), job, step))
+    return found
+
+
 def test_the_contracts_are_run_by_ci(workflow_texts: dict[str, str]) -> None:
     """A contract nothing runs is a comment.
 
-    The assertion is on the command rather than on a step named
-    "Workflow contracts": a step can be renamed, and a step whose `run:`
-    was changed to something else would keep the name and stop asserting
-    anything. It is also unguarded, so there is no `if:` that could
-    leave it as dead code.
+    Three things are asserted, and each closes a way the invocation can
+    be present and inert.
+
+    The **command** is matched, not the step's name and not a substring
+    of the block. A step keeps its name when its `run:` changes, and
+    `echo make workflow-contracts` contains the command without running
+    it, so the match is against a command line of the block.
+
+    The **guards** are read on the job as well as on the step. A step
+    with no `if:` inside a job carrying `if: false` never runs, and a
+    contract reading only the step would call that unguarded.
+
+    The **second invocation** is asserted in the Makefile. This step is
+    the only place in `ci.yml` that names the target, so a pull request
+    deleting the step stops the contracts running and nothing fails.
+    `lint` therefore takes `workflow-contracts` as a prerequisite, and
+    `ci.yml` runs `make lint` as a step of its own: deleting either
+    invocation leaves the other.
     """
     document = parse_workflow("ci.yml", workflow_texts["ci.yml"])
-    steps = [
-        of_type(step, dict)
-        for job in of_type(document.get("jobs"), dict).values()
-        for step in of_type(of_type(job, dict).get("steps"), list)
-    ]
-    running = [step for step in steps if CONTRACT_COMMAND in str(step.get("run", ""))]
+    running = _steps_running(document, CONTRACT_COMMAND)
 
     assert len(running) == 1, (
-        f"exactly one step in ci.yml must run {CONTRACT_COMMAND!r}; "
-        f"{len(running)} do"
+        f"exactly one step in ci.yml must run {CONTRACT_COMMAND!r} as a "
+        f"command; {len(running)} do"
     )
-    assert "if" not in running[0], (
+    found = running[0]
+    assert "if" not in found.step, (
         f"the step running {CONTRACT_COMMAND!r} is guarded by "
-        f"{running[0]['if']!r}, so it can be skipped without failing anything"
+        f"{found.step['if']!r}, so it can be skipped without failing anything"
+    )
+    assert "if" not in found.job, (
+        f"job {found.job_name!r} runs {CONTRACT_COMMAND!r} but is guarded by "
+        f"{found.job['if']!r}, so the step is dead code whenever that is false"
+    )
+
+    lint_steps = _steps_running(document, LINT_COMMAND)
+    assert lint_steps, f"ci.yml must run {LINT_COMMAND!r} as a command"
+    assert all(
+        "if" not in step.step and "if" not in step.job for step in lint_steps
+    ), f"every step running {LINT_COMMAND!r} must be unguarded"
+
+    recipe = _make_target_line("lint")
+    assert CONTRACT_TARGET in recipe.split(":", 1)[1].split("#", 1)[0].split(), (
+        f"the Makefile's lint target must take {CONTRACT_TARGET!r} as a "
+        f"prerequisite, so deleting the CI step does not stop the contracts "
+        f"running; its declaration reads {recipe!r}"
     )
 
 

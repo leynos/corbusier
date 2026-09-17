@@ -351,9 +351,30 @@ make workflow-contracts
 ```
 
 CI runs the same target, as an unguarded step in `ci.yml`, and one of the
-contracts asserts that: a contract nothing runs is a comment. The
+contracts asserts that: a contract nothing runs is a comment. That
 assertion names the command rather than the step's name, because a step
-keeps its name when its `run:` changes.
+keeps its name when its `run:` changes; it matches a command line of the
+`run:` block rather than a substring of it, because `echo make
+workflow-contracts` contains the command and runs nothing; and it reads
+the `if:` on the owning job as well as on the step, because a step with
+no guard inside a job carrying one is dead code whenever that guard is
+false.
+
+The contracts are invoked twice, and that is deliberate. A single
+invocation is a single thing to delete, and the pull request that
+deleted it would be the one the contracts existed to read. `lint`
+therefore takes `workflow-contracts` as a prerequisite, and `ci.yml`
+runs `make lint` as a step of its own, so deleting either invocation
+leaves the other. The Makefile prerequisite is itself asserted.
+
+References to `leynos/shared-actions` are matched with the owner and
+repository name folded to lower case, because GitHub resolves both
+case-insensitively. Matched exactly, `Leynos/shared-actions/...@main`
+is not a reference at all: none of the three pin rules would see it,
+the assertions would stay green on the lowercase references beside it,
+and a mutable ref would reach every Rust job. The path within the
+repository is left as written, since only the owner and repository name
+are case-insensitive.
 
 ### One commit, and not a wrapper-less one
 

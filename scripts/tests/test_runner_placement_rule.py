@@ -19,15 +19,11 @@ reading of the value will find the broken form.
 
 from __future__ import annotations
 
-import sys
 import typing as typ
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from workflow_placement import (  # noqa: E402
+from workflow_placement import (
     line_break_fault,
     runs_on_declarations,
 )

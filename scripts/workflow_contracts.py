@@ -31,6 +31,14 @@ import yaml
 #: enumeration goes stale the moment a workflow adopts a new action from
 #: the same repository, and the reference it misses is exactly the one
 #: nobody thought to add.
+#:
+#: The comparison folds case. GitHub resolves an owner and a repository
+#: name case-insensitively, so `Leynos/shared-actions/...@main` is the
+#: same reference as the lowercase spelling and resolves to the same
+#: action. Matched case-sensitively it is not a reference at all: the
+#: three pin rules never see it, and the assertions still pass on the
+#: lowercase references beside it. A mutable ref reaches every Rust job
+#: and nothing says so.
 SHARED_ACTIONS_PREFIX: typ.Final[str] = "leynos/shared-actions/"
 
 #: Pins of the shared-actions repository whose `setup-rust` installs
@@ -210,6 +218,30 @@ def _uses_values(job: dict[str, object]) -> list[object]:
     return [job.get("uses"), *(of_type(step, dict).get("uses") for step in steps)]
 
 
+def _names_shared_actions(value: str) -> bool:
+    """Return whether a `uses:` value names the shared-actions repository.
+
+    Only the owner and repository name are folded, because only those are
+    case-insensitive to GitHub. The path within the repository is left as
+    written, so a miscased action path is still a different reference.
+
+    Parameters
+    ----------
+    value : str
+        A `uses:` value.
+
+    Returns
+    -------
+    bool
+        True when the value's owner and repository name are this one.
+    """
+    owner, _, rest = value.partition("/")
+    repository, separator, _ = rest.partition("/")
+    if not separator:
+        return False
+    return f"{owner.lower()}/{repository.lower()}/" == SHARED_ACTIONS_PREFIX
+
+
 def _reference(workflow: str, value: object) -> SharedActionsReference | None:
     """Return the shared-actions reference `value` names, if it names one.
 
@@ -225,7 +257,7 @@ def _reference(workflow: str, value: object) -> SharedActionsReference | None:
     SharedActionsReference or None
         The reference, or None when the value names something else.
     """
-    if not isinstance(value, str) or not value.startswith(SHARED_ACTIONS_PREFIX):
+    if not isinstance(value, str) or not _names_shared_actions(value):
         return None
     path, _, ref = value.partition("@")
     return SharedActionsReference(workflow, path, ref)

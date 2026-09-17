@@ -44,19 +44,25 @@ class RunsOn(typ.NamedTuple):
     raw: str
 
 
-def _node_at(node: object, path: tuple[str, ...]) -> typ.Any | None:
+def _node_at(node: yaml.Node | None, path: tuple[str, ...]) -> yaml.Node | None:
     """Return the composed node at `path`, or None when it is absent.
+
+    Typed as `yaml.Node` rather than `typ.Any` throughout. The caller
+    reads `start_mark` and `end_mark` off the result, and `typ.Any`
+    turns that read into an unchecked attribute access: a walk that
+    returned a plain parsed value instead of a node would type-check and
+    fail at runtime.
 
     Parameters
     ----------
-    node : object
+    node : yaml.Node or None
         The node to walk from.
     path : tuple[str, ...]
         Mapping keys, outermost first.
 
     Returns
     -------
-    typ.Any or None
+    yaml.Node or None
         The node, or None when any key along the way is missing.
     """
     for key in path:
@@ -97,17 +103,20 @@ def _raw_runs_on(text: str, job: str) -> str:
     return text[node.start_mark.index : node.end_mark.index]
 
 
-def _node_pairs(node: object) -> list[tuple[str, typ.Any]]:
+def _node_pairs(node: yaml.Node | None) -> list[tuple[str, yaml.Node]]:
     """Return a mapping node's key and value nodes, keys as strings.
+
+    The values are nodes, not the values they represent, because the
+    walk that consumes them needs their source marks.
 
     Parameters
     ----------
-    node : object
-        A composed node, or anything else.
+    node : yaml.Node or None
+        A composed node, or None.
 
     Returns
     -------
-    list[tuple[str, typ.Any]]
+    list[tuple[str, yaml.Node]]
         One pair per entry, empty when the node is not a mapping.
     """
     if not isinstance(node, yaml.MappingNode):
