@@ -4,7 +4,8 @@ use super::validation_fixtures::{clock, default_validator};
 use crate::message::{
     domain::{
         AgentResponseAudit, AgentResponseStatus, ContentPart, ConversationId, Message,
-        MessageMetadata, Role, SequenceNumber, TextPart, ToolCallAudit, ToolCallStatus,
+        MessageBuilderError, MessageMetadata, Role, SequenceNumber, TextPart, ToolCallAudit,
+        ToolCallStatus,
     },
     error::ValidationError,
     ports::validator::MessageValidator,
@@ -12,7 +13,16 @@ use crate::message::{
 use mockable::DefaultClock;
 use rstest::rstest;
 
-fn build_message_with_metadata(clock: &DefaultClock, metadata: MessageMetadata) -> Message {
+/// Builds the message each case validates, propagating a builder failure.
+///
+/// A helper arranges state, and arrangement can fail, so it returns the
+/// error rather than ending the process on it. Only a test body may decide
+/// that a failure is the verdict, which is why the `.expect` moved to the
+/// four call sites.
+fn build_message_with_metadata(
+    clock: &DefaultClock,
+    metadata: MessageMetadata,
+) -> Result<Message, MessageBuilderError> {
     Message::builder(
         ConversationId::new(),
         Role::Assistant,
@@ -21,7 +31,6 @@ fn build_message_with_metadata(clock: &DefaultClock, metadata: MessageMetadata) 
     .with_content(ContentPart::Text(TextPart::new("Audit test")))
     .with_metadata(metadata)
     .build(clock)
-    .expect("test message should build")
 }
 
 fn assert_invalid_metadata(result: Result<(), ValidationError>, expected_fragment: &str) {
@@ -66,7 +75,8 @@ fn validate_metadata_accepts_audit_records(
             AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id("resp-1"),
         );
 
-    let message = build_message_with_metadata(&clock, metadata);
+    let message =
+        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
 
     assert!(default_validator.validate_structure(&message).is_ok());
 }
@@ -82,7 +92,8 @@ fn validate_metadata_rejects_empty_tool_call_id(
         ToolCallStatus::Queued,
     ));
 
-    let message = build_message_with_metadata(&clock, metadata);
+    let message =
+        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "call_id");
@@ -99,7 +110,8 @@ fn validate_metadata_rejects_empty_tool_name(
         ToolCallStatus::Queued,
     ));
 
-    let message = build_message_with_metadata(&clock, metadata);
+    let message =
+        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "tool_name");
@@ -114,7 +126,8 @@ fn validate_metadata_rejects_empty_response_id(
         AgentResponseAudit::new(AgentResponseStatus::Completed).with_response_id(""),
     );
 
-    let message = build_message_with_metadata(&clock, metadata);
+    let message =
+        build_message_with_metadata(&clock, metadata).expect("the fixture message builds");
     let result = default_validator.validate_structure(&message);
 
     assert_invalid_metadata(result, "response_id");
