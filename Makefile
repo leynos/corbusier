@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint markdown-baseline-contract spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -29,6 +29,7 @@ NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
 SPELLING_PYTEST ?= uv run --python 3.13 --with pytest==9.0.2 --with pytest-cov==7.0.0 python -m pytest
+BASELINE_PYTEST ?= uv run --no-project --python 3.13 --with pytest==9.0.2 --with pyyaml==6.0.3 python -m pytest
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
@@ -63,7 +64,7 @@ fmt: ## Format Rust and Markdown sources
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
 
-markdownlint: ## Lint Markdown files
+markdownlint: markdown-baseline-contract ## Lint Markdown files
 	$(MDLINT) '**/*.md'
 	+$(MAKE) spelling
 
@@ -76,6 +77,9 @@ spelling-helper-test: ## Validate the shared spelling-policy integration
 	@PYTHONPATH=scripts $(SPELLING_PYTEST) scripts/tests/test_typos_rollout.py \
 		--cov=generate_typos_config --cov=typos_rollout \
 		--cov=typos_rollout_cache --cov-fail-under=90
+
+markdown-baseline-contract: ## Check the Markdown baseline config and CI wiring
+	@$(BASELINE_PYTEST) scripts/tests/test_markdown_baseline_contract.py
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
