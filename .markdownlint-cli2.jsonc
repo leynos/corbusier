@@ -10,5 +10,19 @@
     },
     "MD029": { "style": "ordered" }
   },
-  "ignores": ["**/.venv/**", ".node_modules/**", "**/node_modules/**", "**/target/**"]
+  // The canonical ignore set (concordat #168, the Markdown formatting
+  // baseline). Every repository carries the same list so that a document
+  // moved between them keeps the same lint status, and so that CI's globs
+  // need no negations of their own.
+  "ignores": [
+    "**/.venv/**",
+    ".vtcode/**",
+    ".node_modules/**",
+    "**/node_modules/**",
+    "**/target/**",
+    ".terraform/**",
+    ".uv-cache/**",
+    "memories/**",
+    "CRUSH.md"
+  ]
 }

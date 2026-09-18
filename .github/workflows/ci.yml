@@ -40,12 +40,15 @@ jobs:
       - name: Format
         run: make check-fmt
       - name: Markdown lint
-        uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e
+        # v24.2.0, as a commit rather than the annotated tag object: a tag
+        # object's SHA is immutable but is not a commit, which PD-006 asks
+        # for. The previous pin, 992badcd, is v20.0.0.
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff
         with:
-          globs: |
-            **/*.md
-            !**/target/**
-            !**/dist/**
+          # One glob, no negations: the exclusions belong in
+          # .markdownlint-cli2.jsonc so that CI and `make markdownlint` lint
+          # the same set. A negation here is invisible to the local gate.
+          globs: '**/*.md'
       # Dependency audits report advisories against the whole lockfile, so a
       # newly published advisory would fail every Dependabot PR regardless of
       # content and deadlock auto-merge. The scheduled audit workflow covers
