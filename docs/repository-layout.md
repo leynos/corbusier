@@ -67,6 +67,11 @@ points sit beside step modules, fixtures, in-memory adapters, PostgreSQL
 support, and shared test helpers so that test ownership remains visible at the
 feature boundary.
 
+`tests/workflow_contracts/` is the exception: it holds pytest modules that
+assert what the files under `.github/workflows/` must say, and Cargo does not
+build it. `make test-workflow-contracts` runs them; see the developers' guide,
+"Coverage publication and CodeScene".
+
 ## Documentation layout
 
 Long-lived documentation belongs in `docs/`. Use
