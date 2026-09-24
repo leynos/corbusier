@@ -1,13 +1,15 @@
 name: Coverage (main)
 
 # CodeScene accepts `cs-coverage upload` only for analysed branches, so
-# main-branch coverage is uploaded here on push; the `mode: check`
-# changed-line gate lives in ci.yml's pull-request coverage job and
-# runs against project 76629 now that CodeScene has enabled its
-# coverage-gates configuration. This workflow also advances the
-# coverage ratchet baseline: caches saved on main are readable by every
-# pull-request run, so the baseline written here is the one PR ratchet
-# checks compare against.
+# main-branch coverage is uploaded here on push. This workflow also
+# advances the coverage ratchet baseline: caches saved on main are
+# readable by every pull-request run, so the baseline written here is the
+# one pull-request ratchet checks compare against.
+#
+# This is the only workflow in the repository that may touch CodeScene. It
+# is not a pull-request lane, so a CodeScene CLI or service change cannot
+# block a merge here; it can only delay a coverage upload. The contracts in
+# tests/workflow_contracts hold both halves of that rule.
 #
 # `workflow_dispatch` lets the upload be re-run on demand: merges
 # performed by the automerge workflow's GITHUB_TOKEN do not fire
@@ -19,6 +21,16 @@ name: Coverage (main)
     branches: [main]
   workflow_dispatch:
 
+# One publisher run at a time for a ref, and never cancelled. GitHub keeps
+# a single pending run per group, so a newer trigger replaces an older
+# pending run, and a cancelled run would abandon both its upload and its
+# baseline write. The group is keyed on the ref alone: a group that also
+# varied by event would let a dispatch and a push to main run side by side
+# and race on the baseline.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   coverage-upload:
     runs-on: ubuntu-latest
@@ -29,8 +41,6 @@ jobs:
       BUILD_PROFILE: debug
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
-      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN || '' }}
-      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 || '' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Setup Rust
@@ -69,15 +79,31 @@ jobs:
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         with:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+      # Reports whether the token is configured without binding it anywhere:
+      # the expression is evaluated before the shell runs, so this step
+      # writes `available=true` or `available=false` and the token is in no
+      # `env`. The uploader is a composite action that hands its step's `env`
+      # to nested steps, so the token goes to it as an input instead.
+      - name: Check for the CodeScene token
+        id: codescene-token
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
       - name: Upload coverage data to CodeScene
-        if: env.CS_ACCESS_TOKEN
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        # The ref test is what keeps `workflow_dispatch` honest: a dispatch
+        # can name any branch, and CodeScene would accept that branch's
+        # coverage as main's.
+        if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
+        # a5765019 is the floor: from it the uploader selects the CodeScene
+        # CLI from a committed manifest and refuses `installer-checksum`.
+        # Earlier revisions install "latest", which no longer resolves.
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         with:
           format: lcov
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ env.CODESCENE_CLI_SHA256 }}
+          # Stated rather than left to the action's default: this being the
+          # upload and not the pull-request check is the point of the split.
+          mode: upload
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
