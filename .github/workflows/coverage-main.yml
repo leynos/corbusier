@@ -42,9 +42,9 @@ jobs:
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@074f7d8ba75a6e5d18532b72cbe38fccbda4e9c6
+        uses: leynos/shared-actions/.github/actions/setup-rust@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
       - name: Refresh apt package index
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -56,13 +56,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
       - name: Cache pg_worker binary
         id: cache-pg-worker
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cargo/bin/pg_worker
           key: pg-worker-0.4.0-${{ runner.os }}
       - name: Cache PostgreSQL binaries
         id: cache-pg-binaries
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             ~/.cache/postgresql_embedded
@@ -79,7 +79,7 @@ jobs:
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/generate-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           output-path: lcov.info
           format: lcov
@@ -100,7 +100,7 @@ jobs:
         # a5765019 is the floor: from it the uploader selects the CodeScene
         # CLI from a committed manifest and refuses `installer-checksum`.
         # Earlier revisions install "latest", which no longer resolves.
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           format: lcov
           # Stated rather than left to the action's default: this being the
