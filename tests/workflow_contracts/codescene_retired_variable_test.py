@@ -8,13 +8,8 @@ this one reads every workflow, not the pull-request closure.
 from __future__ import annotations
 
 import typing as typ
-from pathlib import Path
 
-from workflow_loader import read_workflows
-
-WORKFLOW_DIR: typ.Final = (
-    Path(__file__).resolve().parents[2] / ".github" / "workflows"
-)
+from workflow_loader import WORKFLOW_DIR, repository_workflows
 
 #: The repository variable that fed the uploader's old ``installer-checksum``
 #: input. Nothing may read or refresh it: the uploader takes its digest from a
@@ -40,7 +35,7 @@ def test_nothing_reads_or_refreshes_the_retired_variable() -> None:
     """
     offenders = sorted(
         name
-        for name, document in read_workflows(WORKFLOW_DIR).items()
+        for name, document in repository_workflows().items()
         if RETIRED_VARIABLE in str(document)
     )
     assert not offenders, (

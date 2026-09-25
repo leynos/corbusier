@@ -5,11 +5,12 @@ operational rather than stylistic. The CodeScene command-line tool is
 installed from a URL at job time. The archive itself is pinned, since the
 shared action picks it from a committed manifest and verifies its digest; what
 is not pinned is what that archive talks to. The tool calls CodeScene's API and
-refuses to run when the answer changes shape, which has happened twice: its
-output format moved, and more recently projects stopped returning a gates
-configuration at all. Either way a pull-request lane goes red for a reason no
-change in the repository could have caused. On 2026-09-16 one such move
-reddened every branch in several repositories at once.
+refuses to run when the answer changes shape, which has happened twice. On
+2026-09-16 its output format moved and reddened every branch in several
+repositories at once; on 2026-09-21 projects stopped returning a gates
+configuration at all, which is what failed this repository's check. Either
+way a pull-request lane goes red for a reason no change in the repository
+could have caused.
 
 So a pull-request lane may generate coverage, because the ratchet is
 repository-owned and runs offline, but it may not talk to CodeScene. The

@@ -21,9 +21,9 @@ Recorded on 2026-09-17.
 
 Table 1: advisory covered by this exception.
 
-A peer that holds an open HTTP/2 connection can send an unbounded stream of
-empty DATA frames. The frames consume server processing time without advancing
-flow control, so a single connection can occupy server resources indefinitely.
+An HTTP/2 peer can send empty `DATA` frames that `h2` accepts and queues
+without limit when streams are not actively drained. This can cause unbounded
+memory use or a panic if the length overflows.
 
 ## Why the advisory cannot be fixed
 

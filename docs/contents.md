@@ -63,7 +63,7 @@ the first stop when choosing which document to read or update.
   describes maintainability risks and refactoring responses.
 - [Dependency policy exception: Actix v2a](dependency-policy-exception-actix-v2a.md)
   records the documented dependency-policy exception.
-- [Dependency policy exception: h2 empty DATA frames](dependency-policy-exception-h2-empty-data-frames.md)
+- [h2 advisory exception](dependency-policy-exception-h2-empty-data-frames.md)
   records the audited suppression of RUSTSEC-2026-0258.
 - [Ortho config users' guide](ortho-config-users-guide.md) documents Ortho
   configuration usage.

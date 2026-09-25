@@ -79,7 +79,7 @@ spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 	$(TYPOS_CONFIG_BUILDER) gate --repository .
 
 test-workflow-contracts: ## Assert what the workflow files must say
-	$(WORKFLOW_PYTEST) tests/workflow_contracts -q
+	$(WORKFLOW_PYTEST) --doctest-modules tests/workflow_contracts -q
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
