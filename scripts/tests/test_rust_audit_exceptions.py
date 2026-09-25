@@ -86,6 +86,26 @@ def test_an_undated_exception_is_refused() -> None:
         faults(undated, TODAY)
 
 
+@pytest.mark.parametrize(
+    "date",
+    [
+        pytest.param("2026-13-45", id="no-such-month"),
+        pytest.param("2026-02-30", id="no-such-day"),
+    ],
+)
+def test_an_out_of_range_expiry_is_a_fault(date: str) -> None:
+    """A date the pattern accepts but the calendar does not is refused.
+
+    It must surface as the rule's own fault naming the value, not as a
+    `ValueError` traceback from the date parser, which `main` does not
+    catch.
+    """
+    malformed = GOOD.replace("2026-12-17", date)
+
+    with pytest.raises(AuditExceptionError, match=r"not a calendar date"):
+        faults(malformed, TODAY)
+
+
 def test_an_unjustified_exception_is_refused() -> None:
     """A date without a reason says when to look again and not what at."""
     unjustified = GOOD.replace(
