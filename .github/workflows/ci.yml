@@ -21,7 +21,7 @@ jobs:
       # release on that path.
       WHITAKER_INSTALLER_VERSION: '0.2.8'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - name: Setup Bun
@@ -29,7 +29,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@074f7d8ba75a6e5d18532b72cbe38fccbda4e9c6
+        uses: leynos/shared-actions/.github/actions/setup-rust@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
       - name: Install frontend dependencies and browser
         run: FRONTEND_INSTALL_FLAGS=--frozen-lockfile make frontend-install
       - name: Refresh apt package index
@@ -48,7 +48,7 @@ jobs:
       - name: Workflow contracts
         run: make test-workflow-contracts
       - name: Markdown lint
-        uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff
         with:
           globs: |
             **/*.md
@@ -79,7 +79,7 @@ jobs:
       - name: Frontend e2e
         run: make frontend-e2e
       - name: Cache Whitaker installer
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             ~/.cargo/bin/whitaker-installer
@@ -101,13 +101,13 @@ jobs:
         run: make lint
       - name: Cache pg_worker binary
         id: cache-pg-worker
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cargo/bin/pg_worker
           key: pg-worker-0.4.0-${{ runner.os }}
       - name: Cache PostgreSQL binaries
         id: cache-pg-binaries
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             ~/.cache/postgresql_embedded
@@ -129,7 +129,7 @@ jobs:
       # token, the uploader and the CodeScene host anywhere a pull request
       # can reach.
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/generate-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           output-path: lcov.info
           format: lcov
