@@ -18,6 +18,7 @@ and the exit status is the worse of the two.
 
 from __future__ import annotations
 
+import os
 import subprocess  # noqa: S404 - the commands are fixed, not caller-supplied
 import typing as typ
 
@@ -95,10 +96,15 @@ def main(halves: list[Half] | None = None) -> int:
     return summarize(results)
 
 
+#: The make executable that invoked this runner. The `audit` recipe passes
+#: `$(MAKE)` in, so a wrapper or an alternate make such as `gmake` runs the
+#: halves too; run by hand, it falls back to `make`.
+MAKE: typ.Final[str] = os.environ.get("MAKE") or "make"
+
 #: The two halves, in the order they run.
 HALVES: typ.Final[list[Half]] = [
-    Half("frontend (bun audit)", ["make", "audit-node"]),
-    Half("Rust (cargo audit)", ["make", "rust-audit"]),
+    Half("frontend (bun audit)", [MAKE, "audit-node"]),
+    Half("Rust (cargo audit)", [MAKE, "rust-audit"]),
 ]
 
 

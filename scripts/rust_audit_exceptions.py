@@ -93,6 +93,33 @@ def parse_blocks(text: str) -> list[Exception_]:
     return blocks
 
 
+def _parse_expiry(raw: str, advisory: str) -> dt.date:
+    """Return the date an `expires-at` line names.
+
+    The line's pattern accepts any three digit groups, so `2026-13-45`
+    reaches here. It is refused as a fault naming the line to change rather
+    than escaping as a bare `ValueError` that `main` does not catch.
+
+    Raises
+    ------
+    AuditExceptionError
+        If the digits do not form a calendar date.
+
+    Examples
+    --------
+    >>> _parse_expiry("2026-12-17", "RUSTSEC-2026-0258")
+    datetime.date(2026, 12, 17)
+    """
+    try:
+        return dt.date.fromisoformat(raw)
+    except ValueError as error:
+        message = (
+            f"the exception for {advisory} names `{raw}`, which is not a "
+            f"calendar date; write the expiry as YYYY-MM-DD"
+        )
+        raise AuditExceptionError(message) from error
+
+
 def _read_expiry(lines: list[str], start: int, advisory: str) -> dt.date:
     """Return the expiry date following an advisory line.
 
@@ -113,12 +140,13 @@ def _read_expiry(lines: list[str], start: int, advisory: str) -> dt.date:
     Raises
     ------
     AuditExceptionError
-        If the next non-blank comment line is not an expiry.
+        If the next non-blank comment line is not an expiry, or names a
+        date that is not on the calendar.
     """
     for line in lines[start:]:
         found = _EXPIRES.match(line)
         if found is not None:
-            return dt.date.fromisoformat(found.group("date"))
+            return _parse_expiry(found.group("date"), advisory)
         if _ADVISORY.match(line) or not line.startswith("#"):
             break
     message = (

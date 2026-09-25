@@ -135,7 +135,7 @@ frontend-e2e: ## Run frontend browser-path tests
 # failure stopped the target, so 24 frontend advisories masked
 # RUSTSEC-2026-0258 for weeks. One failure must not hide another.
 audit: ## Audit frontend and Rust dependencies, reporting both
-	uv run scripts/run_audits.py
+	MAKE="$(MAKE)" uv run scripts/run_audits.py
 
 audit-node: ## Audit frontend dependencies for known vulnerabilities
 	cd $(FRONTEND_DIR) && $(BUN) run audit
