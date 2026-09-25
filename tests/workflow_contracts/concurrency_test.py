@@ -41,6 +41,8 @@ from workflow_loader import WORKFLOW_DIR, WORKFLOW_SUFFIXES, load_workflow
 if typ.TYPE_CHECKING:
     from pathlib import Path
 
+    from workflow_loader import Document
+
 #: The exact `cancel-in-progress` expression every pull-request workflow
 #: carries. Comparing against one string rather than searching for a substring
 #: is what makes the literal `true` mutation fail: `true` is a YAML boolean and
@@ -69,7 +71,7 @@ KNOWN_PULL_REQUEST_WORKFLOWS: frozenset[str] = frozenset(
 )
 
 
-def _load(path: Path) -> dict[str, object]:
+def _load(path: Path) -> Document:
     """Read and parse one workflow file.
 
     Parameters
@@ -79,8 +81,9 @@ def _load(path: Path) -> dict[str, object]:
 
     Returns
     -------
-    dict
-        The parsed workflow document.
+    Document
+        The parsed workflow document. Keys are what the loader yields, so an
+        unquoted `on:` arrives as the boolean ``True``.
 
     Raises
     ------
@@ -114,7 +117,7 @@ def _workflow_paths() -> list[Path]:
     )
 
 
-def _trigger_names(document: dict[str, object]) -> frozenset[str] | None:
+def _trigger_names(document: Document) -> frozenset[str] | None:
     """Return the event names a workflow declares under `on:`.
 
     GitHub accepts three shapes: a mapping of event to configuration, a list
@@ -168,7 +171,7 @@ def _pull_request_workflows() -> list[Path]:
     ]
 
 
-def _concurrency(path: Path) -> dict[str, object]:
+def _concurrency(path: Path) -> dict[object, object]:
     """Return a workflow's top-level concurrency mapping.
 
     Parameters
