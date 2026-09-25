@@ -15,7 +15,11 @@ jobs:
       BUILD_PROFILE: debug
       PG_EMBEDDED_WORKER: /home/runner/.cargo/bin/pg_worker
       OPENSSL_NO_VENDOR: "1"
-      WHITAKER_INSTALLER_VERSION: '0.2.6'
+      # 0.2.7 is the floor: from that release the installer takes the
+      # prebuilt dylint-link path instead of building it from source,
+      # which is what the estate standardised on. 0.2.8 is the current
+      # release on that path.
+      WHITAKER_INSTALLER_VERSION: '0.2.8'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -39,6 +43,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
       - name: Format
         run: make check-fmt
+      # The workflow contracts read `.github/workflows` and need no Rust
+      # toolchain, so they run before anything is compiled and fail fast.
+      - name: Workflow contracts
+        run: make test-workflow-contracts
       - name: Markdown lint
         uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e
         with:
@@ -115,20 +123,17 @@ jobs:
           if [ ! -f ~/.cargo/bin/pg_worker ]; then
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
+      # The pull-request lane measures coverage for the ratchet alone and
+      # never talks to CodeScene: coverage-main.yml uploads on push to main,
+      # and the workflow contracts under tests/workflow_contracts refuse the
+      # token, the uploader and the CodeScene host anywhere a pull request
+      # can reach.
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         with:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
-      - name: Check coverage against CodeScene gates
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@18bed1ca49a6de3d8882bd72635a32ae3f023d57
-        with:
-          format: lcov
-          mode: check
-          project-url: https://api.codescene.io/v2/projects/76629
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}
+          # The ratchet reads this report and nothing else does, so it is
+          # not published as an artefact.
+          publish-artefact: 'false'

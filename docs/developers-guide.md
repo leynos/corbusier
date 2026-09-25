@@ -48,10 +48,10 @@ make lint
 make test
 ```
 
-`make check-fmt` validates Rust formatting, `make lint` runs documentation
-generation, Clippy, Whitaker, and the spelling policy with warnings denied, and
-`make test` runs the workspace test suite through nextest. Documentation
-changes should also run:
+`make check-fmt` validates Rust formatting, `make lint` runs the workflow
+contracts, documentation generation, Clippy, Whitaker, and the spelling policy
+with warnings denied, and `make test` runs the workspace test suite through
+nextest. Documentation changes should also run:
 
 ```sh
 make markdownlint
@@ -235,17 +235,15 @@ npm install --global markdownlint-cli2
 
 ### Spelling policy
 
-The lint and Markdown gates run `typos` 1.48.0 with British English and Oxford
-`-ize` conventions. Before checking maintained Markdown, the generator
-refreshes the shared estate dictionary into an untracked local cache only when
-the authority is newer, then merges `typos.local.toml`. The generated
-`typos.toml` is reviewed and committed so a clean, network-restricted checkout
-can still enforce the last known-good policy.
+The lint and Markdown gates enforce British English in the Oxford `-ize` style
+through `typos-config-builder gate`. Run it on its own with `make spelling`.
+Every run regenerates `typos.toml` from the live shared dictionary and the
+repository overlay, then checks the maintained Markdown, so the generated file
+is never drift-checked in continuous integration.
 
 Add repository-only proper names or quoted upstream terms to
-`typos.local.toml`; never edit generated entries in `typos.toml` by hand. The
-spelling gate also runs the helper's Python 3.13 tests with at least 90% line
-coverage.
+`typos.local.toml`, which holds the en-GB-oxendict overlay; never edit
+generated entries in `typos.toml` by hand.
 
 ### `TaskGatewayProvider` and `useTaskGateway`
 
@@ -312,3 +310,106 @@ cargo binstall cargo-audit
 
 `cargo-audit` is installed automatically in CI via the workflow at
 `.github/workflows/ci.yml`.
+
+Neither half of the gate may be silenced casually. An advisory with no
+reachable fixed release is suppressed only through the mechanism for its
+ecosystem, and only alongside a document that records the rationale, the
+exposure, and the trigger for re-review:
+
+- Node.js advisories are suppressed by an entry in
+  `frontend-pwa/security/audit-exceptions.json`, which requires an expiry date
+  and is enforced by `frontend-pwa/scripts/run-audit.mjs`.
+- Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`,
+  paired with a dependency-policy exception document under `docs/`. See
+  [Dependency policy exception: h2 empty DATA frames](dependency-policy-exception-h2-empty-data-frames.md)
+  for the current example.
+
+## Coverage publication and CodeScene
+
+CodeScene belongs to one workflow, `.github/workflows/coverage-main.yml`, which
+runs on a push to `main` and on `workflow_dispatch`. No pull-request lane talks
+to CodeScene. The command-line tool calls CodeScene's API at job time, and that
+API has changed shape without notice: on 2026-09-21 the service stopped
+returning a gates configuration, and every pull-request lane that ran
+`cs-coverage check` went red for a reason no change here could have caused. On
+a push lane the same failure delays a coverage upload instead of blocking a
+merge.
+
+The pull-request lane in `ci.yml` still measures coverage. Its
+`generate-coverage` step sets `with-ratchet: 'true'`, so a drop below the
+baseline fails the pull request, and `publish-artefact: 'false'`, because
+nothing reads the report as an artefact. The publisher writes the ratchet
+baseline on each push to `main`, and pull requests compare against it.
+
+The publisher's shape is load-bearing in four places:
+
+- A step with the id `codescene-token` runs exactly
+  `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
+  with no `if:` and no `env`. The expression is evaluated before the shell
+  runs, so the token enters no process and no `env`. The uploader is a
+  composite action that hands its step's `env` to nested steps, so the upload
+  receives the token only as its `access-token` input.
+- The upload runs only when
+  `steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'`.
+  A dispatch can name any branch, and the uploader checks neither ref nor
+  event, so the ref test is what stops a feature branch's coverage being
+  published as `main`'s.
+- The concurrency group is `coverage-main-${{ github.ref }}` with
+  `cancel-in-progress: false`. Runs never overlap, and a newer trigger replaces
+  an older pending run; no commit order is promised, since GitHub does not
+  promise to start runs in trigger order. A manual re-run keeps its run id, so
+  it republishes that commit's coverage but replaces no baseline saved under a
+  run-keyed cache key. A dispatch that replaces a pending push uploads the same
+  or a newer commit, but `generate-coverage` saves the ratchet baseline only on
+  a push, so the baseline then stays one commit behind until the next push.
+- Merges made by the Dependabot automerge workflow use `GITHUB_TOKEN`, which
+  fires no push event, so the publisher does not run for them. This is a known
+  exception: dispatch the publisher by hand when such a merge needs fresh
+  coverage.
+
+The shared-actions pins for `generate-coverage` and `upload-codescene-coverage`
+must descend from `a5765019`. From that revision the uploader installs the
+CodeScene CLI from a committed manifest and refuses the retired
+`installer-checksum` input; earlier revisions install `latest`, which no longer
+resolves. The `CODESCENE_CLI_SHA256` repository variable fed only that input
+and is not read anywhere.
+
+### Workflow contracts
+
+`make test-workflow-contracts` runs the pytest modules under
+`tests/workflow_contracts/`, which assert the rule above against the workflow
+files. They run as their own CI step before anything compiles, and as a
+prerequisite of `make lint`, so deleting the step does not stop them running.
+
+- `workflow_loader.py` is the only parser. It refuses a mapping that declares a
+  key twice, because PyYAML otherwise keeps the last value silently, and it
+  reads `.yml` and `.yaml` in any case.
+- `workflow_calls.py` decides which `uses:` values run a checked-out workflow:
+  a leading `./` or `$/` is stripped and the rest must name a file directly
+  under `.github/workflows/`. A call to this repository's workflows at an
+  `@ref` runs the file at that ref, which the checkout does not hold, so it is
+  refused rather than followed.
+- `codescene_placement_reader.py` reads triggers as a scalar, a sequence or a
+  mapping, under both the `on` string key and the boolean YAML 1.1 makes of it,
+  and refuses a workflow declaring both. It builds the pull-request closure:
+  every workflow started by a pull-request event (`pull_request`,
+  `pull_request_target`, `merge_group`, `workflow_run`, the review events and
+  `issue_comment`) plus every local workflow those call, transitively. A
+  `workflow_call`-only workflow called with `secrets: inherit` runs on the pull
+  request with the token.
+- `ci_codescene_placement_test.py` refuses, anywhere in the closure, a
+  CodeScene action, a `cs-coverage` command, the token by any reference, the
+  `codescene.io` host in any scalar (a workflow-level `defaults.run.shell`
+  included), `secrets: inherit` into another repository, and a call to this
+  repository by ref. It also requires the pull-request lane to keep its
+  unconditional, ratcheted, unpublished coverage step.
+- `codescene_publisher_test.py` requires the publisher's triggers, its `main`
+  push filter, `mode: upload`, the token check and upload condition compared
+  whole, the token in no `env`, a full-SHA uploader pin with no
+  `installer-checksum`, and the concurrency group compared whole.
+- `codescene_placement_policy.py` holds the reviewed values the tests compare
+  against. Change a value there only with the workflow it describes.
+
+Each reading is proved against constructed trees in the `*_test.py` modules
+beside it. The contracts load no Rust and need only `uv`; the Makefile pins
+pytest and PyYAML and disables bytecode writing.

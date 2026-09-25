@@ -1,0 +1,13 @@
+# `cargo audit` configuration.
+#
+# Every ignored advisory must have a corresponding dependency-policy exception
+# document under `docs/`, and must be re-reviewed when that document's review
+# trigger fires.
+
+[advisories]
+ignore = [
+    # h2 0.3.27 unbounded empty DATA frames. No fixed release is reachable
+    # while the server runs on actix-web 4; see
+    # docs/dependency-policy-exception-h2-empty-data-frames.md.
+    "RUSTSEC-2026-0258",
+]

@@ -69,35 +69,43 @@ fn assert_pr_already_associated_error<T: std::fmt::Debug>(result: Result<T, Task
     }
 }
 
+/// Asserts the lookup returned exactly the task expected.
+///
+/// The slice is destructured rather than measured and then indexed, so the
+/// count and the element come from one pattern and there is no fallible
+/// access to unwrap. A helper is not a test, so it may not decide that a
+/// failure ends the run; here it does not have to.
 fn assert_single_task_found(found: &[Task], expected_id: TaskId) {
-    assert_eq!(found.len(), 1, "expected exactly one task");
-    assert_eq!(
-        found.first().expect("already asserted non-empty").id(),
-        expected_id,
-        "task ID should match"
-    );
+    let [task] = found else {
+        panic!("expected exactly one task, found {}", found.len());
+    };
+    assert_eq!(task.id(), expected_id, "task ID should match");
 }
 
-/// Helper to test that duplicate associations are rejected.
+/// Asserts a second association of the same kind is rejected.
+///
+/// The first association is arrangement, not the thing under test, so its
+/// failure is returned rather than ending the process here; the caller
+/// decides that an arrangement failure is the verdict.
 async fn assert_duplicate_association_rejected<F1, F2, Fut1, Fut2, E>(
     task_id: TaskId,
     first_association: F1,
     duplicate_association: F2,
     assert_error: E,
-) where
+) -> Result<(), TaskLifecycleError>
+where
     F1: FnOnce(TaskId) -> Fut1,
     F2: FnOnce(TaskId) -> Fut2,
     Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     Fut2: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     E: FnOnce(Result<Task, TaskLifecycleError>),
 {
-    first_association(task_id)
-        .await
-        .expect("first association should succeed");
+    first_association(task_id).await?;
 
     let result = duplicate_association(task_id).await;
 
     assert_error(result);
+    Ok(())
 }
 
 // ── Branch association tests ────────────────────────────────────────
@@ -153,7 +161,8 @@ async fn associate_branch_rejects_duplicate_on_same_task(
         },
         assert_branch_already_associated_error,
     )
-    .await;
+    .await
+    .expect("the first association is arrangement and must succeed");
 }
 
 #[rstest]
@@ -259,30 +268,30 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(
         },
         assert_pr_already_associated_error,
     )
-    .await;
+    .await
+    .expect("the first association is arrangement and must succeed");
 }
 
-/// Helper to test that multiple tasks can share the same reference.
+/// Asserts two tasks may share one reference and both come back from it.
+///
+/// The two associations and the lookup are arrangement and query, so their
+/// failures are returned; only the caller may treat one as the verdict.
 async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
     tasks: [Task; 2],
     associate_fn: impl Fn(TaskId) -> Fut1,
     lookup_fn: F,
-) where
+) -> Result<(), TaskLifecycleError>
+where
     F: FnOnce() -> Fut2,
     Fut1: std::future::Future<Output = Result<Task, TaskLifecycleError>>,
     Fut2: std::future::Future<Output = Result<Vec<Task>, TaskLifecycleError>>,
 {
     let [ref first, ref second] = tasks;
 
-    associate_fn(first.id())
-        .await
-        .expect("first task association should succeed");
+    associate_fn(first.id()).await?;
+    associate_fn(second.id()).await?;
 
-    associate_fn(second.id())
-        .await
-        .expect("second task association should succeed");
-
-    let found = lookup_fn().await.expect("lookup should succeed");
+    let found = lookup_fn().await?;
 
     assert_eq!(found.len(), 2, "expected exactly two tasks");
     let ids: Vec<_> = found.iter().map(Task::id).collect();
@@ -291,6 +300,7 @@ async fn assert_multiple_tasks_share_reference<F, Fut1, Fut2>(
         ids.contains(&second.id()),
         "second task should be in results"
     );
+    Ok(())
 }
 
 // ── Many-to-many branch sharing ─────────────────────────────────────
@@ -319,7 +329,8 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: R
         },
         || service.find_by_branch_ref(&ctx, &branch_ref),
     )
-    .await;
+    .await
+    .expect("associating both tasks and looking them up must succeed");
 }
 
 #[rstest]
@@ -348,5 +359,6 @@ async fn multiple_tasks_sharing_pull_request_all_returned(
         },
         || service.find_by_pull_request_ref(&ctx, &pr_ref),
     )
-    .await;
+    .await
+    .expect("associating both tasks and looking them up must succeed");
 }

@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling spelling-helper-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -26,9 +26,15 @@ MDLINT ?= $(shell if [ -n "$$HOME" ] && [ -x "$$HOME/.bun/bin/markdownlint-cli2"
 		printf 'markdownlint-cli2'; \
 	fi)
 NIXIE ?= nixie
-TYPOS_VERSION ?= 1.48.0
-TYPOS := uv tool run typos@$(TYPOS_VERSION)
-SPELLING_PYTEST ?= uv run --python 3.13 --with pytest==9.0.2 --with pytest-cov==7.0.0 python -m pytest
+TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
+TYPOS_CONFIG_BUILDER := uv tool run --python 3.14 --from \
+	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
+	typos-config-builder
+# The workflow contracts are pytest modules with one YAML dependency. Both are
+# pinned, and bytecode is not written: a mutation run that edits a module can
+# otherwise execute a stale `.pyc` whose mtime and size match the edit.
+WORKFLOW_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
+	--with pytest==9.0.2 --with pyyaml==6.0.3 python -m pytest
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
@@ -50,7 +56,9 @@ typecheck: ## Run cargo type checks across the workspace
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
 
-lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
+# `test-workflow-contracts` is a prerequisite here as well as a CI step of its
+# own, so deleting the step does not stop the contracts running.
+lint: test-workflow-contracts ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
@@ -67,15 +75,11 @@ markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
 	+$(MAKE) spelling
 
-spelling: spelling-helper-test ## Enforce en-GB-oxendict spelling in Markdown prose
-	@uv run scripts/generate_typos_config.py
-	@git ls-files -z '*.md' | \
-		xargs -0 -r $(TYPOS) --config typos.toml --force-exclude
+spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
+	$(TYPOS_CONFIG_BUILDER) gate --repository .
 
-spelling-helper-test: ## Validate the shared spelling-policy integration
-	@PYTHONPATH=scripts $(SPELLING_PYTEST) scripts/tests/test_typos_rollout.py \
-		--cov=generate_typos_config --cov=typos_rollout \
-		--cov=typos_rollout_cache --cov-fail-under=90
+test-workflow-contracts: ## Assert what the workflow files must say
+	$(WORKFLOW_PYTEST) --doctest-modules tests/workflow_contracts -q
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
