@@ -14,9 +14,14 @@ history would gain holes. The condition is therefore part of the contract, not
 an implementation detail, and `test_cancellation_is_conditioned_on_the_event`
 fails on the literal.
 
-The group also has to distinguish one pull request from another. A group
-derived from ``github.run_id`` is unique per run and so cancels nothing, while
-a constant group would let one branch cancel another's gates.
+The group also has to distinguish one pull request from another, so it is
+keyed on the pull-request number. A constant group would let one branch
+cancel another's gates, and a group built from ``github.run_id`` alone is
+unique per run and so cancels nothing. Outside a pull request the number is
+empty, and the group falls back to ``github.run_id``: a shared fallback such
+as ``github.ref`` would let a third dispatch replace a pending second one
+that was meant to complete. The run id is allowed in that fallback position
+and nowhere else, so the group is compared whole.
 
 Only `pull_request` is in scope. A `pull_request_target` workflow runs against
 the base repository to carry a token, and the workflows that use it here automate
@@ -28,18 +33,13 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
-from pathlib import Path
+import typing as typ
 
 import pytest
-import yaml
+from workflow_loader import WORKFLOW_DIR, WORKFLOW_SUFFIXES, load_workflow
 
-#: The repository's workflow directory. The module sits two levels below the
-#: repository root, in `tests/workflow_contracts/`.
-WORKFLOW_DIR = Path(__file__).resolve().parents[2] / ".github" / "workflows"
-
-#: Extensions GitHub accepts for a workflow file. Scanning only `.yml` would
-#: silently exempt a `.yaml` workflow from every contract here.
-WORKFLOW_SUFFIXES: tuple[str, ...] = (".yml", ".yaml")
+if typ.TYPE_CHECKING:
+    from pathlib import Path
 
 #: The exact `cancel-in-progress` expression every pull-request workflow
 #: carries. Comparing against one string rather than searching for a substring
@@ -51,24 +51,12 @@ CANCEL_EXPRESSION = "${{ github.event_name == 'pull_request' }}"
 #: deliberately absent; see the module docstring.
 PULL_REQUEST = "pull_request"
 
-#: Expressions that are unique to a single run. A group built from one of these
-#: can never match another run, so it queues nothing and cancels nothing while
-#: looking exactly like a concurrency control.
-RUN_UNIQUE_EXPRESSIONS: tuple[str, ...] = (
-    "github.run_id",
-    "github.run_number",
-    "github.run_attempt",
-    "github.sha",
-)
-
-#: Expressions that differ between two pull requests. A group naming none of
-#: them is shared by every branch, so one pull request's push would cancel
-#: another's gates.
-PER_PULL_REQUEST_EXPRESSIONS: tuple[str, ...] = (
-    "github.event.pull_request.number",
-    "github.head_ref",
-    "github.ref",
-)
+#: The exact group every pull-request workflow carries: keyed on the pull
+#: request, falling back to the run id where there is none. Compared whole,
+#: because each plausible variant fails differently: `github.run_id` alone
+#: cancels nothing, a constant cancels other branches, and a `github.ref`
+#: fallback lets a third dispatch replace a pending second one.
+GROUP_EXPRESSION = "${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}"
 
 #: Workflows known to start on `pull_request`. Discovery below is dynamic so a
 #: new workflow is covered the day it lands, but a dynamic list that silently
@@ -97,11 +85,14 @@ def _load(path: Path) -> dict[str, object]:
     Raises
     ------
     AssertionError
-        If the document does not parse as a mapping, which means it is not a
-        workflow at all.
+        If the document does not parse as a non-empty mapping, which means it
+        is not a workflow at all.
+    DuplicateKeyError
+        If any mapping declares a key twice; the strict loader refuses the
+        document rather than keeping the last value.
     """
-    document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(document, dict):
+    document = load_workflow(path.read_text(encoding="utf-8"))
+    if not document:
         message = f"{path.name} must parse as a mapping"
         raise AssertionError(message)
     return document
@@ -119,7 +110,7 @@ def _workflow_paths() -> list[Path]:
     return sorted(
         path
         for path in WORKFLOW_DIR.iterdir()
-        if path.is_file() and path.suffix in WORKFLOW_SUFFIXES
+        if path.is_file() and path.suffix.lower() in WORKFLOW_SUFFIXES
     )
 
 
@@ -254,35 +245,22 @@ def test_every_pull_request_workflow_declares_a_concurrency_group(
 
 
 @pytest.mark.parametrize("workflow", PULL_REQUEST_WORKFLOWS, ids=WORKFLOW_IDS)
-def test_the_group_is_not_unique_to_one_run(workflow: Path) -> None:
-    """The group is shared by successive runs of the same pull request.
-
-    A group built from the run identifier or the commit SHA matches no other
-    run, so it cancels nothing while reading as a concurrency control.
-    """
-    group = str(_concurrency(workflow).get("group", ""))
-    offenders = [name for name in RUN_UNIQUE_EXPRESSIONS if name in group]
-    assert not offenders, (
-        f"{workflow.name} builds its concurrency group from "
-        f"{', '.join(offenders)}, which is unique to one run; the group would "
-        "never match a superseded run and would cancel nothing"
-    )
-
-
-@pytest.mark.parametrize("workflow", PULL_REQUEST_WORKFLOWS, ids=WORKFLOW_IDS)
-def test_the_group_distinguishes_one_pull_request_from_another(
+def test_the_group_is_keyed_on_the_pull_request_with_a_run_fallback(
     workflow: Path,
 ) -> None:
-    """The group varies with the pull request, so branches do not cancel each other.
+    """The group is the pull request, or the run itself where there is none.
 
-    A constant group would put every open pull request in one queue, and the
-    first push anywhere would cancel the gates running everywhere else.
+    Successive pushes to one pull request share a group, so the newer run
+    cancels the older; two pull requests never share one, so neither cancels
+    the other's gates; and a dispatch falls back to its own run id, so no
+    later dispatch can replace it while it is pending. A run id anywhere but
+    that fallback position would cancel nothing, which is why the group is
+    compared whole rather than searched for its parts.
     """
-    group = str(_concurrency(workflow).get("group", ""))
-    assert any(name in group for name in PER_PULL_REQUEST_EXPRESSIONS), (
-        f"{workflow.name} must key its concurrency group on the pull request, "
-        f"by naming one of {', '.join(PER_PULL_REQUEST_EXPRESSIONS)}; a group "
-        "shared by every branch would cancel unrelated pull requests"
+    group = _concurrency(workflow).get("group")
+    assert group == GROUP_EXPRESSION, (
+        f"{workflow.name} must set concurrency.group to {GROUP_EXPRESSION!r}, "
+        f"not {group!r}"
     )
 
 
