@@ -146,9 +146,10 @@ audit-node: ## Audit frontend dependencies for known vulnerabilities
 audit-exceptions: audit-exceptions-test ## Refuse an ignored advisory that is undated or expired
 	uv run scripts/rust_audit_exceptions.py
 
-audit-exceptions-test: ## Drive the exception rule over dates this tree is not on
-	@PYTHONPATH=scripts $(AUDIT_PYTEST) \
-		scripts/tests/test_rust_audit_exceptions.py
+audit-exceptions-test: ## Drive the exception rule and the audit runner over constructed cases
+	@PYTHONPATH=scripts $(AUDIT_PYTEST) --doctest-modules \
+		scripts/tests/test_rust_audit_exceptions.py scripts/tests/test_run_audits.py \
+		scripts/rust_audit_exceptions.py scripts/run_audits.py
 
 rust-audit: audit-exceptions ## Audit every Rust manifest for known vulnerabilities
 	find . \

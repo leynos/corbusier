@@ -27,6 +27,7 @@ from rust_audit_exceptions import (  # noqa: E402 - after the path fixup above
     AuditExceptionError,
     faults,
     ignored_advisories,
+    main,
     parse_blocks,
 )
 
@@ -104,6 +105,30 @@ def test_an_out_of_range_expiry_is_a_fault(date: str) -> None:
 
     with pytest.raises(AuditExceptionError, match=r"not a calendar date"):
         faults(malformed, TODAY)
+
+
+def test_an_invalid_toml_file_is_a_fault() -> None:
+    """A file the TOML parser refuses is the rule's own fault, not a traceback.
+
+    `main` catches `AuditExceptionError` alone, so a `TOMLDecodeError`
+    escaping `ignored_advisories` would end the run in a traceback pointing
+    at the reader instead of at the file.
+    """
+    broken = GOOD.replace('ignore = ["RUSTSEC-2026-0258"]', 'ignore = ["RUSTSEC-2026-0258"')
+
+    with pytest.raises(AuditExceptionError, match=r"not valid TOML"):
+        faults(broken, TODAY)
+
+
+def test_main_reports_invalid_toml_and_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The command-line entry point exits 1 with the named fault."""
+    config = tmp_path / "audit.toml"
+    config.write_text("[advisories\n", encoding="utf-8")
+
+    assert main([str(config)]) == 1
+    assert "not valid TOML" in capsys.readouterr().err
 
 
 def test_an_unjustified_exception_is_refused() -> None:

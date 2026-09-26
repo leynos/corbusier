@@ -217,8 +217,19 @@ def ignored_advisories(text: str) -> list[str]:
     -------
     list[str]
         The identifiers, in file order.
+
+    Raises
+    ------
+    AuditExceptionError
+        If the file is not valid TOML. `cargo-audit` would refuse it too,
+        so it is reported as a fault naming the parser's position rather
+        than escaping as a `TOMLDecodeError` that `main` does not catch.
     """
-    parsed = tomllib.loads(text)
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        message = f"the audit configuration is not valid TOML: {error}"
+        raise AuditExceptionError(message) from error
     advisories = parsed.get("advisories")
     if not isinstance(advisories, dict):
         return []

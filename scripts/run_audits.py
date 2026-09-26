@@ -22,6 +22,9 @@ import os
 import subprocess  # noqa: S404 - the commands are fixed, not caller-supplied
 import typing as typ
 
+if typ.TYPE_CHECKING:
+    from collections.abc import Mapping
+
 
 class Half(typ.NamedTuple):
     """One audit half.
@@ -91,21 +94,28 @@ def main(halves: list[Half] | None = None) -> int:
     int
         0 when every half passed, otherwise 1.
     """
-    to_run = HALVES if halves is None else halves
+    to_run = audit_halves(os.environ) if halves is None else halves
     results = [(half.name, run(half)) for half in to_run]
     return summarize(results)
 
 
-#: The make executable that invoked this runner. The `audit` recipe passes
-#: `$(MAKE)` in, so a wrapper or an alternate make such as `gmake` runs the
-#: halves too; run by hand, it falls back to `make`.
-MAKE: typ.Final[str] = os.environ.get("MAKE") or "make"
+def audit_halves(environ: Mapping[str, str]) -> list[Half]:
+    """Return the two halves, in the order they run.
 
-#: The two halves, in the order they run.
-HALVES: typ.Final[list[Half]] = [
-    Half("frontend (bun audit)", [MAKE, "audit-node"]),
-    Half("Rust (cargo audit)", [MAKE, "rust-audit"]),
-]
+    The `audit` recipe passes `$(MAKE)` in, so a wrapper or an alternate make
+    such as `gmake` runs the halves too; run by hand, the halves fall back to
+    `make`. The environment is a parameter so tests inject it.
+
+    Examples
+    --------
+    >>> [half.command[0] for half in audit_halves({"MAKE": "gmake"})]
+    ['gmake', 'gmake']
+    """
+    make = environ.get("MAKE") or "make"
+    return [
+        Half("frontend (bun audit)", [make, "audit-node"]),
+        Half("Rust (cargo audit)", [make, "rust-audit"]),
+    ]
 
 
 if __name__ == "__main__":
