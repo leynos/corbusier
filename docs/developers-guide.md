@@ -456,11 +456,18 @@ with no minutes to win.
 
 ### The cancellation contract
 
-`tests/workflow_contracts/concurrency_test.py` reads `.github/workflows` and
-asserts, for every workflow declaring a `pull_request` trigger, that it
-declares a concurrency group, that the group is exactly the expression above,
-and that `cancel-in-progress` is exactly the expression above. It loads
-workflows through the strict loader, which refuses a duplicated key. A further
-test asserts that discovery still finds the workflows it is expected to, so a
-broken read cannot empty the list and turn the rest into a vacuous pass. Run it
-with `make test-workflow-contracts`.
+The rules live in `tests/workflow_contracts/concurrency_rules.py`, as functions
+over a parsed workflow. `concurrency_test.py` holds this repository's workflows
+to them: for every workflow a `pull_request` event starts, a concurrency group
+is declared, the group is exactly the expression above, and
+`cancel-in-progress` is exactly the expression above. Discovery reads triggers
+through `codescene_placement_reader.triggers`, which refuses a missing `on:`, a
+shape it cannot model and a workflow declaring both `on` keys, so no workflow
+leaves discovery in silence. A floor test asserts that discovery still finds
+`ci.yml`, so a broken read cannot empty the list and turn the rest into a
+vacuous pass.
+
+`concurrency_rules_test.py` drives the same functions with constructed
+workflows: every trigger form under both key spellings, the refused shapes, and
+each wrong group, shorthand block and unconditioned cancellation the rules must
+reject. Run both with `make test-workflow-contracts`.
