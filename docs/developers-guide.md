@@ -324,10 +324,66 @@ exposure, and the trigger for re-review:
 - Node.js advisories are suppressed by an entry in
   `frontend-pwa/security/audit-exceptions.json`, which requires an expiry date
   and is enforced by `frontend-pwa/scripts/run-audit.mjs`.
-- Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`,
-  paired with a dependency-policy exception document under `docs/`. See
+- Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`
+  with a dated block (see
+  [clearing a Rust advisory](#clearing-a-rust-advisory)), paired with a
+  dependency-policy exception document under `docs/`. See
   [Dependency policy exception: h2 empty DATA frames](dependency-policy-exception-h2-empty-data-frames.md)
   for the current example.
+
+`make audit` runs both halves and reports both. They used to be Make
+prerequisites, so a failing `audit-node` stopped the target before `rust-audit`
+ran, and 24 frontend advisories masked RUSTSEC-2026-0258 for weeks. One failure
+must not hide another, so `scripts/run_audits.py` runs each half, prints a
+per-half summary, and exits with the worse of the two statuses.
+
+### Clearing a Rust advisory
+
+`cargo-audit` takes a bare list of advisory identifiers in `.cargo/audit.toml`
+and rejects any key it does not know, so an expiry date and a justification
+cannot be fields of that file. They live in a fixed comment block above the
+list:
+
+```toml
+# advisory: RUSTSEC-0000-0000
+# expires-at: 2026-12-17
+# justification: one or more lines saying why it cannot be cleared here.
+
+[advisories]
+ignore = ["RUSTSEC-0000-0000"]
+```
+
+`make audit-exceptions`, which `rust-audit` takes as a prerequisite, makes that
+block load-bearing rather than decorative. It refuses an ignore that carries no
+block, a block that names no expiry or no justification, an expiry that has
+passed, and a block left behind for an advisory no longer ignored. The expiry
+is inclusive through its own day. An entry is a deferral, not a fix, under the
+same rule the frontend ledger applies.
+
+Prefer clearing the advisory. An ignore is right only when no version inside
+the resolved major fixes it and the remedy is upstream, which is the single
+entry there today.
+
+### Clearing a frontend advisory
+
+`make audit-node` runs `frontend-pwa/scripts/run-audit.mjs`, which fails on any
+advisory `bun audit` reports that the exception ledger at
+`frontend-pwa/security/audit-exceptions.json` does not cover. Clear an advisory
+in this order, and stop at the first step that works:
+
+1. Refresh the lockfile. `bun update <package>` moves a transitive dependency
+   inside the range its parent already allows, and changes no manifest.
+2. Add or raise an entry in `overrides` in `frontend-pwa/package.json`. The
+   floor named there is a security floor: it exists to keep the resolved
+   version above the advisory's fixed version, so lowering one reopens the
+   advisory it closed.
+3. Only where neither works, add a ledger entry. Each carries an `expiresAt`
+   date and a justification, and the gate fails once that date passes, so an
+   accepted risk cannot sit there indefinitely. An entry is a deferral, not a
+   fix.
+
+Raising a declared dependency across a major version to clear an advisory is a
+separate change with its own review; it is not part of clearing the advisory.
 
 ## Coverage publication and CodeScene
 
