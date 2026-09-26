@@ -63,6 +63,12 @@ formatting, but review formatter output before committing. Markdown formatter
 defects that affect this repository are tracked upstream in
 [`leynos/mdtablefix`](https://github.com/leynos/mdtablefix).
 
+`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.0, the same
+release CI installs); install it once with
+`cargo install --locked mdtablefix --version 0.6.0`. `make fmt` also runs
+`markdownlint-cli2`, which CI provides through its GitHub action; locally
+install it with `bun install -g markdownlint-cli2` (or `npm install -g`).
+
 ### Abstractions, ports, and helpers
 
 Before adding a new abstraction, hexagonal port, or extracted helper, sweep the
@@ -210,10 +216,9 @@ make markdownlint
 The `MDLINT` variable resolves the executable automatically:
 
 1. If `markdownlint-cli2` is found on `PATH`, that executable is used.
-2. Otherwise, if `~/.bun/bin/markdownlint-cli2` exists and is executable, that
-   fallback is used.
-3. If neither lookup succeeds, `MDLINT` resolves to `markdownlint-cli2` and the
-   shell reports the missing command when the target runs.
+2. Otherwise, `MDLINT` resolves to `$HOME/.bun/bin/markdownlint-cli2`, the
+   path a global `bun install -g markdownlint-cli2` creates; no existence check
+   is made, so the shell reports the missing command when the target runs.
 
 Override the resolved path explicitly if needed:
 

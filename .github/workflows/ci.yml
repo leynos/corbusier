@@ -41,6 +41,13 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
+      - name: Install mdtablefix
+        # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
+        # first release with `--check` and `--git`.
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        with:
+          version: "0.6.0"
+
       - name: Format
         run: make check-fmt
       # The workflow contracts read `.github/workflows` and need no Rust
@@ -50,10 +57,7 @@ jobs:
       - name: Markdown lint
         uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff
         with:
-          globs: |
-            **/*.md
-            !**/target/**
-            !**/dist/**
+          globs: '**/*.md'
       # Dependency audits report advisories against the whole lockfile, so a
       # newly published advisory would fail every Dependabot PR regardless of
       # content and deadlock auto-merge. The scheduled audit workflow covers
