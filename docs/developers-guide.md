@@ -418,3 +418,56 @@ prerequisite of `make lint`, so deleting the step does not stop them running.
 Each reading is proved against constructed trees in the `*_test.py` modules
 beside it. The contracts load no Rust and need only `uv`; the Makefile pins
 pytest and PyYAML and disables bytecode writing.
+
+## Cancelling superseded pull-request runs
+
+Every push to a pull request starts a fresh run of each gate. The run already
+in flight is answering a question about a commit nobody will merge, and left
+alone it holds a runner until it finishes, so the branch pays twice for one
+answer. Every workflow a pull request can start therefore carries a concurrency
+block:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+```
+
+Two halves matter, and each fails in a way nothing else would notice.
+
+- **The group keys on the pull request, and falls back to the run.** A
+  constant group puts every open pull request in one queue, so the first push
+  anywhere cancels the gates running everywhere else. Outside a pull request
+  the number is empty and the group falls back to `github.run_id`. A shared
+  fallback such as `github.ref` would let a third dispatch replace a pending
+  second one that was meant to complete. The run id belongs in that fallback
+  position alone: as the whole group it would match no predecessor and cancel
+  nothing.
+- **Cancellation is conditioned on the event.** A literal
+  `cancel-in-progress: true` reads as the stricter setting and is a regression.
+  A push to `main`, a schedule, and a dispatch have no successor waiting, and
+  the run on `main` writes the warm cache and records the coverage that no
+  later run repeats.
+
+`pull_request_target` workflows are out of scope. They run against the base
+repository to carry a token, and the ones here automate pull-request
+housekeeping rather than building, so cancelling one mid-flight is a hazard
+with no minutes to win.
+
+### The cancellation contract
+
+The rules live in `tests/workflow_contracts/concurrency_rules.py`, as functions
+over a parsed workflow. `concurrency_test.py` holds this repository's workflows
+to them: for every workflow a `pull_request` event starts, a concurrency group
+is declared, the group is exactly the expression above, and
+`cancel-in-progress` is exactly the expression above. Discovery reads triggers
+through `codescene_placement_reader.triggers`, which refuses a missing `on:`, a
+shape it cannot model and a workflow declaring both `on` keys, so no workflow
+leaves discovery in silence. A floor test asserts that discovery still finds
+`ci.yml`, so a broken read cannot empty the list and turn the rest into a
+vacuous pass.
+
+`concurrency_rules_test.py` drives the same functions with constructed
+workflows: every trigger form under both key spellings, the refused shapes, and
+each wrong group, shorthand block and unconditioned cancellation the rules must
+reject. Run both with `make test-workflow-contracts`.
