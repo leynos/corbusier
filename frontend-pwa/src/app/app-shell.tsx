@@ -10,6 +10,12 @@ import { useI18n } from '../i18n/runtime';
 
 const SEED_TASK_ID = '9f6adf0b-4908-47f5-a1fd-27d65f7d84bf';
 
+/**
+ * Render the shared shell chrome: header, navigation and the routed outlet.
+ *
+ * @example
+ * `<AppShell />` renders the application header around the active route.
+ */
 export function AppShell() {
   const { t } = useI18n();
 

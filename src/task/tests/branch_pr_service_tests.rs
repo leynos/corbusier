@@ -140,7 +140,7 @@ async fn associate_branch_persists_and_is_retrievable(service: TestService, ctx:
 async fn associate_branch_rejects_duplicate_on_same_task(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let task = create_test_task(&service, &ctx, 501, "Task")
         .await
         .expect("task creation should succeed");
@@ -161,8 +161,8 @@ async fn associate_branch_rejects_duplicate_on_same_task(
         },
         assert_branch_already_associated_error,
     )
-    .await
-    .expect("the first association is arrangement and must succeed");
+    .await?;
+    Ok(())
 }
 
 #[rstest]
@@ -247,7 +247,7 @@ async fn associate_pull_request_persists_and_transitions_to_in_review(
 async fn associate_pull_request_rejects_duplicate_on_same_task(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let task = create_test_task(&service, &ctx, 601, "Task")
         .await
         .expect("task creation should succeed");
@@ -268,8 +268,8 @@ async fn associate_pull_request_rejects_duplicate_on_same_task(
         },
         assert_pr_already_associated_error,
     )
-    .await
-    .expect("the first association is arrangement and must succeed");
+    .await?;
+    Ok(())
 }
 
 /// Asserts two tasks may share one reference and both come back from it.
@@ -307,7 +307,10 @@ where
 
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: RequestContext) {
+async fn multiple_tasks_sharing_branch_all_returned(
+    service: TestService,
+    ctx: RequestContext,
+) -> Result<(), TaskLifecycleError> {
     let branch_ref =
         BranchRef::from_parts("github", "owner/repo", "shared/branch").expect("valid branch ref");
     let tasks = [
@@ -329,8 +332,8 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: R
         },
         || service.find_by_branch_ref(&ctx, &branch_ref),
     )
-    .await
-    .expect("associating both tasks and looking them up must succeed");
+    .await?;
+    Ok(())
 }
 
 #[rstest]
@@ -338,7 +341,7 @@ async fn multiple_tasks_sharing_branch_all_returned(service: TestService, ctx: R
 async fn multiple_tasks_sharing_pull_request_all_returned(
     service: TestService,
     ctx: RequestContext,
-) {
+) -> Result<(), TaskLifecycleError> {
     let pr_ref = PullRequestRef::from_parts("github", "owner/repo", 99).expect("valid PR ref");
     let tasks = [
         create_test_task(&service, &ctx, 800, "PR share 1")
@@ -359,6 +362,6 @@ async fn multiple_tasks_sharing_pull_request_all_returned(
         },
         || service.find_by_pull_request_ref(&ctx, &pr_ref),
     )
-    .await
-    .expect("associating both tasks and looking them up must succeed");
+    .await?;
+    Ok(())
 }
