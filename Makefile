@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts audit-exceptions audit-exceptions-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts audit-exceptions audit-exceptions-test audit-commands-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -63,7 +63,7 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 
 # `test-workflow-contracts` is a prerequisite here as well as a CI step of its
 # own, so deleting the step does not stop the contracts running.
-lint: test-workflow-contracts ## Run Clippy and the Whitaker Dylint suite with warnings denied
+lint: test-workflow-contracts audit-commands-test ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
@@ -150,6 +150,12 @@ audit-exceptions-test: ## Drive the exception rule and the audit runner over con
 	@PYTHONPATH=scripts $(AUDIT_PYTEST) --doctest-modules \
 		scripts/tests/test_rust_audit_exceptions.py scripts/tests/test_run_audits.py \
 		scripts/rust_audit_exceptions.py scripts/run_audits.py
+
+# The command tests run `make audit` in a child process, so they must never be
+# reachable from `audit` itself: a stand-in `make` that is bypassed would
+# recurse. `lint` reaches them instead.
+audit-commands-test: ## Run the audit commands end to end with a stand-in make
+	@PYTHONPATH=scripts $(AUDIT_PYTEST) scripts/tests/test_audit_commands.py
 
 rust-audit: audit-exceptions ## Audit every Rust manifest for known vulnerabilities
 	find . \
