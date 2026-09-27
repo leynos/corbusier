@@ -50,7 +50,10 @@ const ERROR_PRECEDENCE: readonly TaskCreateField[] = [
   'milestone',
 ];
 
-/** Empty draft used to seed the task-create form on first render. */
+/**
+ * Initial draft that seeds the task-create form with the first supported
+ * provider as its default.
+ */
 export const initialTaskCreateDraft: TaskCreateDraft = {
   provider: SUPPORTED_PROVIDERS[0],
   repository: '',

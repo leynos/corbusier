@@ -17,9 +17,8 @@ use rstest::rstest;
 /// Builds the message each case validates, propagating a builder failure.
 ///
 /// A helper arranges state, and arrangement can fail, so it returns the
-/// error rather than ending the process on it. Only a test body may decide
-/// that a failure is the verdict, which is why the `.expect` moved to the
-/// four call sites.
+/// error rather than ending the process on it. Callers propagate builder
+/// failures with `?`, keeping setup errors distinct from validation outcomes.
 fn build_message_with_metadata(
     clock: &DefaultClock,
     metadata: MessageMetadata,

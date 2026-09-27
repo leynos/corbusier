@@ -17,6 +17,9 @@ export type TaskGatewayErrorKind =
 /**
  * Error raised by a `TaskSliceGateway` adapter, tagged with a kind so
  * callers can branch on failure category without inspecting messages.
+ *
+ * @example
+ * `new TaskGatewayError('not_found', 'Task missing').kind` is `'not_found'`.
  */
 export class TaskGatewayError extends Error {
   constructor(
@@ -30,10 +33,26 @@ export class TaskGatewayError extends Error {
 
 /** Port through which the task slice reaches its backing task store. */
 export interface TaskSliceGateway {
-  /** Create a task from an issue reference. */
+  /**
+   * Create a task from an issue reference.
+   *
+   * @example
+   * `await gateway.createTask(request)` returns the task created from `request`.
+   */
   createTask(request: CreateTaskRequest): Promise<Task>;
-  /** Fetch a task by id. */
+  /**
+   * Fetch a task by id.
+   *
+   * @example
+   * `await gateway.getTask('task-42')` returns task `task-42`.
+   */
   getTask(taskId: string): Promise<Task>;
-  /** Move a task to `targetState`. */
+  /**
+   * Move a task to `targetState`.
+   *
+   * @example
+   * `await gateway.transitionTask('task-42', 'in_progress')` returns task
+   * `task-42` in the `in_progress` state.
+   */
   transitionTask(taskId: string, targetState: TaskState): Promise<Task>;
 }

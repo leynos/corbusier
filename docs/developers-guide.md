@@ -182,10 +182,9 @@ sources, while still depending on the application `src/` tree.
 TypeDoc's `notDocumented` validation over `frontend-pwa/src`
 (`frontend-pwa/typedoc.json`), requiring a JSDoc block on every exported
 declaration, treating validation warnings as errors, and emitting no
-documentation artefacts. The `en-gb` message catalogue is tagged `@internal`
-so its keys stay out of the documented surface. The frontend CI path runs
-this gate after `frontend-typecheck`; the Rust documentation gate is
-unaffected.
+documentation artefacts. The `en-gb` message catalogue is tagged `@internal` so
+its keys stay out of the documented surface. The frontend CI path runs this
+gate after `frontend-typecheck`; the Rust documentation gate is unaffected.
 
 `frontend-pwa/tests/types/jest-axe.d.ts` provides ambient TypeScript
 declarations for the `jest-axe` package because the package does not ship
