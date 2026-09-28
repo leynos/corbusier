@@ -2209,7 +2209,9 @@ been released at least six months ago.
 - Major versions pinned to prevent breaking changes
 - Minor versions allowed to float for security updates
 - Critical security dependencies monitored through cargo-audit
-- Regular dependency updates scheduled monthly
+- Dependabot checks for updates daily: minor and patch updates arrive grouped in
+  one pull request per ecosystem, and each major update arrives in its own pull
+  request, with the `rstest-bdd` crates grouped so they move together
 
 ### 3.4 Third-Party Services
 
