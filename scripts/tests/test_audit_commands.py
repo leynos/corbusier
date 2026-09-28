@@ -100,6 +100,30 @@ def test_the_validator_reports_each_fault_and_exits_1(
     assert "Traceback" not in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("content", "make_directory"),
+    [
+        pytest.param(None, True, id="directory"),
+        pytest.param(b"\xff\xfe not utf-8", False, id="not-utf-8"),
+    ],
+)
+def test_an_unreadable_configuration_is_a_fault_not_a_pass(
+    tmp_path: Path, content: bytes | None, make_directory: bool
+) -> None:
+    """Only a missing file means nothing is ignored; a read failure fails."""
+    path = tmp_path / "audit.toml"
+    if make_directory:
+        path.mkdir()
+    else:
+        path.write_bytes(content or b"")
+
+    result = _validate(path)
+
+    assert result.returncode == 1
+    assert "cannot read the audit configuration" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def _stand_in_make(tmp_path: Path, failing: frozenset[str]) -> Path:
     """Write a `make` stand-in that records each target and fails the named ones."""
     log = tmp_path / "targets.log"
@@ -159,3 +183,55 @@ def test_make_audit_runs_both_halves_and_reports_both(
     assert result.returncode == status, result.stdout + result.stderr
     assert (tmp_path / "targets.log").read_text(encoding="utf-8").split() == ["audit-node", "rust-audit"]
     assert result.stdout.splitlines()[-2:] == summary
+
+
+def _recorder(tmp_path: Path, name: str, status: int) -> Path:
+    """Write a stand-in command that logs its name and exits with `status`."""
+    log = tmp_path / "order.log"
+    script = tmp_path / name
+    script.write_text(
+        f"#!{sys.executable}\n"
+        f"with open({str(log)!r}, 'a', encoding='utf-8') as handle:\n"
+        f"    handle.write({name!r} + '\\n')\n"
+        f"raise SystemExit({status})\n",
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return script
+
+
+@pytest.mark.parametrize(
+    ("validator_status", "expected_order", "make_status"),
+    [
+        pytest.param(0, ["pytest", "validator", "cargo"], 0, id="exceptions-pass"),
+        pytest.param(1, ["pytest", "validator"], 2, id="exceptions-fail"),
+    ],
+)
+def test_rust_audit_runs_the_exception_gate_first_and_stops_on_it(
+    tmp_path: Path, validator_status: int, expected_order: list[str], make_status: int
+) -> None:
+    """`rust-audit` runs the exception tests and validator before `cargo audit`.
+
+    With the validator failing, `cargo audit` never runs and `make` fails, so
+    removing `audit-exceptions` from the target's prerequisites fails here.
+    """
+    pytest_stand_in = _recorder(tmp_path, "pytest", 0)
+    validator = _recorder(tmp_path, "validator", validator_status)
+    cargo = _recorder(tmp_path, "cargo", 0)
+    environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
+
+    result = subprocess.run(  # noqa: S603 - fixed command
+        [  # noqa: S607
+            "make", "--no-print-directory", "-C", str(REPO_ROOT),
+            f"AUDIT_PYTEST={pytest_stand_in}", f"AUDIT_EXCEPTIONS={validator}", f"CARGO={cargo}",
+            "rust-audit",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environ,
+        timeout=CHILD_TIMEOUT,
+    )
+
+    assert result.returncode == make_status, result.stdout + result.stderr
+    assert (tmp_path / "order.log").read_text(encoding="utf-8").split() == expected_order

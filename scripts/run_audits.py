@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import subprocess  # noqa: S404 - the commands are fixed, not caller-supplied
+import sys
 import typing as typ
 
 if typ.TYPE_CHECKING:
@@ -56,10 +57,16 @@ def run(half: Half) -> int:
     Returns
     -------
     int
-        The command's exit status.
+        The command's exit status, or 127 when it could not be started,
+        so a missing tool fails its half instead of ending the run before
+        the other half reports.
     """
     print(f"\n=== {half.name} ===", flush=True)
-    return subprocess.call(half.command)  # noqa: S603 - fixed command
+    try:
+        return subprocess.call(half.command)  # noqa: S603 - fixed command
+    except OSError as error:
+        print(f"cannot run {half.command[0]}: {error}", file=sys.stderr, flush=True)
+        return 127
 
 
 def summarize(results: list[tuple[str, int]]) -> int:

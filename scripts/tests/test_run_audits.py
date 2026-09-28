@@ -56,6 +56,19 @@ def test_a_failing_first_half_does_not_stop_the_second(
     assert "PASS  passing half" in out
 
 
+def test_a_half_that_cannot_start_fails_without_stopping_the_other(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A missing executable fails its half; the other half still runs and reports."""
+    missing = Half("missing tool", [str(tmp_path / "no-such-tool")])
+
+    assert main([missing, PASSING]) == 1
+    captured = capsys.readouterr()
+    assert "FAIL  missing tool" in captured.out
+    assert "PASS  passing half" in captured.out
+    assert "cannot run" in captured.err
+
+
 def test_the_summary_names_each_half_in_order(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

@@ -37,6 +37,9 @@ TYPOS_CONFIG_BUILDER := uv tool run --python 3.14 --from \
 # otherwise execute a stale `.pyc` whose mtime and size match the edit.
 WORKFLOW_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
 	--with pytest==9.0.2 --with pyyaml==6.0.3 python -m pytest
+# The validator for dated Rust audit exceptions. A variable so the command
+# tests can stand in for it and prove `rust-audit` runs it first.
+AUDIT_EXCEPTIONS ?= uv run scripts/rust_audit_exceptions.py
 # The audit-exception rule's tests need pytest alone.
 AUDIT_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
 	--with pytest==9.0.2 python -m pytest
@@ -144,12 +147,13 @@ audit-node: ## Audit frontend dependencies for known vulnerabilities
 	cd $(FRONTEND_DIR) && $(BUN) run audit
 
 audit-exceptions: audit-exceptions-test ## Refuse an ignored advisory that is undated or expired
-	uv run scripts/rust_audit_exceptions.py
+	$(AUDIT_EXCEPTIONS)
 
 audit-exceptions-test: ## Drive the exception rule and the audit runner over constructed cases
 	@PYTHONPATH=scripts $(AUDIT_PYTEST) --doctest-modules \
 		scripts/tests/test_rust_audit_exceptions.py scripts/tests/test_run_audits.py \
-		scripts/rust_audit_exceptions.py scripts/run_audits.py
+		scripts/audit_exception_blocks.py scripts/rust_audit_exceptions.py \
+		scripts/run_audits.py
 
 # The command tests run `make audit` in a child process, so they must never be
 # reachable from `audit` itself: a stand-in `make` that is bypassed would
