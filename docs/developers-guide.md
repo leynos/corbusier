@@ -422,6 +422,12 @@ prerequisite of `make lint`, so deleting the step does not stop them running.
   `installer-checksum`, and the concurrency group compared whole.
 - `codescene_placement_policy.py` holds the reviewed values the tests compare
   against. Change a value there only with the workflow it describes.
+- `shared_actions_pin_test.py` requires every `leynos/shared-actions`
+  reference, step or reusable workflow, to pin the same full commit SHA. The
+  actions are developed together, so a tree pinning them at different commits
+  runs a combination nobody has run. The owner and repository name are matched
+  case-insensitively, as GitHub resolves them. A Dependabot group bump moves
+  every reference together, so the rule costs nothing on that path.
 
 Each reading is proved against constructed trees in the `*_test.py` modules
 beside it. The contracts load no Rust and need only `uv`; the Makefile pins
