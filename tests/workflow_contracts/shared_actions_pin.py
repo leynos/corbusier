@@ -22,8 +22,11 @@ if typ.TYPE_CHECKING:
 
     from workflow_loader import Document
 
-#: The repository prefix of a `uses:` value, lowercased for comparison.
-SHARED_ACTIONS: typ.Final[str] = "leynos/shared-actions/"
+#: The repository a `uses:` value names, lowercased for comparison. A reference
+#: is this name followed by `/` (an action or workflow path) or `@` (an action
+#: at the repository root); requiring the boundary keeps a similarly named
+#: repository such as `leynos/shared-actions-fork` out.
+SHARED_ACTIONS: typ.Final[str] = "leynos/shared-actions"
 
 
 def shared_actions_refs(documents: cabc.Mapping[str, Document]) -> dict[str, list[str]]:
@@ -50,7 +53,7 @@ def shared_actions_refs(documents: cabc.Mapping[str, Document]) -> dict[str, lis
     for name, document in documents.items():
         for call in calls(document):
             uses = str(call.get("uses", "")).strip()
-            if not uses.lower().startswith(SHARED_ACTIONS):
+            if not uses.lower().startswith((f"{SHARED_ACTIONS}/", f"{SHARED_ACTIONS}@")):
                 continue
             _, _, ref = uses.partition("@")
             refs.setdefault(ref, []).append(f"{name}: {uses}")

@@ -57,7 +57,7 @@ def test_the_shared_actions_pin_is_a_full_commit_sha() -> None:
 
 
 def test_the_reader_sees_every_shape_of_reference() -> None:
-    """Steps and job-level reusable workflows are read, in either case.
+    """Steps, repository-root actions and job-level workflows are read, in any case.
 
     A mixed-case owner is the same action to GitHub; matched exactly it would
     escape both rules above while pinning `main`.
@@ -70,11 +70,17 @@ def test_the_reader_sees_every_shape_of_reference() -> None:
         "      - uses: leynos/shared-actions/.github/actions/setup-rust@aaaa\n"
         "      - uses: Leynos/Shared-Actions/.github/actions/generate-coverage@main\n"
         "      - uses: actions/checkout@v5\n"
+        "      - uses: leynos/shared-actions@cccc\n"
         "  merge:\n"
         "    uses: leynos/shared-actions/.github/workflows/automerge.yml@bbbb\n"
     )
 
-    assert sorted(shared_actions_refs({"w.yml": document})) == ["aaaa", "bbbb", "main"]
+    assert sorted(shared_actions_refs({"w.yml": document})) == [
+        "aaaa",
+        "bbbb",
+        "cccc",
+        "main",
+    ]
 
 
 @pytest.mark.parametrize(
