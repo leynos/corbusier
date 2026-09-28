@@ -131,6 +131,25 @@ def test_main_reports_invalid_toml_and_fails(
     assert "not valid TOML" in capsys.readouterr().err
 
 
+def test_a_second_block_for_one_advisory_is_refused() -> None:
+    """Two blocks for one advisory are two statements, and neither wins.
+
+    The earlier block here has expired and the later one is current. Kept
+    by advisory, the later block would hide the expired one entirely.
+    """
+    expired_first = (
+        "# advisory: RUSTSEC-2026-0258\n"
+        "# expires-at: 2026-01-01\n"
+        "# justification: an older reason.\n"
+        "#\n"
+    ) + GOOD
+
+    found = faults(expired_first, TODAY)
+
+    assert any("has 2 exception blocks" in fault for fault in found)
+    assert any("expired on 2026-01-01" in fault for fault in found)
+
+
 def test_an_unjustified_exception_is_refused() -> None:
     """A date without a reason says when to look again and not what at."""
     unjustified = GOOD.replace(

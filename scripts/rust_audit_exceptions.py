@@ -19,6 +19,7 @@ is not a deferral at all.
 
 from __future__ import annotations
 
+import collections
 import datetime as dt
 import re
 import sys
@@ -240,7 +241,9 @@ def ignored_advisories(text: str) -> list[str]:
 def faults(text: str, today: dt.date) -> list[str]:
     """Return every reason the exceptions are not acceptable, in order.
 
-    Both directions are checked. An ignored advisory with no block is an
+    An advisory with more than one block is refused, since the blocks are
+    competing statements about one ignore. Both directions are checked. An
+    ignored advisory with no block is an
     undocumented exception, and a block with no ignored advisory is a stale
     justification for something the audit no longer suppresses; each reads as
     the other from the file alone, and only reporting both keeps the two
@@ -259,18 +262,49 @@ def faults(text: str, today: dt.date) -> list[str]:
     list[str]
         Human-readable faults; empty when the exceptions are acceptable.
     """
-    documented = {block.advisory: block for block in parse_blocks(text)}
+    blocks = parse_blocks(text)
+    documented = {block.advisory for block in blocks}
     ignored = ignored_advisories(text)
+    duplicated = [
+        _duplicated(advisory, count)
+        for advisory, count in collections.Counter(
+            block.advisory for block in blocks
+        ).items()
+        if count > 1
+    ]
     undocumented = [
         _undocumented(advisory) for advisory in ignored if advisory not in documented
     ]
-    unused = [_unused(advisory) for advisory in documented if advisory not in ignored]
+    unused = [
+        _unused(advisory)
+        for advisory in dict.fromkeys(block.advisory for block in blocks)
+        if advisory not in ignored
+    ]
+    # Every block is judged, not one per advisory: a later current block must
+    # not hide an earlier expired one.
     expired = [
         _expired(block)
-        for advisory, block in documented.items()
-        if advisory in ignored and block.expires_at < today
+        for block in blocks
+        if block.advisory in ignored and block.expires_at < today
     ]
-    return [*undocumented, *unused, *expired]
+    return [*duplicated, *undocumented, *unused, *expired]
+
+
+def _duplicated(advisory: str, count: int) -> str:
+    """Return the fault for an advisory carrying more than one block.
+
+    Two blocks are two statements about one ignore, and at most one of them
+    can be the reason it stands; the file must say which.
+
+    Examples
+    --------
+    >>> _duplicated("RUSTSEC-2026-0258", 2).startswith("RUSTSEC-2026-0258 has 2")
+    True
+    """
+    return (
+        f"{advisory} has {count} exception blocks; keep one dated, justified "
+        f"block per ignored advisory"
+    )
 
 
 def _undocumented(advisory: str) -> str:
