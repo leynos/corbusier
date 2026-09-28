@@ -150,6 +150,17 @@ def test_a_second_block_for_one_advisory_is_refused() -> None:
     assert any("expired on 2026-01-01" in fault for fault in found)
 
 
+def test_a_block_naming_two_expiry_dates_is_refused() -> None:
+    """A current date first must not let a later expired date pass."""
+    conflicting = GOOD.replace(
+        "# expires-at: 2026-12-17\n",
+        "# expires-at: 2026-12-17\n# expires-at: 2026-01-01\n",
+    )
+
+    with pytest.raises(AuditExceptionError, match=r"names 2 expiry dates"):
+        faults(conflicting, TODAY)
+
+
 def test_an_unjustified_exception_is_refused() -> None:
     """A date without a reason says when to look again and not what at."""
     unjustified = GOOD.replace(

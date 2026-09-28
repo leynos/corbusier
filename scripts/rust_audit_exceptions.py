@@ -72,31 +72,46 @@ def faults(text: str, today: dt.date) -> list[str]:
         Human-readable faults; empty when the exceptions are acceptable.
     """
     blocks = parse_blocks(text)
-    documented = {block.advisory for block in blocks}
     ignored = ignored_advisories(text)
-    duplicated = [
-        _duplicated(advisory, count)
-        for advisory, count in collections.Counter(
-            block.advisory for block in blocks
-        ).items()
-        if count > 1
+    return [
+        *_duplicate_faults(blocks),
+        *_undocumented_faults(blocks, ignored),
+        *_unused_faults(blocks, ignored),
+        *_expired_faults(blocks, ignored, today),
     ]
-    undocumented = [
-        _undocumented(advisory) for advisory in ignored if advisory not in documented
-    ]
-    unused = [
-        _unused(advisory)
-        for advisory in dict.fromkeys(block.advisory for block in blocks)
-        if advisory not in ignored
-    ]
-    # Every block is judged, not one per advisory: a later current block must
-    # not hide an earlier expired one.
-    expired = [
+
+
+def _duplicate_faults(blocks: list[Exception_]) -> list[str]:
+    """Return a fault for each advisory that carries more than one block."""
+    counts = collections.Counter(block.advisory for block in blocks)
+    return [_duplicated(advisory, count) for advisory, count in counts.items() if count > 1]
+
+
+def _undocumented_faults(blocks: list[Exception_], ignored: list[str]) -> list[str]:
+    """Return a fault for each ignored advisory that has no block."""
+    documented = {block.advisory for block in blocks}
+    return [_undocumented(advisory) for advisory in ignored if advisory not in documented]
+
+
+def _unused_faults(blocks: list[Exception_], ignored: list[str]) -> list[str]:
+    """Return a fault for each block whose advisory is not ignored, once each."""
+    advisories = dict.fromkeys(block.advisory for block in blocks)
+    return [_unused(advisory) for advisory in advisories if advisory not in ignored]
+
+
+def _expired_faults(
+    blocks: list[Exception_], ignored: list[str], today: dt.date
+) -> list[str]:
+    """Return a fault for each block of an ignored advisory that has expired.
+
+    Every block is judged, not one per advisory: a later current block must
+    not hide an earlier expired one.
+    """
+    return [
         _expired(block)
         for block in blocks
         if block.advisory in ignored and block.expires_at < today
     ]
-    return [*duplicated, *undocumented, *unused, *expired]
 
 
 def _duplicated(advisory: str, count: int) -> str:

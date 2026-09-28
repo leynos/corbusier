@@ -42,7 +42,13 @@ class Half(typ.NamedTuple):
     command: list[str]
 
 
-def run(half: Half) -> int:
+#: Seconds either half may run. Both audits fetch an advisory database and
+#: normally finish in about a minute; a hung half must fail, not stop the
+#: other half from running and the summary from printing.
+HALF_TIMEOUT: typ.Final[float] = 900.0
+
+
+def run(half: Half, timeout: float = HALF_TIMEOUT) -> int:
     """Run one half and return its exit status.
 
     Output is not captured. A gate's output is what makes a failure
@@ -57,13 +63,18 @@ def run(half: Half) -> int:
     Returns
     -------
     int
-        The command's exit status, or 127 when it could not be started,
-        so a missing tool fails its half instead of ending the run before
-        the other half reports.
+        The command's exit status; 127 when it could not be started, and
+        124 when it outran `timeout` and was killed. Either way the half
+        fails instead of ending the run before the other half reports.
     """
     print(f"\n=== {half.name} ===", flush=True)
     try:
-        return subprocess.call(half.command)  # noqa: S603 - fixed command
+        # `subprocess.call` kills the child when the timeout expires.
+        return subprocess.call(half.command, timeout=timeout)  # noqa: S603 - fixed command
+    except subprocess.TimeoutExpired:
+        message = f"{half.name} ran longer than {timeout:g} s and was stopped"
+        print(message, file=sys.stderr, flush=True)
+        return 124
     except OSError as error:
         print(f"cannot run {half.command[0]}: {error}", file=sys.stderr, flush=True)
         return 127

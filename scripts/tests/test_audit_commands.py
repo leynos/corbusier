@@ -149,7 +149,7 @@ def _run_make_audit(fake: Path) -> subprocess.CompletedProcess[str]:
     """Run the real `audit` recipe with the stand-in passed as `MAKE`."""
     environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
     return subprocess.run(  # noqa: S603 - fixed command
-        ["make", "--no-print-directory", "-C", str(REPO_ROOT), f"MAKE={fake}", "audit"],  # noqa: S607
+        ["make", "--no-print-directory", "-C", str(REPO_ROOT), f"MAKE={fake}", "audit"],  # noqa: S607 - `make` from PATH is the gate under test
         capture_output=True,
         text=True,
         check=False,
@@ -221,7 +221,7 @@ def test_rust_audit_runs_the_exception_gate_first_and_stops_on_it(
     environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
 
     result = subprocess.run(  # noqa: S603 - fixed command
-        [  # noqa: S607
+        [  # noqa: S607 - `make` from PATH is the gate under test
             "make", "--no-print-directory", "-C", str(REPO_ROOT),
             f"AUDIT_PYTEST={pytest_stand_in}", f"AUDIT_EXCEPTIONS={validator}", f"CARGO={cargo}",
             "rust-audit",

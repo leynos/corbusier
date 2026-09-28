@@ -20,6 +20,7 @@ from run_audits import (  # noqa: E402 - after the path fixup above
     Half,
     audit_halves,
     main,
+    run,
     summarize,
 )
 
@@ -67,6 +68,14 @@ def test_a_half_that_cannot_start_fails_without_stopping_the_other(
     assert "FAIL  missing tool" in captured.out
     assert "PASS  passing half" in captured.out
     assert "cannot run" in captured.err
+
+
+def test_a_hung_half_is_stopped_and_fails(capsys: pytest.CaptureFixture[str]) -> None:
+    """A half that outruns its timeout is killed and fails with 124."""
+    hung = Half("hung half", [sys.executable, "-c", "import time; time.sleep(30)"])
+
+    assert run(hung, timeout=0.5) == 124
+    assert "ran longer than 0.5 s" in capsys.readouterr().err
 
 
 def test_the_summary_names_each_half_in_order(

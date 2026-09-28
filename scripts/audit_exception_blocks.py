@@ -105,6 +105,23 @@ def _parse_expiry(raw: str, advisory: str) -> dt.date:
         raise AuditExceptionError(message) from error
 
 
+def _block_lines(lines: list[str], start: int) -> list[str]:
+    """Return the comment lines of one block, up to the next block or the TOML.
+
+    Examples
+    --------
+    >>> _block_lines(["# advisory: RUSTSEC-2026-0001", "# a", "# b",
+    ...               "# advisory: RUSTSEC-2026-0002"], 1)
+    ['# a', '# b']
+    """
+    block: list[str] = []
+    for line in lines[start:]:
+        if _ADVISORY.match(line) or not line.startswith("#"):
+            break
+        block.append(line)
+    return block
+
+
 def _read_expiry(lines: list[str], start: int, advisory: str) -> dt.date:
     """Return the expiry date following an advisory line.
 
@@ -125,15 +142,22 @@ def _read_expiry(lines: list[str], start: int, advisory: str) -> dt.date:
     Raises
     ------
     AuditExceptionError
-        If the next non-blank comment line is not an expiry, or names a
-        date that is not on the calendar.
+        If the block names no expiry, names more than one, or names a date
+        that is not on the calendar.
     """
-    for line in lines[start:]:
-        found = _EXPIRES.match(line)
-        if found is not None:
-            return _parse_expiry(found.group("date"), advisory)
-        if _ADVISORY.match(line) or not line.startswith("#"):
-            break
+    dates = [
+        found.group("date")
+        for line in _block_lines(lines, start)
+        if (found := _EXPIRES.match(line)) is not None
+    ]
+    if len(dates) > 1:
+        message = (
+            f"the exception for {advisory} names {len(dates)} expiry dates "
+            f"({', '.join(dates)}); keep exactly one"
+        )
+        raise AuditExceptionError(message)
+    if dates:
+        return _parse_expiry(dates[0], advisory)
     message = (
         f"the exception for {advisory} names no expiry; add an "
         f"`# expires-at: YYYY-MM-DD` line, because an exception that cannot "
@@ -215,8 +239,8 @@ def ignored_advisories(text: str) -> list[str]:
     except tomllib.TOMLDecodeError as error:
         message = f"the audit configuration is not valid TOML: {error}"
         raise AuditExceptionError(message) from error
-    advisories = parsed.get("advisories")
-    if not isinstance(advisories, dict):
-        return []
-    ignore = advisories.get("ignore")
-    return [str(entry) for entry in ignore] if isinstance(ignore, list) else []
+    match parsed:
+        case {"advisories": {"ignore": list() as ignore}}:
+            return [str(entry) for entry in ignore]
+        case _:
+            return []
