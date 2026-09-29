@@ -9,9 +9,9 @@
 # matching `[target.*]` table replaces `[build] rustflags` outright, and an
 # assigned `RUSTFLAGS` replaces both. Every flag is therefore repeated in each
 # source here, and the Makefile composes them into the `RUSTFLAGS` its
-# recipes set. Coverage and release builds assign `RUSTFLAGS` without them on
-# purpose: a measurement and a shipped artefact stay on the platform linker
-# and the single-threaded frontend.
+# recipes set. Coverage and the release recipe and workflow assign `RUSTFLAGS`
+# without them on purpose. A direct `cargo build --release` keeps these flags
+# unless `RUSTFLAGS` is assigned.
 # The Cranelift codegen backend is the development-profile default: the
 # repository's whole suite passes under it (see "Cranelift" in
 # docs/developers-guide.md). Coverage selects LLVM explicitly, since
