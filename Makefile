@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts audit-exceptions audit-exceptions-test audit-commands-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -37,6 +37,12 @@ TYPOS_CONFIG_BUILDER := uv tool run --python 3.14 --from \
 # otherwise execute a stale `.pyc` whose mtime and size match the edit.
 WORKFLOW_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
 	--with pytest==9.0.2 --with pyyaml==6.0.3 python -m pytest
+# The validator for dated Rust audit exceptions. A variable so the command
+# tests can stand in for it and prove `rust-audit` runs it first.
+AUDIT_EXCEPTIONS ?= uv run scripts/rust_audit_exceptions.py
+# The audit-exception rule's tests need pytest alone.
+AUDIT_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
+	--with pytest==9.0.2 python -m pytest
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
@@ -60,7 +66,7 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 
 # `test-workflow-contracts` is a prerequisite here as well as a CI step of its
 # own, so deleting the step does not stop the contracts running.
-lint: test-workflow-contracts ## Run Clippy and the Whitaker Dylint suite with warnings denied
+lint: test-workflow-contracts audit-commands-test ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
@@ -131,12 +137,31 @@ frontend-semantic: ## Run semantic frontend linting and styling checks
 frontend-e2e: ## Run frontend browser-path tests
 	cd $(FRONTEND_DIR) && $(BUN) run e2e
 
-audit: audit-node rust-audit ## Audit frontend and Rust dependencies for known vulnerabilities
+# Both halves always run and both report. As Make prerequisites the first
+# failure stopped the target, so 24 frontend advisories masked
+# RUSTSEC-2026-0258 for weeks. One failure must not hide another.
+audit: ## Audit frontend and Rust dependencies, reporting both
+	MAKE="$(MAKE)" uv run scripts/run_audits.py
 
 audit-node: ## Audit frontend dependencies for known vulnerabilities
 	cd $(FRONTEND_DIR) && $(BUN) run audit
 
-rust-audit: ## Audit every Rust manifest for known vulnerabilities
+audit-exceptions: audit-exceptions-test ## Refuse an ignored advisory that is undated or expired
+	$(AUDIT_EXCEPTIONS)
+
+audit-exceptions-test: ## Drive the exception rule and the audit runner over constructed cases
+	@PYTHONPATH=scripts $(AUDIT_PYTEST) --doctest-modules \
+		scripts/tests/test_rust_audit_exceptions.py scripts/tests/test_run_audits.py \
+		scripts/audit_exception_blocks.py scripts/rust_audit_exceptions.py \
+		scripts/run_audits.py
+
+# The command tests run `make audit` in a child process, so they must never be
+# reachable from `audit` itself: a stand-in `make` that is bypassed would
+# recurse. `lint` reaches them instead.
+audit-commands-test: ## Run the audit commands end to end with a stand-in make
+	@PYTHONPATH=scripts $(AUDIT_PYTEST) scripts/tests/test_audit_commands.py
+
+rust-audit: audit-exceptions ## Audit every Rust manifest for known vulnerabilities
 	find . \
 		\( -path '*/target/*' -o -path '*/node_modules/*' -o -path '*/.venv/*' \) -prune -o \
 		-name Cargo.toml -exec sh -c 'set -e; for manifest do \

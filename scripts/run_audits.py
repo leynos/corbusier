@@ -1,0 +1,140 @@
+#!/usr/bin/env -S uv run python
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
+"""Run both dependency audits and report both outcomes.
+
+`audit: audit-node rust-audit` made the two halves Make prerequisites, so a
+failing frontend audit stopped the target before the Rust half ran. That is
+how this repository came to carry two audit failures while only one was
+visible: 24 frontend advisories masked RUSTSEC-2026-0258 entirely, and
+clearing the frontend revealed a Rust advisory that had been there since
+2026-08-17.
+
+One failure must not hide another, so both halves always run and both report,
+and the exit status is the worse of the two.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess  # noqa: S404 - the commands are fixed, not caller-supplied
+import sys
+import typing as typ
+
+if typ.TYPE_CHECKING:
+    from collections.abc import Mapping
+
+
+class Half(typ.NamedTuple):
+    """One audit half.
+
+    Attributes
+    ----------
+    name : str
+        What to call it in the summary.
+    command : list[str]
+        The command to run.
+    """
+
+    name: str
+    command: list[str]
+
+
+#: Seconds either half may run. Both audits fetch an advisory database and
+#: normally finish in about a minute; a hung half must fail, not stop the
+#: other half from running and the summary from printing.
+HALF_TIMEOUT: typ.Final[float] = 900.0
+
+
+def run(half: Half, timeout: float = HALF_TIMEOUT) -> int:
+    """Run one half and return its exit status.
+
+    Output is not captured. A gate's output is what makes a failure
+    actionable, and holding it back to re-print later loses the interleaving
+    with the tool's own progress.
+
+    Parameters
+    ----------
+    half : Half
+        The half to run.
+
+    Returns
+    -------
+    int
+        The command's exit status; 127 when it could not be started, and
+        124 when it outran `timeout` and was killed. Either way the half
+        fails instead of ending the run before the other half reports.
+    """
+    print(f"\n=== {half.name} ===", flush=True)
+    try:
+        # `subprocess.call` kills the child when the timeout expires.
+        return subprocess.call(half.command, timeout=timeout)  # noqa: S603 - fixed command
+    except subprocess.TimeoutExpired:
+        message = f"{half.name} ran longer than {timeout:g} s and was stopped"
+        print(message, file=sys.stderr, flush=True)
+        return 124
+    except OSError as error:
+        print(f"cannot run {half.command[0]}: {error}", file=sys.stderr, flush=True)
+        return 127
+
+
+def summarize(results: list[tuple[str, int]]) -> int:
+    """Print one line per half and return the status to exit with.
+
+    Parameters
+    ----------
+    results : list of tuple
+        Each half's name and exit status, in the order they ran.
+
+    Returns
+    -------
+    int
+        0 when every half passed, otherwise 1.
+    """
+    print("\n=== audit summary ===", flush=True)
+    for name, status in results:
+        print(f"{'PASS' if status == 0 else 'FAIL'}  {name}")
+    return 0 if all(status == 0 for _, status in results) else 1
+
+
+def main(halves: list[Half] | None = None) -> int:
+    """Run every half, report both, and fail if either failed.
+
+    Parameters
+    ----------
+    halves : list[Half] or None
+        The halves to run; the two real ones by default.
+
+    Returns
+    -------
+    int
+        0 when every half passed, otherwise 1.
+    """
+    to_run = audit_halves(os.environ) if halves is None else halves
+    results = [(half.name, run(half)) for half in to_run]
+    return summarize(results)
+
+
+def audit_halves(environ: Mapping[str, str]) -> list[Half]:
+    """Return the two halves, in the order they run.
+
+    The `audit` recipe passes `$(MAKE)` in, so a wrapper or an alternate make
+    such as `gmake` runs the halves too; run by hand, the halves fall back to
+    `make`. The environment is a parameter so tests inject it.
+
+    Examples
+    --------
+    >>> [half.command[0] for half in audit_halves({"MAKE": "gmake"})]
+    ['gmake', 'gmake']
+    """
+    make = environ.get("MAKE") or "make"
+    return [
+        Half("frontend (bun audit)", [make, "audit-node"]),
+        Half("Rust (cargo audit)", [make, "rust-audit"]),
+    ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
