@@ -39,7 +39,9 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
+        uses: leynos/shared-actions/.github/actions/setup-rust@8a83824b29dfe8f861714b544dc85fb925ed010c
+        with:
+          install-mold: 'true'
       - name: Install frontend dependencies and browser
         run: FRONTEND_INSTALL_FLAGS=--frozen-lockfile make frontend-install
       - name: Refresh apt package index
@@ -112,7 +114,9 @@ jobs:
               cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
             fi
           fi
-          whitaker-installer
+          # --cranelift provisions rustc-codegen-cranelift on Whitaker's pinned
+          # toolchain; the dev profile builds with the Cranelift backend.
+          whitaker-installer --cranelift
       - name: Lint
         run: make lint
       - name: Cache pg_worker binary

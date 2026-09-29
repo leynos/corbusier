@@ -46,6 +46,14 @@ AUDIT_PYTEST ?= PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.14 \
 FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
+# The development build standard (concordat rule `rust-build-defaults`):
+# the parallel rustc frontend and, on Linux, the mold linker. An assigned
+# RUSTFLAGS replaces every `rustflags` table in .cargo/config.toml, so each
+# recipe that sets it composes these onto any inherited value (CI's
+# setup-rust exports one), except coverage, which stays on LLVM and the
+# platform linker.
+STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(shell uname -s)), -Clink-arg=-fuse-ld=mold)
+
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
@@ -56,20 +64,20 @@ clean: ## Remove build artifacts
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) nextest run $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) nextest run $(TEST_FLAGS) $(BUILD_JOBS)
 
 typecheck: ## Run cargo type checks across the workspace
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS) $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
+	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
 
 # `test-workflow-contracts` is a prerequisite here as well as a CI step of its
 # own, so deleting the step does not stop the contracts running.
 lint: test-workflow-contracts audit-commands-test ## Run Clippy and the Whitaker Dylint suite with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
-	$(CARGO) clippy $(CLIPPY_FLAGS)
-	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 	+$(MAKE) spelling
 
 fmt: ## Format Rust and Markdown sources
