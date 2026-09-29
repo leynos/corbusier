@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import typing as typ
 
-from codescene_placement_reader import calls
+from workflow_reading import calls
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
