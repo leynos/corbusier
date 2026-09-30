@@ -485,39 +485,36 @@ and is not read anywhere.
 
 ### Workflow contracts
 
-`make test-workflow-contracts` runs the pytest modules under
-`tests/workflow_contracts/`, which assert the rule above against the workflow
-files. They run as their own CI step before anything compiles, and as a
-prerequisite of `make lint`, so deleting the step does not stop them running.
+`make test-workflow-contracts` holds the rule above against the workflow files.
+It runs `cv005-contracts check`, the shared contract library in
+`leynos/shared-actions` (`packages/cv005-contracts`), from a full commit named
+by `CV005_CONTRACTS_REF` in the Makefile, and then the pytest modules under
+`tests/workflow_contracts/`. A fix to the CodeScene rules is therefore a pin
+bump. The target needs `uv`, which fetches the Python 3.13 the library runs
+under. The repository's only parameter is `repository` in `.github/cv005.toml`.
+The library's own suite proves each rule refuses the shape it exists to refuse,
+so this repository keeps no copy of the readers or the refusal cases. It
+refuses, anywhere in the closure a pull request reaches (every workflow started
+by a pull-request event plus every local workflow those call, transitively), a
+CodeScene action, a `cs-coverage` command, the token by any reference, the
+`codescene.io` host in any scalar (a workflow-level `defaults.run.shell`
+included), `secrets: inherit` into another repository, and a call to this
+repository by ref. It also requires the pull-request lane to keep its
+unconditional, ratcheted, unpublished coverage step, the publisher's triggers,
+`main` push filter, `mode: upload`, token check and upload condition, the token
+in no `env`, a full-SHA uploader pin with no `installer-checksum`, and the
+concurrency group. The target runs as its own CI step before anything compiles,
+and as a prerequisite of `make lint` and `make all`, so deleting the step does
+not stop it running.
+
+The pytest modules that remain:
 
 - `workflow_loader.py` is the only parser. It refuses a mapping that declares a
   key twice, because PyYAML otherwise keeps the last value silently, and it
   reads `.yml` and `.yaml` in any case.
-- `workflow_calls.py` decides which `uses:` values run a checked-out workflow:
-  a leading `./` or `$/` is stripped and the rest must name a file directly
-  under `.github/workflows/`. A call to this repository's workflows at an
-  `@ref` runs the file at that ref, which the checkout does not hold, so it is
-  refused rather than followed.
-- `codescene_placement_reader.py` reads triggers as a scalar, a sequence or a
-  mapping, under both the `on` string key and the boolean YAML 1.1 makes of it,
-  and refuses a workflow declaring both. It builds the pull-request closure:
-  every workflow started by a pull-request event (`pull_request`,
-  `pull_request_target`, `merge_group`, `workflow_run`, the review events and
-  `issue_comment`) plus every local workflow those call, transitively. A
-  `workflow_call`-only workflow called with `secrets: inherit` runs on the pull
-  request with the token.
-- `ci_codescene_placement_test.py` refuses, anywhere in the closure, a
-  CodeScene action, a `cs-coverage` command, the token by any reference, the
-  `codescene.io` host in any scalar (a workflow-level `defaults.run.shell`
-  included), `secrets: inherit` into another repository, and a call to this
-  repository by ref. It also requires the pull-request lane to keep its
-  unconditional, ratcheted, unpublished coverage step.
-- `codescene_publisher_test.py` requires the publisher's triggers, its `main`
-  push filter, `mode: upload`, the token check and upload condition compared
-  whole, the token in no `env`, a full-SHA uploader pin with no
-  `installer-checksum`, and the concurrency group compared whole.
-- `codescene_placement_policy.py` holds the reviewed values the tests compare
-  against. Change a value there only with the workflow it describes.
+- `workflow_reading.py` reads triggers as a scalar, a sequence or a mapping,
+  under both the `on` string key and the boolean YAML 1.1 makes of it, and
+  refuses a workflow declaring both; it also reads jobs, steps and calls.
 - `shared_actions_pin_test.py` requires every `leynos/shared-actions`
   reference, step or reusable workflow, to pin the same full commit SHA. The
   actions are developed together, so a tree pinning them at different commits
@@ -571,11 +568,10 @@ over a parsed workflow. `concurrency_test.py` holds this repository's workflows
 to them: for every workflow a `pull_request` event starts, a concurrency group
 is declared, the group is exactly the expression above, and
 `cancel-in-progress` is exactly the expression above. Discovery reads triggers
-through `codescene_placement_reader.triggers`, which refuses a missing `on:`, a
-shape it cannot model and a workflow declaring both `on` keys, so no workflow
-leaves discovery in silence. A floor test asserts that discovery still finds
-`ci.yml`, so a broken read cannot empty the list and turn the rest into a
-vacuous pass.
+through `workflow_reading.triggers`, which refuses a missing `on:`, a shape it
+cannot model and a workflow declaring both `on` keys, so no workflow leaves
+discovery in silence. A floor test asserts that discovery still finds `ci.yml`,
+so a broken read cannot empty the list and turn the rest into a vacuous pass.
 
 `concurrency_rules_test.py` drives the same functions with constructed
 workflows: every trigger form under both key spellings, the refused shapes, and

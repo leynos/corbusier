@@ -5,7 +5,7 @@
 workflows. Each function takes a parsed document rather than a path, so a
 fixture exercises exactly the code the repository contract runs.
 
-Triggers are read by ``codescene_placement_reader.triggers``, which reads the
+Triggers are read by ``workflow_reading.triggers``, which reads the
 scalar, sequence and mapping forms under both the ``on`` string key and the
 boolean ``True`` YAML 1.1 makes of it. It refuses a workflow declaring both
 keys, a missing ``on:`` and any shape it cannot model, so no workflow can
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import typing as typ
 
-from codescene_placement_reader import triggers
+from workflow_reading import triggers
 
 if typ.TYPE_CHECKING:
     from collections.abc import Mapping
