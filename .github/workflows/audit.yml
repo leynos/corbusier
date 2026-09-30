@@ -27,6 +27,8 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend-pwa && bun install --frozen-lockfile
       - name: Install cargo-audit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall --no-confirm cargo-audit
       - name: Audit dependencies
         run: make audit
