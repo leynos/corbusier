@@ -149,6 +149,11 @@ jobs:
       # token, the uploader and the CodeScene host anywhere a pull request
       # can reach.
       - name: Test and Measure Coverage
+        env:
+          # One of the two exclusions from the build standard: a coverage build is a
+          # measurement, so it takes neither the parallel frontend nor the mold linker.
+          # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
+          RUSTFLAGS: -D warnings
         uses: leynos/shared-actions/.github/actions/generate-coverage@8a83824b29dfe8f861714b544dc85fb925ed010c
         with:
           output-path: lcov.info
