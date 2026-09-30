@@ -172,9 +172,13 @@ audit-exceptions-test: ## Drive the exception rule and the audit runner over con
 audit-commands-test: ## Run the audit commands end to end with a stand-in make
 	@PYTHONPATH=scripts $(AUDIT_PYTEST) scripts/tests/test_audit_commands.py
 
+# The uv directories hold checkouts of other repositories (the CV-005 contract
+# runs from one), whose fixture manifests are not this workspace's, so the
+# search prunes them.
 rust-audit: audit-exceptions ## Audit every Rust manifest for known vulnerabilities
 	find . \
-		\( -path '*/target/*' -o -path '*/node_modules/*' -o -path '*/.venv/*' \) -prune -o \
+		\( -path '*/target/*' -o -path '*/node_modules/*' -o -path '*/.venv/*' \
+		-o -path '*/.uv-cache/*' -o -path '*/.uv-tools/*' \) -prune -o \
 		-name Cargo.toml -exec sh -c 'set -e; for manifest do \
 			manifest_dir=$$(dirname "$$manifest"); \
 			printf "Auditing Rust manifest %s\n" "$$manifest"; \
