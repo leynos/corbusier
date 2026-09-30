@@ -185,19 +185,51 @@ def test_make_audit_runs_both_halves_and_reports_both(
     assert result.stdout.splitlines()[-2:] == summary
 
 
-def _recorder(tmp_path: Path, name: str, status: int) -> Path:
-    """Write a stand-in command that logs its name and exits with `status`."""
-    log = tmp_path / "order.log"
+def _recorder(tmp_path: Path, name: str, status: int = 0, *, record: str = "name") -> Path:
+    """Write a stand-in command that logs a line and exits with `status`.
+
+    `record` is the expression the line is built from: the command's own name
+    by default, or the directory it ran in with ``"os.getcwd()"``.
+    """
+    log = tmp_path / ("order.log" if record == "name" else f"{name}.log")
+    line = repr(name) if record == "name" else record
     script = tmp_path / name
     script.write_text(
         f"#!{sys.executable}\n"
+        "import os\n"
         f"with open({str(log)!r}, 'a', encoding='utf-8') as handle:\n"
-        f"    handle.write({name!r} + '\\n')\n"
+        f"    handle.write({line} + '\\n')\n"
         f"raise SystemExit({status})\n",
         encoding="utf-8",
     )
     script.chmod(script.stat().st_mode | stat.S_IXUSR)
     return script
+
+
+def _run_rust_audit(
+    tmp_path: Path, *, validator_status: int = 0, cargo: Path, workspace: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run the real `rust-audit` recipe with stand-ins for pytest, the validator and cargo.
+
+    Run from the repository by default, or from `workspace` with this
+    repository's Makefile, so the `find` in the recipe searches that tree.
+    """
+    directory = ["-C", str(workspace), "-f", str(REPO_ROOT / "Makefile")] if workspace else ["-C", str(REPO_ROOT)]
+    environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
+    return subprocess.run(  # noqa: S603 - fixed command
+        [  # noqa: S607 - `make` from PATH is the gate under test
+            "make", "--no-print-directory", *directory,
+            f"AUDIT_PYTEST={_recorder(tmp_path, 'pytest')}",
+            f"AUDIT_EXCEPTIONS={_recorder(tmp_path, 'validator', validator_status)}",
+            f"CARGO={cargo}",
+            "rust-audit",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environ,
+        timeout=CHILD_TIMEOUT,
+    )
 
 
 @pytest.mark.parametrize(
@@ -215,41 +247,12 @@ def test_rust_audit_runs_the_exception_gate_first_and_stops_on_it(
     With the validator failing, `cargo audit` never runs and `make` fails, so
     removing `audit-exceptions` from the target's prerequisites fails here.
     """
-    pytest_stand_in = _recorder(tmp_path, "pytest", 0)
-    validator = _recorder(tmp_path, "validator", validator_status)
-    cargo = _recorder(tmp_path, "cargo", 0)
-    environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
-
-    result = subprocess.run(  # noqa: S603 - fixed command
-        [  # noqa: S607 - `make` from PATH is the gate under test
-            "make", "--no-print-directory", "-C", str(REPO_ROOT),
-            f"AUDIT_PYTEST={pytest_stand_in}", f"AUDIT_EXCEPTIONS={validator}", f"CARGO={cargo}",
-            "rust-audit",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        env=environ,
-        timeout=CHILD_TIMEOUT,
+    result = _run_rust_audit(
+        tmp_path, validator_status=validator_status, cargo=_recorder(tmp_path, "cargo")
     )
 
     assert result.returncode == make_status, result.stdout + result.stderr
     assert (tmp_path / "order.log").read_text(encoding="utf-8").split() == expected_order
-
-
-def _cwd_recorder(tmp_path: Path, name: str) -> Path:
-    """Write a stand-in command that logs the directory it runs in."""
-    log = tmp_path / f"{name}.log"
-    script = tmp_path / name
-    script.write_text(
-        f"#!{sys.executable}\n"
-        "import os\n"
-        f"with open({str(log)!r}, 'a', encoding='utf-8') as handle:\n"
-        "    handle.write(os.getcwd() + '\\n')\n",
-        encoding="utf-8",
-    )
-    script.chmod(script.stat().st_mode | stat.S_IXUSR)
-    return script
 
 
 @pytest.mark.parametrize(
@@ -280,22 +283,8 @@ def test_rust_audit_reaches_the_workspace_manifest_and_prunes_tool_trees(
     decoy = workspace / pruned
     decoy.mkdir(parents=True)
     (decoy / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
-    pytest_stand_in = _recorder(tmp_path, "pytest", 0)
-    validator = _recorder(tmp_path, "validator", 0)
-    cargo = _cwd_recorder(tmp_path, "cargo")
-    environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
-
-    result = subprocess.run(  # noqa: S603 - fixed command
-        [  # noqa: S607 - `make` from PATH is the gate under test
-            "make", "--no-print-directory", "-C", str(workspace), "-f", str(REPO_ROOT / "Makefile"),
-            f"AUDIT_PYTEST={pytest_stand_in}", f"AUDIT_EXCEPTIONS={validator}", f"CARGO={cargo}",
-            "rust-audit",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        env=environ,
-        timeout=CHILD_TIMEOUT,
+    result = _run_rust_audit(
+        tmp_path, cargo=_recorder(tmp_path, "cargo", record="os.getcwd()"), workspace=workspace
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
