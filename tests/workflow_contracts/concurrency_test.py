@@ -38,7 +38,7 @@ from __future__ import annotations
 import typing as typ
 
 import pytest
-from codescene_placement_reader import triggers
+from workflow_reading import triggers
 from concurrency_rules import (
     CANCEL_EXPRESSION,
     GROUP_EXPRESSION,
