@@ -85,6 +85,8 @@ jobs:
             cargo install pg-embed-setup-unpriv@0.4.0 --locked
           fi
       - name: Generate coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           output-path: lcov.info

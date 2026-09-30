@@ -74,6 +74,8 @@ jobs:
       # Dependabot merges instead.
       - name: Install cargo-audit
         if: github.actor != 'dependabot[bot]'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall --no-confirm cargo-audit
       - name: Audit dependencies
         if: github.actor != 'dependabot[bot]'
@@ -145,6 +147,8 @@ jobs:
       # token, the uploader and the CodeScene host anywhere a pull request
       # can reach.
       - name: Test and Measure Coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@22c1a57865e42ba7e2ca4f88ae49fa6f81f58013
         with:
           output-path: lcov.info
