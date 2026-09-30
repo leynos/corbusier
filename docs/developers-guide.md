@@ -254,6 +254,10 @@ Every run regenerates `typos.toml` from the live shared dictionary and the
 repository overlay, then checks the maintained Markdown, so the generated file
 is never drift-checked in continuous integration.
 
+`TYPOS_CONFIG_BUILDER_VERSION` in the `Makefile` pins the
+`typos-config-builder` release the gate runs (currently `v0.1.3`). Raise it
+together with the regenerated `typos.toml`, never on its own.
+
 Add repository-only proper names or quoted upstream terms to
 `typos.local.toml`, which holds the en-GB-oxendict overlay; never edit
 generated entries in `typos.toml` by hand.
