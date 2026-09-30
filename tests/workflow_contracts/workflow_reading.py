@@ -1,21 +1,23 @@
-"""Reading machinery for the workflow contracts in this directory.
+"""Readings over parsed workflow documents, for the pytest contracts here.
 
-This module gets facts out of a workflow tree and holds no opinion about
-them; the assertions live in the contracts that call it, and the readings are
-proved against constructed trees in ``workflow_reading_test``. Every reader
-takes its documents as an argument, so a fixture tree exercises exactly the
-code the contracts run.
+The readers take an already parsed document (``workflow_loader.Document``, from
+the strict loader that refuses a duplicated mapping key) and hold no opinion
+about it; the assertions live in the contracts that call them, and the readings
+are proved against constructed workflows in ``workflow_reading_test``, because
+the repository's own workflows are written the one way the first reader
+understood.
 
-Loading is ``workflow_loader``'s, which refuses a duplicated mapping key.
-``triggers`` reads ``on:`` as a scalar, a sequence or a mapping, under both
-the string key and YAML 1.1's boolean ``True``, and refuses anything else. A
-mapping-only reader stringifies ``on: [push, pull_request]`` into one key
-that matches no trigger, and a reader that returns nothing for an unknown
-shape lets the workflow escape every pull-request clause.
+``triggers`` reads ``on:`` as a scalar, a sequence or a mapping, under both the
+string key and YAML 1.1's boolean ``True``, refuses a workflow declaring both,
+and refuses any other shape, so a workflow cannot escape a clause by spelling
+its triggers unexpectedly. ``jobs`` and ``steps`` return the mapping jobs and
+steps in document order, and ``calls`` returns the jobs that are themselves
+workflow calls followed by every step. ``concurrency_rules`` and
+``concurrency_test`` use ``triggers``; ``shared_actions_pin`` uses ``calls``,
+``jobs`` and ``steps``.
 
-The CV-005 CodeScene placement contract, which also followed local calls to
-find what a pull request reaches, now runs from the shared library through
-``make test-workflow-contracts``.
+The CV-005 CodeScene contract does not use this module: it runs from the shared
+contract library through ``make test-workflow-contracts``.
 """
 
 from __future__ import annotations

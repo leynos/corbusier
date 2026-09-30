@@ -235,3 +235,69 @@ def test_rust_audit_runs_the_exception_gate_first_and_stops_on_it(
 
     assert result.returncode == make_status, result.stdout + result.stderr
     assert (tmp_path / "order.log").read_text(encoding="utf-8").split() == expected_order
+
+
+def _cwd_recorder(tmp_path: Path, name: str) -> Path:
+    """Write a stand-in command that logs the directory it runs in."""
+    log = tmp_path / f"{name}.log"
+    script = tmp_path / name
+    script.write_text(
+        f"#!{sys.executable}\n"
+        "import os\n"
+        f"with open({str(log)!r}, 'a', encoding='utf-8') as handle:\n"
+        "    handle.write(os.getcwd() + '\\n')\n",
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return script
+
+
+@pytest.mark.parametrize(
+    "pruned",
+    [
+        pytest.param("target/debug/build", id="target"),
+        pytest.param("frontend/node_modules/pkg", id="node-modules"),
+        pytest.param(".venv/lib/pkg", id="venv"),
+        pytest.param(".uv-cache/git-v0/checkouts/abc/fixture", id="uv-cache"),
+        pytest.param(".uv-tools/tool/fixture", id="uv-tools"),
+    ],
+)
+def test_rust_audit_reaches_the_workspace_manifest_and_prunes_tool_trees(
+    tmp_path: Path, pruned: str
+) -> None:
+    """`rust-audit` audits the workspace manifest and skips vendored trees.
+
+    The contract target runs the shared library from a checkout in the
+    repository-local uv cache, and that checkout holds fixture manifests with
+    no targets, which `cargo audit` refuses. A real workspace manifest and a
+    decoy under each pruned directory are created in a scratch tree, the recipe
+    runs there with a stand-in `cargo` that logs where it ran, and only the
+    workspace directory may be logged, so dropping any prune fails its case.
+    """
+    workspace = tmp_path / "workspace"
+    (workspace / "crates/app").mkdir(parents=True)
+    (workspace / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+    decoy = workspace / pruned
+    decoy.mkdir(parents=True)
+    (decoy / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
+    pytest_stand_in = _recorder(tmp_path, "pytest", 0)
+    validator = _recorder(tmp_path, "validator", 0)
+    cargo = _cwd_recorder(tmp_path, "cargo")
+    environ = {key: value for key, value in os.environ.items() if key not in {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}}
+
+    result = subprocess.run(  # noqa: S603 - fixed command
+        [  # noqa: S607 - `make` from PATH is the gate under test
+            "make", "--no-print-directory", "-C", str(workspace), "-f", str(REPO_ROOT / "Makefile"),
+            f"AUDIT_PYTEST={pytest_stand_in}", f"AUDIT_EXCEPTIONS={validator}", f"CARGO={cargo}",
+            "rust-audit",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environ,
+        timeout=CHILD_TIMEOUT,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    audited = (tmp_path / "cargo.log").read_text(encoding="utf-8").split()
+    assert audited == [str(workspace)], f"only the workspace manifest may be audited, saw {audited}"
