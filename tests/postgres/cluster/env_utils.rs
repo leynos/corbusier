@@ -282,26 +282,22 @@ mod shared_directory_tests {
     //! Tests for the pinned shared install and data directories.
 
     use super::shared_directory_changes;
+    use rstest::rstest;
     use std::ffi::OsString;
 
-    #[test]
-    fn unset_variables_are_pinned_to_one_shared_root() {
-        let changes = shared_directory_changes(|_| None);
-        let keys: Vec<_> = changes.iter().map(|(key, _)| key.clone()).collect();
-        assert_eq!(
-            keys,
-            [
-                OsString::from("PG_DATA_DIR"),
-                OsString::from("PG_RUNTIME_DIR")
-            ]
-        );
-    }
-
-    #[test]
-    fn a_caller_supplied_data_directory_is_left_alone() {
+    /// Which of the two variables the caller already set decides what is
+    /// pinned: nothing is pinned over a caller's data directory, and a
+    /// caller's runtime directory is kept while the data directory is pinned.
+    #[rstest]
+    #[case::none_set(&[], &["PG_DATA_DIR", "PG_RUNTIME_DIR"])]
+    #[case::data_dir_set(&["PG_DATA_DIR"], &[])]
+    #[case::runtime_dir_set(&["PG_RUNTIME_DIR"], &["PG_DATA_DIR"])]
+    fn the_caller_s_variables_win(#[case] preset: &[&str], #[case] expected: &[&str]) {
         let changes = shared_directory_changes(|key| {
-            (key == "PG_DATA_DIR").then(|| OsString::from("/elsewhere"))
+            preset.contains(&key).then(|| OsString::from("/elsewhere"))
         });
-        assert!(changes.is_empty(), "the caller's directory must win");
+        let keys: Vec<_> = changes.iter().map(|(key, _)| key.clone()).collect();
+        let want: Vec<_> = expected.iter().map(OsString::from).collect();
+        assert_eq!(keys, want);
     }
 }
