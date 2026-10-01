@@ -304,6 +304,27 @@ Using `BearerToken` rather than a bare `&str` reduces string-argument
 saturation and makes the intended role of each parameter unambiguous at call
 sites.
 
+### PostgreSQL test cluster (`tests/postgres/cluster`)
+
+The PostgreSQL tests run on an embedded cluster provided by
+`pg-embed-setup-unpriv` 0.6.3 with the `diesel-support` and `async-api`
+features; CI has no database service. Each test is its own process under
+nextest, and the suite shares one cluster across those processes: the first
+process runs `initdb`, and later processes find the initialized directory and
+only start the server.
+
+`pg-embed-setup-unpriv` 0.5 shared one derived data directory by default. From
+0.6 every process gets a directory of its own, which would make all 118
+PostgreSQL tests run `initdb` and exceed the nextest limit (see
+`leynos/pg-embed-setup-unpriv#306`). `worker_env_changes` in
+`tests/postgres/cluster/env_utils.rs` therefore sets `PG_DATA_DIR` and
+`PG_RUNTIME_DIR` to the `data` and `install` children of
+`<temp dir>/corbusier-pg-embed-<effective uid>`, before the bootstrap. The
+effective user ID keeps users on one host apart. A `PG_DATA_DIR` set by the
+caller wins and nothing is pinned; a caller's `PG_RUNTIME_DIR` is kept. Remove
+the pinning only if the crate gains a supported way to share a cluster across
+processes or the suite stops using one process per test.
+
 ## Dependency audit
 
 The workspace ships a unified dependency-vulnerability gate. Run it with:
