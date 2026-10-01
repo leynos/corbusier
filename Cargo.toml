@@ -62,7 +62,7 @@ actix_v2a = { git = "https://github.com/leynos/actix-v2a.git", rev = "7cc8d8c7af
 jsonwebtoken = "9.3.0"
 
 # Embedded PostgreSQL support (tests and tooling)
-pg-embed-setup-unpriv = { version = "0.5.0", features = ["diesel-support", "async-api"] }
+pg-embed-setup-unpriv = { version = "0.6.3", features = ["diesel-support", "async-api"] }
 postgresql_embedded = "0.20.0"
 
 [dev-dependencies]

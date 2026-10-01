@@ -21,11 +21,42 @@ pub(super) fn env_vars_to_os(
 }
 
 pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
-    worker_env_changes_impl(
+    let (mut changes, port_guard) = worker_env_changes_impl(
         detect_execution_privileges,
         locate_pg_worker_path,
         prepare_pg_worker,
-    )
+    )?;
+    changes.extend(shared_directory_changes(|key| std::env::var_os(key)));
+    Ok((changes, port_guard))
+}
+
+/// Pins one install and data directory for every test process.
+///
+/// This suite shares a single cluster across processes: the first process runs
+/// `initdb`, and later ones find the initialised directory and only start the
+/// server. `pg-embed-setup-unpriv` 0.6 gives each process a directory of its own
+/// unless `PG_DATA_DIR` is set, which would make every test process run
+/// `initdb` and leave a server behind for the next sweep. Setting the variables
+/// restores the sharing. A value the caller already set is left alone.
+fn shared_directory_changes(
+    lookup: impl Fn(&str) -> Option<OsString>,
+) -> Vec<(OsString, Option<OsString>)> {
+    if lookup("PG_DATA_DIR").is_some() {
+        return Vec::new();
+    }
+    let root =
+        std::env::temp_dir().join(format!("corbusier-pg-embed-{}", Uid::effective().as_raw()));
+    let mut changes = vec![(
+        OsString::from("PG_DATA_DIR"),
+        Some(root.join("data").into_os_string()),
+    )];
+    if lookup("PG_RUNTIME_DIR").is_none() {
+        changes.push((
+            OsString::from("PG_RUNTIME_DIR"),
+            Some(root.join("install").into_os_string()),
+        ));
+    }
+    changes
 }
 
 pub(super) fn drop_privileges_if_root(
@@ -243,5 +274,34 @@ mod tests {
 
         assert_eq!(worker_value, expected_os);
         drop(guard);
+    }
+}
+
+#[cfg(test)]
+mod shared_directory_tests {
+    //! Tests for the pinned shared install and data directories.
+
+    use super::shared_directory_changes;
+    use std::ffi::OsString;
+
+    #[test]
+    fn unset_variables_are_pinned_to_one_shared_root() {
+        let changes = shared_directory_changes(|_| None);
+        let keys: Vec<_> = changes.iter().map(|(key, _)| key.clone()).collect();
+        assert_eq!(
+            keys,
+            [
+                OsString::from("PG_DATA_DIR"),
+                OsString::from("PG_RUNTIME_DIR")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_caller_supplied_data_directory_is_left_alone() {
+        let changes = shared_directory_changes(|key| {
+            (key == "PG_DATA_DIR").then(|| OsString::from("/elsewhere"))
+        });
+        assert!(changes.is_empty(), "the caller's directory must win");
     }
 }
