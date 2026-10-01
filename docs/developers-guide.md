@@ -235,8 +235,10 @@ nextest tests pass (one is skipped). Coverage selects LLVM explicitly
 (`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because instrumentation needs it,
 and release builds use the release profile, which Cranelift does not touch.
 Re-measure the whole suite on the next toolchain bump; if it fails, record the
-failing tests here as an exception and remove the backend from
-`.cargo/config.toml`.
+failing tests here as an exception and remove `[profile.dev] codegen-backend`
+and `[unstable] codegen-backend` from `.cargo/config.toml` together: the first
+needs the second's feature gate, so removing only the gate leaves a
+configuration Cargo rejects.
 
 ## Frontend task slice APIs
 
