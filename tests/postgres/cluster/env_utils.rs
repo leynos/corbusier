@@ -1,6 +1,7 @@
 //! Environment helpers for `PostgreSQL` test clusters.
 
 use super::BoxError;
+use super::shared_dir::{shared_directory_changes, shared_directory_root};
 use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
 use crate::test_helpers::EnvVarGuard;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -29,46 +30,6 @@ pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
     let root = shared_directory_root(&std::env::temp_dir(), Uid::effective().as_raw());
     changes.extend(shared_directory_changes(&root, |key| std::env::var_os(key)));
     Ok((changes, port_guard))
-}
-
-/// Returns the root shared by every test process of one user.
-///
-/// The user ID is part of the name so two users on one host never share, and
-/// never fight over the ownership of, a cluster directory.
-fn shared_directory_root(temp_dir: &std::path::Path, uid: u32) -> std::path::PathBuf {
-    temp_dir.join(format!("corbusier-pg-embed-{uid}"))
-}
-
-/// Pins one install and data directory under `root` for every test process.
-///
-/// This suite shares a single cluster across processes: the first process runs
-/// `initdb`, and later ones find the initialized directory and only start the
-/// server. `pg-embed-setup-unpriv` 0.6 gives each process a directory of its own
-/// unless `PG_DATA_DIR` is set, which would make every test process run
-/// `initdb` and leave a server behind for the next sweep. Setting the variables
-/// restores the sharing. A data directory the caller already set wins and
-/// nothing is pinned; a runtime directory the caller set is kept while the data
-/// directory is pinned. The caller supplies `root` and the environment lookup so
-/// the function touches neither the operating system nor the process
-/// environment.
-fn shared_directory_changes(
-    root: &std::path::Path,
-    lookup: impl Fn(&str) -> Option<OsString>,
-) -> Vec<(OsString, Option<OsString>)> {
-    if lookup("PG_DATA_DIR").is_some() {
-        return Vec::new();
-    }
-    let mut changes = vec![(
-        OsString::from("PG_DATA_DIR"),
-        Some(root.join("data").into_os_string()),
-    )];
-    if lookup("PG_RUNTIME_DIR").is_none() {
-        changes.push((
-            OsString::from("PG_RUNTIME_DIR"),
-            Some(root.join("install").into_os_string()),
-        ));
-    }
-    changes
 }
 
 pub(super) fn drop_privileges_if_root(
@@ -286,59 +247,5 @@ mod tests {
 
         assert_eq!(worker_value, expected_os);
         drop(guard);
-    }
-}
-
-#[cfg(test)]
-mod shared_directory_tests {
-    //! Tests for the pinned shared install and data directories.
-
-    use super::{shared_directory_changes, shared_directory_root};
-    use rstest::rstest;
-    use std::ffi::OsString;
-    use std::path::Path;
-
-    fn pinned(values: &[(OsString, Option<OsString>)]) -> Vec<(String, String)> {
-        values
-            .iter()
-            .map(|(key, value)| {
-                (
-                    key.to_string_lossy().into_owned(),
-                    value
-                        .as_ref()
-                        .map(|v| v.to_string_lossy().into_owned())
-                        .unwrap_or_default(),
-                )
-            })
-            .collect()
-    }
-
-    /// The root is one directory per user under the given temporary directory.
-    #[rstest]
-    #[case(1000, "/tmp/corbusier-pg-embed-1000")]
-    #[case(0, "/tmp/corbusier-pg-embed-0")]
-    fn the_root_is_named_for_the_user(#[case] uid: u32, #[case] expected: &str) {
-        assert_eq!(
-            shared_directory_root(Path::new("/tmp"), uid),
-            Path::new(expected)
-        );
-    }
-
-    /// Which variables the caller already set decides what is pinned, and the
-    /// pinned values are the `data` and `install` children of one shared root.
-    #[rstest]
-    #[case::none_set(&[], &[("PG_DATA_DIR", "/r/data"), ("PG_RUNTIME_DIR", "/r/install")])]
-    #[case::data_dir_set(&["PG_DATA_DIR"], &[])]
-    #[case::runtime_dir_set(&["PG_RUNTIME_DIR"], &[("PG_DATA_DIR", "/r/data")])]
-    #[case::both_set(&["PG_DATA_DIR", "PG_RUNTIME_DIR"], &[])]
-    fn the_caller_s_variables_win(#[case] preset: &[&str], #[case] expected: &[(&str, &str)]) {
-        let changes = shared_directory_changes(Path::new("/r"), |key| {
-            preset.contains(&key).then(|| OsString::from("/elsewhere"))
-        });
-        let want: Vec<(String, String)> = expected
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect();
-        assert_eq!(pinned(&changes), want);
     }
 }
