@@ -108,7 +108,7 @@ jobs:
         # a5765019 is the floor: from it the uploader selects the CodeScene
         # CLI from a committed manifest and refuses `installer-checksum`.
         # Earlier revisions install "latest", which no longer resolves.
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@c4ed5ffaf0640b1907d5359a87fd1677034eec27
         with:
           format: lcov
           # Stated rather than left to the action's default: this being the
