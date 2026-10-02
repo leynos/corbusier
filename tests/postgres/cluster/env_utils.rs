@@ -12,6 +12,8 @@ use std::net::TcpListener;
 
 type WorkerEnvChanges = (Vec<(OsString, Option<OsString>)>, Option<TcpListener>);
 
+/// Converts string environment pairs to the `OsString` pairs the guards take, keeping an
+/// unset value unset.
 pub(super) fn env_vars_to_os(
     env_vars: &[(String, Option<String>)],
 ) -> Vec<(OsString, Option<OsString>)> {
@@ -21,6 +23,11 @@ pub(super) fn env_vars_to_os(
         .collect()
 }
 
+/// The environment changes to apply around a bootstrap: the worker, the port and the shared
+/// directories.
+///
+/// The per-user shared install and data directories are added to whatever the privilege-aware
+/// worker and port logic returns, unless the caller already chose a data directory.
 pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
     let (mut changes, port_guard) = worker_env_changes_impl(
         detect_execution_privileges,
@@ -32,6 +39,8 @@ pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
     Ok((changes, port_guard))
 }
 
+/// Drops to the named unprivileged user when running as root, returning the guard that
+/// holds the changed environment; `None` when already unprivileged.
 pub(super) fn drop_privileges_if_root(
     username: &str,
     env_vars: &[(OsString, Option<OsString>)],
@@ -78,6 +87,8 @@ pub(super) fn drop_privileges_if_root(
     Ok(Some(env_guard))
 }
 
+/// The privilege-aware part of `worker_env_changes`, with its three environment-touching
+/// steps injected so tests can drive root and non-root without being either.
 fn worker_env_changes_impl<D, L, P>(
     detect_privileges: D,
     locate_worker: L,
@@ -121,6 +132,8 @@ where
     Ok((changes, port_guard))
 }
 
+/// Reserves a free port for the cluster unless the caller set `PG_PORT`; the returned
+/// listener keeps the port bound until the bootstrap has read it.
 fn resolve_pg_port() -> Result<Option<(OsString, TcpListener)>, BoxError> {
     if std::env::var_os("PG_PORT").is_some() {
         return Ok(None);
@@ -146,12 +159,14 @@ mod tests {
     use std::ffi::OsString;
     use std::io;
 
+    /// A worker path that does not exist, unique per call, so no test finds a real binary.
     fn dummy_worker_path() -> Utf8PathBuf {
         let base = Utf8PathBuf::try_from(std::env::temp_dir())
             .expect("temp directory path is not valid UTF-8");
         base.join(format!("pg_worker_test_{}", uuid::Uuid::new_v4()))
     }
 
+    /// A `PG_PORT` the caller set is preserved: no port is reserved and none is emitted.
     #[test]
     fn preserves_existing_pg_port() {
         let guard = EnvVarGuard::set_many(&[
@@ -175,6 +190,7 @@ mod tests {
         drop(guard);
     }
 
+    /// An unprivileged run emits no worker, because it starts the server in process.
     #[test]
     fn non_root_does_not_emit_pg_embedded_worker() {
         let guard = EnvVarGuard::set_many(&[
@@ -198,6 +214,8 @@ mod tests {
         drop(guard);
     }
 
+    /// A root run with no discoverable worker fails with `NotFound` rather than starting
+    /// without one.
     #[test]
     fn root_without_worker_yields_not_found() {
         let guard = EnvVarGuard::set_many(&[
@@ -222,6 +240,7 @@ mod tests {
         drop(guard);
     }
 
+    /// A root run with a discoverable worker emits its prepared path as `PG_EMBEDDED_WORKER`.
     #[test]
     fn root_sets_pg_embedded_worker_when_discoverable() {
         let guard = EnvVarGuard::set_many(&[
