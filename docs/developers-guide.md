@@ -63,9 +63,9 @@ formatting, but review formatter output before committing. Markdown formatter
 defects that affect this repository are tracked upstream in
 [`leynos/mdtablefix`](https://github.com/leynos/mdtablefix).
 
-`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.0, the same
+`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.1, the same
 release CI installs); install it once with
-`cargo install --locked mdtablefix --version 0.6.0`. `make fmt` also runs
+`cargo install --locked mdtablefix --version 0.6.1`. `make fmt` also runs
 `markdownlint-cli2`, which CI provides through its GitHub action; locally
 install it with `bun install -g markdownlint-cli2` (or `npm install -g`).
 
