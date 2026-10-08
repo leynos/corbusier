@@ -1,6 +1,7 @@
 //! Cluster lifecycle helpers for `PostgreSQL` integration tests.
 mod env_utils;
 mod fs_utils;
+mod shared_dir;
 mod worker_helpers;
 use self::env_utils::{drop_privileges_if_root, env_vars_to_os, worker_env_changes};
 use self::fs_utils::{cleanup_stale_postmaster_pid, sync_password_from_file, sync_port_from_pid};
@@ -160,7 +161,6 @@ impl ManagedCluster {
         let admin_url = self.connection().database_url("postgres");
         let template_name = template.to_owned();
         let template_name_for_drop = template.to_owned();
-
         tokio::task::spawn_blocking(move || {
             let lock = TEMPLATE_LOCK.get_or_init(|| Mutex::new(()));
             let _guard = lock
