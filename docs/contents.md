@@ -65,6 +65,8 @@ the first stop when choosing which document to read or update.
   records the documented dependency-policy exception.
 - [h2 advisory exception](dependency-policy-exception-h2-empty-data-frames.md)
   records the audited suppression of RUSTSEC-2026-0258.
+- [braces advisory exception](dependency-policy-exception-braces-nested-patterns.md)
+  records the time-bound suppression of GHSA-vfj7-8cjw-p6xm.
 - [Ortho config users' guide](ortho-config-users-guide.md) documents Ortho
   configuration usage.
 - [pg-embed setup for unprivileged users](pg-embed-setup-unpriv-users-guide.md)
