@@ -51,6 +51,8 @@ jobs:
           persist-credentials: false
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        with:
+          install-mold: 'true'
       - name: Refresh apt package index
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -86,6 +88,7 @@ jobs:
           fi
       - name: Generate coverage
         env:
+          RUSTFLAGS: -D warnings
           GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:

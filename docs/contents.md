@@ -16,6 +16,9 @@ the first stop when choosing which document to read or update.
   runtime expectations.
 - [Developers' guide](developers-guide.md) explains maintainer workflows,
   quality gates, local services, and implementation conventions.
+- [ADR 012: Rust build standard](adr-012-rust-build-standard.md) records why
+  development builds use the fast flags while coverage and release builds stay
+  off them.
 - [Roadmap](roadmap.md) tracks planned delivery work, dependencies, and
   acceptance criteria.
 
