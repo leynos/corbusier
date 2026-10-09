@@ -356,7 +356,9 @@ exposure, and the trigger for re-review:
 
 - Node.js advisories are suppressed by an entry in
   `frontend-pwa/security/audit-exceptions.json`, which requires an expiry date
-  and is enforced by `frontend-pwa/scripts/run-audit.mjs`.
+  and is enforced by `frontend-pwa/scripts/run-audit.mjs`. See
+  [Dependency policy exception: braces nested patterns](dependency-policy-exception-braces-nested-patterns.md)
+  for the current example.
 - Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`
   with a dated block (see
   [clearing a Rust advisory](#clearing-a-rust-advisory)), paired with a
