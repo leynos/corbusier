@@ -60,10 +60,10 @@ pub fn selects_cranelift(config: &str) -> bool {
 pub fn config_problems(config: &str) -> Problems {
     let mut problems = Vec::new();
     if !selects_cranelift(config) {
-        problems.push("[profile.dev] does not set codegen-backend = \"cranelift\"".to_owned());
+        problems.push("[profile.dev] does not select cranelift".to_owned());
     }
     if !holds(config, "unstable", "codegen-backend", "true") {
-        problems.push("[unstable] does not set codegen-backend = true, which Cargo needs to take the backend key".to_owned());
+        problems.push("[unstable] does not set codegen-backend = true".to_owned());
     }
     problems
 }
@@ -78,9 +78,7 @@ pub fn toolchain_problems(toolchain: &str) -> Problems {
     if listed {
         Vec::new()
     } else {
-        vec![format!(
-            "rust-toolchain.toml does not list the {COMPONENT} component"
-        )]
+        vec![format!("no {COMPONENT} component in rust-toolchain.toml")]
     }
 }
 
@@ -93,28 +91,70 @@ fn none_of(problems: &Problems) -> Result<(), String> {
     }
 }
 
-const CONFIG_OK: &str = "[unstable]\ncodegen-backend = true\n\n[profile.dev]\ncodegen-backend = \"cranelift\" # fast debug builds\n";
+const CONFIG_OK: &str = concat!(
+    "[unstable]\ncodegen-backend = true\n\n",
+    "[profile.dev]\ncodegen-backend = \"cranelift\" # fast debug builds\n",
+);
 const CONFIG_NO_FEATURE: &str = "[profile.dev]\ncodegen-backend = \"cranelift\"\n";
-const CONFIG_FEATURE_OFF: &str =
-    "[unstable]\ncodegen-backend = false\n\n[profile.dev]\ncodegen-backend = \"cranelift\"\n";
-const CONFIG_OTHER_BACKEND: &str =
-    "[unstable]\ncodegen-backend = true\n\n[profile.dev]\ncodegen-backend = \"llvm\"\n";
-const CONFIG_WRONG_TABLE: &str =
-    "[unstable]\ncodegen-backend = true\n\n[profile.release]\ncodegen-backend = \"cranelift\"\n";
-const CONFIG_COMMENTED: &str =
-    "[unstable]\n# codegen-backend = true\n\n[profile.dev]\n# codegen-backend = \"cranelift\"\n";
-const TOOLCHAIN_OK: &str = "[toolchain]\nchannel = \"nightly-2026-05-28\"\ncomponents = [\n  \"clippy\",\n  \"rustc-codegen-cranelift-preview\",\n]\n";
-const TOOLCHAIN_LACKING: &str =
-    "[toolchain]\nchannel = \"nightly-2026-05-28\"\ncomponents = [\"clippy\", \"rustfmt\"]\n";
-const TOOLCHAIN_COMMENTED: &str = "[toolchain]\nchannel = \"nightly-2026-05-28\"\n# components = [\"rustc-codegen-cranelift-preview\"]\n";
+const CONFIG_FEATURE_OFF: &str = concat!(
+    "[unstable]\ncodegen-backend = false\n\n",
+    "[profile.dev]\ncodegen-backend = \"cranelift\"\n",
+);
+const CONFIG_OTHER_BACKEND: &str = concat!(
+    "[unstable]\ncodegen-backend = true\n\n",
+    "[profile.dev]\ncodegen-backend = \"llvm\"\n",
+);
+const CONFIG_WRONG_TABLE: &str = concat!(
+    "[unstable]\ncodegen-backend = true\n\n",
+    "[profile.release]\ncodegen-backend = \"cranelift\"\n",
+);
+const CONFIG_COMMENTED: &str = concat!(
+    "[unstable]\n# codegen-backend = true\n\n",
+    "[profile.dev]\n# codegen-backend = \"cranelift\"\n",
+);
+const TOOLCHAIN_OK: &str = concat!(
+    "[toolchain]\nchannel = \"nightly-2026-05-28\"\n",
+    "components = [\n  \"clippy\",\n  \"rustc-codegen-cranelift-preview\",\n]\n",
+);
+const TOOLCHAIN_LACKING: &str = concat!(
+    "[toolchain]\nchannel = \"nightly-2026-05-28\"\n",
+    "components = [\"clippy\", \"rustfmt\"]\n",
+);
+const TOOLCHAIN_COMMENTED: &str = concat!(
+    "[toolchain]\nchannel = \"nightly-2026-05-28\"\n",
+    "# components = [\"rustc-codegen-cranelift-preview\"]\n",
+);
 const TOOLCHAIN_LOOKALIKE: &str = "[toolchain]\ncomponents = [\"rustc-codegen-cranelift\"]\n";
-const WHITAKER_OK: &str = "      - name: Install Whitaker\n        uses: org/shared-actions/.github/actions/install-whitaker@abc\n        with:\n          cranelift: 'true'\n";
-const WHITAKER_BARE: &str = "      - name: Install Whitaker\n        uses: org/shared-actions/.github/actions/install-whitaker@abc\n        with:\n          cranelift: true\n";
-const WHITAKER_MISSING: &str = "      - name: Install Whitaker\n        uses: org/shared-actions/.github/actions/install-whitaker@abc\n";
-const WHITAKER_OFF: &str = "      - name: Install Whitaker\n        uses: org/shared-actions/.github/actions/install-whitaker@abc\n        with:\n          cranelift: 'false'\n";
-const WHITAKER_BEFORE_A_SIBLING: &str = "      - name: Install Whitaker\n        uses: org/shared-actions/.github/actions/install-whitaker@abc\n      - name: Other\n        with:\n          cranelift: 'true'\n";
-const WHITAKER_COMMENT_ONLY: &str =
-    "      # install-whitaker@abc needs cranelift\n      - name: Other\n        run: true\n";
+
+/// The head of an `install-whitaker` step, shared by the fixtures below.
+const STEP: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: org/shared-actions/.github/actions/install-whitaker@abc\n",
+);
+const WHITAKER_OK: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: org/shared-actions/.github/actions/install-whitaker@abc\n",
+    "        with:\n          cranelift: 'true'\n",
+);
+const WHITAKER_BARE: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: org/shared-actions/.github/actions/install-whitaker@abc\n",
+    "        with:\n          cranelift: true\n",
+);
+const WHITAKER_OFF: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: org/shared-actions/.github/actions/install-whitaker@abc\n",
+    "        with:\n          cranelift: 'false'\n",
+);
+const WHITAKER_BEFORE_A_SIBLING: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: org/shared-actions/.github/actions/install-whitaker@abc\n",
+    "      - name: Other\n        with:\n          cranelift: 'true'\n",
+);
+const WHITAKER_COMMENT_ONLY: &str = concat!(
+    "      # install-whitaker@abc needs cranelift\n",
+    "      - name: Other\n        run: true\n",
+);
 
 /// Returns the number of complaints about a fixture workflow's Whitaker steps.
 fn whitaker_count(text: &str) -> usize {
@@ -134,13 +174,13 @@ fn the_repository_selects_cranelift_as_recorded() -> Result<(), String> {
     if selects_cranelift(CONFIG) == SELECTED {
         Ok(())
     } else {
+        let state = if SELECTED {
+            "no longer selects"
+        } else {
+            "now selects"
+        };
         Err(format!(
-            "the configuration {} Cranelift, but the contract records SELECTED = {SELECTED}",
-            if SELECTED {
-                "no longer selects"
-            } else {
-                "now selects"
-            }
+            "the configuration {state} Cranelift; SELECTED is {SELECTED}"
         ))
     }
 }
@@ -192,7 +232,7 @@ fn the_toolchain_reader_wants_the_component() {
 fn the_whitaker_reader_wants_the_input_on_each_step() {
     assert_eq!(whitaker_count(WHITAKER_OK), 0);
     assert_eq!(whitaker_count(WHITAKER_BARE), 0);
-    for refused in [WHITAKER_MISSING, WHITAKER_OFF, WHITAKER_BEFORE_A_SIBLING] {
+    for refused in [STEP, WHITAKER_OFF, WHITAKER_BEFORE_A_SIBLING] {
         assert_eq!(whitaker_count(refused), 1, "{refused}");
     }
     assert_eq!(whitaker_count(WHITAKER_COMMENT_ONLY), 0);
