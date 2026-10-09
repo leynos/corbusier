@@ -25,9 +25,11 @@ Table 1: advisory covered by this exception.
 ## Why the advisory cannot be fixed
 
 `braces` 3.0.3 is the newest release on the registry, and the advisory covers
-it, so no upgrade or override reaches a patched version. The only path to it is
-`stylelint > fast-glob > micromatch > braces`, a development-time linting
-chain. Replacing `stylelint` or its glob stack is out of scope for an audit fix.
+it, so no upgrade or override reaches a patched version. Every path to it is a
+development-time route rooted in `stylelint`:
+`stylelint > fast-glob > micromatch > braces`,
+`stylelint > micromatch > braces`, and a route through `globby > fast-glob`.
+Replacing `stylelint` or its glob stack is out of scope for an audit fix.
 
 ## Exposure
 
@@ -45,8 +47,9 @@ which the reviewer would see, rather than a production risk.
 ## Review trigger
 
 The ledger entry `BRACES_NESTED_PATTERN_DOS_2026_10` in
-`frontend-pwa/security/audit-exceptions.json` expires on 2026-12-09, and
-`run-audit.mjs` fails the gate from that date. Remove the entry and this
+`frontend-pwa/security/audit-exceptions.json` expires on 2026-12-09. The runner
+treats a date-only expiry as inclusive, so `run-audit.mjs` rejects the entry,
+and fails the gate, from 2026-12-10 00:00 UTC. Remove the entry and this
 document when either becomes true:
 
 - a patched `braces` release exists and the lockfile resolves it, or
