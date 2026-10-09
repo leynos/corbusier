@@ -983,3 +983,25 @@ async fn execute_orchestrated_turn() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+### Build standard
+
+Development builds (`make test`, `make lint`, `make typecheck` and the debug
+build) use the parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the
+`mold` linker. Install `mold` before building on Linux: the configuration names
+it, so a build without it fails at link time.
+
+The flags live in `.cargo/config.toml`, but Cargo applies exactly one
+`rustflags` source and an assigned `RUSTFLAGS` replaces every configuration
+source. The Makefile therefore restates the flags in each recipe and keeps any
+`RUSTFLAGS` already in the environment, appending the standard flags after it.
+Two builds are held out deliberately. The coverage build assigns its own flags,
+because a measurement should not depend on the fast flags. `make release` keeps
+the environment's `RUSTFLAGS` and names neither fast flag, so a shipped
+artefact links with the platform linker. A bare `cargo build --release` takes
+the configuration's flags unless `RUSTFLAGS` is assigned, for example
+`RUSTFLAGS="" cargo build --release`.
+
+Cranelift is the development-profile code generator, selected in
+`.cargo/config.toml`; coverage selects LLVM explicitly because instrumentation
+needs it. See [ADR 012](adr-012-rust-build-standard.md) for the reasoning.

@@ -63,9 +63,9 @@ formatting, but review formatter output before committing. Markdown formatter
 defects that affect this repository are tracked upstream in
 [`leynos/mdtablefix`](https://github.com/leynos/mdtablefix).
 
-`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.0, the same
+`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.1, the same
 release CI installs); install it once with
-`cargo install --locked mdtablefix --version 0.6.0`. `make fmt` also runs
+`cargo install --locked mdtablefix --version 0.6.1`. `make fmt` also runs
 `markdownlint-cli2`, which CI provides through its GitHub action; locally
 install it with `bun install -g markdownlint-cli2` (or `npm install -g`).
 
@@ -197,6 +197,50 @@ checked alongside the accessibility test setup.
 Tests that call `axe(container)` and then
 `expect(results).toHaveNoViolations()` rely on this setup file being listed in
 the accessibility Vitest configuration's `setupFiles`.
+
+## The build standard
+
+Development, test, lint, and typecheck builds use the parallel `rustc` frontend
+(`-Zthreads=8`) and, on Linux, the `mold` linker (`-Clink-arg=-fuse-ld=mold`).
+These are defaults in `.cargo/config.toml`, which Cargo discovers on its own,
+so a bare `cargo build` gets them. `mold` ships for Linux only, so the linker
+flag lives in a Linux-only table and macOS and Windows keep their platform
+linker. Cargo selects one `rustflags` source rather than merging them, so every
+source repeats the same flags apart from the linker.
+
+An assigned `RUSTFLAGS` replaces the configuration's flags, so the Makefile
+recipes that set it compose the standard's flags onto any inherited value (CI's
+`setup-rust` exports one). Two builds are deliberately excluded: coverage
+assigns `RUSTFLAGS` without the fast flags, because a measurement should not
+depend on them, and the release recipe and workflow keep the platform linker,
+because they assign `RUSTFLAGS` (even an empty value displaces the
+configuration). Cargo has no per-profile `rustflags`, so a direct
+`cargo build --release` takes the configuration's flags unless `RUSTFLAGS` is
+assigned too.
+
+On Linux, install `mold` before building: the configuration names it, so a
+build without it fails at link time. CI installs it through `setup-rust`'s
+`install-mold` input. `tests/build_standard_contract.rs` holds the standard. It
+reads the configuration sources, the commands `make -n` prints for each
+development target on a Linux host and a macOS host (each keeping the caller's
+own `RUSTFLAGS`) and for the release target (the coverage exclusion is checked
+in the workflow steps) on a Linux host, and the `setup-rust` steps of the CI
+workflows (each must pass `install-mold`), so a flag lost through a recipe or
+workflow edit fails there. The decision is recorded in
+[ADR 012](adr-012-rust-build-standard.md).
+
+### Cranelift
+
+Cranelift is the development-profile codegen backend. The full suite was
+measured under it on the pinned `nightly-2025-12-12` on 2026-09-29: all 902
+nextest tests pass (one is skipped). Coverage selects LLVM explicitly
+(`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because instrumentation needs it,
+and release builds use the release profile, which Cranelift does not touch.
+Re-measure the whole suite on the next toolchain bump; if it fails, record the
+failing tests here as an exception and remove `[profile.dev] codegen-backend`
+and `[unstable] codegen-backend` from `.cargo/config.toml` together: the first
+needs the second's feature gate, so removing only the gate leaves a
+configuration Cargo rejects.
 
 ## Frontend task slice APIs
 
@@ -356,7 +400,9 @@ exposure, and the trigger for re-review:
 
 - Node.js advisories are suppressed by an entry in
   `frontend-pwa/security/audit-exceptions.json`, which requires an expiry date
-  and is enforced by `frontend-pwa/scripts/run-audit.mjs`.
+  and is enforced by `frontend-pwa/scripts/run-audit.mjs`. See
+  [Dependency policy exception: braces nested patterns](dependency-policy-exception-braces-nested-patterns.md)
+  for the current example.
 - Rust advisories are suppressed by an `ignore` entry in `.cargo/audit.toml`
   with a dated block (see
   [clearing a Rust advisory](#clearing-a-rust-advisory)), paired with a
