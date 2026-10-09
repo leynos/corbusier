@@ -994,13 +994,13 @@ it, so a build without it fails at link time.
 The flags live in `.cargo/config.toml`, but Cargo applies exactly one
 `rustflags` source and an assigned `RUSTFLAGS` replaces every configuration
 source. The Makefile therefore restates the flags in each recipe and keeps any
-`RUSTFLAGS` you set, appending the standard flags after yours. Two builds are
-held out on purpose: the coverage build assigns its own flags, because a
-measurement should not depend on the fast flags, and the release build.
-`make release` keeps your `RUSTFLAGS` and names neither fast flag, so a shipped
-artefact links with the platform linker. A bare `cargo build --release` is
-different: it takes the configuration's flags unless you assign `RUSTFLAGS`
-yourself, for example `RUSTFLAGS="" cargo build --release`.
+`RUSTFLAGS` already in the environment, appending the standard flags after it.
+Two builds are held out deliberately. The coverage build assigns its own flags,
+because a measurement should not depend on the fast flags. `make release` keeps
+the environment's `RUSTFLAGS` and names neither fast flag, so a shipped
+artefact links with the platform linker. A bare `cargo build --release` takes
+the configuration's flags unless `RUSTFLAGS` is assigned, for example
+`RUSTFLAGS="" cargo build --release`.
 
 Cranelift is the development-profile code generator, selected in
 `.cargo/config.toml`; coverage selects LLVM explicitly because instrumentation
