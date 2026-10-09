@@ -26,6 +26,16 @@ fake_make!(
     held_out_probe_only_make,
     "cargo metadata --format-version 1 --locked"
 );
+// A fake runner whose held-out target runs a metadata probe that assigns `RUSTFLAGS`, so it reads as assigned.
+fake_make!(
+    held_out_assigned_metadata_make,
+    "RUSTFLAGS=\"${RUSTFLAGS-}\" cargo metadata --format-version 1"
+);
+// A fake runner whose held-out target runs a version probe that assigns `RUSTFLAGS`.
+fake_make!(
+    held_out_assigned_version_make,
+    "RUSTFLAGS=\"${RUSTFLAGS-}\" cargo nextest --version"
+);
 
 // A fake runner whose held-out command assigns `RUSTFLAGS` without a standard flag.
 fake_make!(
@@ -191,6 +201,18 @@ fn a_held_out_target_must_run_a_build_or_test_command_of_its_own() -> Result<(),
             .any(|problem| problem.contains("runs no build or test command")),
         "a target that only probes passed",
     )?;
+    for assigned_probe in [
+        held_out_assigned_metadata_make as MakeRunner,
+        held_out_assigned_version_make,
+    ] {
+        let (problems, _) = held_out_problems_for(assigned_probe, &["coverage"])?;
+        ensure(
+            problems
+                .iter()
+                .any(|problem| problem.contains("runs no build or test command")),
+            "an assigned probe stood in for the build",
+        )?;
+    }
     let (building, _) = held_out_problems_for(held_out_inspecting_make, &["coverage"])?;
     ensure(
         building.is_empty(),

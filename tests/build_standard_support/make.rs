@@ -238,17 +238,12 @@ pub fn held_out_problems_for(
     let mut read = 0;
     for name in targets {
         let target = Target(name);
-        let commands: Vec<Assignment> = make_commands(runner, target, Host::Linux)?
-            .into_iter()
-            .map(|command| command.assignment)
-            .collect();
+        let commands = make_commands(runner, target, Host::Linux)?;
         read += commands.len();
-        // A command that assigns nothing and runs no build tool (a formatter, a metadata probe) is
-        // `Unassigned`; a target made only of those would hide behind the other targets' count.
-        if !commands
-            .iter()
-            .any(|command| !matches!(command, Assignment::Unassigned))
-        {
+        // A command that runs no build or test tool (a formatter, a metadata probe, a version probe) is
+        // no evidence of a build, whether or not it assigns `RUSTFLAGS`; a target made only of those would
+        // hide behind the other targets' count.
+        if !commands.iter().any(|command| compiles(&command.text)) {
             problems.push(format!(
                 "`make {target}` runs no build or test command, so the check reads nothing of it"
             ));
@@ -256,7 +251,7 @@ pub fn held_out_problems_for(
         problems.extend(
             commands
                 .iter()
-                .flat_map(|command| held_out_command_problems(target, command)),
+                .flat_map(|command| held_out_command_problems(target, &command.assignment)),
         );
     }
     Ok((problems, read))
