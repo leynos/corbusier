@@ -31,6 +31,8 @@ mod injected;
 mod injected_held_out;
 #[path = "build_standard_support/make.rs"]
 mod make;
+#[path = "build_standard_support/policy_cases.rs"]
+mod policy_cases;
 #[path = "build_standard_support/process.rs"]
 mod process;
 #[path = "build_standard_support/reader_cases.rs"]

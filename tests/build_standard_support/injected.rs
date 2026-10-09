@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 use super::{
     config::{Pin, THREADS_FLAG},
     development::{Tools, development_problems_expecting},
-    make::{Host, Target},
+    make::{Host, MakeRunner, Target},
 };
 
 /// Renders canned `make -n` text for a fake runner through a fallible writer, so
@@ -28,26 +28,59 @@ pub(super) const fn linker_flag(host: Host) -> &'static str {
     }
 }
 
-/// A fake runner: a compliant `make -n` for any target, with no process behind it.
-fn compliant_make(_target: Target<'_>, host: Host) -> Result<String, String> {
+/// Defines a fake runner that prints the same canned text for every target and host.
+macro_rules! fake_make {
+    ($name:ident, $text:expr) => {
+        fn $name(_target: Target<'_>, _host: Host) -> Result<String, String> {
+            canned(format_args!("{}\n", $text))
+        }
+    };
+}
+pub(super) use fake_make;
+
+/// Renders a command that assigns what a compliant recipe assigns on a host, followed by any lines after it.
+fn compliant_text(host: Host, commands: &str) -> String {
     let linker = linker_flag(host);
-    canned(format_args!(
-        "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" cargo test\n"
-    ))
+    format!(
+        "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" {commands}"
+    )
 }
 
-/// A fake runner whose recipes run only a metadata probe, no build, test or lint tool.
-fn probe_only_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("cargo metadata --format-version 1\n"))
+/// Defines a fake runner whose first command assigns what a compliant recipe assigns on the host.
+macro_rules! compliant_make {
+    ($name:ident, $commands:expr) => {
+        fn $name(_target: Target<'_>, host: Host) -> Result<String, String> {
+            canned(format_args!("{}\n", compliant_text(host, $commands)))
+        }
+    };
 }
 
-/// A fake runner whose every recipe runs an assigned version probe and nothing else.
-fn assigned_probe_make(_target: Target<'_>, host: Host) -> Result<String, String> {
-    let linker = linker_flag(host);
-    canned(format_args!(
-        "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" cargo nextest --version\n"
-    ))
-}
+// A fake runner: a compliant `make -n` for any target, with no process behind it.
+compliant_make!(compliant_make, "cargo test");
+
+// A fake runner whose recipes run only a metadata probe, no build, test or lint tool.
+fake_make!(probe_only_make, "cargo metadata --format-version 1");
+
+// A fake runner whose every recipe runs an assigned version probe and nothing else.
+compliant_make!(assigned_probe_make, "cargo nextest --version");
+
+// A fake runner whose command loses the caller's `RUSTFLAGS`.
+fake_make!(dropping_make, "RUSTFLAGS=\"-D warnings\" cargo test");
+
+// A fake runner whose test command assigns nothing, so the warning policy never reaches it.
+fake_make!(bare_test_make, "cargo test");
+
+// A fake runner whose lint commands assign nothing beside a command that does.
+compliant_make!(
+    bare_lint_make,
+    "cargo test\ncargo clippy --all-targets\nwhitaker --all"
+);
+
+// A fake runner with commands that run no compiled code under test, beside one that assigns.
+compliant_make!(
+    exempt_commands_make,
+    "cargo test\ncargo fmt --all --check\ncargo metadata --format-version 1\nRUSTDOCFLAGS=\"-D warnings\" cargo doc"
+);
 
 /// A fake runner whose `lint` target runs Clippy and not Whitaker, and whose other targets run tests.
 fn lint_without_whitaker_make(target: Target<'_>, host: Host) -> Result<String, String> {
@@ -59,32 +92,6 @@ fn lint_without_whitaker_make(target: Target<'_>, host: Host) -> Result<String, 
     };
     canned(format_args!(
         "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" {tool}\n"
-    ))
-}
-
-/// A fake runner whose command loses the caller's `RUSTFLAGS`.
-fn dropping_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("RUSTFLAGS=\"-D warnings\" cargo test\n"))
-}
-
-/// A fake runner whose test command assigns nothing, so the warning policy never reaches it.
-fn bare_test_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("cargo test\n"))
-}
-
-/// A fake runner whose lint commands assign nothing beside a command that does.
-fn bare_lint_make(_target: Target<'_>, host: Host) -> Result<String, String> {
-    let linker = linker_flag(host);
-    canned(format_args!(
-        "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" cargo test\ncargo clippy --all-targets\nwhitaker --all\n"
-    ))
-}
-
-/// A fake runner with commands that run no compiled code under test, beside one that assigns.
-fn exempt_commands_make(_target: Target<'_>, host: Host) -> Result<String, String> {
-    let linker = linker_flag(host);
-    canned(format_args!(
-        "RUSTFLAGS=\"${{RUSTFLAGS:+$RUSTFLAGS }}-D warnings {THREADS_FLAG}{linker}\" cargo test\ncargo fmt --all --check\ncargo metadata --format-version 1\nRUSTDOCFLAGS=\"-D warnings\" cargo doc\n"
     ))
 }
 
@@ -177,38 +184,23 @@ fn a_development_command_without_an_assignment_is_refused_and_an_exempt_one_is_n
     )
 }
 
-/// Scenario: development recipes that run a metadata probe and nothing that builds, tests or lints.
+/// Scenario: development recipes whose only command is a metadata probe, or an assigned version probe.
 ///
 /// Invariant: each development target must run a tool of its own, so a target that only probes is
-/// refused instead of hiding behind the assignments another target supplies.
+/// refused instead of hiding behind the assignments another target supplies, and an assignment is no
+/// tool: a probe that carries `RUSTFLAGS` does not stand in for the build, test or lint command.
 #[test]
 fn a_development_target_that_runs_no_tool_is_refused() -> Result<(), String> {
-    let (problems, read) =
-        development_problems_expecting(probe_only_make, Host::Linux, Pin::Nightly, &[])?;
-    ensure(read == 0, "a probe was read as an assignment")?;
-    ensure(
-        problems
-            .iter()
-            .any(|problem| problem.contains("runs no build, test or lint command")),
-        "a target that only probes passed",
-    )
-}
-
-/// Scenario: development recipes whose only command is an assigned version probe.
-///
-/// Invariant: an assignment is not a tool, so a probe that carries `RUSTFLAGS` does not stand in for
-/// the build, test or lint command a target must run.
-#[test]
-fn an_assigned_version_probe_is_no_build_tool() -> Result<(), String> {
-    let (problems, read) =
-        development_problems_expecting(assigned_probe_make, Host::Linux, Pin::Nightly, &[])?;
-    ensure(read > 0, "the probe's assignment was not read")?;
-    ensure(
-        problems
-            .iter()
-            .any(|problem| problem.contains("runs no build, test or lint command")),
-        "an assigned probe passed as a tool",
-    )
+    for runner in [probe_only_make as MakeRunner, assigned_probe_make] {
+        let (problems, _) = development_problems_expecting(runner, Host::Linux, Pin::Nightly, &[])?;
+        ensure(
+            problems
+                .iter()
+                .any(|problem| problem.contains("runs no build, test or lint command")),
+            "a target that only probes passed",
+        )?;
+    }
+    Ok(())
 }
 
 /// Scenario: a record of the tools each target runs, against recipes that keep or drop one.

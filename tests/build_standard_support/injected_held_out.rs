@@ -3,76 +3,65 @@
 //! check fires in a repository that defines none.
 
 use super::{
-    injected::{canned, ensure, undefined_make},
+    injected::{canned, ensure, fake_make, undefined_make},
     make::{
         Host, MakeRunner, Target, held_out_problems, held_out_problems_for, held_out_target_count,
     },
 };
 
-/// A fake runner whose command assigns an empty `RUSTFLAGS`, dropping the caller's.
-fn release_clearing_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("RUSTFLAGS=\"\" cargo build --release\n"))
-}
+// A fake runner whose command assigns an empty `RUSTFLAGS`, dropping the caller's.
+fake_make!(
+    release_clearing_make,
+    "RUSTFLAGS=\"\" cargo build --release"
+);
 
-/// A fake runner whose held-out target runs an inspection command beside an assigning build.
-fn held_out_inspecting_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!(
-        "cargo metadata --format-version 1 --locked\nRUSTFLAGS=\"-D warnings\" cargo build --release\n"
-    ))
-}
+// A fake runner whose held-out target runs an inspection command beside an assigning build.
+fake_make!(
+    held_out_inspecting_make,
+    "cargo metadata --format-version 1 --locked\nRUSTFLAGS=\"-D warnings\" cargo build --release"
+);
 
-/// A fake runner whose held-out target runs only a metadata probe.
-fn held_out_probe_only_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("cargo metadata --format-version 1 --locked\n"))
-}
+// A fake runner whose held-out target runs only a metadata probe.
+fake_make!(
+    held_out_probe_only_make,
+    "cargo metadata --format-version 1 --locked"
+);
 
-/// A fake runner whose held-out command assigns `RUSTFLAGS` without a standard flag.
-fn held_out_assigning_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!(
-        "RUSTFLAGS=\"-D warnings\" cargo build --release\n"
-    ))
-}
+// A fake runner whose held-out command assigns `RUSTFLAGS` without a standard flag.
+fake_make!(
+    held_out_assigning_make,
+    "RUSTFLAGS=\"-D warnings\" cargo build --release"
+);
 
-/// A fake runner whose held-out command assigns nothing, so it takes the configuration's flags.
-fn held_out_unassigned_make(_target: Target<'_>, _host: Host) -> Result<String, String> {
-    canned(format_args!("cargo build --release\n"))
-}
+// A fake runner whose held-out command assigns nothing, so it takes the configuration's flags.
+fake_make!(held_out_unassigned_make, "cargo build --release");
 
-/// Defines a fake runner that prints one release command, whatever the target and host.
-macro_rules! release_make {
-    ($name:ident, $text:expr) => {
-        fn $name(_target: Target<'_>, _host: Host) -> Result<String, String> {
-            canned(format_args!("{}\n", $text))
-        }
-    };
-}
-
-release_make!(
+fake_make!(
     keeps_dash,
     "RUSTFLAGS=\"${RUSTFLAGS-}\" cargo build --release"
 );
-release_make!(
+fake_make!(
     keeps_dash_with_flags,
     "RUSTFLAGS=\"${RUSTFLAGS-} -D warnings\" cargo build --release"
 );
-release_make!(
+fake_make!(
     keeps_plus,
     "RUSTFLAGS=\"${RUSTFLAGS:+$RUSTFLAGS }\" cargo build --release"
 );
-release_make!(
+fake_make!(
     keeps_plus_with_flags,
     "RUSTFLAGS=\"${RUSTFLAGS:+$RUSTFLAGS }-Zpolonius=next\" cargo build --release"
 );
-release_make!(assigns_nothing_unquoted, "RUSTFLAGS= cargo build --release");
-release_make!(
+fake_make!(assigns_nothing_unquoted, "RUSTFLAGS= cargo build --release");
+fake_make!(
     assigns_an_empty_string,
     "RUSTFLAGS=\"\" cargo build --release"
 );
-release_make!(
+fake_make!(
     assigns_the_standard_flags_alone,
     "RUSTFLAGS=-Zthreads=8 -Clink-arg=-fuse-ld=mold cargo build --release"
 );
-release_make!(
+fake_make!(
     assigns_its_own_flags_alone,
     "RUSTFLAGS=\"-D warnings\" cargo build --release"
 );
