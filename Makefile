@@ -1,4 +1,4 @@
-.PHONY: help all clean test typecheck build release lint fmt check-fmt markdownlint spelling test-workflow-contracts audit-exceptions audit-exceptions-test audit-commands-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
+.PHONY: help all clean test typecheck build release lint yamllint actionlint fmt check-fmt markdownlint spelling test-workflow-contracts audit-exceptions audit-exceptions-test audit-commands-test nixie local-k8s-up local-k8s-down local-k8s-status local-k8s-logs frontend-install frontend-dev frontend-lint frontend-typecheck frontend-docs-check frontend-test frontend-test-a11y frontend-localizability frontend-semantic frontend-e2e audit audit-node rust-audit
 
 TARGET ?= corbusier
 
@@ -47,6 +47,8 @@ FRONTEND_DIR ?= frontend-pwa
 FRONTEND_INSTALL_FLAGS ?=
 
 UV ?= uv
+YAMLLINT ?= yamllint
+ACTIONLINT ?= actionlint
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
 # commit, so a fix is a pin bump. `.github/cv005.toml` holds this repository's
@@ -84,11 +86,19 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 
 # `test-workflow-contracts` is a prerequisite here as well as a CI step of its
 # own, so deleting the step does not stop the contracts running.
-lint: test-workflow-contracts audit-commands-test ## Run Clippy and the Whitaker Dylint suite with warnings denied
+lint: test-workflow-contracts audit-commands-test yamllint actionlint ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(dir $(CARGO)):$(dir $(WHITAKER)):$$PATH" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 	+$(MAKE) spelling
+
+# yamllint reads `.yamllint.yml`, which extends `.yamllint-estate.yml`, and
+# resolves that path against the working directory, so it runs from the root.
+yamllint: ## Lint every tracked YAML file strictly
+	git ls-files -z '*.yml' '*.yaml' | xargs -0 -r $(YAMLLINT) --strict --
+
+actionlint: ## Lint the GitHub Actions workflows, including their shell scripts
+	$(ACTIONLINT)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all

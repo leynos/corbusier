@@ -99,6 +99,8 @@ jobs:
           # The dev profile builds with the Cranelift backend, so the lint suite's
           # toolchain needs rustc-codegen-cranelift too.
           cranelift: 'true'
+      - name: Install the YAML lint tools
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@2ddf19b3fd52c0f1089db0d57b015f859b80ab67
       - name: Lint
         run: make lint
       - name: Cache pg_worker binary
