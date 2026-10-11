@@ -49,10 +49,11 @@ make test
 ```
 
 `make check-fmt` validates Rust formatting, `make lint` runs the workflow
-contracts, documentation generation, Clippy, Whitaker, the spelling policy,
-`yamllint --strict` over every Git-tracked YAML file, and `actionlint`, with
-warnings denied, and `make test` runs the workspace test suite through nextest.
-Documentation changes should also run:
+contracts, `make interrogate` (Python docstring coverage over `scripts` and
+`tests`; it needs `uv`), documentation generation, Clippy, Whitaker, the
+spelling policy, `yamllint --strict` over every Git-tracked YAML file, and
+`actionlint`, with warnings denied, and `make test` runs the workspace test
+suite through nextest. Documentation changes should also run:
 
 ```sh
 make markdownlint

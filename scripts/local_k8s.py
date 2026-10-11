@@ -86,6 +86,7 @@ def handle_cli_errors(func: Callable[..., int]) -> Callable[..., int]:
 
     @functools.wraps(func)
     def wrapper(*args: object, **kwargs: object) -> int:
+        """Run the command and turn a CLI error into an exit status."""
         try:
             return func(*args, **kwargs)
         except LocalK8sError as error:
