@@ -64,10 +64,10 @@ the versions CI installs through the shared `install-yaml-lint` action. Run the
 targets from the repository root: yamllint resolves `.yamllint.yml`, which
 extends the estate base `.yamllint-estate.yml` (copied verbatim, never edited
 here), against the working directory. `.github/actionlint.yaml` declares the
-`ubicloud-*` runner labels. `tests/yaml_lint_contract.rs` judges the Makefile
-and workflow wiring against fixtures and then the real files, and its
-`boundary` module runs the targets with stand-in tools to prove the
-tracked-files list and that a tool failure fails the target.
+`ubicloud-*` runner labels. `tests/yaml_lint_contract/` judges the Makefile and
+workflow wiring against fixtures and then the real files, and its `boundary`
+module runs the targets with stand-in tools to prove the tracked-files list and
+that a tool failure fails the target.
 
 Run `make fmt` after documentation changes to apply Rust and Markdown
 formatting, but review formatter output before committing. Markdown formatter
