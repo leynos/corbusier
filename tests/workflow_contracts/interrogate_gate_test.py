@@ -84,6 +84,8 @@ def test_the_tool_is_pinned_and_run_through_uv() -> None:
     assert _variable("INTERROGATE_VERSION") == "1.7.0"
     command = _variable("INTERROGATE")
     assert re.search(r"(\$\(UV\)|\buv) tool run\b", command), "run via uv tool run"
+    if re.search(r"^UV\s*[:?]?=", _makefile_text(), re.MULTILINE):
+        assert "$(UV) tool run" in command, "honour the configured $(UV) executable"
     assert "--from 'interrogate==$(INTERROGATE_VERSION)'" in command
 
 
@@ -98,7 +100,9 @@ def test_the_flags_demand_a_full_exact_report() -> None:
     expected = ["-vv", "--fail-under", "100"]
     if _tracked("*.pyi"):
         expected = ["-vv", "--ext", "pyi", "--fail-under", "100"]
-    assert flags == expected, f"INTERROGATE_FLAGS must be exactly {expected}, not {flags}"
+    assert flags == expected, (
+        f"INTERROGATE_FLAGS must be exactly {expected}, not {flags}"
+    )
 
 
 def test_every_python_directory_is_a_target() -> None:
@@ -118,7 +122,11 @@ def test_ci_installs_uv_before_it_runs_make_lint() -> None:
     checked = 0
     for name, job in workflow["jobs"].items():
         steps = job.get("steps", [])
-        lint = [i for i, s in enumerate(steps) if str(s.get("run", "")).strip() == "make lint"]
+        lint = [
+            i
+            for i, s in enumerate(steps)
+            if str(s.get("run", "")).strip() == "make lint"
+        ]
         if not lint:
             continue
         uv = [i for i, s in enumerate(steps) if "setup-uv" in str(s.get("uses", ""))]
@@ -158,7 +166,10 @@ def test_the_target_passes_the_configured_flags_and_targets(tmp_path: Path) -> N
     """The tool receives exactly the configured flags, then the targets."""
     _run_target(tmp_path, "exit 0\n")
     received = (tmp_path / "args.txt").read_text(encoding="utf-8").split()
-    expected = _variable("INTERROGATE_FLAGS").split() + _variable("INTERROGATE_TARGETS").split()
+    expected = (
+        _variable("INTERROGATE_FLAGS").split()
+        + _variable("INTERROGATE_TARGETS").split()
+    )
     assert received == expected
 
 
