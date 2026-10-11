@@ -108,29 +108,78 @@ fn lint_gate_is_wired(makefile: &str) -> bool {
             && line.contains("| xargs")
             && line.contains("$(YAMLLINT)")
             && line.contains("--strict")
+            && !line.contains(".github")
+            && !line.contains("|| true")
     });
     let actionlint = lines.iter().any(|line| line.starts_with("$(ACTIONLINT)"));
     yamllint && actionlint
 }
 
-/// Returns whether a job installs the tools, pinned, before it runs the gate.
+/// Returns whether a line is a job key: indented by exactly two spaces.
+fn is_job_header(line: &str) -> bool {
+    line.starts_with("  ") && !line.starts_with("   ")
+}
+
+/// Splits a workflow into its jobs, each as its code lines.
+///
+/// A job starts at a two-space-indented key under `jobs:` and runs to the next
+/// such key.
+fn jobs(workflow: &str) -> Vec<Vec<&str>> {
+    let mut found: Vec<Vec<&str>> = Vec::new();
+    let mut in_jobs = false;
+    for line in workflow.lines() {
+        let code = line.split(" #").next().unwrap_or_default();
+        if code.trim().is_empty() || code.trim_start().starts_with('#') {
+            continue;
+        }
+        if !code.starts_with(' ') {
+            in_jobs = code.trim_end() == "jobs:";
+        } else if in_jobs && is_job_header(code) {
+            found.push(Vec::new());
+        } else if let Some(job) = found.last_mut().filter(|_| in_jobs) {
+            job.push(code.trim());
+        }
+    }
+    found
+}
+
+/// Returns whether a step line pins the shared installer to a full commit SHA.
+fn pins_the_installer(line: &str) -> bool {
+    line.trim_start_matches("- ")
+        .strip_prefix("uses: ")
+        .and_then(|uses| uses.strip_prefix(INSTALLER))
+        .is_some_and(|reference| {
+            reference.len() == 40 && reference.bytes().all(|b| b.is_ascii_hexdigit())
+        })
+}
+
+/// Returns whether a step line runs the lint gate without ignoring failure.
+fn runs_the_gate(line: &str) -> bool {
+    matches!(
+        line.trim_start_matches("- "),
+        "run: make lint" | "run: /usr/bin/make lint"
+    )
+}
+
+/// Returns whether some job runs the gate and every such job installs the
+/// tools, pinned, in the same job and before it, with failure not ignored.
 fn ci_installs_before_lint(workflow: &str) -> bool {
-    let lines: Vec<&str> = code_lines(workflow).collect();
-    let lint = lines.iter().position(|line| {
-        matches!(
-            line.trim_start_matches("- "),
-            "run: make lint" | "run: /usr/bin/make lint"
-        )
-    });
-    let install = lines.iter().position(|line| {
-        line.trim_start_matches("- ")
-            .strip_prefix("uses: ")
-            .and_then(|uses| uses.strip_prefix(INSTALLER))
-            .is_some_and(|reference| {
-                reference.len() == 40 && reference.bytes().all(|b| b.is_ascii_hexdigit())
-            })
-    });
-    matches!((install, lint), (Some(first), Some(second)) if first < second)
+    let gated: Vec<Vec<&str>> = jobs(workflow)
+        .into_iter()
+        .filter(|job| {
+            job.iter()
+                .any(|line| line.contains("make") && line.contains("lint"))
+        })
+        .collect();
+    !gated.is_empty()
+        && gated.iter().all(|job| {
+            let install = job.iter().position(|line| pins_the_installer(line));
+            let lint = job.iter().position(|line| runs_the_gate(line));
+            let ignored = job
+                .iter()
+                .any(|line| line.contains("continue-on-error: true") || line.contains("|| true"));
+            matches!((install, lint), (Some(first), Some(second)) if first < second) && !ignored
+        })
 }
 
 /// Returns whether CI still provisions a lint tool by hand.
@@ -156,6 +205,8 @@ const GOOD_MAKEFILE: &str = "lint: yamllint actionlint\nyamllint:\n\tgit ls-file
 #[case::not_strict(&GOOD_MAKEFILE.replace(" --strict", ""), false)]
 #[case::one_pathspec(&GOOD_MAKEFILE.replace(" '*.yaml'", ""), false)]
 #[case::workflows_only(&GOOD_MAKEFILE.replace("git ls-files -z '*.yml' '*.yaml' | xargs -0 -r $(YAMLLINT) --strict --", "$(YAMLLINT) --strict .github/workflows"), false)]
+#[case::workflows_filter(&GOOD_MAKEFILE.replace("'*.yaml' |", "'*.yaml' .github/workflows |"), false)]
+#[case::failure_ignored(&GOOD_MAKEFILE.replace("--strict --", "--strict -- || true"), false)]
 #[case::outside_lint(&GOOD_MAKEFILE.replace("lint: yamllint actionlint", "lint:\n\ttrue\nother: yamllint actionlint"), false)]
 #[case::no_actionlint(&GOOD_MAKEFILE.replace("\t$(ACTIONLINT)", "\ttrue"), false)]
 fn the_gate_judgement_detects_each_defect(#[case] makefile: &str, #[case] wired: bool) {
@@ -164,33 +215,51 @@ fn the_gate_judgement_detects_each_defect(#[case] makefile: &str, #[case] wired:
 
 #[rstest]
 #[case::pinned(
-    "steps:\n  - uses: \
+    "jobs:\n  gate:\n    steps:\n      - uses: \
      leynos/shared-actions/.github/actions/install-yaml-lint@\
-     0123456789abcdef0123456789abcdef01234567\n  - run: make lint\n",
+     0123456789abcdef0123456789abcdef01234567\n      - run: make lint\n",
     true
 )]
 #[case::unpinned(
-    "steps:\n  - uses: leynos/shared-actions/.github/actions/install-yaml-lint@v1\n  - run: make \
-     lint\n",
+    "jobs:\n  gate:\n    steps:\n      - uses: \
+     leynos/shared-actions/.github/actions/install-yaml-lint@v1\n      - run: make lint\n",
     false
 )]
 #[case::absolute_make(
-    "steps:\n  - uses: \
+    "jobs:\n  gate:\n    steps:\n      - uses: \
      leynos/shared-actions/.github/actions/install-yaml-lint@\
-     0123456789abcdef0123456789abcdef01234567\n  - run: /usr/bin/make lint\n",
+     0123456789abcdef0123456789abcdef01234567\n      - run: /usr/bin/make lint\n",
     true
 )]
-#[case::missing("steps:\n  - run: make lint\n", false)]
+#[case::missing("jobs:\n  gate:\n    steps:\n      - run: make lint\n", false)]
+#[case::other_job(
+    "jobs:\n  tools:\n    steps:\n      - uses: \
+     leynos/shared-actions/.github/actions/install-yaml-lint@\
+     0123456789abcdef0123456789abcdef01234567\n  gate:\n    steps:\n      - run: make lint\n",
+    false
+)]
+#[case::same_job(
+    "jobs:\n  gate:\n    steps:\n      - uses: \
+     leynos/shared-actions/.github/actions/install-yaml-lint@\
+     0123456789abcdef0123456789abcdef01234567\n      - run: make lint\n",
+    true
+)]
+#[case::ignored_failure(
+    "jobs:\n  gate:\n    steps:\n      - uses: \
+     leynos/shared-actions/.github/actions/install-yaml-lint@\
+     0123456789abcdef0123456789abcdef01234567\n      - run: make lint || true\n",
+    false
+)]
 #[case::after(
-    "steps:\n  - run: make lint\n  - uses: \
+    "jobs:\n  gate:\n    steps:\n      - run: make lint\n  - uses: \
      leynos/shared-actions/.github/actions/install-yaml-lint@\
      0123456789abcdef0123456789abcdef01234567\n",
     false
 )]
 #[case::no_lint(
-    "steps:\n  - uses: \
+    "jobs:\n  gate:\n    steps:\n      - uses: \
      leynos/shared-actions/.github/actions/install-yaml-lint@\
-     0123456789abcdef0123456789abcdef01234567\n  - run: make test\n",
+     0123456789abcdef0123456789abcdef01234567\n      - run: make test\n",
     false
 )]
 fn the_ci_judgement_detects_each_defect(#[case] workflow: &str, #[case] installs: bool) {
@@ -222,4 +291,167 @@ fn the_local_yamllint_configuration_extends_the_estate_base() {
 #[test]
 fn actionlint_accepts_the_estate_runner_labels() {
     assert!(code_lines(ACTIONLINT_CONFIG).any(|line| line == "- ubicloud-*"));
+}
+
+/// The directives of the estate base that the lint gate depends on.
+const ESTATE_BASE_DIRECTIVES: [&str; 18] = [
+    "extends: default",
+    "**/charts/**/templates/",
+    "document-start: disable",
+    "min-spaces-from-content: 1",
+    "spaces: consistent",
+    "indent-sequences: consistent",
+    "check-multi-line-strings: false",
+    "min-spaces-inside: 0",
+    "max-spaces-inside: 1",
+    "max: 120",
+    "allow-non-breakable-words: true",
+    "allow-non-breakable-inline-mappings: true",
+    ".github/workflows/",
+    ".github/actions/",
+    "allowed-values: ['true', 'false']",
+    "check-keys: false",
+    "braces:",
+    "brackets:",
+];
+
+#[test]
+fn the_estate_base_carries_every_directive_the_gate_depends_on() {
+    let base = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/.yamllint-estate.yml"));
+    for directive in ESTATE_BASE_DIRECTIVES {
+        assert!(
+            base.contains(directive),
+            "the estate base lacks `{directive}`"
+        );
+    }
+}
+
+mod boundary {
+    //! The recipes run against the repository with stand-in tools.
+
+    use std::{
+        error::Error,
+        path::{Path, PathBuf},
+        process::{Command, Output},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    use cap_std::{
+        ambient_authority,
+        fs::{Dir, PermissionsExt},
+    };
+
+    static SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+    /// A stand-in tool in the system temporary directory and its log.
+    pub struct FakeTool {
+        directory: Dir,
+        pub tool: PathBuf,
+        log_name: String,
+    }
+
+    impl FakeTool {
+        /// Writes an executable stand-in that logs its arguments and exits
+        /// with `exit_code`, under names unique to this process and call.
+        pub fn new(exit_code: i32) -> Result<Self, Box<dyn Error>> {
+            let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst);
+            let stem = format!("corbusier-yaml-lint-{}-{sequence}", std::process::id());
+            let temporary = std::env::temp_dir();
+            let directory = Dir::open_ambient_dir(&temporary, ambient_authority())?;
+            let log_name = format!("{stem}.log");
+            let log = temporary.join(&log_name);
+            directory.write(
+                &stem,
+                format!(
+                    "#!/bin/sh\nfor argument in \"$@\"; do printf '%s\\n' \"$argument\"; done > '{}'\nexit {exit_code}\n",
+                    log.display()
+                ),
+            )?;
+            let mut permissions = directory.metadata(&stem)?.permissions();
+            permissions.set_mode(0o755);
+            directory.set_permissions(&stem, permissions)?;
+            Ok(Self {
+                directory,
+                tool: temporary.join(stem),
+                log_name,
+            })
+        }
+
+        /// Reads the arguments the tool logged.
+        pub fn logged(&self) -> Result<String, Box<dyn Error>> {
+            Ok(self.directory.read_to_string(&self.log_name)?)
+        }
+    }
+
+    pub fn make(target: &str, variable: &str, tool: &Path) -> Result<Output, Box<dyn Error>> {
+        Ok(Command::new("make")
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .arg(target)
+            .arg(format!("{variable}={}", tool.display()))
+            .output()?)
+    }
+
+    pub fn tracked_yaml() -> Result<Vec<String>, Box<dyn Error>> {
+        let output = Command::new("git")
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .args(["ls-files", "-z", "*.yml", "*.yaml"])
+            .output()?;
+        let mut files: Vec<String> = String::from_utf8(output.stdout)?
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(str::to_owned)
+            .collect();
+        files.sort_unstable();
+        Ok(files)
+    }
+
+    #[test]
+    fn make_yamllint_hands_the_tool_strict_mode_and_the_tracked_yaml() {
+        let fake = FakeTool::new(0).expect("write a stand-in yamllint");
+
+        let output = make("yamllint", "YAMLLINT", &fake.tool).expect("run make yamllint");
+
+        assert!(output.status.success(), "{output:?}");
+        let logged = fake.logged().expect("read the stand-in's log");
+        let mut arguments = logged.lines();
+        assert_eq!(arguments.next(), Some("--strict"));
+        assert_eq!(arguments.next(), Some("--"));
+        let mut given: Vec<&str> = arguments.collect();
+        given.sort_unstable();
+        assert_eq!(given, tracked_yaml().expect("list tracked YAML"));
+    }
+
+    #[test]
+    fn a_failing_yamllint_fails_the_make_target() {
+        let fake = FakeTool::new(1).expect("write a stand-in yamllint");
+
+        let output = make("yamllint", "YAMLLINT", &fake.tool).expect("run make yamllint");
+
+        assert!(!output.status.success());
+    }
+
+    #[test]
+    fn a_failing_actionlint_fails_the_make_target() {
+        let fake = FakeTool::new(1).expect("write a stand-in actionlint");
+
+        let output = make("actionlint", "ACTIONLINT", &fake.tool).expect("run make actionlint");
+
+        assert!(!output.status.success());
+    }
+
+    #[test]
+    fn a_dry_run_of_lint_reaches_both_tools() {
+        let output = Command::new("make")
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .args(["-n", "lint"])
+            .output()
+            .expect("run make -n lint");
+
+        let plan = String::from_utf8_lossy(&output.stdout);
+        assert!(plan.contains("yamllint --strict"), "{plan}");
+        assert!(
+            plan.lines().any(|line| line.trim() == "actionlint"),
+            "{plan}"
+        );
+    }
 }

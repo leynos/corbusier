@@ -49,14 +49,25 @@ make test
 ```
 
 `make check-fmt` validates Rust formatting, `make lint` runs the workflow
-contracts, documentation generation, Clippy, Whitaker, and the spelling policy
-with warnings denied, and `make test` runs the workspace test suite through
-nextest. Documentation changes should also run:
+contracts, documentation generation, Clippy, Whitaker, the spelling policy,
+`yamllint --strict` over every Git-tracked YAML file, and `actionlint`, with
+warnings denied, and `make test` runs the workspace test suite through nextest.
+Documentation changes should also run:
 
 ```sh
 make markdownlint
 make nixie
 ```
+
+The YAML linters need yamllint 1.38.0, actionlint 1.7.12 and shellcheck 0.11.0,
+the versions CI installs through the shared `install-yaml-lint` action. Run the
+targets from the repository root: yamllint resolves `.yamllint.yml`, which
+extends the estate base `.yamllint-estate.yml` (copied verbatim, never edited
+here), against the working directory. `.github/actionlint.yaml` declares the
+`ubicloud-*` runner labels. `tests/yaml_lint_contract.rs` judges the Makefile
+and workflow wiring against fixtures and then the real files, and its
+`boundary` module runs the targets with stand-in tools to prove the
+tracked-files list and that a tool failure fails the target.
 
 Run `make fmt` after documentation changes to apply Rust and Markdown
 formatting, but review formatter output before committing. Markdown formatter

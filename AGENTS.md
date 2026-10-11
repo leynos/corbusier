@@ -148,10 +148,17 @@ project:
 
     ```sh
     cargo clippy --workspace --all-targets --all-features -- -D warnings
+    git ls-files -z '*.yml' '*.yaml' | xargs -0 -r yamllint --strict --
+    actionlint
     ```
 
     linting every target with all features enabled and denying all Clippy
-    warnings.
+    warnings, then every Git-tracked YAML file and the GitHub Actions
+    workflows. `.yamllint-estate.yml` is the estate's shared base, copied
+    verbatim and never edited here; `.yamllint.yml` extends it and may only add
+    an `ignore`. CI installs `yamllint`, `actionlint` and `shellcheck` through
+    the pinned shared `install-yaml-lint` action before `make lint`, and never
+    installs them by hand.
   - `make test` executes:
 
     ```sh
