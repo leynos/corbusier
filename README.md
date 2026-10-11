@@ -150,6 +150,7 @@ The project enforces strict code quality standards:
 
 - Comprehensive Clippy linting (pedantic mode with additional deny rules)
 - Whitaker Dylint checks layered into `make lint`
+- Python docstring coverage (`make interrogate`, run by `make lint`; needs `uv`)
 - Mandatory code formatting via `cargo fmt`
 - Full test coverage requirements
 - British English with Oxford spelling in documentation, enforced by a pinned
