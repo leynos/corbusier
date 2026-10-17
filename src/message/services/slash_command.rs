@@ -51,19 +51,18 @@ where
             .ok_or_else(|| SlashCommandError::UnknownCommand(invocation.command().to_owned()))?;
 
         let validated_parameters = definition.validate_parameters(invocation.parameters())?;
+        let scope = CommandScope {
+            command: invocation.command(),
+            parameters: &validated_parameters,
+        };
         let expanded_content = render_template(
             self.environment.as_ref(),
-            invocation.command(),
+            scope,
             &definition.expansion_template,
-            &validated_parameters,
         )?;
 
-        let planned_tool_calls = Self::plan_tool_calls(
-            self.environment.as_ref(),
-            invocation.command(),
-            &definition.tool_calls,
-            &validated_parameters,
-        )?;
+        let planned_tool_calls =
+            Self::plan_tool_calls(self.environment.as_ref(), scope, &definition.tool_calls)?;
 
         let tool_call_audits = planned_tool_calls
             .iter()
@@ -72,11 +71,7 @@ where
             })
             .collect();
 
-        let expansion = build_expansion(
-            invocation.command(),
-            &validated_parameters,
-            expanded_content,
-        );
+        let expansion = build_expansion(scope, expanded_content);
         Ok(SlashCommandExecution::new(
             invocation,
             expansion,
@@ -87,20 +82,15 @@ where
 
     fn plan_tool_calls(
         environment: &Environment<'_>,
-        command: &str,
+        scope: CommandScope<'_>,
         templates: &[crate::message::domain::ToolCallTemplate],
-        parameters: &BTreeMap<String, Value>,
     ) -> Result<Vec<PlannedToolCall>, SlashCommandError> {
         templates
             .iter()
             .enumerate()
             .map(|(index, template)| {
-                let rendered_arguments = render_template(
-                    environment,
-                    command,
-                    &template.arguments_template,
-                    parameters,
-                )?;
+                let rendered_arguments =
+                    render_template(environment, scope, &template.arguments_template)?;
                 let arguments: Value =
                     serde_json::from_str(&rendered_arguments).map_err(|error| {
                         SlashCommandError::InvalidToolArgumentsTemplate {
@@ -110,10 +100,10 @@ where
                     })?;
 
                 let call_id = build_deterministic_call_id(&DeterministicCallIdInput {
-                    command,
+                    command: scope.command,
                     index,
                     tool_name: &template.tool_name,
-                    parameters,
+                    parameters: scope.parameters,
                     arguments: &arguments,
                 });
 
@@ -127,40 +117,47 @@ where
     }
 }
 
+/// The command name and validated parameters that every rendering and planning
+/// step of one execution reads together.
+///
+/// Scope: private to this module and borrowed for a single `execute` call, so
+/// it adds no ownership or lifetime obligations beyond that call. It exists to
+/// stop the two values being threaded through each helper as loose arguments.
+#[derive(Clone, Copy)]
+struct CommandScope<'a> {
+    command: &'a str,
+    parameters: &'a BTreeMap<String, Value>,
+}
+
 fn render_template(
     environment: &Environment<'_>,
-    command: &str,
+    scope: CommandScope<'_>,
     template: &str,
-    parameters: &BTreeMap<String, Value>,
 ) -> Result<String, SlashCommandError> {
-    let context = build_template_context(command, parameters);
+    let context = build_template_context(scope);
     environment
         .render_str(template, context)
         .map_err(|error| SlashCommandError::TemplateRender {
-            command: command.to_owned(),
+            command: scope.command.to_owned(),
             reason: error.to_string(),
         })
 }
 
-fn build_template_context(
-    command: &str,
-    parameters: &BTreeMap<String, Value>,
-) -> Map<String, Value> {
+fn build_template_context(scope: CommandScope<'_>) -> Map<String, Value> {
     let mut context = Map::new();
-    context.insert("command".to_owned(), Value::String(command.to_owned()));
-    for (key, value) in parameters {
+    context.insert(
+        "command".to_owned(),
+        Value::String(scope.command.to_owned()),
+    );
+    for (key, value) in scope.parameters {
         context.insert(key.clone(), value.clone());
     }
     context
 }
 
-fn build_expansion(
-    command: &str,
-    parameters: &BTreeMap<String, Value>,
-    expanded_content: String,
-) -> SlashCommandExpansion {
-    let mut expansion = SlashCommandExpansion::new(format!("/{command}"), expanded_content);
-    for (key, value) in parameters {
+fn build_expansion(scope: CommandScope<'_>, expanded_content: String) -> SlashCommandExpansion {
+    let mut expansion = SlashCommandExpansion::new(format!("/{}", scope.command), expanded_content);
+    for (key, value) in scope.parameters {
         expansion = expansion.with_parameter(key.clone(), value.clone());
     }
     expansion
