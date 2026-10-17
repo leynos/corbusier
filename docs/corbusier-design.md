@@ -450,6 +450,10 @@ Corbusier implements this through:
 - Parameter validation is schema-driven and typed (`string`, `number`,
   `boolean`, `select`) with typed errors for unknown parameters, missing
   required parameters, and invalid values.
+- The service groups a command name and its validated parameters in a private,
+  borrowed `CommandScope` for one execution. Rendering, tool-call planning, and
+  expansion helpers in `slash_command.rs` receive this scope; it is not a
+  public or cross-module abstraction.
 - Template expansion and tool-argument rendering use `minijinja`.
 - Deterministic tool-call identifiers are generated from a canonical payload
   string with this exact order and encoding:
