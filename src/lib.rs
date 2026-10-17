@@ -31,6 +31,7 @@ pub mod http_api;
 pub mod tenant;
 
 pub mod agent_backend;
+pub(crate) mod hex;
 pub mod hook_engine;
 pub mod message;
 pub(crate) mod postgres_support;
