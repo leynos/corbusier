@@ -78,6 +78,7 @@ mod tests {
 
     use super::{to_lower_hex, to_lower_hex_prefix};
     use rstest::rstest;
+    use sha2::{Digest, Sha256};
 
     #[rstest]
     #[case::empty(&[], "")]
@@ -118,5 +119,26 @@ mod tests {
                 u8::from_str_radix(&rendered, 16).expect("two hex digits parse as a byte value");
             assert_eq!(parsed, byte, "round-trip mismatch for byte {byte:#04x}");
         }
+    }
+
+    /// Guards the `sha2` 0.11 digest-to-byte-slice compatibility contract.
+    ///
+    /// `Sha256::digest` returns a `hybrid_array::Array<u8, _>`, which no longer
+    /// implements `LowerHex`, so the encoder reaches it through deref coercion
+    /// to `&[u8]`. Passing `&digest` straight to both entry points, plus the
+    /// explicit `&[u8]` binding, makes the build fail if a later `sha2` release
+    /// stops coercing. The input is the FIPS 180-2 `"abc"` vector, so the
+    /// expected output is fixed and independent of this crate.
+    #[test]
+    fn sha2_digest_coerces_to_byte_slice_for_both_encoders() {
+        let digest = Sha256::digest(b"abc");
+        let as_slice: &[u8] = &digest;
+        assert_eq!(as_slice.len(), 32);
+
+        assert_eq!(
+            to_lower_hex(&digest),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        );
+        assert_eq!(to_lower_hex_prefix(&digest, 4), "ba7816bf");
     }
 }
