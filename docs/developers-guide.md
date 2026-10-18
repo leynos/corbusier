@@ -92,6 +92,31 @@ Use [`contents.md`](contents.md) to choose the right documentation destination.
 Substantive architectural decisions belong in an ADR or the relevant design
 document, not only in code comments.
 
+#### Slash-command execution scope
+
+`CommandScope` is a module-private, copyable borrowed view over the parsed
+command name and validated parameters. `SlashCommandService::execute` creates
+it after validation and passes it to template rendering, tool-call planning,
+and expansion helpers. Keep it within that execution flow: it owns neither
+value and is not a cross-module abstraction.
+
+#### Hexadecimal digest rendering
+
+`src/hex.rs` owns the crate's only hexadecimal encoder. `to_lower_hex` renders
+every byte as two lowercase digits, and `to_lower_hex_prefix` renders at most a
+requested number of leading bytes for callers that want a truncated digest
+suffix. Both are `pub(crate)`: identifier rendering is an implementation
+detail, not part of the public contract.
+
+Call these instead of `format!("{:x}", digest)` or a hand-rolled nibble loop.
+`sha2` 0.11 returns `hybrid_array::Array<u8, _>` from `finalize` and `digest`,
+and that type does not implement `core::fmt::LowerHex`, so `{:x}` does not
+compile; `&digest` coerces to `&[u8]` through `Deref`, so the encoder accepts a
+finalized digest directly. The encoder holds no digest knowledge — callers
+hash, then encode. Prefer `to_lower_hex_prefix` over indexing or slicing a
+digest, because `clippy::indexing_slicing` and `clippy::string_slice` are
+denied.
+
 ### Dependency management
 
 Cargo dependencies must use explicit SemVer-compatible caret requirements such

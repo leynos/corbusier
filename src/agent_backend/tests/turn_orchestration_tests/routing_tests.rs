@@ -12,6 +12,7 @@ use rstest::rstest;
 use serde_json::json;
 use uuid::Uuid;
 
+/// Verifies orchestration preserves a fixed call ID in routed results and audits.
 #[rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_turn_routes_tool_calls_and_returns_audits(
@@ -61,6 +62,22 @@ async fn execute_turn_routes_tool_calls_and_returns_audits(
         .collect();
     let routed_call_refs: Vec<&str> = routed_call_ids.iter().map(String::as_str).collect();
     assert_eq!(routed_call_refs, result_call_ids);
+
+    let search_result = response
+        .tool_results()
+        .iter()
+        .find(|result| result.tool_name() == "search_docs")
+        .expect("search_docs result should exist");
+    assert_eq!(
+        search_result.call_id(),
+        "call-a8cfa11d8e923189ca983d42ce89ecc58bc9e0c64f95cd65f7945c469f695d8d"
+    );
+    let search_audit = response
+        .tool_call_audits()
+        .iter()
+        .find(|audit| audit.tool_name() == "search_docs")
+        .expect("search_docs audit should exist");
+    assert_eq!(search_audit.call_id(), search_result.call_id());
 
     let created_sessions = context.runtime.created_session_ids()?;
     assert_eq!(created_sessions.len(), 1);

@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::hex::to_lower_hex_prefix;
 use crate::message::domain::{
     PlannedToolCall, SlashCommandError, SlashCommandExecution, SlashCommandExpansion,
     SlashCommandInvocation, ToolCallAudit, ToolCallStatus,
@@ -50,19 +51,18 @@ where
             .ok_or_else(|| SlashCommandError::UnknownCommand(invocation.command().to_owned()))?;
 
         let validated_parameters = definition.validate_parameters(invocation.parameters())?;
+        let scope = CommandScope {
+            command: invocation.command(),
+            parameters: &validated_parameters,
+        };
         let expanded_content = render_template(
             self.environment.as_ref(),
-            invocation.command(),
+            scope,
             &definition.expansion_template,
-            &validated_parameters,
         )?;
 
-        let planned_tool_calls = Self::plan_tool_calls(
-            self.environment.as_ref(),
-            invocation.command(),
-            &definition.tool_calls,
-            &validated_parameters,
-        )?;
+        let planned_tool_calls =
+            Self::plan_tool_calls(self.environment.as_ref(), scope, &definition.tool_calls)?;
 
         let tool_call_audits = planned_tool_calls
             .iter()
@@ -71,11 +71,7 @@ where
             })
             .collect();
 
-        let expansion = build_expansion(
-            invocation.command(),
-            &validated_parameters,
-            expanded_content,
-        );
+        let expansion = build_expansion(scope, expanded_content);
         Ok(SlashCommandExecution::new(
             invocation,
             expansion,
@@ -84,22 +80,26 @@ where
         ))
     }
 
+    /// Renders and parses every tool argument template in declaration order.
+    ///
+    /// The template position is part of each deterministic ID, so identical
+    /// templates at positions zero and one still receive distinct IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a template-rendering or invalid-arguments error when any
+    /// template cannot be rendered or its output is not JSON.
     fn plan_tool_calls(
         environment: &Environment<'_>,
-        command: &str,
+        scope: CommandScope<'_>,
         templates: &[crate::message::domain::ToolCallTemplate],
-        parameters: &BTreeMap<String, Value>,
     ) -> Result<Vec<PlannedToolCall>, SlashCommandError> {
         templates
             .iter()
             .enumerate()
             .map(|(index, template)| {
-                let rendered_arguments = render_template(
-                    environment,
-                    command,
-                    &template.arguments_template,
-                    parameters,
-                )?;
+                let rendered_arguments =
+                    render_template(environment, scope, &template.arguments_template)?;
                 let arguments: Value =
                     serde_json::from_str(&rendered_arguments).map_err(|error| {
                         SlashCommandError::InvalidToolArgumentsTemplate {
@@ -109,10 +109,10 @@ where
                     })?;
 
                 let call_id = build_deterministic_call_id(&DeterministicCallIdInput {
-                    command,
+                    command: scope.command,
                     index,
                     tool_name: &template.tool_name,
-                    parameters,
+                    parameters: scope.parameters,
                     arguments: &arguments,
                 });
 
@@ -126,78 +126,85 @@ where
     }
 }
 
+/// The command name and validated parameters that every rendering and planning
+/// step of one execution reads together.
+///
+/// Scope: private to this module and borrowed for a single `execute` call, so
+/// it adds no ownership or lifetime obligations beyond that call. It exists to
+/// stop the two values being threaded through each helper as loose arguments.
+#[derive(Clone, Copy)]
+struct CommandScope<'a> {
+    command: &'a str,
+    parameters: &'a BTreeMap<String, Value>,
+}
+
+/// Renders a template with the command name and validated parameters.
+///
+/// For example, a `task` scope with `issue = 42` renders
+/// `{{ command }} {{ issue }}` as `task 42`.
 fn render_template(
     environment: &Environment<'_>,
-    command: &str,
+    scope: CommandScope<'_>,
     template: &str,
-    parameters: &BTreeMap<String, Value>,
 ) -> Result<String, SlashCommandError> {
-    let context = build_template_context(command, parameters);
+    let context = build_template_context(scope);
     environment
         .render_str(template, context)
         .map_err(|error| SlashCommandError::TemplateRender {
-            command: command.to_owned(),
+            command: scope.command.to_owned(),
             reason: error.to_string(),
         })
 }
 
-fn build_template_context(
-    command: &str,
-    parameters: &BTreeMap<String, Value>,
-) -> Map<String, Value> {
+/// Makes the command name and validated parameters available to templates.
+///
+/// A `task` scope with `issue = 42` produces the JSON context
+/// `{"command":"task","issue":42}`.
+fn build_template_context(scope: CommandScope<'_>) -> Map<String, Value> {
     let mut context = Map::new();
-    context.insert("command".to_owned(), Value::String(command.to_owned()));
-    for (key, value) in parameters {
+    context.insert(
+        "command".to_owned(),
+        Value::String(scope.command.to_owned()),
+    );
+    for (key, value) in scope.parameters {
         context.insert(key.clone(), value.clone());
     }
     context
 }
 
-fn build_expansion(
-    command: &str,
-    parameters: &BTreeMap<String, Value>,
-    expanded_content: String,
-) -> SlashCommandExpansion {
-    let mut expansion = SlashCommandExpansion::new(format!("/{command}"), expanded_content);
-    for (key, value) in parameters {
+/// Builds persisted expansion details from the command and rendered content.
+///
+/// A `task` scope produces `/task` and carries its validated parameters into
+/// the expansion metadata.
+fn build_expansion(scope: CommandScope<'_>, expanded_content: String) -> SlashCommandExpansion {
+    let mut expansion = SlashCommandExpansion::new(format!("/{}", scope.command), expanded_content);
+    for (key, value) in scope.parameters {
         expansion = expansion.with_parameter(key.clone(), value.clone());
     }
     expansion
 }
 
+/// Builds an indexed slash-command ID from the canonical call payload.
+///
+/// For `/task action=start issue=42`, the first planned call is
+/// `sc-0-81e30d6fd777c32f`.
 fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
     let canonical = canonical_call_id_payload(input);
     let digest = Sha256::digest(canonical.as_bytes());
-    let mut hash_suffix = String::with_capacity(16);
-    for byte in digest.iter().take(8) {
-        hash_suffix.push(hex_nibble_character(byte >> 4));
-        hash_suffix.push(hex_nibble_character(byte & 0x0f));
-    }
+    let hash_suffix = to_lower_hex_prefix(&digest, CALL_ID_DIGEST_BYTES);
     format!("sc-{}-{hash_suffix}", input.index)
 }
 
-const fn hex_nibble_character(nibble: u8) -> char {
-    match nibble {
-        0 => '0',
-        1 => '1',
-        2 => '2',
-        3 => '3',
-        4 => '4',
-        5 => '5',
-        6 => '6',
-        7 => '7',
-        8 => '8',
-        9 => '9',
-        10 => 'a',
-        11 => 'b',
-        12 => 'c',
-        13 => 'd',
-        14 => 'e',
-        15 => 'f',
-        _ => '?',
-    }
-}
+/// Number of leading digest bytes rendered into a slash-command call ID.
+///
+/// Sixty-four bits of digest keeps identifiers short while leaving collisions
+/// implausible for the number of tool calls a single command can plan.
+const CALL_ID_DIGEST_BYTES: usize = 8;
 
+/// Serialises ID inputs in a stable field order before hashing.
+///
+/// The payload includes the command, call index, tool, validated parameters,
+/// and rendered arguments, so changing any of these changes the digest.
 fn canonical_call_id_payload(input: &DeterministicCallIdInput<'_>) -> String {
     let mut canonical = String::new();
     canonical.push_str("command=");
