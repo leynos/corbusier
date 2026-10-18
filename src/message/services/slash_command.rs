@@ -80,6 +80,15 @@ where
         ))
     }
 
+    /// Renders and parses every tool argument template in declaration order.
+    ///
+    /// The template position is part of each deterministic ID, so identical
+    /// templates at positions zero and one still receive distinct IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a template-rendering or invalid-arguments error when any
+    /// template cannot be rendered or its output is not JSON.
     fn plan_tool_calls(
         environment: &Environment<'_>,
         scope: CommandScope<'_>,
@@ -129,6 +138,10 @@ struct CommandScope<'a> {
     parameters: &'a BTreeMap<String, Value>,
 }
 
+/// Renders a template with the command name and validated parameters.
+///
+/// For example, a `task` scope with `issue = 42` renders
+/// `{{ command }} {{ issue }}` as `task 42`.
 fn render_template(
     environment: &Environment<'_>,
     scope: CommandScope<'_>,
@@ -143,6 +156,10 @@ fn render_template(
         })
 }
 
+/// Makes the command name and validated parameters available to templates.
+///
+/// A `task` scope with `issue = 42` produces the JSON context
+/// `{"command":"task","issue":42}`.
 fn build_template_context(scope: CommandScope<'_>) -> Map<String, Value> {
     let mut context = Map::new();
     context.insert(
@@ -155,6 +172,10 @@ fn build_template_context(scope: CommandScope<'_>) -> Map<String, Value> {
     context
 }
 
+/// Builds persisted expansion details from the command and rendered content.
+///
+/// A `task` scope produces `/task` and carries its validated parameters into
+/// the expansion metadata.
 fn build_expansion(scope: CommandScope<'_>, expanded_content: String) -> SlashCommandExpansion {
     let mut expansion = SlashCommandExpansion::new(format!("/{}", scope.command), expanded_content);
     for (key, value) in scope.parameters {
@@ -163,6 +184,10 @@ fn build_expansion(scope: CommandScope<'_>, expanded_content: String) -> SlashCo
     expansion
 }
 
+/// Builds an indexed slash-command ID from the canonical call payload.
+///
+/// For `/task action=start issue=42`, the first planned call is
+/// `sc-0-81e30d6fd777c32f`.
 fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
     let canonical = canonical_call_id_payload(input);
     let digest = Sha256::digest(canonical.as_bytes());
@@ -176,6 +201,10 @@ fn build_deterministic_call_id(input: &DeterministicCallIdInput<'_>) -> String {
 /// implausible for the number of tool calls a single command can plan.
 const CALL_ID_DIGEST_BYTES: usize = 8;
 
+/// Serialises ID inputs in a stable field order before hashing.
+///
+/// The payload includes the command, call index, tool, validated parameters,
+/// and rendered arguments, so changing any of these changes the digest.
 fn canonical_call_id_payload(input: &DeterministicCallIdInput<'_>) -> String {
     let mut canonical = String::new();
     canonical.push_str("command=");

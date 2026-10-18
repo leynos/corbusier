@@ -5,17 +5,67 @@
 
 use std::sync::Arc;
 
+use mockable::DefaultClock;
 use rstest::{fixture, rstest};
 
+use super::adapters_test_support::{clock, ctx, repo};
+use crate::context::RequestContext;
 use crate::message::{
-    adapters::memory::InMemorySlashCommandRegistry,
-    domain::{PlannedToolCall, SlashCommandDefinition, ToolCallTemplate},
+    adapters::memory::{InMemoryMessageRepository, InMemorySlashCommandRegistry},
+    domain::{
+        ContentPart, ConversationId, Message, MessageMetadata, PlannedToolCall, Role,
+        SequenceNumber, SlashCommandDefinition, TextPart, ToolCallTemplate,
+    },
+    ports::repository::MessageRepository,
     services::SlashCommandService,
 };
 
+/// Provides the default in-memory slash-command registry for call-ID tests.
 #[fixture]
 fn slash_command_service() -> SlashCommandService<InMemorySlashCommandRegistry> {
     SlashCommandService::new(Arc::new(InMemorySlashCommandRegistry::new()))
+}
+
+/// Stores a generated audit record and reads it back through the message port.
+#[rstest]
+#[tokio::test]
+async fn call_id_survives_message_store_and_retrieval(
+    slash_command_service: SlashCommandService<InMemorySlashCommandRegistry>,
+    repo: InMemoryMessageRepository,
+    ctx: RequestContext,
+    clock: DefaultClock,
+) {
+    let execution = slash_command_service
+        .execute("/task action=start issue=42")
+        .expect("slash command should execute");
+    let message = Message::builder(
+        ConversationId::new(),
+        Role::Assistant,
+        SequenceNumber::new(1),
+    )
+    .with_content(ContentPart::Text(TextPart::new("Starting task")))
+    .with_metadata(
+        MessageMetadata::empty().with_tool_call_audits(execution.tool_call_audits().to_vec()),
+    )
+    .build(&clock)
+    .expect("message should build");
+    let message_id = message.id();
+
+    repo.store(&ctx, &message)
+        .await
+        .expect("message should store");
+    let stored_message = repo
+        .find_by_id(&ctx, message_id)
+        .await
+        .expect("message lookup should succeed")
+        .expect("stored message should be found");
+    let audit = stored_message
+        .metadata()
+        .tool_call_audits
+        .first()
+        .expect("slash-command audit should be stored");
+
+    assert_eq!(audit.call_id, "sc-0-81e30d6fd777c32f");
 }
 
 /// Pins the whole identifier for a fixed input to a digest computed outside

@@ -80,6 +80,7 @@ mod tests {
     use rstest::rstest;
     use sha2::{Digest, Sha256};
 
+    /// Checks empty input, leading zeroes, and mixed high and low nibbles.
     #[rstest]
     #[case::empty(&[], "")]
     #[case::leading_zeroes(&[0x00, 0x0f, 0xff, 0xa0], "000fffa0")]
@@ -88,6 +89,7 @@ mod tests {
         assert_eq!(to_lower_hex(bytes), expected);
     }
 
+    /// Checks truncation, a zero-byte limit, and limits beyond the input.
     #[rstest]
     #[case::truncates(&[0x0f, 0xff, 0x10], 2, "0fff")]
     #[case::zero_limit(&[0x0f], 0, "")]

@@ -268,6 +268,7 @@ fn assert_call_id_is_full_lowercase_hex(call_id: &str) {
     );
 }
 
+/// Ensures deterministic IDs always use the full lowercase digest format.
 #[rstest]
 #[case::empty_parameters("read_file", json!({}), 0)]
 #[case::nested_parameters("write", json!({"b": [1, {"a": null}], "a": "x"}), 7)]

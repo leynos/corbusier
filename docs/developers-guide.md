@@ -92,6 +92,14 @@ Use [`contents.md`](contents.md) to choose the right documentation destination.
 Substantive architectural decisions belong in an ADR or the relevant design
 document, not only in code comments.
 
+#### Slash-command execution scope
+
+`CommandScope` is a module-private, copyable borrowed view over the parsed
+command name and validated parameters. `SlashCommandService::execute` creates
+it after validation and passes it to template rendering, tool-call planning,
+and expansion helpers. Keep it within that execution flow: it owns neither
+value and is not a cross-module abstraction.
+
 #### Hexadecimal digest rendering
 
 `src/hex.rs` owns the crate's only hexadecimal encoder. `to_lower_hex` renders
