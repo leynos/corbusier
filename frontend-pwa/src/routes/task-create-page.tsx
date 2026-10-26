@@ -5,7 +5,7 @@
  * `useCreateTaskMutation`, localized copy, and post-success navigation.
  */
 import { useNavigate } from '@tanstack/react-router';
-import { type FormEvent, useState } from 'react';
+import { type SyntheticEvent, useState } from 'react';
 
 import { useI18n } from '../i18n/runtime';
 import { useCreateTaskMutation } from '../task_slice/application/task-queries';
@@ -37,7 +37,7 @@ export function TaskCreatePage() {
     setErrors((current) => ({ ...current, [field]: undefined }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors = validateTaskCreateDraft(draft);

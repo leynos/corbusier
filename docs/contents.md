@@ -16,9 +16,6 @@ the first stop when choosing which document to read or update.
   runtime expectations.
 - [Developers' guide](developers-guide.md) explains maintainer workflows,
   quality gates, local services, and implementation conventions.
-- [ADR 012: Rust build standard](adr-012-rust-build-standard.md) records why
-  development builds use the fast flags while coverage and release builds stay
-  off them.
 - [Roadmap](roadmap.md) tracks planned delivery work, dependencies, and
   acceptance criteria.
 
@@ -59,6 +56,10 @@ the first stop when choosing which document to read or update.
   records migration and coexistence policy.
 - [ADR 011: Corbusier and Frankie review adapter role segregation](adr-011-corbusier-frankie-review-adapter-role-segregation.md)
   records adapter responsibility boundaries.
+- [ADR 012: Rust build standard](adr-012-rust-build-standard.md) records the
+  development build flags and release-build boundary.
+- [ADR 013: Frontend linting strategy](adr-013-frontend-linting-strategy.md)
+  records frontend lint tools, selected rules, and the narrow plugin conflict.
 
 ## Guides and reference material
 

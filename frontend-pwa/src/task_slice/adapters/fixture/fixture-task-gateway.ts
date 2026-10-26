@@ -41,8 +41,8 @@ export function createFixtureTaskGateway(
   function enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const nextOperation = operationQueue.then(operation, operation);
     operationQueue = nextOperation.then(
-      () => undefined,
-      () => undefined,
+      () => {},
+      () => {},
     );
 
     return nextOperation;
@@ -204,7 +204,7 @@ function applyTransition(task: Task, targetState: TaskState): Task {
  * and local development.
  */
 function delay() {
-  return new Promise((resolve) => window.setTimeout(resolve, 15));
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 15));
 }
 
 /**

@@ -8,13 +8,14 @@
  * class list exceeds the configured threshold.
  */
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import path from 'node:path';
 
 import ts from 'typescript';
+import { z } from 'zod';
 
-interface SemanticConfig {
-  maxClasslistLength?: number;
-}
+const SemanticConfigSchema = z.object({
+  maxClasslistLength: z.number().positive().optional(),
+});
 
 interface Violation {
   file: string;
@@ -28,21 +29,19 @@ const PROJECT_ROOT = process.cwd();
 
 function loadThreshold(): number {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
-  const config = JSON.parse(raw) as SemanticConfig;
+  const config = SemanticConfigSchema.parse(JSON.parse(raw));
   const value = config.maxClasslistLength;
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : 16;
+  return value === undefined ? 16 : Math.floor(value);
 }
 
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
-  return Array.from(glob.scanSync(PROJECT_ROOT));
+  return [...glob.scanSync(PROJECT_ROOT)];
 }
 
 function extractStringLiteral(
   initializer: ts.JsxAttributeValue,
-): string | null {
+): string | undefined {
   if (ts.isStringLiteral(initializer)) {
     return initializer.text;
   }
@@ -55,7 +54,7 @@ function extractStringLiteral(
       return expression.text;
     }
   }
-  return null;
+  return undefined;
 }
 
 /** Return true when the node is a JSX `className` attribute with an initializer. */
@@ -63,7 +62,7 @@ function isClassNameAttribute(node: ts.Node): node is ts.JsxAttribute {
   return (
     ts.isJsxAttribute(node) &&
     node.name.text === 'className' &&
-    node.initializer != null
+    node.initializer !== undefined
   );
 }
 
@@ -114,7 +113,7 @@ function main(): void {
   }
 
   for (const violation of violations) {
-    const displayPath = relative(PROJECT_ROOT, violation.file);
+    const displayPath = path.relative(PROJECT_ROOT, violation.file);
     console.error(
       `${displayPath}:${violation.line}:${violation.column} className has ${violation.length} utilities (max ${maxLength}).`,
     );

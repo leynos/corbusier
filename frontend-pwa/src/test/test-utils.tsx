@@ -15,12 +15,15 @@ import { createAppRouter } from '../app/router';
 import { createFixtureTaskGateway } from '../task_slice/adapters/fixture/fixture-task-gateway';
 import type { Task } from '../task_slice/domain/task';
 
-export async function renderApp(
-  { initialPath = '/tasks/new', seedTasks } = {} as {
-    initialPath?: string;
-    seedTasks?: Task[];
-  },
-) {
+interface RenderAppOptions {
+  initialPath?: string;
+  seedTasks?: Task[];
+}
+
+export async function renderApp({
+  initialPath = '/tasks/new',
+  seedTasks,
+}: RenderAppOptions = {}) {
   const history = createMemoryHistory({ initialEntries: [initialPath] });
   const router = createAppRouter();
   router.update({ history });

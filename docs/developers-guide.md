@@ -202,6 +202,21 @@ The shipped `4.4.1` slice boundary is recorded in
 The Whitaker user's guide remains a tooling guide for the Rust lint runner and
 does not describe these frontend-only APIs.
 
+### Frontend linting
+
+`make frontend-lint` runs Biome and then Oxlint in `frontend-pwa`. Oxlint uses
+the recommended Unicorn profile and the pinned `ai-deslop` plugin with
+type-aware rules enabled. The exact versions and the one rule conflict are
+recorded in [ADR 013](adr-013-frontend-linting-strategy.md).
+
+Runtime schemas belong at input boundaries. Frontend transport responses and
+tooling configuration are parsed before callers rely on their shape; keep
+unchecked shape tests and type assertions out of these paths.
+
+The lint command supplements the existing Biome checks. Run
+`make frontend-typecheck`, `make frontend-docs-check`, and `make frontend-test`
+for the separate TypeScript, TypeDoc, and behavioural validation gates.
+
 ### TypeScript type checking for tests
 
 `frontend-pwa/tsconfig.test.json` extends the base `tsconfig.json` and widens

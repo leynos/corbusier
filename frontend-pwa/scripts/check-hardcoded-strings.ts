@@ -11,19 +11,25 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
+import { z } from 'zod';
 
 interface HardcodedStringsConfig {
   minWordLength: number;
   userFacingAttributes: string[];
 }
 
-interface SemanticConfig {
-  hardcodedStrings?: Partial<HardcodedStringsConfig>;
-}
+const UserFacingAttributesSchema = z.array(z.string());
+const HardcodedStringsConfigSchema = z.object({
+  minWordLength: z.number().optional(),
+  userFacingAttributes: UserFacingAttributesSchema.optional(),
+});
+const SemanticConfigSchema = z.object({
+  hardcodedStrings: HardcodedStringsConfigSchema.optional(),
+});
 
 interface Violation {
   file: string;
@@ -48,9 +54,12 @@ interface VisitContext {
   results: Violation[];
 }
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(SCRIPT_DIR, '..');
-const CONFIG_PATH = resolve(PROJECT_ROOT, 'tools/semantic-lint.config.json');
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
+const CONFIG_PATH = path.resolve(
+  PROJECT_ROOT,
+  'tools/semantic-lint.config.json',
+);
 
 const DEFAULTS: HardcodedStringsConfig = {
   minWordLength: 2,
@@ -67,14 +76,12 @@ const DEFAULTS: HardcodedStringsConfig = {
 /** Load semantic-lint config with repo defaults for this rule. */
 function loadConfig(): HardcodedStringsConfig {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
-  const config = JSON.parse(raw) as SemanticConfig;
+  const config = SemanticConfigSchema.parse(JSON.parse(raw));
   const section = config.hardcodedStrings;
-  const userFacingAttributes = Array.isArray(section?.userFacingAttributes)
-    ? section.userFacingAttributes.filter(
-        (attribute): attribute is string =>
-          typeof attribute === 'string' && attribute.trim().length > 0,
-      )
-    : [];
+  const userFacingAttributes =
+    section?.userFacingAttributes?.filter(
+      (attribute) => attribute.trim().length > 0,
+    ) ?? [];
 
   return {
     minWordLength:
@@ -91,8 +98,8 @@ function loadConfig(): HardcodedStringsConfig {
 /** Return the TSX files scanned by this rule. */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
-  return Array.from(glob.scanSync(PROJECT_ROOT), (filePath) =>
-    resolve(PROJECT_ROOT, filePath),
+  return [...glob.scanSync(PROJECT_ROOT)].map((filePath) =>
+    path.resolve(PROJECT_ROOT, filePath),
   );
 }
 
@@ -131,14 +138,7 @@ function isTCallExpression(node: ts.Node): boolean {
 
 /** Return true when the node sits inside a `t(…)` call expression. */
 function isInsideTCall(node: ts.Node): boolean {
-  let cursor = node.parent;
-  while (cursor) {
-    if (isTCallExpression(cursor)) {
-      return true;
-    }
-    cursor = cursor.parent;
-  }
-  return false;
+  return ts.findAncestor(node.parent, isTCallExpression) !== undefined;
 }
 
 /** Return true when `data-i18n-ignore` is enabled for a JSX attribute. */
@@ -423,7 +423,7 @@ function main(): void {
   }
 
   for (const v of violations) {
-    const displayPath = relative(PROJECT_ROOT, v.file);
+    const displayPath = path.relative(PROJECT_ROOT, v.file);
     const label =
       v.kind === 'jsx-text'
         ? 'hard-coded JSX text'
