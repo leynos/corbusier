@@ -49,6 +49,19 @@ function createGatewayWithResponse(response: Response) {
   return createHttpTaskGateway('/api/v1', createFetchForResponse(response));
 }
 
+/**
+ * Builds a gateway with one literal replacement in the task envelope.
+ *
+ * @example
+ * `createGatewayWithTaskField('"issue_number": 42', '"issue_number": 0')`
+ * serves an envelope containing issue number zero.
+ */
+function createGatewayWithTaskField(original: string, replacement: string) {
+  return createGatewayWithResponse(
+    new Response(taskEnvelope.replace(original, replacement)),
+  );
+}
+
 describe('http task gateway', () => {
   it('parses successful task detail responses', async () => {
     const gateway = createGatewayWithResponse(new Response(taskEnvelope));
@@ -258,23 +271,6 @@ describe('http task gateway', () => {
     );
   });
 
-  it.each([
-    0, -1, -42, 1.5, 9_007_199_254_740_992,
-  ])('rejects invalid issue number %s', async (issueNumber) => {
-    const responseBody = taskEnvelope.replace(
-      '"issue_number": 42',
-      `"issue_number": ${issueNumber}`,
-    );
-    const gateway = createGatewayWithResponse(new Response(responseBody));
-
-    await expect(gateway.getTask('task-1')).rejects.toEqual(
-      new TaskGatewayError(
-        'unavailable',
-        'The task API returned an invalid task shape.',
-      ),
-    );
-  });
-
   it('normalizes null optional references to absence', async () => {
     const responseBody = taskEnvelope.replace(
       '"id": "task-1"',
@@ -315,11 +311,10 @@ describe('http task gateway', () => {
       (_, index) => `2026-${String(index + 1).padStart(2, '0')}-01T12:30:45Z`,
     ),
   ])('accepts valid calendar timestamp %s', async (timestamp) => {
-    const responseBody = taskEnvelope.replace(
+    const gateway = createGatewayWithTaskField(
       '"created_at": "2026-04-13T00:00:00.000Z"',
       `"created_at": "${timestamp}"`,
     );
-    const gateway = createGatewayWithResponse(new Response(responseBody));
 
     await expect(gateway.getTask('task-1')).resolves.toMatchObject({
       created_at: timestamp,
@@ -327,23 +322,30 @@ describe('http task gateway', () => {
   });
 
   it.each([
-    '2023-02-29T00:00:00Z',
-    '2026-04-31T00:00:00Z',
-    '2026-01-01T24:00:00Z',
-    '2026-01-01T23:60:00Z',
-    '2026-01-01T23:59:60Z',
-    '2026-01-01T00:00:00+24:00',
-    '2026-01-01T00:00:00-01:60',
-    ...Array.from(
-      { length: 12 },
-      (_, index) => `2026-${String(index + 1).padStart(2, '0')}-32T12:30:45Z`,
-    ),
-  ])('rejects invalid calendar timestamp %s', async (timestamp) => {
-    const responseBody = taskEnvelope.replace(
-      '"created_at": "2026-04-13T00:00:00.000Z"',
-      `"created_at": "${timestamp}"`,
-    );
-    const gateway = createGatewayWithResponse(new Response(responseBody));
+    ...[0, -1, -42, 1.5, 9_007_199_254_740_992].map((issueNumber) => ({
+      name: `issue number ${issueNumber}`,
+      original: '"issue_number": 42',
+      replacement: `"issue_number": ${issueNumber}`,
+    })),
+    ...[
+      '2023-02-29T00:00:00Z',
+      '2026-04-31T00:00:00Z',
+      '2026-01-01T24:00:00Z',
+      '2026-01-01T23:60:00Z',
+      '2026-01-01T23:59:60Z',
+      '2026-01-01T00:00:00+24:00',
+      '2026-01-01T00:00:00-01:60',
+      ...Array.from(
+        { length: 12 },
+        (_, index) => `2026-${String(index + 1).padStart(2, '0')}-32T12:30:45Z`,
+      ),
+    ].map((timestamp) => ({
+      name: `calendar timestamp ${timestamp}`,
+      original: '"created_at": "2026-04-13T00:00:00.000Z"',
+      replacement: `"created_at": "${timestamp}"`,
+    })),
+  ])('rejects invalid $name', async ({ original, replacement }) => {
+    const gateway = createGatewayWithTaskField(original, replacement);
 
     await expect(gateway.getTask('task-1')).rejects.toEqual(
       new TaskGatewayError(

@@ -102,6 +102,7 @@ const CONCEPT_HINTS: ConceptHint[] = [
 /**
  * Merge configured options with defaults; config read, JSON, or schema errors
  * throw. Defaults require 4 tokens, distance at most 0.2, and 2 occurrences.
+ * @example `loadOptions().minTokenCount` is `6` when config sets it to `6`.
  */
 function loadOptions(): NearDuplicateOptions {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
@@ -109,7 +110,10 @@ function loadOptions(): NearDuplicateOptions {
   return { ...DEFAULT_OPTIONS, ...config.nearDuplicateClasses };
 }
 
-/** Return paths for every TSX file under the frontend `src/` directory. */
+/**
+ * Return paths for every TSX file under the frontend `src/` directory.
+ * @example `getTsxFiles()` includes `src/App.tsx` when that file exists.
+ */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
   return [...glob.scanSync(PROJECT_ROOT)];
@@ -126,7 +130,13 @@ function tokenMatches(pattern: string, token: string): boolean {
   return token === pattern;
 }
 
-/** Return the first ordered concept hint whose required token patterns match. */
+/**
+ * Return the first ordered concept hint whose required token patterns match.
+ * @example
+ * const buttonTokens = ['inline-flex', 'items-center', 'px-3', 'py-2',
+ *   'rounded-md', 'bg-blue-600'];
+ * findConceptHint(buttonTokens)?.id; // 'button-like'
+ */
 function findConceptHint(tokens: string[]): ConceptHint | undefined {
   for (const hint of CONCEPT_HINTS) {
     const matches = hint.requiredTokens.every((pattern) =>
@@ -271,7 +281,11 @@ function jaccardDistance(
   return union === 0 ? 1 : 1 - intersection / union;
 }
 
-/** Emit locations and optional concept hints; return the exact-group count. */
+/**
+ * Emit locations and optional concept hints; return the exact-group count.
+ * @example `reportExactDuplicates(occurrences, options)` returns `1` and logs
+ * one group when two candidates share a signature and `minOccurrences` is `2`.
+ */
 function reportExactDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,
@@ -304,7 +318,11 @@ function reportExactDuplicates(
   return findings;
 }
 
-/** Emit pairs within the configured Jaccard distance; return the pair count. */
+/**
+ * Emit pairs within the configured Jaccard distance; return the pair count.
+ * @example `reportNearDuplicates(occurrences, options)` returns `1` and logs
+ * one pair when its distance is `0.1` and `maxJaccardDistance` is `0.2`.
+ */
 function reportNearDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,

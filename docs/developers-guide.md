@@ -223,6 +223,11 @@ to that suite; production scripts do not depend on them. The audit command
 tests provide a temporary `bun` executable through the child process's path to
 exercise exit and signal handling without changing the parent environment.
 
+The HTTP task gateway unit tests use a file-local envelope replacement helper
+for cases that vary one JSON field. It creates a fresh response for each test,
+while callers state their expected results. Keep it in that test module; other
+adapter and command tests use their own fixtures.
+
 ### TypeScript type checking for tests
 
 `frontend-pwa/tsconfig.test.json` extends the base `tsconfig.json` and widens

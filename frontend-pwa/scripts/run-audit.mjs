@@ -20,7 +20,11 @@ import {
   runAuditJson,
 } from '../security/audit-utils.js';
 
-/** Resolve symlinks and canonicalise a path; filesystem errors propagate. */
+/**
+ * Resolve symlinks and canonicalise a path; filesystem errors propagate.
+ * @example If `/repo/src/alias.ts` links to `main.ts`, normalising it returns
+ * the canonical path to `/repo/src/main.ts`.
+ */
 const normalise = (filePath) => realpathSync.native(filePath);
 
 const workspacePackageName = packageJson.name;

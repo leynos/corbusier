@@ -39,7 +39,10 @@ function loadThreshold(): number {
   return value === undefined ? 16 : Math.floor(value);
 }
 
-/** Return paths for every TSX file under the frontend `src/` directory. */
+/**
+ * Return paths for every TSX file under the frontend `src/` directory.
+ * @example `getTsxFiles()` includes `src/App.tsx` when that file exists.
+ */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
   return [...glob.scanSync(PROJECT_ROOT)];
@@ -115,7 +118,11 @@ function analyseFile(
   visit(source);
 }
 
-/** Scan frontend TSX files, report over-limit class lists, and set exit code 1. */
+/**
+ * Scan frontend TSX files, report over-limit class lists, and set exit code 1.
+ * @example `main()` reports an over-limit class list and sets
+ * `process.exitCode` to `1` when a violation is found.
+ */
 function main(): void {
   const maxLength = loadThreshold();
   const violations: Violation[] = [];
