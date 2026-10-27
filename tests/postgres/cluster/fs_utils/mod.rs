@@ -1,15 +1,21 @@
 //! Filesystem helpers for `PostgreSQL` test clusters.
 
 use super::BoxError;
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::ambient_authority;
-use cap_std::fs_utf8::Dir;
+use cap_std::fs_utf8::{Dir, File, OpenOptions, Permissions};
 use postgresql_embedded::Settings;
+use std::io::{self, Read};
+use std::sync::atomic::{AtomicU64, Ordering};
 
+static NEXT_TIMEZONE_STAGE: AtomicU64 = AtomicU64::new(0);
+
+/// Opens an explicit directory capability for test-cluster filesystem work.
 pub(super) fn open_ambient_dir(path: &Utf8Path) -> Result<Dir, BoxError> {
     Dir::open_ambient_dir(path, ambient_authority()).map_err(|err| Box::new(err) as BoxError)
 }
 
+/// Opens a file's parent capability and returns its relative basename.
 pub(super) fn open_parent_dir(path: &Utf8Path) -> Result<(Dir, &str), BoxError> {
     let file_name = path.file_name().ok_or_else(|| {
         Box::new(std::io::Error::other("path must include a file name")) as BoxError
@@ -20,6 +26,14 @@ pub(super) fn open_parent_dir(path: &Utf8Path) -> Result<(Dir, &str), BoxError> 
 }
 
 /// Restores `PostgreSQL`'s standard UTC alias when the bundled database omits it.
+///
+/// Call after setup and before server start in either startup path. For an
+/// installation containing only `UCT`, success leaves both names available;
+/// an existing `UTC` file is preserved, including one installed concurrently.
+///
+/// # Errors
+///
+/// Returns filesystem errors without leaving a partially copied `UTC` alias.
 pub(super) fn ensure_utc_timezone_file(settings: &Settings) -> Result<(), BoxError> {
     let installation_dir = Utf8Path::from_path(&settings.installation_dir).ok_or_else(|| {
         Box::new(std::io::Error::other(format!(
@@ -36,13 +50,71 @@ pub(super) fn ensure_utc_timezone_file(settings: &Settings) -> Result<(), BoxErr
         Err(err) => return Err(Box::new(err) as BoxError),
     }
 
-    // The embedded distribution includes UCT, which is the same zero-offset
-    // zone, but some releases omit the UTC alias used by Diesel connections.
-    dir.copy(Utf8Path::new("UCT"), &dir, Utf8Path::new("UTC"))
+    let mut source = dir
+        .open(Utf8Path::new("UCT"))
         .map_err(|err| Box::new(err) as BoxError)?;
-    Ok(())
+    let source_permissions = source
+        .metadata()
+        .map_err(|err| Box::new(err) as BoxError)?
+        .permissions();
+    publish_utc_alias(&dir, &mut source, source_permissions)
+        .map_err(|err| Box::new(err) as BoxError)
 }
 
+/// Copies a timezone source privately, then publishes its complete UTC alias.
+///
+/// This helper belongs only to the installation repair above and its tests;
+/// accepting a reader permits deterministic coverage of interrupted copies.
+/// Source permissions are restored before publication so a restrictive caller
+/// umask cannot prevent the `PostgreSQL` worker from reading the completed alias.
+fn publish_utc_alias(
+    timezone_dir: &Dir,
+    source: &mut impl Read,
+    source_permissions: Permissions,
+) -> io::Result<()> {
+    let (staging_name, mut staging_file) = create_timezone_stage(timezone_dir)?;
+    let result = io::copy(source, &mut staging_file)
+        .and_then(|_| staging_file.set_permissions(source_permissions))
+        .and_then(|()| staging_file.sync_all())
+        .and_then(
+            |()| match timezone_dir.hard_link(&staging_name, timezone_dir, "UTC") {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+                Err(error) => Err(error),
+            },
+        );
+    // Close the handle before unlinking on platforms that reject open-file removal.
+    drop(staging_file);
+    let cleanup = timezone_dir.remove_file(&staging_name);
+    match (result, cleanup) {
+        (Ok(()), cleanup_result) => cleanup_result,
+        (Err(error), Ok(())) => Err(error),
+        (Err(error), Err(cleanup_error)) => Err(io::Error::new(
+            error.kind(),
+            format!("{error}; failed to remove {staging_name}: {cleanup_error}"),
+        )),
+    }
+}
+
+/// Exclusively creates a same-directory staging file for one repair attempt.
+///
+/// Process identity and a counter avoid live-name collisions; exclusive creation
+/// also skips stale files left by an earlier process with a reused process ID.
+fn create_timezone_stage(timezone_dir: &Dir) -> io::Result<(Utf8PathBuf, File)> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    loop {
+        let sequence = NEXT_TIMEZONE_STAGE.fetch_add(1, Ordering::Relaxed);
+        let name = Utf8PathBuf::from(format!(".UTC-{}-{sequence}.tmp", std::process::id()));
+        match timezone_dir.open_with(&name, &options) {
+            Ok(file) => return Ok((name, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Refreshes credentials after another process creates the shared password file.
 pub(super) fn sync_password_from_file(settings: &mut Settings) -> Result<(), BoxError> {
     let password_path_string = settings.password_file.to_string_lossy();
     // settings.password_file is expected to be UTF-8, so lossy conversion is
@@ -63,6 +135,7 @@ pub(super) fn sync_password_from_file(settings: &mut Settings) -> Result<(), Box
     Ok(())
 }
 
+/// Reads the server-selected port from the shared cluster's PID file.
 pub(super) fn sync_port_from_pid(settings: &mut Settings) -> Result<(), BoxError> {
     let data_dir_string = settings.data_dir.to_string_lossy();
     let data_dir_path = Utf8Path::new(data_dir_string.as_ref());
@@ -121,96 +194,6 @@ pub(super) fn cleanup_stale_postmaster_pid(settings: &Settings) -> Result<(), Bo
 }
 
 #[cfg(test)]
-mod tests {
-    //! Tests for timezone files in the embedded `PostgreSQL` installation.
-
-    use super::{BoxError, ensure_utc_timezone_file, open_ambient_dir};
-    use camino::{Utf8Path, Utf8PathBuf};
-    use cap_std::fs_utf8::Dir;
-    use postgresql_embedded::Settings;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
-
-    struct TemporaryInstall {
-        root: Dir,
-        directory_name: Utf8PathBuf,
-        path: Utf8PathBuf,
-    }
-
-    impl TemporaryInstall {
-        fn new() -> Result<Self, BoxError> {
-            let temp_path = Utf8PathBuf::from_path_buf(std::env::temp_dir()).map_err(|path| {
-                Box::new(std::io::Error::other(format!(
-                    "temporary directory is not UTF-8: {}",
-                    path.display()
-                ))) as BoxError
-            })?;
-            let root = open_ambient_dir(&temp_path)?;
-            let directory_name = Utf8PathBuf::from(format!(
-                "corbusier-pg-timezone-{}-{}",
-                std::process::id(),
-                NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed)
-            ));
-            root.create_dir(&directory_name)
-                .map_err(|err| Box::new(err) as BoxError)?;
-            let path = temp_path.join(&directory_name);
-            Ok(Self {
-                root,
-                directory_name,
-                path,
-            })
-        }
-    }
-
-    impl Drop for TemporaryInstall {
-        fn drop(&mut self) {
-            if let Err(error) = self.root.remove_dir_all(&self.directory_name) {
-                tracing::warn!(
-                    path = %self.path,
-                    %error,
-                    "failed to remove temporary PostgreSQL installation"
-                );
-            }
-        }
-    }
-
-    /// Adds the omitted UTC alias from UCT and preserves an existing UTC file.
-    #[test]
-    fn missing_utc_alias_is_copied_once() {
-        let temporary = TemporaryInstall::new().expect("temporary installation is created");
-        let install_dir =
-            open_ambient_dir(&temporary.path).expect("installation directory is opened");
-        install_dir
-            .create_dir_all(Utf8Path::new("share/timezone"))
-            .expect("timezone directory is created");
-        let timezone_dir = install_dir
-            .open_dir(Utf8Path::new("share/timezone"))
-            .expect("timezone directory is opened");
-        timezone_dir
-            .write(Utf8Path::new("UCT"), b"UTC alias")
-            .expect("UCT source file is written");
-        let settings = Settings {
-            installation_dir: temporary.path.clone().into_std_path_buf(),
-            ..Settings::new()
-        };
-
-        ensure_utc_timezone_file(&settings).expect("missing UTC alias is restored");
-        assert_eq!(
-            timezone_dir
-                .read_to_string(Utf8Path::new("UTC"))
-                .expect("restored UTC alias is readable"),
-            "UTC alias"
-        );
-        timezone_dir
-            .write(Utf8Path::new("UTC"), b"existing UTC")
-            .expect("existing UTC file is written");
-        ensure_utc_timezone_file(&settings).expect("existing UTC alias is preserved");
-        assert_eq!(
-            timezone_dir
-                .read_to_string(Utf8Path::new("UTC"))
-                .expect("existing UTC file is readable"),
-            "existing UTC"
-        );
-    }
-}
+mod test_support;
+#[cfg(test)]
+mod tests;

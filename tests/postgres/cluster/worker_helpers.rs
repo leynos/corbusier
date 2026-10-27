@@ -99,6 +99,10 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
 }
 
 impl super::ManagedCluster {
+    /// Executes one worker operation with the bootstrap environment and timeout.
+    ///
+    /// Lifecycle methods retain setup/start ordering; a `Setup` request here only
+    /// prepares the installation and does not implicitly start the server.
     pub(super) fn run_worker_operation(
         &self,
         operation: WorkerOperation,

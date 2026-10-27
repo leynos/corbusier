@@ -79,6 +79,7 @@ pub struct ManagedCluster {
     runtime: Option<Runtime>,
     postgres: Option<PostgreSQL>,
 }
+/// Prepares the installation, repairs UTC, then starts the in-process server.
 async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
     postgres
         .setup()
@@ -265,6 +266,7 @@ impl ManagedCluster {
         Ok(())
     }
 
+    /// Repairs UTC between worker setup and start, then reads the selected port.
     fn start_via_worker(&mut self) -> Result<(), BoxError> {
         self.run_worker_operation(WorkerOperation::Setup, self.bootstrap.setup_timeout)?;
         let postgres = PostgreSQL::new(self.bootstrap.settings.clone());
