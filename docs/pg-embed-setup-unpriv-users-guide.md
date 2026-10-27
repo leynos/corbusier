@@ -606,9 +606,13 @@ still running as `root`, follow these steps:
 
 ## Known issues and mitigations
 
-- **TimeZone errors**: The embedded cluster loads timezone data from the host
-  `tzdata` package. Install it inside the execution environment if you see
-  `invalid value for parameter "TimeZone": "UTC"`.
+- **TimeZone errors**: PostgreSQL resolves timezone names from its installation
+  directory. Some embedded archives include the equivalent `UCT` zone but omit
+  the `UTC` alias, which Diesel requests when opening a connection. The test
+  harness restores the alias before starting the server. When running the
+  embedded server outside the harness, ensure its `share/timezone` directory
+  contains `UTC`; installing host `tzdata` alone does not repair a missing
+  alias in the embedded installation.
 - **Download rate limits**: `postgresql_embedded` fetches binaries from the
   Theseus GitHub releases. Supply a `GITHUB_TOKEN` environment variable if you
   hit rate limits in CI.
