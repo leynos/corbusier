@@ -22,6 +22,7 @@ const emptyDraft: TaskCreateDraft = {
 
 const noErrors: TaskCreateErrors = {};
 
+/** Renders the form with default values and returns its event handlers. */
 function renderForm(overrides?: {
   draft?: Partial<TaskCreateDraft>;
   errors?: TaskCreateErrors;

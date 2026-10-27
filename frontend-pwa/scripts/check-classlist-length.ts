@@ -27,6 +27,11 @@ interface Violation {
 const CONFIG_PATH = 'tools/semantic-lint.config.json';
 const PROJECT_ROOT = process.cwd();
 
+/**
+ * Read the configured class-list limit, defaulting to 16 utilities.
+ * Missing, unreadable, malformed, or schema-invalid configuration throws.
+ * @example A configured value of `12.8` produces a threshold of `12`.
+ */
 function loadThreshold(): number {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
   const config = SemanticConfigSchema.parse(JSON.parse(raw));
@@ -34,11 +39,17 @@ function loadThreshold(): number {
   return value === undefined ? 16 : Math.floor(value);
 }
 
+/** Return paths for every TSX file under the frontend `src/` directory. */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
   return [...glob.scanSync(PROJECT_ROOT)];
 }
 
+/**
+ * Extract a static string from a JSX attribute value; dynamic expressions
+ * return `undefined` and are skipped by the class-list check.
+ * @example `className="p-2"` yields `p-2`; `className={classes}` is skipped.
+ */
 function extractStringLiteral(
   initializer: ts.JsxAttributeValue,
 ): string | undefined {
@@ -104,6 +115,7 @@ function analyseFile(
   visit(source);
 }
 
+/** Scan frontend TSX files, report over-limit class lists, and set exit code 1. */
 function main(): void {
   const maxLength = loadThreshold();
   const violations: Violation[] = [];

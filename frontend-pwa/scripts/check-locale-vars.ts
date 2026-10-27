@@ -17,6 +17,10 @@ const BASE_LOCALE = process.env.I18N_BASE_LOCALE ?? 'en-gb';
 const LOCALES_DIR = path.resolve(process.cwd(), 'src/i18n');
 const PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9_]+)\}/g;
 
+/**
+ * List sorted `.ts` catalogue paths in `src/i18n`; filesystem errors propagate.
+ * For example, `en-gb.ts` and `fr.ts` are returned in path-sorted order.
+ */
 async function listLocaleFiles(): Promise<string[]> {
   return fs
     .readdirSync(LOCALES_DIR, { withFileTypes: true })
@@ -25,6 +29,11 @@ async function listLocaleFiles(): Promise<string[]> {
     .toSorted();
 }
 
+/**
+ * Import one locale module and return its sole string-to-string catalogue.
+ * Import errors propagate; zero or multiple catalogue exports throw an error.
+ * @example An export `{ greeting: 'Hello' }` is returned as the message map.
+ */
 async function loadMessages(filePath: string): Promise<MessageMap> {
   const module = await import(pathToFileURL(filePath).href);
   const exports = Object.values(module)

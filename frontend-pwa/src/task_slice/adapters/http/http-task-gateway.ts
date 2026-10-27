@@ -97,6 +97,15 @@ const invalidTaskTransitionSchema = z.object({
   reason: z.literal('invalid_task_transition'),
 });
 
+/**
+ * Create the gateway error used when a task response violates its contract.
+ * Callers can report the failure as an unavailable API response.
+ *
+ * @returns A stable error for malformed task data.
+ *
+ * @example
+ * throw taskContractGatewayError();
+ */
 function taskContractGatewayError(): TaskGatewayError {
   return new TaskGatewayError('unavailable', INVALID_TASK_RESPONSE_MESSAGE);
 }
@@ -157,6 +166,18 @@ export function createHttpTaskGateway(
   };
 }
 
+/**
+ * Fetch one task resource and decode the task API's success envelope.
+ * Network failures and invalid responses reject with `TaskGatewayError`.
+ *
+ * @param fetchFn - Fetch implementation, injectable for adapter tests.
+ * @param resource - Task API URL to request.
+ * @param init - Optional request method, headers, and body.
+ * @returns The validated task from the response.
+ *
+ * @example
+ * await sendTaskRequest(fetch, '/tasks/123'); // Resolves to the validated task.
+ */
 async function sendTaskRequest(
   fetchFn: typeof fetch,
   resource: string,
@@ -192,6 +213,17 @@ interface ParsedTimestamp {
 const TIMESTAMP_RE =
   /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:\d{2})$/;
 
+/**
+ * Parse the components of an ISO timestamp with an explicit UTC offset.
+ * Returns `undefined` when the string does not match the timestamp syntax;
+ * calendar and range checks are performed by `isValidTimestamp`.
+ *
+ * @param value - Timestamp string to parse.
+ * @returns Parsed components, or `undefined` when the syntax does not match.
+ *
+ * @example
+ * parseTimestampGroups('2024-02-29T12:30:00Z'); // Returns the parsed components.
+ */
 function parseTimestampGroups(value: string): ParsedTimestamp | undefined {
   const match = TIMESTAMP_RE.exec(value);
   const groups = match?.groups;
@@ -236,6 +268,15 @@ function matchesCalendarDate(p: ParsedTimestamp): boolean {
   );
 }
 
+/**
+ * Check that a timestamp has valid syntax, calendar values, time, and offset.
+ *
+ * @param value - Timestamp string to validate.
+ * @returns `true` only for a valid timestamp with an explicit offset.
+ *
+ * @example
+ * isValidTimestamp('2024-02-29T12:30:00Z'); // Returns true.
+ */
 function isValidTimestamp(value: string): boolean {
   const parts = parseTimestampGroups(value);
   if (parts === undefined) return false;
@@ -246,6 +287,17 @@ function isValidTimestamp(value: string): boolean {
   );
 }
 
+/**
+ * Decode and validate a successful task API response.
+ * Malformed JSON, an invalid envelope, or an invalid task rejects with a
+ * `TaskGatewayError` of kind `unavailable`.
+ *
+ * @param response - Successful HTTP response from the task API.
+ * @returns The validated task in `data.data.task`.
+ *
+ * @example
+ * await parseSuccessEnvelope(response); // Resolves to the response task.
+ */
 async function parseSuccessEnvelope(response: Response): Promise<Task> {
   let responseBody: unknown;
   try {
@@ -267,6 +319,17 @@ async function parseSuccessEnvelope(response: Response): Promise<Task> {
   return task.data;
 }
 
+/**
+ * Convert a non-success HTTP response into the gateway's typed error.
+ * Invalid or unreadable error bodies use the HTTP-status fallback and the
+ * `unavailable` kind.
+ *
+ * @param response - Non-success response returned by the task API.
+ * @returns A gateway error with the mapped kind and API or fallback message.
+ *
+ * @example
+ * const error = await readGatewayError(response); // Inspect `error.kind` and `error.message`.
+ */
 async function readGatewayError(response: Response): Promise<TaskGatewayError> {
   const fallbackMessage = `The task API returned HTTP ${response.status}.`;
 
@@ -294,6 +357,16 @@ async function readGatewayError(response: Response): Promise<TaskGatewayError> {
   );
 }
 
+/**
+ * Map task API status codes to their corresponding gateway error kinds.
+ * Unknown statuses return `undefined` so callers can choose a fallback.
+ *
+ * @param status - HTTP status code from the task API.
+ * @returns A mapped kind for known client errors, otherwise `undefined`.
+ *
+ * @example
+ * errorKindForStatus(404); // Returns 'not_found'.
+ */
 function errorKindForStatus(status: number): TaskGatewayErrorKind | undefined {
   switch (status) {
     case 400: {

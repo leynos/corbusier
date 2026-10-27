@@ -37,6 +37,17 @@ export function TaskCreatePage() {
     setErrors((current) => ({ ...current, [field]: undefined }));
   }
 
+  /**
+   * Validate the current draft, create its task, then navigate to that task.
+   * Invalid drafts stay on the form with field errors; mutation failures are
+   * exposed through `mutation.error` for the form's error banner.
+   *
+   * @param event - Form submission event whose browser navigation is prevented.
+   * @returns Resolves after validation, and after navigation if creation succeeds.
+   *
+   * @example
+   * // The form calls this handler; a successful submission opens the new task.
+   */
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 

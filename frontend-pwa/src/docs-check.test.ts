@@ -17,6 +17,7 @@ import path from 'node:path';
 
 const repositoryRoot = path.resolve(process.cwd(), '..');
 
+/** Creates a Bun stub that records its working directory and arguments. */
 function createFakeBun(fixtureDirectory: string, exitCode: number) {
   const fakeBun = path.join(fixtureDirectory, 'bun');
   writeFileSync(

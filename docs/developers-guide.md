@@ -217,6 +217,12 @@ The lint command supplements the existing Biome checks. Run
 `make frontend-typecheck`, `make frontend-docs-check`, and `make frontend-test`
 for the separate TypeScript, TypeDoc, and behavioural validation gates.
 
+The semantic command regression suite creates temporary project fixtures and
+copies the script under test into each fixture. Its setup helpers belong only
+to that suite; production scripts do not depend on them. The audit command
+tests provide a temporary `bun` executable through the child process's path to
+exercise exit and signal handling without changing the parent environment.
+
 ### TypeScript type checking for tests
 
 `frontend-pwa/tsconfig.test.json` extends the base `tsconfig.json` and widens

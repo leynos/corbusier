@@ -20,6 +20,7 @@ interface RenderAppOptions {
   seedTasks?: Task[];
 }
 
+/** Mounts the app with fixture tasks and waits for its initial route to load. */
 export async function renderApp({
   initialPath = '/tasks/new',
   seedTasks,

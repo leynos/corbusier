@@ -20,6 +20,7 @@ import {
   runAuditJson,
 } from '../security/audit-utils.js';
 
+/** Resolve symlinks and canonicalise a path; filesystem errors propagate. */
 const normalise = (filePath) => realpathSync.native(filePath);
 
 const workspacePackageName = packageJson.name;
@@ -58,6 +59,12 @@ function buildLedgerMaps(auditEntries) {
   return { ledgerByAdvisory, allowedIds };
 }
 
+/**
+ * Return a ledger validation error, or `undefined` when its expiry is valid.
+ * Date-only expiries remain valid through that calendar day; invalid or past
+ * dates return a message suitable for the audit diagnostic.
+ * @example An expiry of `2030-01-02` is valid at noon on that date.
+ */
 function getLedgerExpiryError(entry, advisoryId, referenceDateValue) {
   if (!entry) {
     return `Audit ledger entry missing for advisory ${advisoryId ?? 'unknown'}.`;

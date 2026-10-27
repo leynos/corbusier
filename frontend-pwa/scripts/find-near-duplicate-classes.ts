@@ -99,12 +99,17 @@ const CONCEPT_HINTS: ConceptHint[] = [
   },
 ];
 
+/**
+ * Merge configured options with defaults; config read, JSON, or schema errors
+ * throw. Defaults require 4 tokens, distance at most 0.2, and 2 occurrences.
+ */
 function loadOptions(): NearDuplicateOptions {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
   const config = SemanticConfigSchema.parse(JSON.parse(raw));
   return { ...DEFAULT_OPTIONS, ...config.nearDuplicateClasses };
 }
 
+/** Return paths for every TSX file under the frontend `src/` directory. */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
   return [...glob.scanSync(PROJECT_ROOT)];
@@ -121,6 +126,7 @@ function tokenMatches(pattern: string, token: string): boolean {
   return token === pattern;
 }
 
+/** Return the first ordered concept hint whose required token patterns match. */
 function findConceptHint(tokens: string[]): ConceptHint | undefined {
   for (const hint of CONCEPT_HINTS) {
     const matches = hint.requiredTokens.every((pattern) =>
@@ -133,6 +139,10 @@ function findConceptHint(tokens: string[]): ConceptHint | undefined {
   return undefined;
 }
 
+/**
+ * Extract a static JSX string value; dynamic expressions return `undefined`.
+ * @example `className="flex gap-2"` yields `flex gap-2`.
+ */
 function extractStringLiteral(
   initializer: ts.JsxAttributeValue,
 ): string | undefined {
@@ -151,6 +161,10 @@ function extractStringLiteral(
   return undefined;
 }
 
+/**
+ * Split a class stack into unique, lowercase, sorted tokens.
+ * @example `normalizeTokens(' P-2 p-2 FLEX ')` yields `['flex', 'p-2']`.
+ */
 function normalizeTokens(raw: string): string[] {
   return [
     ...new Set(
@@ -257,6 +271,7 @@ function jaccardDistance(
   return union === 0 ? 1 : 1 - intersection / union;
 }
 
+/** Emit locations and optional concept hints; return the exact-group count. */
 function reportExactDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,
@@ -289,6 +304,7 @@ function reportExactDuplicates(
   return findings;
 }
 
+/** Emit pairs within the configured Jaccard distance; return the pair count. */
 function reportNearDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,

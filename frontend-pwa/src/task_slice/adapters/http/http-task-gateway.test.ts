@@ -4,6 +4,7 @@
  * The suite validates success parsing plus shared-error mapping without
  * reaching a real backend.
  */
+import type { CreateTaskRequest } from '../../domain/task';
 import { TaskGatewayError } from '../../ports/task-slice-gateway';
 import { createHttpTaskGateway } from './http-task-gateway';
 
@@ -38,10 +39,12 @@ const taskEnvelope = `{
   "success": true
 }`;
 
+/** Returns a fetch mock that resolves with the supplied response. */
 function createFetchForResponse(response: Response): typeof fetch {
   return vi.fn<typeof fetch>().mockResolvedValue(response);
 }
 
+/** Builds the gateway with a fetch mock fixed to the supplied response. */
 function createGatewayWithResponse(response: Response) {
   return createHttpTaskGateway('/api/v1', createFetchForResponse(response));
 }
@@ -171,6 +174,181 @@ describe('http task gateway', () => {
       new TaskGatewayError(
         'conflict',
         'invalid state transition for task task-2',
+      ),
+    );
+  });
+
+  it('sends the create request with an idempotency key', async () => {
+    const fetchFn = createFetchForResponse(new Response(taskEnvelope));
+    const gateway = createHttpTaskGateway('/api/v1', fetchFn);
+    const request = {
+      provider: 'github',
+      repository: 'acme/widgets',
+      issue_number: 42,
+      title: 'A task',
+    } satisfies CreateTaskRequest;
+
+    await gateway.createTask(request);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/v1/tasks',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': expect.stringMatching(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+          ),
+        },
+      }),
+    );
+  });
+
+  it.each([
+    { status: 400, kind: 'validation' },
+    { status: 401, kind: 'unauthorized' },
+    { status: 403, kind: 'unauthorized' },
+    { status: 404, kind: 'not_found' },
+    { status: 409, kind: 'conflict' },
+    { status: 503, kind: 'unavailable' },
+  ])('maps HTTP $status to $kind', async ({ status, kind }) => {
+    const gateway = createGatewayWithResponse(
+      Response.json({ message: 'API error' }, { status }),
+    );
+
+    await expect(gateway.getTask('task-1')).rejects.toMatchObject({
+      kind,
+      message: 'API error',
+    });
+  });
+
+  it('reports malformed success JSON', async () => {
+    const gateway = createGatewayWithResponse(new Response('{'));
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned malformed JSON.',
+      ),
+    );
+  });
+
+  it('maps a rejected fetch to unavailable', async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new Error('offline'));
+    const gateway = createHttpTaskGateway('/api/v1', fetchFn);
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError('unavailable', 'The task API could not be reached.'),
+    );
+  });
+
+  it.each([
+    { body: '{', name: 'malformed JSON' },
+    { body: '{"message": 42}', name: 'an invalid error shape' },
+  ])('falls back to the HTTP status for $name', async ({ body }) => {
+    const gateway = createGatewayWithResponse(
+      new Response(body, { status: 503 }),
+    );
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError('unavailable', 'The task API returned HTTP 503.'),
+    );
+  });
+
+  it.each([
+    0, -1, -42, 1.5, 9_007_199_254_740_992,
+  ])('rejects invalid issue number %s', async (issueNumber) => {
+    const responseBody = taskEnvelope.replace(
+      '"issue_number": 42',
+      `"issue_number": ${issueNumber}`,
+    );
+    const gateway = createGatewayWithResponse(new Response(responseBody));
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid task shape.',
+      ),
+    );
+  });
+
+  it('normalizes null optional references to absence', async () => {
+    const responseBody = taskEnvelope.replace(
+      '"id": "task-1"',
+      '"id": "task-1", "branch_ref": null, "pull_request_ref": null',
+    );
+    const task = await createGatewayWithResponse(
+      new Response(responseBody),
+    ).getTask('task-1');
+
+    expect(task.branch_ref).toBeUndefined();
+    expect(task.pull_request_ref).toBeUndefined();
+  });
+
+  it.each(
+    Array.from({ length: 12 }, (_, index) => ({
+      sequence: index,
+      text: `extension-${index}`,
+      nested: { enabled: index % 2 === 0 },
+    })),
+  )('retains generated task extension $sequence', async (extension) => {
+    const responseBody = taskEnvelope.replace(
+      '"id": "task-1"',
+      `"id": "task-1", "extension": ${JSON.stringify(extension)}`,
+    );
+    const gateway = createGatewayWithResponse(new Response(responseBody));
+
+    await expect(gateway.getTask('task-1')).resolves.toMatchObject({
+      extension,
+    });
+  });
+
+  it.each([
+    '2024-02-29T23:59:59Z',
+    '2026-01-01T00:00:00+23:59',
+    '2026-12-31T23:59:59.123456-23:59',
+    ...Array.from(
+      { length: 12 },
+      (_, index) => `2026-${String(index + 1).padStart(2, '0')}-01T12:30:45Z`,
+    ),
+  ])('accepts valid calendar timestamp %s', async (timestamp) => {
+    const responseBody = taskEnvelope.replace(
+      '"created_at": "2026-04-13T00:00:00.000Z"',
+      `"created_at": "${timestamp}"`,
+    );
+    const gateway = createGatewayWithResponse(new Response(responseBody));
+
+    await expect(gateway.getTask('task-1')).resolves.toMatchObject({
+      created_at: timestamp,
+    });
+  });
+
+  it.each([
+    '2023-02-29T00:00:00Z',
+    '2026-04-31T00:00:00Z',
+    '2026-01-01T24:00:00Z',
+    '2026-01-01T23:60:00Z',
+    '2026-01-01T23:59:60Z',
+    '2026-01-01T00:00:00+24:00',
+    '2026-01-01T00:00:00-01:60',
+    ...Array.from(
+      { length: 12 },
+      (_, index) => `2026-${String(index + 1).padStart(2, '0')}-32T12:30:45Z`,
+    ),
+  ])('rejects invalid calendar timestamp %s', async (timestamp) => {
+    const responseBody = taskEnvelope.replace(
+      '"created_at": "2026-04-13T00:00:00.000Z"',
+      `"created_at": "${timestamp}"`,
+    );
+    const gateway = createGatewayWithResponse(new Response(responseBody));
+
+    await expect(gateway.getTask('task-1')).rejects.toEqual(
+      new TaskGatewayError(
+        'unavailable',
+        'The task API returned an invalid task shape.',
       ),
     );
   });

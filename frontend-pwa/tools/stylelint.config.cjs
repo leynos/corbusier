@@ -1,3 +1,6 @@
+/**
+ * Configures Stylelint checks for frontend CSS, used by `semantic:lint`.
+ */
 module.exports = {
   plugins: ["stylelint-declaration-strict-value"],
   rules: {
