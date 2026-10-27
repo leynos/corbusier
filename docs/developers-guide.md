@@ -427,6 +427,17 @@ ordering remains in `ManagedCluster`. Keep the staging and publication helpers
 private to `fs_utils`; their only permitted callers are the UTC repair and its
 tests. Other setup callers invoke `ensure_utc_timezone_file` as a whole.
 
+The UTC publication property tests use `proptest` against the real filesystem
+helper. They generate binary payloads up to 4 KiB, existing aliases,
+interrupted copies at varied offsets, and one to four competing attempts with
+successful and failed sources. Assertions require preservation of an existing
+alias, publication of one complete successful source, and removal of every
+stage. These generated tests sample native thread schedules; the deterministic
+publication-boundary regression separately holds a copy open and checks that
+`UTC` stays absent until completion. They do not exhaustively prove operating
+system scheduling or filesystem guarantees. Keep the generated reader private
+to the property-test module; it is a fault injector for this helper only.
+
 ## Dependency audit
 
 The workspace ships a unified dependency-vulnerability gate. Run it with:

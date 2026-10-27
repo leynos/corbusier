@@ -194,6 +194,8 @@ pub(super) fn cleanup_stale_postmaster_pid(settings: &Settings) -> Result<(), Bo
 }
 
 #[cfg(test)]
+mod prop_tests;
+#[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod tests;
