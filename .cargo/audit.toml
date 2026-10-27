@@ -14,10 +14,10 @@
 # expires-at: 2026-12-17
 # justification: h2 0.3.27, unbounded empty DATA frames, fixed in 0.4.16.
 #   `actix-http` is the only dependent and every 3.x release through the
-#   current 3.13.6 requires `h2 ^0.3.27`, so no lockfile move and no in-major
-#   bump reaches 0.4. This repository also pins `actix-http` to 3.12.1 under
-#   the dependency-policy exception recorded in
-#   `docs/dependency-policy-exception-actix-v2a.md`. The remedy is upstream;
+#   current 3.20.0 requires `h2 ^0.3.27`, so no lockfile move and no in-major
+#   bump reaches 0.4. The lockfile resolves `actix-http` 3.19.0 to reach the
+#   patched Zstd dependency line; that release still requires `h2 ^0.3.27`.
+#   The remedy is upstream;
 #   the request is drafted and this entry expires three months from
 #   2026-09-17 so the wait is re-examined rather than forgotten.
 #   The full rationale is
