@@ -1,4 +1,6 @@
-/** End-to-end checks for the Bun audit wrapper and its exit status. */
+/**
+ * @file End-to-end checks for the Bun audit wrapper and its exit status.
+ */
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

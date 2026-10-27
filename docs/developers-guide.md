@@ -194,8 +194,16 @@ transport code directly.
   gateway error mapping.
 - `createFixtureTaskGateway` is the default local and test adapter. It keeps
   task state in memory, serializes queued operations over that shared state,
-  and preserves fixture-first development until the live HTTP gateway is
-  selected in later roadmap work.
+  and supports fixture-first development. The HTTP gateway is also available as
+  an opt-in mode for the browser flow described below.
+
+Run `make frontend-e2e` to exercise the browser paths. Playwright starts the
+fixture app on port 4173 for the `chromium` project and an HTTP-mode app on
+port 4174 for `http-chromium`, with `VITE_TASK_GATEWAY_MODE=http` and
+`VITE_CORBUSIER_API_BASE_URL=/api/v1`. The HTTP flow intercepts API requests
+with Playwright, so it needs no live backend. The fixture remains the default
+gateway mode. Roadmap item 4.4.2 is complete; live task UI work remains in
+pending item 4.4.3.
 
 The shipped `4.4.1` slice boundary is recorded in
 [`corbusier-design.md`](corbusier-design.md#713-repository-owned-frontend-workspace-boundary).
@@ -240,6 +248,8 @@ the checked surface to include `src/`, `tests/`, `vite.config.ts`,
 The separate test pass is required because tests and test configuration use
 different inclusion patterns and ambient types from the production application
 sources, while still depending on the application `src/` tree.
+
+Vitest includes `.test.mjs` files under `src/` alongside TypeScript tests.
 
 `make frontend-docs-check` runs `bun run docs:check` inside `frontend-pwa`:
 TypeDoc's `notDocumented` validation over `frontend-pwa/src`

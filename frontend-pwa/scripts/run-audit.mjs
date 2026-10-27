@@ -21,8 +21,8 @@ import {
 } from '../security/audit-utils.js';
 
 /**
- * Resolve symlinks and canonicalise a path; filesystem errors propagate.
- * @example If `/repo/src/alias.ts` links to `main.ts`, normalising it returns
+ * Resolve symlinks and canonicalize a path; filesystem errors propagate.
+ * @example If `/repo/src/alias.ts` links to `main.ts`, normalizing it returns
  * the canonical path to `/repo/src/main.ts`.
  */
 const normalise = (filePath) => realpathSync.native(filePath);
