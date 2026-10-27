@@ -1,4 +1,5 @@
 /**
+ * @file
  * Unit tests for parsing Bun audit output at the command boundary.
  */
 import { describe, expect, it } from 'vitest';

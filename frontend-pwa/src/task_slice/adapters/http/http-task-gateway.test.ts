@@ -39,6 +39,9 @@ const taskEnvelope = `{
   "success": true
 }`;
 
+const idempotencyKeyPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /** Returns a fetch mock that resolves with the supplied response. */
 function createFetchForResponse(response: Response): typeof fetch {
   return vi.fn<typeof fetch>().mockResolvedValue(response);
@@ -101,7 +104,14 @@ describe('http task gateway', () => {
     expect(fetchFn).toHaveBeenNthCalledWith(
       2,
       '/api/v1/tasks/task%2Fwith%20reserved%3Fcharacters/state',
-      expect.objectContaining({ method: 'PUT' }),
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ state: 'done' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': expect.stringMatching(idempotencyKeyPattern),
+        },
+      }),
     );
   });
 
@@ -210,9 +220,7 @@ describe('http task gateway', () => {
         body: JSON.stringify(request),
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': expect.stringMatching(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-          ),
+          'Idempotency-Key': expect.stringMatching(idempotencyKeyPattern),
         },
       }),
     );
