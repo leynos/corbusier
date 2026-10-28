@@ -1,7 +1,9 @@
 /**
- * Exercise semantic lint scripts as commands against isolated project fixtures.
+ * @file Exercise semantic lint scripts as commands against isolated project
+ * fixtures.
  * The fixture copies only the script under test and shares installed packages;
  * it never changes the real frontend configuration or process environment.
+ * Run through the frontend Vitest suite to check observable command outcomes.
  */
 import { spawnSync } from 'node:child_process';
 import {
@@ -82,6 +84,7 @@ describe('semantic lint commands', () => {
 
   it.each([
     0,
+    0.5,
     -1,
     '16',
   ])('rejects an invalid class limit %s', (maxClasslistLength) => {
@@ -89,6 +92,18 @@ describe('semantic lint commands', () => {
     const result = runScript('check-classlist-length.ts');
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('maxClasslistLength');
+  });
+
+  it('floors a fractional class limit while preserving a minimum of one', () => {
+    writeConfig({ maxClasslistLength: 1.9 });
+    writeComponent('<div className="one" />');
+    const withinLimit = runScript('check-classlist-length.ts');
+    expect(withinLimit.status).toBe(0);
+
+    writeComponent('<div className="one two" />');
+    const overLimit = runScript('check-classlist-length.ts');
+    expect(overLimit.status).toBe(1);
+    expect(overLimit.stderr).toContain('2 utilities (max 1)');
   });
 
   it('reports repeated stacks without failing by default and can fail explicitly', () => {

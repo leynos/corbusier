@@ -1,5 +1,5 @@
 /**
- * Exercise HTTP-backed task flows through the rendered application.
+ * @file Exercise HTTP-backed task flows through the rendered application.
  *
  * Playwright intercepts the API boundary while the application uses its real
  * HTTP gateway and renders the returned task or mapped error state.

@@ -14,7 +14,7 @@ import ts from 'typescript';
 import { z } from 'zod';
 
 const SemanticConfigSchema = z.object({
-  maxClasslistLength: z.number().positive().optional(),
+  maxClasslistLength: z.number().min(1).optional(),
 });
 
 interface Violation {
