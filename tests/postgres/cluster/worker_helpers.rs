@@ -8,11 +8,15 @@ use cap_std::fs::Permissions;
 #[cfg(unix)]
 use cap_std::fs::PermissionsExt;
 use corbusier::worker::shell_escape;
+use pg_embedded_setup_unpriv::worker_process_test_api::{
+    WorkerOperation, WorkerRequest, WorkerRequestArgs, run as run_worker,
+};
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 static WORKER_CACHE: OnceLock<Mutex<HashMap<Utf8PathBuf, Utf8PathBuf>>> = OnceLock::new();
 
@@ -92,6 +96,34 @@ pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxErr
         .entry(key)
         .or_insert_with(|| destination_path.clone());
     Ok(result_path.clone())
+}
+
+impl super::ManagedCluster {
+    /// Executes one worker operation with the bootstrap environment and timeout.
+    ///
+    /// Lifecycle methods retain setup/start ordering; a `Setup` request here only
+    /// prepares the installation and does not implicitly start the server.
+    pub(super) fn run_worker_operation(
+        &self,
+        operation: WorkerOperation,
+        timeout: Duration,
+    ) -> Result<(), BoxError> {
+        let worker = self.bootstrap.worker_binary.as_ref().ok_or_else(|| {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "PG_EMBEDDED_WORKER is not set for worker operation",
+            )) as BoxError
+        })?;
+        let args = WorkerRequestArgs {
+            worker: worker.as_path(),
+            settings: &self.bootstrap.settings,
+            env_vars: &self.env_vars,
+            operation,
+            timeout,
+        };
+        run_worker(&WorkerRequest::new(args)).map_err(|err| Box::new(err) as BoxError)?;
+        Ok(())
+    }
 }
 
 fn write_worker_wrapper(

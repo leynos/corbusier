@@ -4,19 +4,19 @@ mod fs_utils;
 mod shared_dir;
 mod worker_helpers;
 use self::env_utils::{drop_privileges_if_root, env_vars_to_os, worker_env_changes};
-use self::fs_utils::{cleanup_stale_postmaster_pid, sync_password_from_file, sync_port_from_pid};
+use self::fs_utils::{
+    cleanup_stale_postmaster_pid, ensure_utc_timezone_file, sync_password_from_file,
+    sync_port_from_pid,
+};
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
 use once_cell::sync::OnceCell;
-use pg_embedded_setup_unpriv::worker_process_test_api::{
-    WorkerOperation, WorkerRequest, WorkerRequestArgs, run as run_worker,
-};
+use pg_embedded_setup_unpriv::worker_process_test_api::WorkerOperation;
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, TestBootstrapSettings, bootstrap_for_tests};
 use postgresql_embedded::{PostgreSQL, Settings, Status};
 use rstest::fixture;
 use std::io::{self, Write};
 use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
 use tokio::runtime::Runtime;
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 static SHARED_CLUSTER: OnceCell<ManagedCluster> = OnceCell::new();
@@ -79,11 +79,13 @@ pub struct ManagedCluster {
     runtime: Option<Runtime>,
     postgres: Option<PostgreSQL>,
 }
+/// Prepares the installation, repairs UTC, then starts the in-process server.
 async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
     postgres
         .setup()
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
+    ensure_utc_timezone_file(postgres.settings())?;
     if !matches!(postgres.status(), Status::Started) {
         postgres
             .start()
@@ -264,8 +266,11 @@ impl ManagedCluster {
         Ok(())
     }
 
+    /// Repairs UTC between worker setup and start, then reads the selected port.
     fn start_via_worker(&mut self) -> Result<(), BoxError> {
         self.run_worker_operation(WorkerOperation::Setup, self.bootstrap.setup_timeout)?;
+        let postgres = PostgreSQL::new(self.bootstrap.settings.clone());
+        ensure_utc_timezone_file(postgres.settings())?;
         self.run_worker_operation(WorkerOperation::Start, self.bootstrap.start_timeout)?;
         sync_port_from_pid(&mut self.bootstrap.settings)?;
         Ok(())
@@ -289,28 +294,6 @@ impl ManagedCluster {
                 .await
                 .map_err(|err| Box::new(err) as BoxError)
         })?;
-        Ok(())
-    }
-
-    fn run_worker_operation(
-        &self,
-        operation: WorkerOperation,
-        timeout: Duration,
-    ) -> Result<(), BoxError> {
-        let worker = self.bootstrap.worker_binary.as_ref().ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "PG_EMBEDDED_WORKER is not set for worker operation",
-            )) as BoxError
-        })?;
-        let args = WorkerRequestArgs {
-            worker: worker.as_path(),
-            settings: &self.bootstrap.settings,
-            env_vars: &self.env_vars,
-            operation,
-            timeout,
-        };
-        run_worker(&WorkerRequest::new(args)).map_err(|err| Box::new(err) as BoxError)?;
         Ok(())
     }
 

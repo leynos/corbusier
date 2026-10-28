@@ -6,7 +6,7 @@ records an **explicit, reviewer-approved** exception that suppresses one
 advisory for which no fixed release is reachable from the current HTTP server
 stack.
 
-Recorded on 2026-09-17.
+Recorded on 2026-09-17. Dependency constraints rechecked on 2026-10-27.
 
 ## Advisory
 
@@ -33,17 +33,18 @@ no release in its dependency chain accepts a patched `h2`:
 - `h2` 0.3.27 is the newest release on the 0.3 series, so no patch-level
   upgrade exists. The fix lands only in the 0.4 series, from 0.4.16.
 - The only path to `h2` is `actix-web` 4, through `actix-http` 3. Every
-  `actix-http` 3.x release, including the newest (3.13.6), declares
+  `actix-http` 3.x release, including the newest (3.20.0), declares
   `h2 = "0.3.27"`. Moving `actix-http` forward within its major series
-  therefore changes nothing.
+  therefore leaves this advisory unresolved. The lockfile now selects 3.19.0
+  for its patched Zstd dependency line, while retaining `h2` 0.3.27.
 - The `http2` feature that pulls in `h2` cannot be switched off locally. The
   `actix_v2a` dependency, recorded under its own
   [dependency-policy exception](dependency-policy-exception-actix-v2a.md),
   declares `actix-web = "4"` with default features, so the feature is
   re-enabled through that crate regardless of the features Corbusier selects.
 
-Migrating off `actix-web` 4 onto a major version that consumes `h2` 0.4 is the
-only genuine remedy, and it is out of scope for a dependency-audit fix.
+An upstream release must accept `h2` 0.4.16 or later before a dependency update
+can clear this advisory. No lockfile-only remedy is currently available.
 
 ## Exposure
 
