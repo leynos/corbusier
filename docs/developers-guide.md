@@ -434,9 +434,10 @@ successful and failed sources. Assertions require preservation of an existing
 alias, publication of one complete successful source, and removal of every
 stage. These generated tests sample native thread schedules; the deterministic
 publication-boundary regression separately holds a copy open and checks that
-`UTC` stays absent until completion. They do not exhaustively prove operating
-system scheduling or filesystem guarantees. Keep the generated reader private
-to the property-test module; it is a fault injector for this helper only.
+`UTC` stays absent until completion. The generated tests do not exhaustively
+prove operating system scheduling or filesystem guarantees. Keep the generated
+reader private to the property-test module; it is a fault injector for this
+helper only.
 
 ## Dependency audit
 
