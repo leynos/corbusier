@@ -6,7 +6,7 @@
  */
 
 import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import packageJson from '../package.json' with { type: 'json' };
@@ -20,10 +20,12 @@ import {
   runAuditJson,
 } from '../security/audit-utils.js';
 
-const normalise = (path) =>
-  typeof realpathSync.native === 'function'
-    ? realpathSync.native(path)
-    : realpathSync(path);
+/**
+ * Resolve symlinks and canonicalize a path; filesystem errors propagate.
+ * @example If `/repo/src/alias.ts` links to `main.ts`, normalizing it returns
+ * the canonical path to `/repo/src/main.ts`.
+ */
+const normalise = (filePath) => realpathSync.native(filePath);
 
 const workspacePackageName = packageJson.name;
 const workspaceKeys = new Set([
@@ -61,6 +63,12 @@ function buildLedgerMaps(auditEntries) {
   return { ledgerByAdvisory, allowedIds };
 }
 
+/**
+ * Return a ledger validation error, or `undefined` when its expiry is valid.
+ * Date-only expiries remain valid through that calendar day; invalid or past
+ * dates return a message suitable for the audit diagnostic.
+ * @example An expiry of `2030-01-02` is valid at noon on that date.
+ */
 function getLedgerExpiryError(entry, advisoryId, referenceDateValue) {
   if (!entry) {
     return `Audit ledger entry missing for advisory ${advisoryId ?? 'unknown'}.`;
@@ -88,7 +96,7 @@ function getLedgerExpiryError(entry, advisoryId, referenceDateValue) {
     return `Audit exception ${entryLabel} for advisory ${entry.advisory} expired on ${rawExpiry}.`;
   }
 
-  return null;
+  return;
 }
 
 function reportAllowedAdvisories(expected) {
@@ -112,14 +120,14 @@ function reportAllowedAdvisories(expected) {
  * }
  */
 function isExecutedDirectly(meta) {
-  const invokedPath = process.argv?.[1];
+  const invokedPath = process.argv[1];
   if (!invokedPath) {
     return false;
   }
 
   try {
     const scriptPath = fileURLToPath(meta.url);
-    const absoluteInvokedPath = resolve(invokedPath);
+    const absoluteInvokedPath = path.resolve(invokedPath);
     return normalise(scriptPath) === normalise(absoluteInvokedPath);
   } catch {
     return false;
@@ -200,9 +208,9 @@ export function main() {
 if (isExecutedDirectly(import.meta)) {
   try {
     const exitCode = main();
-    process.exit(exitCode);
+    process.exitCode = exitCode;
   } catch (error) {
     console.error(error);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

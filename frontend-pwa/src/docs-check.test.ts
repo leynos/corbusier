@@ -13,19 +13,20 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import path from 'node:path';
 
-const repositoryRoot = resolve(process.cwd(), '..');
+const repositoryRoot = path.resolve(process.cwd(), '..');
 
+/** Creates a Bun stub that records its working directory and arguments. */
 function createFakeBun(fixtureDirectory: string, exitCode: number) {
-  const fakeBun = join(fixtureDirectory, 'bun');
+  const fakeBun = path.join(fixtureDirectory, 'bun');
   writeFileSync(
     fakeBun,
     [
       '#!/usr/bin/env sh',
       'script_dir=$(dirname "$0")',
       'pwd > "$script_dir/working-directory"',
-      'printf "%s\\n" "$@" > "$script_dir/arguments"',
+      String.raw`printf "%s\n" "$@" > "$script_dir/arguments"`,
       `exit ${exitCode}`,
     ].join('\n'),
   );
@@ -43,19 +44,24 @@ function runDocsCheck(fakeBun: string) {
 
 describe('frontend-docs-check', () => {
   it('runs the configured Bun command from the frontend workspace', () => {
-    const fixtureDirectory = mkdtempSync(join(tmpdir(), 'corbusier-make-'));
+    const fixtureDirectory = mkdtempSync(
+      path.join(tmpdir(), 'corbusier-make-'),
+    );
 
     try {
       const fakeBun = createFakeBun(fixtureDirectory, 0);
-      const argumentsPath = join(fixtureDirectory, 'arguments');
-      const workingDirectoryPath = join(fixtureDirectory, 'working-directory');
+      const argumentsPath = path.join(fixtureDirectory, 'arguments');
+      const workingDirectoryPath = path.join(
+        fixtureDirectory,
+        'working-directory',
+      );
 
       const result = runDocsCheck(fakeBun);
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
       expect(readFileSync(workingDirectoryPath, 'utf8').trim()).toBe(
-        join(repositoryRoot, 'frontend-pwa'),
+        path.join(repositoryRoot, 'frontend-pwa'),
       );
       expect(readFileSync(argumentsPath, 'utf8').trim().split('\n')).toEqual([
         'run',
@@ -67,7 +73,9 @@ describe('frontend-docs-check', () => {
   });
 
   it('propagates a failing Bun command', () => {
-    const fixtureDirectory = mkdtempSync(join(tmpdir(), 'corbusier-make-'));
+    const fixtureDirectory = mkdtempSync(
+      path.join(tmpdir(), 'corbusier-make-'),
+    );
 
     try {
       const fakeBun = createFakeBun(fixtureDirectory, 23);

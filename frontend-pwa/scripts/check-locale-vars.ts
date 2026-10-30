@@ -7,25 +7,39 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { z } from 'zod';
 
-type MessageMap = Record<string, string>;
+const MessageMapSchema = z.record(z.string(), z.string());
+type MessageMap = z.infer<typeof MessageMapSchema>;
 type MessagePlaceholders = Map<string, Set<string>>;
 
 const BASE_LOCALE = process.env.I18N_BASE_LOCALE ?? 'en-gb';
 const LOCALES_DIR = path.resolve(process.cwd(), 'src/i18n');
 const PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9_]+)\}/g;
 
+/**
+ * List sorted `.ts` catalogue paths in `src/i18n`; filesystem errors propagate.
+ * For example, `en-gb.ts` and `fr.ts` are returned in path-sorted order.
+ */
 async function listLocaleFiles(): Promise<string[]> {
   return fs
     .readdirSync(LOCALES_DIR, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
     .map((entry) => path.join(LOCALES_DIR, entry.name))
-    .sort();
+    .toSorted();
 }
 
+/**
+ * Import one locale module and return its sole string-to-string catalogue.
+ * Import errors propagate; zero or multiple catalogue exports throw an error.
+ * @example An export `{ greeting: 'Hello' }` is returned as the message map.
+ */
 async function loadMessages(filePath: string): Promise<MessageMap> {
   const module = await import(pathToFileURL(filePath).href);
-  const exports = Object.values(module).filter(isMessageMap);
+  const exports = Object.values(module)
+    .map((candidate) => MessageMapSchema.safeParse(candidate))
+    .filter((result) => result.success)
+    .map((result) => result.data);
 
   if (exports.length !== 1) {
     throw new Error(
@@ -34,24 +48,6 @@ async function loadMessages(filePath: string): Promise<MessageMap> {
   }
 
   return exports[0];
-}
-
-/**
- * Return true when the value is a non-null object and not an array.
- *
- * @param value - Candidate value to inspect.
- * @returns {value is Record<string, unknown>} Whether the value is a plain object candidate.
- */
-function isNonArrayObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isMessageMap(value: unknown): value is MessageMap {
-  if (!isNonArrayObject(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => typeof entry === 'string');
 }
 
 function collectPlaceholders(messages: MessageMap): MessagePlaceholders {

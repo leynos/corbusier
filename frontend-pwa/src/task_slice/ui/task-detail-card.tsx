@@ -81,7 +81,7 @@ export function TaskDetailCard({ task }: { task: Task }) {
             {task.origin.metadata.description}
           </p>
         </div>
-      ) : null}
+      ) : undefined}
     </section>
   );
 }

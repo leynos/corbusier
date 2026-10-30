@@ -8,13 +8,14 @@
  * class list exceeds the configured threshold.
  */
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import path from 'node:path';
 
 import ts from 'typescript';
+import { z } from 'zod';
 
-interface SemanticConfig {
-  maxClasslistLength?: number;
-}
+const SemanticConfigSchema = z.object({
+  maxClasslistLength: z.number().min(1).optional(),
+});
 
 interface Violation {
   file: string;
@@ -26,23 +27,35 @@ interface Violation {
 const CONFIG_PATH = 'tools/semantic-lint.config.json';
 const PROJECT_ROOT = process.cwd();
 
+/**
+ * Read the configured class-list limit, defaulting to 16 utilities.
+ * Missing, unreadable, malformed, or schema-invalid configuration throws.
+ * @example A configured value of `12.8` produces a threshold of `12`.
+ */
 function loadThreshold(): number {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
-  const config = JSON.parse(raw) as SemanticConfig;
+  const config = SemanticConfigSchema.parse(JSON.parse(raw));
   const value = config.maxClasslistLength;
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : 16;
+  return value === undefined ? 16 : Math.floor(value);
 }
 
+/**
+ * Return paths for every TSX file under the frontend `src/` directory.
+ * @example `getTsxFiles()` includes `src/App.tsx` when that file exists.
+ */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
-  return Array.from(glob.scanSync(PROJECT_ROOT));
+  return [...glob.scanSync(PROJECT_ROOT)];
 }
 
+/**
+ * Extract a static string from a JSX attribute value; dynamic expressions
+ * return `undefined` and are skipped by the class-list check.
+ * @example `className="p-2"` yields `p-2`; `className={classes}` is skipped.
+ */
 function extractStringLiteral(
   initializer: ts.JsxAttributeValue,
-): string | null {
+): string | undefined {
   if (ts.isStringLiteral(initializer)) {
     return initializer.text;
   }
@@ -55,7 +68,7 @@ function extractStringLiteral(
       return expression.text;
     }
   }
-  return null;
+  return undefined;
 }
 
 /** Return true when the node is a JSX `className` attribute with an initializer. */
@@ -63,7 +76,7 @@ function isClassNameAttribute(node: ts.Node): node is ts.JsxAttribute {
   return (
     ts.isJsxAttribute(node) &&
     node.name.text === 'className' &&
-    node.initializer != null
+    node.initializer !== undefined
   );
 }
 
@@ -105,6 +118,11 @@ function analyseFile(
   visit(source);
 }
 
+/**
+ * Scan frontend TSX files, report over-limit class lists, and set exit code 1.
+ * @example `main()` reports an over-limit class list and sets
+ * `process.exitCode` to `1` when a violation is found.
+ */
 function main(): void {
   const maxLength = loadThreshold();
   const violations: Violation[] = [];
@@ -114,7 +132,7 @@ function main(): void {
   }
 
   for (const violation of violations) {
-    const displayPath = relative(PROJECT_ROOT, violation.file);
+    const displayPath = path.relative(PROJECT_ROOT, violation.file);
     console.error(
       `${displayPath}:${violation.line}:${violation.column} className has ${violation.length} utilities (max ${maxLength}).`,
     );

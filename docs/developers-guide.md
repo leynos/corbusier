@@ -194,13 +194,47 @@ transport code directly.
   gateway error mapping.
 - `createFixtureTaskGateway` is the default local and test adapter. It keeps
   task state in memory, serializes queued operations over that shared state,
-  and preserves fixture-first development until the live HTTP gateway is
-  selected in later roadmap work.
+  and supports fixture-first development. The HTTP gateway is also available as
+  an opt-in mode for the browser flow described below.
+
+Run `make frontend-e2e` to exercise the browser paths. Playwright starts the
+fixture app on port 4173 for the `chromium` project and an HTTP-mode app on
+port 4174 for `http-chromium`, with `VITE_TASK_GATEWAY_MODE=http` and
+`VITE_CORBUSIER_API_BASE_URL=/api/v1`. The HTTP flow intercepts API requests
+with Playwright, so it needs no live backend. The fixture remains the default
+gateway mode. Roadmap item 4.4.2 is complete; live task UI work remains in
+pending item 4.4.3.
 
 The shipped `4.4.1` slice boundary is recorded in
 [`corbusier-design.md`](corbusier-design.md#713-repository-owned-frontend-workspace-boundary).
 The Whitaker user's guide remains a tooling guide for the Rust lint runner and
 does not describe these frontend-only APIs.
+
+### Frontend linting
+
+`make frontend-lint` runs Biome and then Oxlint in `frontend-pwa`. Oxlint uses
+the recommended Unicorn profile and the pinned `ai-deslop` plugin with
+type-aware rules enabled. The exact versions and the one rule conflict are
+recorded in [ADR 013](adr-013-frontend-linting-strategy.md).
+
+Runtime schemas belong at input boundaries. Frontend transport responses and
+tooling configuration are parsed before callers rely on their shape; keep
+unchecked shape tests and type assertions out of these paths.
+
+The lint command supplements the existing Biome checks. Run
+`make frontend-typecheck`, `make frontend-docs-check`, and `make frontend-test`
+for the separate TypeScript, TypeDoc, and behavioural validation gates.
+
+The semantic command regression suite creates temporary project fixtures and
+copies the script under test into each fixture. Its setup helpers belong only
+to that suite; production scripts do not depend on them. The audit command
+tests provide a temporary `bun` executable through the child process's path to
+exercise exit and signal handling without changing the parent environment.
+
+The HTTP task gateway unit tests use a file-local envelope replacement helper
+for cases that vary one JSON field. It creates a fresh response for each test,
+while callers state their expected results. Keep it in that test module; other
+adapter and command tests use their own fixtures.
 
 ### TypeScript type checking for tests
 
@@ -214,6 +248,8 @@ the checked surface to include `src/`, `tests/`, `vite.config.ts`,
 The separate test pass is required because tests and test configuration use
 different inclusion patterns and ambient types from the production application
 sources, while still depending on the application `src/` tree.
+
+Vitest includes `.test.mjs` files under `src/` alongside TypeScript tests.
 
 `make frontend-docs-check` runs `bun run docs:check` inside `frontend-pwa`:
 TypeDoc's `notDocumented` validation over `frontend-pwa/src`

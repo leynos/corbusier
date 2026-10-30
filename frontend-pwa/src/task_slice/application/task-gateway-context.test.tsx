@@ -9,7 +9,7 @@ import { TaskGatewayProvider, useTaskGateway } from './task-gateway-context';
 
 describe('useTaskGateway', () => {
   it('throws when called outside a TaskGatewayProvider', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       expect(() => renderHook(() => useTaskGateway())).toThrow(

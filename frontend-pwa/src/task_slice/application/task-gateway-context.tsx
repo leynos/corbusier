@@ -11,7 +11,9 @@ import { createContext, type PropsWithChildren, useContext } from 'react';
 
 import type { TaskSliceGateway } from '../ports/task-slice-gateway';
 
-const TaskGatewayContext = createContext<TaskSliceGateway | null>(null);
+const TaskGatewayContext = createContext<TaskSliceGateway | undefined>(
+  undefined,
+);
 
 /**
  * Injects a `TaskSliceGateway` implementation into the React context tree.

@@ -4,190 +4,110 @@
  * This adapter consumes the stabilized Corbusier task contract while keeping
  * transport parsing and error mapping inside the adapter boundary.
  */
-import type {
-  IssueProvider,
-  Task,
-  TaskOrigin,
-  TaskState,
-} from '../../domain/task';
+import { z } from 'zod';
+
+import type { CreateTaskRequest, Task, TaskState } from '../../domain/task';
 import {
   TaskGatewayError,
   type TaskGatewayErrorKind,
   type TaskSliceGateway,
 } from '../../ports/task-slice-gateway';
 
-interface ApiMetadata {
-  request_id: string;
-  timestamp: string;
-  version: string;
-}
-
-interface ApiEnvelope<T> {
-  data: T;
-  error: null;
-  metadata: ApiMetadata;
-  success: true;
-}
-
-interface TaskEnvelope {
-  task: Task;
-}
-
-interface SharedErrorResponse {
-  code: string;
-  details?: Record<string, unknown>;
-  message: string;
-  traceId?: string;
-}
-
-const TASK_STATES = new Set<TaskState>([
-  'draft',
-  'in_progress',
-  'in_review',
-  'paused',
-  'done',
-  'abandoned',
-]);
-
-const INVALID_TASK_SHAPE_MESSAGE =
-  'The task API returned an invalid task shape.' as const;
+const INVALID_TASK_RESPONSE_MESSAGE =
+  'The task API returned an invalid task shape.';
 
 const INVALID_SUCCESS_ENVELOPE_MESSAGE =
-  'The task API returned an invalid success response.' as const;
+  'The task API returned an invalid success response.';
 
 const CONTRACT_VERSION = 'v1' as const;
+const nonEmptyStringSchema = z.string().min(1);
+const positiveIntegerSchema = z.number().int().min(1);
+const stringArraySchema = z.array(z.string());
+const timestampSchema = z.string().refine(isValidTimestamp);
+const providerSchema = z.enum(['github', 'gitlab']);
 
-function taskShapeGatewayError(): TaskGatewayError {
-  return new TaskGatewayError('unavailable', INVALID_TASK_SHAPE_MESSAGE);
-}
+const issueSnapshotSchema = z.looseObject({
+  title: nonEmptyStringSchema,
+  description: z.string().optional(),
+  labels: stringArraySchema,
+  assignees: stringArraySchema,
+  milestone: z.string().optional(),
+});
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
+// The API may add fields independently; validate known fields and retain
+// extensions for callers that can understand them.
+const taskSchema = z.looseObject({
+  id: nonEmptyStringSchema,
+  origin: z.looseObject({
+    type: z.literal('issue'),
+    issue_ref: z.looseObject({
+      provider: providerSchema,
+      repository: nonEmptyStringSchema,
+      issue_number: positiveIntegerSchema,
+    }),
+    metadata: issueSnapshotSchema,
+  }),
+  branch_ref: z
+    .looseObject({
+      provider: providerSchema,
+      repository: nonEmptyStringSchema,
+      branch_name: nonEmptyStringSchema,
+    })
+    .nullish()
+    .transform((reference) => reference || undefined),
+  pull_request_ref: z
+    .looseObject({
+      provider: providerSchema,
+      repository: nonEmptyStringSchema,
+      pull_request_number: positiveIntegerSchema,
+    })
+    .nullish()
+    .transform((reference) => reference || undefined),
+  state: z.enum([
+    'draft',
+    'in_progress',
+    'in_review',
+    'paused',
+    'done',
+    'abandoned',
+  ]),
+  created_at: timestampSchema,
+  updated_at: timestampSchema,
+}) satisfies z.ZodType<Task>;
 
-function isIssueProvider(value: unknown): value is IssueProvider {
-  return value === 'github' || value === 'gitlab';
-}
+const successEnvelopeSchema = z.object({
+  data: z.object({ task: z.unknown() }),
+  error: z.null(),
+  metadata: z.object({
+    request_id: nonEmptyStringSchema,
+    timestamp: timestampSchema,
+    version: z.literal(CONTRACT_VERSION),
+  }),
+  success: z.literal(true),
+});
 
-function requireNonEmptyString(
-  raw: Record<string, unknown>,
-  field: string,
-): string {
-  const value = raw[field];
-  if (typeof value !== 'string' || value.length === 0) {
-    throw taskShapeGatewayError();
-  }
-  return value;
-}
+const sharedErrorResponseSchema = z.object({
+  code: z.string().optional(),
+  details: z.unknown().optional(),
+  message: z.string(),
+  traceId: z.string().optional(),
+});
 
-function requireStringArray(raw: Record<string, unknown>, field: string): void {
-  const value = raw[field];
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    throw taskShapeGatewayError();
-  }
-}
-
-function requireOptionalString(
-  raw: Record<string, unknown>,
-  key: string,
-): void {
-  if (raw[key] !== undefined && typeof raw[key] !== 'string') {
-    throw taskShapeGatewayError();
-  }
-}
-
-function validateIssueSnapshot(raw: unknown): void {
-  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
-  requireNonEmptyString(raw, 'title');
-  requireStringArray(raw, 'labels');
-  requireStringArray(raw, 'assignees');
-  requireOptionalString(raw, 'description');
-  requireOptionalString(raw, 'milestone');
-}
+const invalidTaskTransitionSchema = z.object({
+  reason: z.literal('invalid_task_transition'),
+});
 
 /**
- * Returns true when `value` is a finite integer ≥ `min`.
- * Narrows the type to `number` for the caller.
+ * Create the gateway error used when a task response violates its contract.
+ * Callers can report the failure as an unavailable API response.
+ *
+ * @returns A stable error for malformed task data.
+ *
+ * @example
+ * throw taskContractGatewayError();
  */
-function isIntegerAtLeast(value: unknown, min: number): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min;
-}
-
-/** Throws if `record[field]` is not an integer ≥ `minValue`. */
-function requireIntegerField(
-  record: Record<string, unknown>,
-  field: string,
-  minValue: number,
-): void {
-  if (!isIntegerAtLeast(record[field], minValue)) {
-    throw taskShapeGatewayError();
-  }
-}
-
-function validateIssueRef(raw: unknown): void {
-  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
-  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
-  requireNonEmptyString(raw, 'repository');
-  requireIntegerField(raw, 'issue_number', 1);
-}
-
-function validateTaskOrigin(raw: unknown): asserts raw is TaskOrigin {
-  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
-  if (raw.type !== 'issue') throw taskShapeGatewayError();
-  validateIssueRef(raw.issue_ref);
-  validateIssueSnapshot(raw.metadata);
-}
-
-function validateOptionalBranchRef(raw: unknown): void {
-  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
-  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
-  requireNonEmptyString(raw, 'repository');
-  requireNonEmptyString(raw, 'branch_name');
-}
-
-function validateOptionalPullRequestRef(raw: unknown): void {
-  if (!isPlainRecord(raw)) throw taskShapeGatewayError();
-  if (!isIssueProvider(raw.provider)) throw taskShapeGatewayError();
-  requireNonEmptyString(raw, 'repository');
-  requireIntegerField(raw, 'pull_request_number', 1);
-}
-
-function validateTaskState(task: Record<string, unknown>): void {
-  if (
-    typeof task.state !== 'string' ||
-    !(TASK_STATES as ReadonlySet<string>).has(task.state)
-  ) {
-    throw taskShapeGatewayError();
-  }
-}
-
-function validateOptionalRef(
-  raw: unknown,
-  validator: (v: unknown) => void,
-): void {
-  if (raw !== undefined && raw !== null) {
-    validator(raw);
-  }
-}
-
-function requireTimestampFields(task: Record<string, unknown>): void {
-  if (!isValidTimestamp(task.created_at)) {
-    throw taskShapeGatewayError();
-  }
-  if (!isValidTimestamp(task.updated_at)) {
-    throw taskShapeGatewayError();
-  }
-}
-
-function validateParsedTaskEnvelopeTask(task: unknown): Task {
-  if (!isPlainRecord(task)) throw taskShapeGatewayError();
-  requireNonEmptyString(task, 'id');
-  validateTaskState(task);
-  validateTaskOrigin(task.origin);
-  validateOptionalRef(task.branch_ref, validateOptionalBranchRef);
-  validateOptionalRef(task.pull_request_ref, validateOptionalPullRequestRef);
-  requireTimestampFields(task);
-  return task as unknown as Task;
+function taskContractGatewayError(): TaskGatewayError {
+  return new TaskGatewayError('unavailable', INVALID_TASK_RESPONSE_MESSAGE);
 }
 
 /**
@@ -195,7 +115,10 @@ function validateParsedTaskEnvelopeTask(task: unknown): Task {
  * Centralizes the repeated Content-Type + Idempotency-Key header pair and
  * JSON serialization so that createTask and transitionTask stay DRY.
  */
-function mutationInit(body: unknown, method: 'POST' | 'PUT'): RequestInit {
+function mutationInit(
+  body: CreateTaskRequest | { state: TaskState },
+  method: 'POST' | 'PUT',
+): RequestInit {
   return {
     body: JSON.stringify(body),
     headers: {
@@ -243,6 +166,18 @@ export function createHttpTaskGateway(
   };
 }
 
+/**
+ * Fetch one task resource and decode the task API's success envelope.
+ * Network failures and invalid responses reject with `TaskGatewayError`.
+ *
+ * @param fetchFn - Fetch implementation, injectable for adapter tests.
+ * @param resource - Task API URL to request.
+ * @param init - Optional request method, headers, and body.
+ * @returns The validated task from the response.
+ *
+ * @example
+ * await sendTaskRequest(fetch, '/tasks/123'); // Resolves to the validated task.
+ */
 async function sendTaskRequest(
   fetchFn: typeof fetch,
   resource: string,
@@ -262,32 +197,7 @@ async function sendTaskRequest(
     throw await readGatewayError(response);
   }
 
-  const envelope = await parseSuccessEnvelope(response);
-  return validateParsedTaskEnvelopeTask(envelope.data.task);
-}
-
-function isValidEnvelopeShell(
-  parsed: unknown,
-): parsed is Record<string, unknown> {
-  return (
-    isPlainRecord(parsed) &&
-    parsed.success === true &&
-    parsed.error === null &&
-    isPlainRecord(parsed.metadata) &&
-    hasValidMetadata(parsed.metadata)
-  );
-}
-
-function hasValidMetadata(metadata: Record<string, unknown>): boolean {
-  return (
-    isNonEmptyString(metadata.request_id) &&
-    metadata.version === CONTRACT_VERSION &&
-    isValidTimestamp(metadata.timestamp)
-  );
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
+  return parseSuccessEnvelope(response);
 }
 
 interface ParsedTimestamp {
@@ -303,10 +213,21 @@ interface ParsedTimestamp {
 const TIMESTAMP_RE =
   /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:\d{2})$/;
 
-function parseTimestampGroups(value: string): ParsedTimestamp | null {
+/**
+ * Parse the components of an ISO timestamp with an explicit UTC offset.
+ * Returns `undefined` when the string does not match the timestamp syntax;
+ * calendar and range checks are performed by `isValidTimestamp`.
+ *
+ * @param value - Timestamp string to parse.
+ * @returns Parsed components, or `undefined` when the syntax does not match.
+ *
+ * @example
+ * parseTimestampGroups('2024-02-29T12:30:00Z'); // Returns the parsed components.
+ */
+function parseTimestampGroups(value: string): ParsedTimestamp | undefined {
   const match = TIMESTAMP_RE.exec(value);
   const groups = match?.groups;
-  if (!groups) return null;
+  if (!groups) return undefined;
   return {
     year: Number(groups.year),
     month: Number(groups.month),
@@ -347,10 +268,18 @@ function matchesCalendarDate(p: ParsedTimestamp): boolean {
   );
 }
 
-function isValidTimestamp(value: unknown): value is string {
-  if (!isNonEmptyString(value)) return false;
+/**
+ * Check that a timestamp has valid syntax, calendar values, time, and offset.
+ *
+ * @param value - Timestamp string to validate.
+ * @returns `true` only for a valid timestamp with an explicit offset.
+ *
+ * @example
+ * isValidTimestamp('2024-02-29T12:30:00Z'); // Returns true.
+ */
+function isValidTimestamp(value: string): boolean {
   const parts = parseTimestampGroups(value);
-  if (parts === null) return false;
+  if (parts === undefined) return false;
   return (
     isValidTimeOfDay(parts.hour, parts.minute, parts.second) &&
     isValidOffset(parts.offset) &&
@@ -358,21 +287,21 @@ function isValidTimestamp(value: unknown): value is string {
   );
 }
 
-function hasValidTaskPayload(data: unknown): boolean {
-  return (
-    isPlainRecord(data) &&
-    'task' in data &&
-    data.task !== null &&
-    data.task !== undefined
-  );
-}
-
-async function parseSuccessEnvelope(
-  response: Response,
-): Promise<ApiEnvelope<TaskEnvelope>> {
-  let parsed: unknown;
+/**
+ * Decode and validate a successful task API response.
+ * Malformed JSON, an invalid envelope, or an invalid task rejects with a
+ * `TaskGatewayError` of kind `unavailable`.
+ *
+ * @param response - Successful HTTP response from the task API.
+ * @returns The validated task in `data.data.task`.
+ *
+ * @example
+ * await parseSuccessEnvelope(response); // Resolves to the response task.
+ */
+async function parseSuccessEnvelope(response: Response): Promise<Task> {
+  let responseBody: unknown;
   try {
-    parsed = await response.json();
+    responseBody = await response.json();
   } catch {
     throw new TaskGatewayError(
       'unavailable',
@@ -380,60 +309,81 @@ async function parseSuccessEnvelope(
     );
   }
 
-  if (!isValidEnvelopeShell(parsed)) {
-    throw new TaskGatewayError('unavailable', INVALID_SUCCESS_ENVELOPE_MESSAGE);
-  }
-  if (!hasValidTaskPayload(parsed.data)) {
+  const envelope = successEnvelopeSchema.safeParse(responseBody);
+  if (!envelope.success) {
     throw new TaskGatewayError('unavailable', INVALID_SUCCESS_ENVELOPE_MESSAGE);
   }
 
-  return parsed as unknown as ApiEnvelope<TaskEnvelope>;
+  const task = taskSchema.safeParse(envelope.data.data.task);
+  if (!task.success) throw taskContractGatewayError();
+  return task.data;
 }
 
+/**
+ * Convert a non-success HTTP response into the gateway's typed error.
+ * Invalid or unreadable error bodies use the HTTP-status fallback and the
+ * `unavailable` kind.
+ *
+ * @param response - Non-success response returned by the task API.
+ * @returns A gateway error with the mapped kind and API or fallback message.
+ *
+ * @example
+ * const error = await readGatewayError(response); // Inspect `error.kind` and `error.message`.
+ */
 async function readGatewayError(response: Response): Promise<TaskGatewayError> {
-  const HTTP_STATUS_TO_ERROR_KIND: Readonly<
-    Partial<Record<number, TaskGatewayErrorKind>>
-  > = {
-    400: 'validation',
-    401: 'unauthorized',
-    403: 'unauthorized',
-    404: 'not_found',
-    409: 'conflict',
-  } as const;
-
-  function classifyErrorKind(statusCode: number): TaskGatewayErrorKind {
-    return HTTP_STATUS_TO_ERROR_KIND[statusCode] ?? 'unavailable';
-  }
-
-  function mapErrorKind(
-    statusCode: number,
-    errorBody: SharedErrorResponse,
-  ): TaskGatewayErrorKind {
-    const reason = errorBody.details?.reason;
-    if (typeof reason === 'string' && reason === 'invalid_task_transition') {
-      return 'conflict';
-    }
-
-    return classifyErrorKind(statusCode);
-  }
-
   const fallbackMessage = `The task API returned HTTP ${response.status}.`;
 
-  let body: unknown;
+  let responseBody: unknown;
   try {
-    body = await response.json();
+    responseBody = await response.json();
   } catch {
     return new TaskGatewayError('unavailable', fallbackMessage);
   }
 
-  if (!isPlainRecord(body) || typeof body.message !== 'string') {
+  const errorBody = sharedErrorResponseSchema.safeParse(responseBody);
+  if (!errorBody.success) {
     return new TaskGatewayError('unavailable', fallbackMessage);
   }
 
-  const errorBody = body as unknown as SharedErrorResponse;
+  const errorKind = invalidTaskTransitionSchema.safeParse(
+    errorBody.data.details,
+  ).success
+    ? 'conflict'
+    : (errorKindForStatus(response.status) ?? 'unavailable');
 
   return new TaskGatewayError(
-    mapErrorKind(response.status, errorBody),
-    errorBody.message || fallbackMessage,
+    errorKind,
+    errorBody.data.message || fallbackMessage,
   );
+}
+
+/**
+ * Map task API status codes to their corresponding gateway error kinds.
+ * Unknown statuses return `undefined` so callers can choose a fallback.
+ *
+ * @param status - HTTP status code from the task API.
+ * @returns A mapped kind for known client errors, otherwise `undefined`.
+ *
+ * @example
+ * errorKindForStatus(404); // Returns 'not_found'.
+ */
+function errorKindForStatus(status: number): TaskGatewayErrorKind | undefined {
+  switch (status) {
+    case 400: {
+      return 'validation';
+    }
+    case 401:
+    case 403: {
+      return 'unauthorized';
+    }
+    case 404: {
+      return 'not_found';
+    }
+    case 409: {
+      return 'conflict';
+    }
+    default: {
+      return undefined;
+    }
+  }
 }

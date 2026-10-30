@@ -7,9 +7,10 @@
  * can be extracted before duplication spreads.
  */
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import path from 'node:path';
 
 import ts from 'typescript';
+import { z } from 'zod';
 
 type Occurrence = {
   file: string;
@@ -28,9 +29,16 @@ type NearDuplicateOptions = {
   failOnViolation: boolean;
 };
 
-type SemanticConfig = {
-  nearDuplicateClasses?: Partial<NearDuplicateOptions>;
-};
+const NearDuplicateOptionsSchema = z.object({
+  minTokenCount: z.number().int().positive().optional(),
+  maxJaccardDistance: z.number().min(0).max(1).optional(),
+  minOccurrences: z.number().int().positive().optional(),
+  suppressPrefixes: z.array(z.string()).optional(),
+  failOnViolation: z.boolean().optional(),
+});
+const SemanticConfigSchema = z.object({
+  nearDuplicateClasses: NearDuplicateOptionsSchema.optional(),
+});
 
 type ConceptHint = {
   id: string;
@@ -91,15 +99,24 @@ const CONCEPT_HINTS: ConceptHint[] = [
   },
 ];
 
+/**
+ * Merge configured options with defaults; config read, JSON, or schema errors
+ * throw. Defaults require 4 tokens, distance at most 0.2, and 2 occurrences.
+ * @example `loadOptions().minTokenCount` is `6` when config sets it to `6`.
+ */
 function loadOptions(): NearDuplicateOptions {
   const raw = readFileSync(CONFIG_PATH, 'utf8');
-  const config = JSON.parse(raw) as SemanticConfig;
-  return { ...DEFAULT_OPTIONS, ...(config.nearDuplicateClasses ?? {}) };
+  const config = SemanticConfigSchema.parse(JSON.parse(raw));
+  return { ...DEFAULT_OPTIONS, ...config.nearDuplicateClasses };
 }
 
+/**
+ * Return paths for every TSX file under the frontend `src/` directory.
+ * @example `getTsxFiles()` includes `src/App.tsx` when that file exists.
+ */
 function getTsxFiles(): string[] {
   const glob = new Bun.Glob('src/**/*.tsx');
-  return Array.from(glob.scanSync(PROJECT_ROOT));
+  return [...glob.scanSync(PROJECT_ROOT)];
 }
 
 function tokenMatches(pattern: string, token: string): boolean {
@@ -113,7 +130,14 @@ function tokenMatches(pattern: string, token: string): boolean {
   return token === pattern;
 }
 
-function findConceptHint(tokens: string[]): ConceptHint | null {
+/**
+ * Return the first ordered concept hint whose required token patterns match.
+ * @example
+ * const buttonTokens = ['inline-flex', 'items-center', 'px-3', 'py-2',
+ *   'rounded-md', 'bg-blue-600'];
+ * findConceptHint(buttonTokens)?.id; // 'button-like'
+ */
+function findConceptHint(tokens: string[]): ConceptHint | undefined {
   for (const hint of CONCEPT_HINTS) {
     const matches = hint.requiredTokens.every((pattern) =>
       tokens.some((token) => tokenMatches(pattern, token)),
@@ -122,12 +146,16 @@ function findConceptHint(tokens: string[]): ConceptHint | null {
       return hint;
     }
   }
-  return null;
+  return undefined;
 }
 
+/**
+ * Extract a static JSX string value; dynamic expressions return `undefined`.
+ * @example `className="flex gap-2"` yields `flex gap-2`.
+ */
 function extractStringLiteral(
   initializer: ts.JsxAttributeValue,
-): string | null {
+): string | undefined {
   if (ts.isStringLiteral(initializer)) {
     return initializer.text;
   }
@@ -140,19 +168,23 @@ function extractStringLiteral(
       return expression.text;
     }
   }
-  return null;
+  return undefined;
 }
 
+/**
+ * Split a class stack into unique, lowercase, sorted tokens.
+ * @example `normalizeTokens(' P-2 p-2 FLEX ')` yields `['flex', 'p-2']`.
+ */
 function normalizeTokens(raw: string): string[] {
-  return Array.from(
-    new Set(
+  return [
+    ...new Set(
       raw
         .trim()
         .split(/\s+/u)
         .map((token) => token.trim().toLowerCase())
         .filter(Boolean),
     ),
-  ).sort();
+  ].toSorted();
 }
 
 function shouldSuppress(
@@ -249,6 +281,11 @@ function jaccardDistance(
   return union === 0 ? 1 : 1 - intersection / union;
 }
 
+/**
+ * Emit locations and optional concept hints; return the exact-group count.
+ * @example `reportExactDuplicates(occurrences, options)` returns `1` and logs
+ * one group when two candidates share a signature and `minOccurrences` is `2`.
+ */
 function reportExactDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,
@@ -270,7 +307,7 @@ function reportExactDuplicates(
     const locations = group
       .map(
         (entry) =>
-          `${relative(PROJECT_ROOT, entry.file)}:${entry.line}:${entry.column}`,
+          `${path.relative(PROJECT_ROOT, entry.file)}:${entry.line}:${entry.column}`,
       )
       .join(', ');
     console.error(`Repeated class stack found at ${locations}.`);
@@ -281,26 +318,31 @@ function reportExactDuplicates(
   return findings;
 }
 
+/**
+ * Emit pairs within the configured Jaccard distance; return the pair count.
+ * @example `reportNearDuplicates(occurrences, options)` returns `1` and logs
+ * one pair when its distance is `0.1` and `maxJaccardDistance` is `0.2`.
+ */
 function reportNearDuplicates(
   occurrences: readonly Occurrence[],
   options: NearDuplicateOptions,
 ): number {
   const candidates = getCandidateOccurrences(occurrences, options);
-  const unique = Array.from(
-    new Map(
+  const unique = [
+    ...new Map(
       candidates.map((occurrence) => [occurrence.signature, occurrence]),
     ).values(),
-  );
+  ];
 
   let findings = 0;
   const seen = new Set<string>();
   for (let index = 0; index < unique.length; index += 1) {
-    const current = unique[index];
+    const current = unique.at(index);
     if (!current) {
       continue;
     }
     for (let nextIndex = index + 1; nextIndex < unique.length; nextIndex += 1) {
-      const next = unique[nextIndex];
+      const next = unique.at(nextIndex);
       if (!next) {
         continue;
       }
@@ -308,14 +350,14 @@ function reportNearDuplicates(
       if (distance > options.maxJaccardDistance) {
         continue;
       }
-      const key = [current.signature, next.signature].sort().join('::');
+      const key = [current.signature, next.signature].toSorted().join('::');
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
       findings += 1;
       console.error(
-        `Near-duplicate class stacks found at ${relative(PROJECT_ROOT, current.file)}:${current.line}:${current.column} and ${relative(PROJECT_ROOT, next.file)}:${next.line}:${next.column}.`,
+        `Near-duplicate class stacks found at ${path.relative(PROJECT_ROOT, current.file)}:${current.line}:${current.column} and ${path.relative(PROJECT_ROOT, next.file)}:${next.line}:${next.column}.`,
       );
     }
   }

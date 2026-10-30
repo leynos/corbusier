@@ -6,7 +6,7 @@
  * `TaskCreateFormProps`; this component is purely presentational and carries
  * no side-effects. Field names and labels are resolved via `useI18n`.
  */
-import type { FormEvent } from 'react';
+import type { SyntheticEvent } from 'react';
 
 import { useI18n } from '../../i18n/runtime';
 import type {
@@ -21,7 +21,7 @@ interface TaskCreateFormProps {
   isSubmitting: boolean;
   submitError?: string;
   onChange(field: TaskCreateField, value: string): void;
-  onSubmit(event: FormEvent<HTMLFormElement>): void;
+  onSubmit(event: SyntheticEvent<HTMLFormElement>): void;
 }
 
 /**
@@ -49,7 +49,7 @@ export function TaskCreateForm({
         <div className="alert alert-error" role="alert">
           <span>{submitError}</span>
         </div>
-      ) : null}
+      ) : undefined}
       <div className="task-create-form__row">
         <label className="form-control w-full">
           <span className="label-text mb-2 font-semibold">
@@ -66,7 +66,7 @@ export function TaskCreateForm({
           </select>
           {errors.provider ? (
             <span className="label-text-alt text-error">{errors.provider}</span>
-          ) : null}
+          ) : undefined}
         </label>
         <Field
           error={errors.repository}
@@ -172,7 +172,7 @@ function Field({
       />
       {error ? (
         <span className="label-text-alt text-error">{error}</span>
-      ) : null}
+      ) : undefined}
     </label>
   );
 }

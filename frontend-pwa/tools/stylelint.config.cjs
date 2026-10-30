@@ -1,3 +1,6 @@
+/**
+ * @file Configures Stylelint checks for frontend CSS, used by `semantic:lint`.
+ */
 module.exports = {
   plugins: ["stylelint-declaration-strict-value"],
   rules: {
@@ -12,7 +15,7 @@ module.exports = {
         "fill",
         "stroke",
       ],
-      { ignoreValues: ["transparent", "currentColor", "/^var\\(--/"] },
+      { ignoreValues: ['transparent', 'currentColor', String.raw`/^var\(--/`] },
     ],
     "declaration-no-important": true,
     "declaration-property-unit-disallowed-list": {

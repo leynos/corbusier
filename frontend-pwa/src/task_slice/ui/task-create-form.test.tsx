@@ -1,9 +1,9 @@
 /**
  * @file Unit tests for the `TaskCreateForm` presentational component.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FormEvent } from 'react';
+import type { SyntheticEvent } from 'react';
 
 import { I18nProvider } from '../../i18n/runtime';
 import type { TaskCreateDraft, TaskCreateErrors } from '../domain/task-form';
@@ -22,13 +22,14 @@ const emptyDraft: TaskCreateDraft = {
 
 const noErrors: TaskCreateErrors = {};
 
+/** Renders the form with default values and returns its event handlers. */
 function renderForm(overrides?: {
   draft?: Partial<TaskCreateDraft>;
   errors?: TaskCreateErrors;
   isSubmitting?: boolean;
   submitError?: string;
   onChange?: (field: string, value: string) => void;
-  onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit?: (event: SyntheticEvent<HTMLFormElement>) => void;
 }) {
   const onChange = overrides?.onChange ?? vi.fn();
   const onSubmit = overrides?.onSubmit ?? vi.fn();
@@ -103,12 +104,17 @@ describe('TaskCreateForm', () => {
   });
 
   it('calls onSubmit when the form is submitted', async () => {
-    const { onSubmit } = renderForm();
+    let submittedFormClass: string | undefined;
+    renderForm({
+      onSubmit: (event) => {
+        submittedFormClass = event.currentTarget.className;
+      },
+    });
 
     const submitButton = screen.getByRole('button', { name: 'Create task' });
-    fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
+    await userEvent.click(submitButton);
 
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(submittedFormClass).toBe('task-create-form');
   });
 
   it('matches the expected rendered structure for the idle state', () => {

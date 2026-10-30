@@ -38,11 +38,22 @@ export function createFixtureTaskGateway(
   const tasks = new Map(seedTasks.map((task) => [task.id, task]));
   let operationQueue = Promise.resolve();
 
+  /**
+   * Run a gateway operation after earlier operations have settled.
+   * A rejected operation still rejects for its caller, while the queue remains
+   * usable for later operations.
+   *
+   * @param operation - Asynchronous operation to serialize with gateway calls.
+   * @returns The operation's result or rejection.
+   *
+   * @example
+   * await enqueue(async () => 42); // Resolves to 42 after earlier work finishes.
+   */
   function enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const nextOperation = operationQueue.then(operation, operation);
     operationQueue = nextOperation.then(
-      () => undefined,
-      () => undefined,
+      () => {},
+      () => {},
     );
 
     return nextOperation;
@@ -204,7 +215,7 @@ function applyTransition(task: Task, targetState: TaskState): Task {
  * and local development.
  */
 function delay() {
-  return new Promise((resolve) => window.setTimeout(resolve, 15));
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 15));
 }
 
 /**

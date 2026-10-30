@@ -31,28 +31,40 @@ declare module 'vitest' {
   }
 }
 
-expect.extend(
-  toHaveNoViolations as unknown as Parameters<typeof expect.extend>[0],
+expect.extend(toHaveNoViolations);
+
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean;
+}
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.scrollTo = () => {};
+
+const matchMediaDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'matchMedia',
 );
+const existingMatchMedia =
+  matchMediaDescriptor?.get?.call(globalThis) ?? matchMediaDescriptor?.value;
 
-(
-  globalThis as typeof globalThis & {
-    IS_REACT_ACT_ENVIRONMENT: boolean;
-  }
-).IS_REACT_ACT_ENVIRONMENT = true;
+if (!existingMatchMedia) {
+  globalThis.matchMedia = (query: string): MediaQueryList => {
+    const members = new Map<PropertyKey, unknown>([
+      ['media', query],
+      ['matches', false],
+      ['onchange', undefined],
+      ['addEventListener', () => {}],
+      ['removeEventListener', () => {}],
+      ['dispatchEvent', () => true],
+      ['addListener', () => {}],
+      ['removeListener', () => {}],
+    ]);
 
-window.scrollTo = () => {};
-
-if (!window.matchMedia) {
-  window.matchMedia = (query: string): MediaQueryList =>
-    ({
-      media: query,
-      matches: false,
-      onchange: null,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-      addListener: () => undefined,
-      removeListener: () => undefined,
-      dispatchEvent: () => true,
-    }) as MediaQueryList;
+    // SAFETY: The proxy supplies the MediaQueryList members used by tests and
+    // no-op legacy listener methods that JSDOM's replacement still needs.
+    return new Proxy(
+      {},
+      { get: (_target, property) => members.get(property) },
+    ) as MediaQueryList;
+  };
 }

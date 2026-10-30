@@ -10,34 +10,54 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { z } from 'zod';
 
 const GHSA_PATTERN = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
+const AdvisorySchema = z.looseObject({
+  github_advisory_id: z.string().optional(),
+  title: z.string().optional(),
+  url: z.string().optional(),
+});
+const AdvisoryMapSchema = z.record(z.string(), z.array(AdvisorySchema));
+const AuditObjectSchema = z.record(z.string(), z.unknown());
 
 /**
  * Extract a GHSA identifier from an advisory URL.
  *
  * @param {string} url
- * @returns {string | null}
+ * @returns {string | undefined}
  */
 function extractGhsaFromUrl(url) {
   const match = url.match(GHSA_PATTERN);
-  return match ? match[0] : null;
+  return match?.[0];
 }
 
+/**
+ * Read an advisory's GitHub identifier, falling back to its advisory URL.
+ * Invalid records and records without a GHSA identifier produce `undefined`.
+ *
+ * @param {unknown} advisory
+ * @returns {string | undefined}
+ *
+ * @example
+ * extractGithubAdvisoryId({ url: 'https://github.com/advisories/GHSA-abcd-1234-efgh' });
+ * // Returns 'GHSA-abcd-1234-efgh'.
+ */
 function extractGithubAdvisoryId(advisory) {
-  if (!advisory || typeof advisory !== 'object') {
-    return null;
+  const result = AdvisorySchema.safeParse(advisory);
+  if (!result.success) {
+    return;
   }
 
-  if (typeof advisory.github_advisory_id === 'string') {
-    return advisory.github_advisory_id;
+  if (result.data.github_advisory_id !== undefined) {
+    return result.data.github_advisory_id;
   }
 
-  if (typeof advisory.url === 'string') {
-    return extractGhsaFromUrl(advisory.url);
+  if (result.data.url !== undefined) {
+    return extractGhsaFromUrl(result.data.url);
   }
 
-  return null;
+  return;
 }
 
 /**
@@ -50,9 +70,13 @@ function assertSpawnSuccess(result) {
   if (result.error) {
     throw result.error;
   }
-  if (result.status === null) {
-    const signalSuffix = result.signal ? ` (signal: ${result.signal})` : '';
-    throw new Error(`bun audit did not exit normally${signalSuffix}`);
+  if (result.signal) {
+    throw new Error(
+      `bun audit did not exit normally (signal: ${result.signal})`,
+    );
+  }
+  if (!Number.isInteger(result.status)) {
+    throw new TypeError('bun audit did not exit normally');
   }
 }
 
@@ -69,7 +93,7 @@ function parseAuditOutput(raw) {
   }
 
   try {
-    return JSON.parse(stdout);
+    return AuditObjectSchema.parse(JSON.parse(stdout));
   } catch (error) {
     const wrapped = new Error(
       `Failed to parse bun audit JSON: ${error.message}`,
@@ -100,7 +124,7 @@ export function runAuditJson() {
   });
 
   assertSpawnSuccess(result);
-  const status = result.status;
+  const status = result.status ?? 1;
   const json = parseAuditOutput(result.stdout);
   return { json, status };
 }
@@ -124,23 +148,43 @@ export function runAuditJson() {
  * console.log(advisories[0].github_advisory_id);
  */
 export function collectAdvisories(auditJson) {
-  if (!auditJson || typeof auditJson !== 'object') {
-    return [];
+  const root = AuditObjectSchema.safeParse(auditJson);
+  if (!root.success) {
+    throw new Error('Invalid bun audit advisory payload');
   }
 
-  const entries =
-    auditJson.advisories && typeof auditJson.advisories === 'object'
-      ? Object.entries(auditJson.advisories)
-      : Object.entries(auditJson);
+  const entries = Object.hasOwn(root.data, 'advisories')
+    ? root.data.advisories
+    : root.data;
+  const advisories = AdvisoryMapSchema.safeParse(entries);
+  if (!advisories.success) {
+    throw new Error('Invalid bun audit advisory payload');
+  }
+  return flattenAdvisories(advisories.data);
+}
 
-  return entries.flatMap(([packageName, value]) =>
-    Array.isArray(value)
-      ? value.map((advisory) => ({
-          ...advisory,
-          package: packageName,
-          github_advisory_id: extractGithubAdvisoryId(advisory),
-        }))
-      : [],
+/**
+ * Add each package name and normalized GitHub advisory ID to its records.
+ * Records remain in package order and preserve their original fields.
+ *
+ * @param {Record<string, Array<{ github_advisory_id?: string, url?: string }>>} advisories
+ * @returns {Array<Record<string, unknown> & {
+ *   package: string,
+ *   github_advisory_id?: string
+ * }>} Normalized advisory records.
+ *
+ * @example
+ * flattenAdvisories({ pkg: [{ url: 'https://github.com/advisories/GHSA-abcd-1234-efgh' }] });
+ * // Returns [{ package: 'pkg', url: 'https://github.com/advisories/GHSA-abcd-1234-efgh',
+ * //   github_advisory_id: 'GHSA-abcd-1234-efgh' }].
+ */
+function flattenAdvisories(advisories) {
+  return Object.entries(advisories).flatMap(([packageName, records]) =>
+    records.map((advisory) => ({
+      ...advisory,
+      package: packageName,
+      github_advisory_id: extractGithubAdvisoryId(advisory),
+    })),
   );
 }
 
