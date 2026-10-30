@@ -34,7 +34,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@5a99aed78ce68dcebd3052b75c31e6f173162b1e
+        uses: leynos/shared-actions/.github/actions/setup-rust@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           install-mold: 'true'
       - name: Install frontend dependencies and browser
@@ -51,7 +51,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@5a99aed78ce68dcebd3052b75c31e6f173162b1e
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           version: "0.6.1"
 
@@ -94,13 +94,13 @@ jobs:
       - name: Frontend e2e
         run: make frontend-e2e
       - name: Install Whitaker
-        uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           # The dev profile builds with the Cranelift backend, so the lint suite's
           # toolchain needs rustc-codegen-cranelift too.
           cranelift: 'true'
       - name: Install the YAML lint tools
-        uses: leynos/shared-actions/.github/actions/install-yaml-lint@5a99aed78ce68dcebd3052b75c31e6f173162b1e
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@6e99f225cb06684f9e6f89b63a7ca4a04095c067
       - name: Install uv for the docstring-coverage gate
         # `make lint` runs interrogate through `uv tool run`.
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -142,7 +142,7 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
           GITHUB_TOKEN: ${{ github.token }}
-        uses: leynos/shared-actions/.github/actions/generate-coverage@5a99aed78ce68dcebd3052b75c31e6f173162b1e
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           output-path: lcov.info
           format: lcov
