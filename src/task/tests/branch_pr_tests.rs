@@ -105,6 +105,30 @@ fn branch_ref_round_trips_through_display_and_try_from() {
 }
 
 #[rstest]
+#[case("github:owner/repo:main", "github", "owner/repo", "main")]
+#[case("gitlab:team/project:feature/x", "gitlab", "team/project", "feature/x")]
+#[case("github:a/b:release/1.2", "github", "a/b", "release/1.2")]
+fn branch_ref_from_str_parses_canonical_values(
+    #[case] text: &str,
+    #[case] provider: &str,
+    #[case] repository: &str,
+    #[case] branch: &str,
+) {
+    let expected = BranchRef::from_parts(provider, repository, branch).expect("valid branch ref");
+    assert_eq!(BranchRef::from_str(text), Ok(expected));
+}
+
+#[rstest]
+#[case("")]
+#[case("no-colons-here")]
+#[case("only:one")]
+#[case("github:owner/repo:bad:name")]
+#[case(":owner/repo:main")]
+fn branch_ref_from_str_rejects_malformed_values(#[case] text: &str) {
+    assert!(BranchRef::from_str(text).is_err());
+}
+
+#[rstest]
 fn branch_ref_parse_canonical_rejects_malformed() {
     assert!(BranchRef::parse_canonical("no-colons-here").is_err());
     assert!(BranchRef::parse_canonical("only:one").is_err());
@@ -156,6 +180,30 @@ fn pull_request_ref_round_trips_through_display_and_try_from() {
 
     let parsed = PullRequestRef::from_str(canonical.as_str()).expect("canonical should parse");
     assert_eq!(parsed, original);
+}
+
+#[rstest]
+#[case("github:owner/repo:42", "github", "owner/repo", 42)]
+#[case("gitlab:team/project:99", "gitlab", "team/project", 99)]
+#[case("github:a/b:1", "github", "a/b", 1)]
+fn pull_request_ref_from_str_parses_canonical_values(
+    #[case] text: &str,
+    #[case] provider: &str,
+    #[case] repository: &str,
+    #[case] number: u64,
+) {
+    let expected = PullRequestRef::from_parts(provider, repository, number).expect("valid PR ref");
+    assert_eq!(PullRequestRef::from_str(text), Ok(expected));
+}
+
+#[rstest]
+#[case("")]
+#[case("no-colons")]
+#[case("github:owner/repo:notanumber")]
+#[case("github:owner/repo:-1")]
+#[case("github:owner/repo:")]
+fn pull_request_ref_from_str_rejects_malformed_values(#[case] text: &str) {
+    assert!(PullRequestRef::from_str(text).is_err());
 }
 
 #[rstest]
