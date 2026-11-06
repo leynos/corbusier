@@ -98,6 +98,8 @@ impl Role {
 /// # Examples
 ///
 /// ```
+/// use std::str::FromStr;
+///
 /// use corbusier::message::domain::Role;
 ///
 /// assert!(Role::from_str("user").is_ok());

@@ -311,10 +311,20 @@ workflow edit fails there. The decision is recorded in
 `CARGO_INCREMENTAL=1`. `tests/build_footprint_contract.rs` parses all three
 settings.
 
+### Parsing string-backed types
+
+String-backed domain types (roles, statuses, identifiers and the like) parse
+through `std::str::FromStr`, so call `value.parse::<T>()` or
+`T::from_str(text)` with `std::str::FromStr` in scope. They previously
+implemented `TryFrom<&str>`; the current Clippy pedantic group (`TryFrom<str>`
+could be `FromStr`) asks for the standard parsing trait, and the call sites
+moved with it. Types that convert from owned `String` values keep
+`TryFrom<String>`.
+
 ### Cranelift
 
 Cranelift is the development-profile codegen backend. The full suite was
-measured under it on the pinned toolchain on 2026-11-06: all 1111 nextest tests
+measured under it on the pinned toolchain on 2026-11-06: all 1121 nextest tests
 pass (one is skipped). Coverage selects LLVM explicitly
 (`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because instrumentation needs it,
 and release builds use the release profile, which Cranelift does not touch.
