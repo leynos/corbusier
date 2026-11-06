@@ -2,12 +2,11 @@
 mod env_utils;
 mod fs_utils;
 mod shared_dir;
+#[cfg(test)]
+mod timezone_tests;
 mod worker_helpers;
 use self::env_utils::{drop_privileges_if_root, env_vars_to_os, worker_env_changes};
-use self::fs_utils::{
-    cleanup_stale_postmaster_pid, ensure_utc_timezone_file, sync_password_from_file,
-    sync_port_from_pid,
-};
+use self::fs_utils::{cleanup_stale_postmaster_pid, sync_password_from_file, sync_port_from_pid};
 use crate::test_helpers::EnvVarGuard;
 use diesel::prelude::*;
 use once_cell::sync::OnceCell;
@@ -79,13 +78,12 @@ pub struct ManagedCluster {
     runtime: Option<Runtime>,
     postgres: Option<PostgreSQL>,
 }
-/// Prepares the installation, repairs UTC, then starts the in-process server.
+/// Prepares the installation, then starts the in-process server.
 async fn setup_postgres(postgres: &mut PostgreSQL) -> Result<(), BoxError> {
     postgres
         .setup()
         .await
         .map_err(|err| Box::new(err) as BoxError)?;
-    ensure_utc_timezone_file(postgres.settings())?;
     if !matches!(postgres.status(), Status::Started) {
         postgres
             .start()
@@ -270,11 +268,9 @@ impl ManagedCluster {
         Ok(())
     }
 
-    /// Repairs UTC between worker setup and start, then reads the selected port.
+    /// Runs worker setup and start, then reads the selected port.
     fn start_via_worker(&mut self) -> Result<(), BoxError> {
         self.run_worker_operation(WorkerOperation::Setup, self.bootstrap.setup_timeout)?;
-        let postgres = PostgreSQL::new(self.bootstrap.settings.clone());
-        ensure_utc_timezone_file(postgres.settings())?;
         self.run_worker_operation(WorkerOperation::Start, self.bootstrap.start_timeout)?;
         sync_port_from_pid(&mut self.bootstrap.settings)?;
         Ok(())
