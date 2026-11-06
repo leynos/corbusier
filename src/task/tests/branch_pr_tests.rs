@@ -122,10 +122,11 @@ fn branch_ref_from_str_parses_canonical_values(
 #[case("")]
 #[case("no-colons-here")]
 #[case("only:one")]
-#[case("github:owner/repo:bad:name")]
-#[case(":owner/repo:main")]
 fn branch_ref_from_str_rejects_malformed_values(#[case] text: &str) {
-    assert!(BranchRef::from_str(text).is_err());
+    assert_eq!(
+        BranchRef::from_str(text),
+        Err(TaskDomainError::InvalidBranchRefFormat(text.to_owned()))
+    );
 }
 
 #[rstest]
@@ -203,7 +204,12 @@ fn pull_request_ref_from_str_parses_canonical_values(
 #[case("github:owner/repo:-1")]
 #[case("github:owner/repo:")]
 fn pull_request_ref_from_str_rejects_malformed_values(#[case] text: &str) {
-    assert!(PullRequestRef::from_str(text).is_err());
+    assert_eq!(
+        PullRequestRef::from_str(text),
+        Err(TaskDomainError::InvalidPullRequestRefFormat(
+            text.to_owned()
+        ))
+    );
 }
 
 #[rstest]

@@ -324,7 +324,7 @@ moved with it. Types that convert from owned `String` values keep
 ### Cranelift
 
 Cranelift is the development-profile codegen backend. The full suite was
-measured under it on the pinned toolchain on 2026-11-06: all 1137 nextest tests
+measured under it on the pinned toolchain on 2026-11-06: all 1135 nextest tests
 pass (one is skipped). Coverage selects LLVM explicitly
 (`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because instrumentation needs it,
 and release builds use the release profile, which Cranelift does not touch.
