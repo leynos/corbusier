@@ -63,7 +63,7 @@ jsonwebtoken = "9.3.0"
 
 # Embedded PostgreSQL support (tests and tooling)
 pg-embed-setup-unpriv = { version = "0.6.3", features = ["diesel-support", "async-api"] }
-postgresql_embedded = "0.20.0"
+postgresql_embedded = "0.22.0"
 
 [dev-dependencies]
 actix-http = "3.12.1"
