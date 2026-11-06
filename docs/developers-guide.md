@@ -447,7 +447,7 @@ sites.
 ### PostgreSQL test cluster (`tests/postgres/cluster`)
 
 The PostgreSQL tests run on an embedded cluster provided by
-`pg-embed-setup-unpriv` 0.6.3 with the `diesel-support` and `async-api`
+`pg-embed-setup-unpriv` 0.7.0 with the `diesel-support` and `async-api`
 features; CI has no database service. Each test is its own process under
 nextest, and the suite shares one cluster across those processes: the first
 process runs `initdb`, and later processes find the initialized directory and
@@ -476,7 +476,11 @@ that as a regression test through the public cluster fixture. The in-process
 and then reads the selected port. Worker request execution belongs to
 `run_worker_operation` in `worker_helpers`; lifecycle ordering remains in
 `ManagedCluster`. The CI jobs install the matching `pg_worker` from
-pg-embed-setup-unpriv 0.7.0.
+pg-embed-setup-unpriv 0.7.0. `postgresql_embedded` reuses an installation that
+already exists without extracting it again, so a developer machine that holds
+an installation made by an older release (one that skipped the `UTC` alias)
+must delete that installation directory once; fresh installations, as in CI,
+are complete.
 
 ## Dependency audit
 
