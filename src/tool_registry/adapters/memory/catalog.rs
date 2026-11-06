@@ -78,8 +78,7 @@ impl InMemoryToolCatalog {
         let tenants = self.read_state()?;
         let records = tenants
             .get(&tenant_id)
-            .map(|s| s.audit_records.clone())
-            .unwrap_or_default();
+            .map_or_else(Default::default, |s| s.audit_records.clone());
         Ok(records)
     }
 }
@@ -179,14 +178,13 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let tenants = self.read_state()?;
         let entries = tenants
             .get(&ctx.tenant_id())
-            .map(|s| {
+            .map_or_else(Default::default, |s| {
                 s.entries
                     .values()
                     .filter(|e| e.tool().name() == tool_name)
                     .cloned()
                     .collect()
-            })
-            .unwrap_or_default();
+            });
         Ok(entries)
     }
 
@@ -194,8 +192,7 @@ impl ToolCatalogRepository for InMemoryToolCatalog {
         let tenants = self.read_state()?;
         let entries = tenants
             .get(&ctx.tenant_id())
-            .map(|s| s.entries.values().cloned().collect())
-            .unwrap_or_default();
+            .map_or_else(Default::default, |s| s.entries.values().cloned().collect());
         Ok(entries)
     }
 

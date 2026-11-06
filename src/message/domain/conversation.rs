@@ -7,6 +7,7 @@ use super::ConversationId;
 use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Conversation lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,10 +45,10 @@ impl std::fmt::Display for ConversationStateParseError {
 
 impl std::error::Error for ConversationStateParseError {}
 
-impl TryFrom<&str> for ConversationState {
-    type Error = ConversationStateParseError;
+impl FromStr for ConversationState {
+    type Err = ConversationStateParseError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "active" => Ok(Self::Active),
             "paused" => Ok(Self::Paused),

@@ -302,11 +302,30 @@ workflows (each must pass `install-mold`), so a flag lost through a recipe or
 workflow edit fails there. The decision is recorded in
 [ADR 012](adr-012-rust-build-standard.md).
 
+### Development build footprint
+
+`[profile.dev]` in `Cargo.toml` sets `incremental = false` and `debug = 0`, and
+`.cargo/config.toml` sets the native `[unstable] embed-metadata = false` key
+(available from the 2026-07-31 nightlies). To debug, set
+`CARGO_PROFILE_DEV_DEBUG=true`; to rebuild incrementally, set
+`CARGO_INCREMENTAL=1`. `tests/build_footprint_contract.rs` parses all three
+settings.
+
+### Parsing string-backed types
+
+String-backed domain types (roles, statuses, identifiers and the like) parse
+through `std::str::FromStr`, so call `value.parse::<T>()` or
+`T::from_str(text)` with `std::str::FromStr` in scope. They previously
+implemented `TryFrom<&str>`; the current Clippy pedantic group (`TryFrom<str>`
+could be `FromStr`) asks for the standard parsing trait, and the call sites
+moved with it. Types that convert from owned `String` values keep
+`TryFrom<String>`.
+
 ### Cranelift
 
 Cranelift is the development-profile codegen backend. The full suite was
-measured under it on the pinned `nightly-2025-12-12` on 2026-09-29: all 902
-nextest tests pass (one is skipped). Coverage selects LLVM explicitly
+measured under it on the pinned toolchain on 2026-11-06: all 1165 nextest tests
+pass (one is skipped). Coverage selects LLVM explicitly
 (`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because instrumentation needs it,
 and release builds use the release profile, which Cranelift does not touch.
 Re-measure the whole suite on the next toolchain bump; if it fails, record the

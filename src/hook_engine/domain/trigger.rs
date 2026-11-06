@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 use thiserror::Error;
 
 /// Canonical hook trigger types.
@@ -103,10 +104,10 @@ impl fmt::Display for HookTriggerType {
 #[error("unknown hook trigger type: {0}")]
 pub struct ParseHookTriggerTypeError(pub String);
 
-impl TryFrom<&str> for HookTriggerType {
-    type Error = ParseHookTriggerTypeError;
+impl FromStr for HookTriggerType {
+    type Err = ParseHookTriggerTypeError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "turn_start" => Ok(Self::TurnStart),
             "turn_end" => Ok(Self::TurnEnd),

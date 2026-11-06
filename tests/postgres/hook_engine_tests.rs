@@ -172,7 +172,10 @@ async fn postgres_hook_execution_history_is_tenant_isolated(
         .execute(&tenant_b, other_tenant_context)
         .await
         .expect("tenant B execution succeeds");
-    assert!(other_tenant_results.is_empty());
+    assert_eq!(
+        other_tenant_results,
+        [] as [corbusier::hook_engine::domain::HookExecutionResult; 0]
+    );
 
     let tenant_a_results = ctx
         .execution_log
@@ -186,7 +189,10 @@ async fn postgres_hook_execution_history_is_tenant_isolated(
         .find_by_trigger_context(&tenant_b, trigger_context_id)
         .await
         .expect("tenant B lookup succeeds");
-    assert!(tenant_b_results.is_empty());
+    assert_eq!(
+        tenant_b_results,
+        [] as [corbusier::hook_engine::domain::HookExecutionResult; 0]
+    );
 
     Ok(())
 }
@@ -329,26 +335,26 @@ async fn postgres_policy_audit_is_queryable_and_tenant_scoped(
             .len(),
         1
     );
-    assert!(
+    assert_eq!(
         ctx.policy_audit
             .find_by_task(&tenant_b, task_id)
             .await
-            .expect("cross-tenant query succeeds")
-            .is_empty()
+            .expect("cross-tenant query succeeds"),
+        [] as [corbusier::hook_engine::domain::PolicyAuditEvent; 0]
     );
-    assert!(
+    assert_eq!(
         ctx.policy_audit
             .find_by_conversation(&tenant_b, conversation_id)
             .await
-            .expect("cross-tenant conversation query succeeds")
-            .is_empty()
+            .expect("cross-tenant conversation query succeeds"),
+        [] as [corbusier::hook_engine::domain::PolicyAuditEvent; 0]
     );
-    assert!(
+    assert_eq!(
         ctx.policy_audit
             .find_by_trigger_context(&tenant_b, trigger_context_id)
             .await
-            .expect("cross-tenant trigger query succeeds")
-            .is_empty()
+            .expect("cross-tenant trigger query succeeds"),
+        [] as [corbusier::hook_engine::domain::PolicyAuditEvent; 0]
     );
     Ok(())
 }

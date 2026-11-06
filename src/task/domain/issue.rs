@@ -3,6 +3,7 @@
 use super::{IssueNumber, RepositoryFullName, TaskDomainError};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Supported external issue providers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -26,10 +27,10 @@ impl IssueProvider {
     }
 }
 
-impl TryFrom<&str> for IssueProvider {
-    type Error = TaskDomainError;
+impl FromStr for IssueProvider {
+    type Err = TaskDomainError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "github" => Ok(Self::GitHub),
@@ -79,7 +80,7 @@ impl IssueRef {
         issue_number: u64,
     ) -> Result<Self, TaskDomainError> {
         Ok(Self::new(
-            IssueProvider::try_from(provider)?,
+            IssueProvider::from_str(provider)?,
             RepositoryFullName::new(repository)?,
             IssueNumber::new(issue_number)?,
         ))

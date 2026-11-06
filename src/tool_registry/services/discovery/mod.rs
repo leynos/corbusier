@@ -18,6 +18,9 @@ use crate::tool_registry::{
 use mockable::Clock;
 use std::sync::Arc;
 
+/// The catalog entry resolved before a rejection (if any), with the error.
+type RejectedResolution = (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError);
+
 mod log_and_audit;
 mod types;
 
@@ -173,7 +176,8 @@ where
     ) -> ToolDiscoveryRoutingServiceResult<ToolCallResult> {
         let entry = match self.resolve_and_validate(ctx, request).await {
             Ok(entry) => entry,
-            Err((maybe_entry, err)) => {
+            Err(rejection) => {
+                let (maybe_entry, err) = *rejection;
                 if let Some(entry) = maybe_entry {
                     let rejected = log_and_audit::RejectedCallContext {
                         request,
@@ -195,20 +199,20 @@ where
         &self,
         ctx: &RequestContext,
         request: &ToolCallRequest,
-    ) -> Result<CatalogEntry, (Option<CatalogEntry>, ToolDiscoveryRoutingServiceError)> {
+    ) -> Result<CatalogEntry, Box<RejectedResolution>> {
         let entries = match self
             .catalog
             .find_by_tool_name(ctx, request.tool_name())
             .await
         {
             Ok(e) => e,
-            Err(err) => return Err((None, err.into())),
+            Err(err) => return Err(Box::new((None, err.into()))),
         };
 
         let entry = match entries.len() {
             0 => {
                 let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
-                return Err((None, err.into()));
+                return Err(Box::new((None, err.into())));
             }
             1 => {
                 // INVARIANT: `into_iter().next()` always yields `Some`
@@ -216,7 +220,7 @@ where
                 // structurally unreachable.
                 let Some(entry) = entries.into_iter().next() else {
                     let err = ToolRegistryDomainError::ToolNotFound(request.tool_name().to_owned());
-                    return Err((None, err.into()));
+                    return Err(Box::new((None, err.into())));
                 };
                 entry
             }
@@ -225,12 +229,12 @@ where
                     tool_name: request.tool_name().to_owned(),
                     server_count: n,
                 };
-                return Err((None, err.into()));
+                return Err(Box::new((None, err.into())));
             }
         };
 
         if let Err(err) = self.validate_entry(ctx, &entry, request).await {
-            return Err((Some(entry), err));
+            return Err(Box::new((Some(entry), err)));
         }
         Ok(entry)
     }

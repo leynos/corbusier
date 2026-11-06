@@ -7,6 +7,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use super::{AgentSessionId, HandoffId, MessageId, SequenceNumber, TurnId};
 
@@ -289,10 +290,10 @@ impl std::fmt::Display for ParseHandoffStatusError {
 
 impl std::error::Error for ParseHandoffStatusError {}
 
-impl TryFrom<&str> for HandoffStatus {
-    type Error = ParseHandoffStatusError;
+impl FromStr for HandoffStatus {
+    type Err = ParseHandoffStatusError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "initiated" => Ok(Self::Initiated),
             "accepted" => Ok(Self::Accepted),

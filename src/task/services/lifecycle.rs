@@ -12,6 +12,7 @@ use crate::task::{
     ports::{TaskRepository, TaskRepositoryError},
 };
 use mockable::Clock;
+use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -352,7 +353,7 @@ where
             target_state,
         } = request;
 
-        let parsed_target_state = TaskState::try_from(target_state.as_str())?;
+        let parsed_target_state = TaskState::from_str(target_state.as_str())?;
         let mut task = self.find_task_by_id_or_error(ctx, task_id).await?;
         task.transition_to(parsed_target_state, &*self.clock)?;
         self.repository.update(ctx, &task).await?;

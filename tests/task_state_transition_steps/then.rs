@@ -6,10 +6,11 @@ use corbusier::task::{
     services::TaskLifecycleError,
 };
 use rstest_bdd_macros::then;
+use std::str::FromStr;
 
 #[then(r#"the task state is "{state}""#)]
 fn task_state_is(world: &TaskTransitionWorld, state: String) -> Result<(), eyre::Report> {
-    let expected_state = TaskState::try_from(state.as_str())
+    let expected_state = TaskState::from_str(state.as_str())
         .map_err(|err| eyre::eyre!("invalid expected state in scenario: {err}"))?;
 
     let task = world

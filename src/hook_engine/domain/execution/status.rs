@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::fmt;
+use std::str::FromStr;
 use thiserror::Error;
 
 /// Action-level execution status.
@@ -41,10 +42,10 @@ impl fmt::Display for ActionStatus {
 #[error("unknown action status: {0}")]
 pub struct ParseActionStatusError(pub String);
 
-impl TryFrom<&str> for ActionStatus {
-    type Error = ParseActionStatusError;
+impl FromStr for ActionStatus {
+    type Err = ParseActionStatusError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "succeeded" => Ok(Self::Succeeded),
             "failed" => Ok(Self::Failed),
@@ -120,10 +121,10 @@ impl fmt::Display for HookExecutionStatus {
 #[error("unknown hook execution status: {0}")]
 pub struct ParseHookExecutionStatusError(pub String);
 
-impl TryFrom<&str> for HookExecutionStatus {
-    type Error = ParseHookExecutionStatusError;
+impl FromStr for HookExecutionStatus {
+    type Err = ParseHookExecutionStatusError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "pending" => Ok(Self::Pending),
             "succeeded" => Ok(Self::Succeeded),

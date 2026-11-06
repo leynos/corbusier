@@ -132,7 +132,8 @@ impl McpServerRegistryRepository for InMemoryMcpServerRegistry {
         })?;
         Ok(tenants
             .get(&ctx.tenant_id())
-            .map(|state| state.servers.values().cloned().collect())
-            .unwrap_or_default())
+            .map_or_else(Default::default, |state| {
+                state.servers.values().cloned().collect()
+            }))
     }
 }

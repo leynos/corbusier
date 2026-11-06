@@ -65,7 +65,7 @@ async fn execute_turn_produces_deterministic_tool_call_order_for_identical_input
 
     let routed_call_ids = context.tool_router.routed_call_ids()?;
     assert_eq!(routed_call_ids.len(), 4);
-    let (first_half, second_half) = routed_call_ids.as_slice().split_at(2);
+    let (first_half, second_half) = routed_call_ids.split_at(2);
     assert_eq!(first_half, second_half);
     Ok(())
 }

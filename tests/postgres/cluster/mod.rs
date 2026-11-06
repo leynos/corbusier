@@ -189,7 +189,11 @@ impl ManagedCluster {
     /// # Errors
     ///
     /// Returns an error if the database cannot be created from the template.
-    #[expect(clippy::unused_async, reason = "Part of async API for consistency")]
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "Part of async API for consistency"
+    )]
     pub async fn temporary_database_from_template(
         &'static self,
         db_name: &str,

@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Task lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -69,10 +70,10 @@ impl fmt::Display for TaskState {
     }
 }
 
-impl TryFrom<&str> for TaskState {
-    type Error = ParseTaskStateError;
+impl FromStr for TaskState {
+    type Err = ParseTaskStateError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "draft" => Ok(Self::Draft),

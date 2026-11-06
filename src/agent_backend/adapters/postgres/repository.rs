@@ -20,6 +20,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
+use std::str::FromStr;
 
 /// `PostgreSQL` connection pool type used by backend registry adapters.
 pub type BackendPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -278,7 +279,7 @@ fn row_to_registration(
 
     let parsed_name =
         BackendName::new(&name).map_err(BackendRegistryError::invalid_persisted_data)?;
-    let parsed_status = BackendStatus::try_from(status.as_str())
+    let parsed_status = BackendStatus::from_str(status.as_str())
         .map_err(BackendRegistryError::invalid_persisted_data)?;
     let parsed_capabilities: AgentCapabilities = serde_json::from_value(capabilities)
         .map_err(BackendRegistryError::invalid_persisted_data)?;

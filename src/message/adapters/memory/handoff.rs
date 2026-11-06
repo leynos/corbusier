@@ -43,10 +43,7 @@ impl<C: Clock + Send + Sync> InMemoryHandoffAdapter<C> {
     /// Returns the number of stored handoffs.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.store
-            .read()
-            .map(|guard| guard.handoffs.len())
-            .unwrap_or(0)
+        self.store.read().map_or(0, |guard| guard.handoffs.len())
     }
 
     /// Returns `true` if no handoffs are stored.

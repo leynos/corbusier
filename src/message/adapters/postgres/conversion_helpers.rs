@@ -10,6 +10,7 @@ use crate::message::{
     error::RepositoryError,
     ports::repository::RepositoryResult,
 };
+use std::str::FromStr;
 
 /// Wraps a serialization/conversion error for consistent error handling.
 pub(super) fn ser_err<E: std::fmt::Display>(e: E) -> RepositoryError {
@@ -31,7 +32,7 @@ pub(super) fn ser_err<E: std::fmt::Display>(e: E) -> RepositoryError {
 /// - The sequence number is negative (invalid for `u64`)
 /// - The content is empty (domain invariant violation)
 pub(crate) fn row_to_message(row: MessageRow) -> RepositoryResult<Message> {
-    let role = Role::try_from(row.role.as_str()).map_err(ser_err)?;
+    let role = Role::from_str(row.role.as_str()).map_err(ser_err)?;
     let content: Vec<ContentPart> = serde_json::from_value(row.content).map_err(ser_err)?;
     let metadata: MessageMetadata = serde_json::from_value(row.metadata).map_err(ser_err)?;
     let sequence_number = u64::try_from(row.sequence_number).map_err(ser_err)?;

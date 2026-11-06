@@ -3,6 +3,7 @@
 use super::ParseTenantStatusError;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Lifecycle status of a tenant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -31,10 +32,10 @@ impl fmt::Display for TenantStatus {
     }
 }
 
-impl TryFrom<&str> for TenantStatus {
-    type Error = ParseTenantStatusError;
+impl FromStr for TenantStatus {
+    type Err = ParseTenantStatusError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "active" => Ok(Self::Active),

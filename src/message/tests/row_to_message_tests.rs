@@ -142,7 +142,9 @@ fn row_to_message_fails_for_negative_sequence_number(message_row: MessageRow) {
     match result.expect_err("should fail for negative sequence") {
         RepositoryError::Serialization(msg) => {
             assert!(
-                msg.contains("out of range") || msg.contains("negative"),
+                msg.contains("out of range")
+                    || msg.contains("negative")
+                    || msg.contains("too small"),
                 "error should mention range: {msg}"
             );
         }

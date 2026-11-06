@@ -214,7 +214,10 @@ async fn in_memory_hook_history_is_tenant_isolated() {
         .execute(&tenant_b, other_tenant_context)
         .await
         .expect("tenant B execution succeeds");
-    assert!(other_tenant_results.is_empty());
+    assert_eq!(
+        other_tenant_results,
+        [] as [corbusier::hook_engine::domain::HookExecutionResult; 0]
+    );
 
     let own_tenant = execution_log
         .find_by_trigger_context(&tenant_a, trigger_context_id)
@@ -226,7 +229,10 @@ async fn in_memory_hook_history_is_tenant_isolated() {
         .find_by_trigger_context(&tenant_b, trigger_context_id)
         .await
         .expect("tenant B lookup succeeds");
-    assert!(other_tenant.is_empty());
+    assert_eq!(
+        other_tenant,
+        [] as [corbusier::hook_engine::domain::HookExecutionResult; 0]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

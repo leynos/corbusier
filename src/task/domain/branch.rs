@@ -3,6 +3,7 @@
 use super::{IssueProvider, RepositoryFullName, TaskDomainError};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Maximum length for a validated branch name.
 ///
@@ -126,7 +127,7 @@ impl BranchRef {
         branch_name: &str,
     ) -> Result<Self, TaskDomainError> {
         let branch_ref = Self::new(
-            IssueProvider::try_from(provider)?,
+            IssueProvider::from_str(provider)?,
             RepositoryFullName::new(repository)?,
             BranchName::new(branch_name)?,
         );
@@ -189,10 +190,10 @@ impl fmt::Display for BranchRef {
     }
 }
 
-impl TryFrom<&str> for BranchRef {
-    type Error = TaskDomainError;
+impl FromStr for BranchRef {
+    type Err = TaskDomainError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::parse_canonical(value)
     }
 }

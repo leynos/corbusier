@@ -19,6 +19,7 @@ use diesel::OptionalExtension;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use std::str::FromStr;
 
 /// `PostgreSQL` connection pool type used by hook execution log adapters.
 pub type HookExecutionPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -269,9 +270,9 @@ impl HookExecutionLogRepository for PostgresHookExecutionLogRepository {
 fn row_to_execution(row: HookExecutionRow) -> HookExecutionLogResult<HookExecutionResult> {
     let hook_id = HookId::new(row.hook_id)
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;
-    let trigger_type = HookTriggerType::try_from(row.trigger_type.as_str())
+    let trigger_type = HookTriggerType::from_str(row.trigger_type.as_str())
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;
-    let status = HookExecutionStatus::try_from(row.status.as_str())
+    let status = HookExecutionStatus::from_str(row.status.as_str())
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;
     let action_results: Vec<ActionResult> = serde_json::from_value(row.action_results)
         .map_err(|err| HookExecutionLogError::invalid_persisted_data(err.to_string()))?;

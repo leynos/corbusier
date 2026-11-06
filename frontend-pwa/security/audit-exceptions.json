@@ -7,5 +7,14 @@
     "reason": "Development-time tooling only. braces reaches the tree through stylelint > fast-glob > micromatch, which pin braces@3.0.3. The brace patterns come from stylelint and repository configuration, not runtime input; a pull request can change that configuration and fail its own CI run. The advisory (stack exhaustion on deeply nested patterns) covers every release up to 3.0.3, the latest published, so there is no patched release to move to. Rationale and exposure: docs/dependency-policy-exception-braces-nested-patterns.md. Remove this entry once a patched braces exists or stylelint drops braces 3.",
     "addedAt": "2026-10-09",
     "expiresAt": "2026-12-09"
+  },
+  {
+    "id": "MINIMATCH_GLOBPARTS_DOS_2026_11",
+    "package": "@corbusier/frontend-pwa",
+    "advisory": "GHSA-g3hv-75wg-m249",
+    "introducedBy": "typedoc",
+    "reason": "Development-time tooling only. minimatch reaches the tree through typedoc, which requires minimatch ^10.2.5; the patched release is 11.0.1, and typedoc 0.28.20 fails to resolve its entry-point globs under minimatch 11 (docs:check exits 6), so an override cannot be taken. The glob patterns come from the typedoc configuration in this repository, not runtime input. Remove this entry once typedoc accepts minimatch 11.",
+    "addedAt": "2026-11-06",
+    "expiresAt": "2026-12-06"
   }
 ]

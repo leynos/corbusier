@@ -6,6 +6,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use super::context_snapshot::ContextWindowSnapshot;
 use super::{AgentSessionId, ConversationId, HandoffId, SequenceNumber, TurnId};
@@ -316,10 +317,10 @@ impl std::fmt::Display for ParseAgentSessionStateError {
 
 impl std::error::Error for ParseAgentSessionStateError {}
 
-impl TryFrom<&str> for AgentSessionState {
-    type Error = ParseAgentSessionStateError;
+impl FromStr for AgentSessionState {
+    type Err = ParseAgentSessionStateError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "active" => Ok(Self::Active),
             "paused" => Ok(Self::Paused),

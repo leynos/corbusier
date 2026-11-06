@@ -17,6 +17,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::{DatabaseErrorKind, Error as DieselError, QueryResult};
+use std::str::FromStr;
 
 /// `PostgreSQL` connection pool type for MCP server adapters.
 pub type McpServerPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -266,7 +267,7 @@ fn row_to_server(row: McpServerRow) -> McpServerRegistryResult<McpServerRegistra
         McpServerName::new(&name).map_err(McpServerRegistryError::invalid_persisted_data)?;
     let parsed_transport: McpTransport = serde_json::from_value(transport)
         .map_err(McpServerRegistryError::invalid_persisted_data)?;
-    let parsed_lifecycle = McpServerLifecycleState::try_from(lifecycle_state.as_str())
+    let parsed_lifecycle = McpServerLifecycleState::from_str(lifecycle_state.as_str())
         .map_err(McpServerRegistryError::invalid_persisted_data)?;
     let parsed_health =
         build_health_snapshot(health_status.as_str(), health_checked_at, health_message)?;
@@ -289,7 +290,7 @@ fn build_health_snapshot(
     health_checked_at: Option<chrono::DateTime<chrono::Utc>>,
     health_message: Option<String>,
 ) -> McpServerRegistryResult<Option<McpServerHealthSnapshot>> {
-    let parsed_status = McpServerHealthStatus::try_from(health_status)
+    let parsed_status = McpServerHealthStatus::from_str(health_status)
         .map_err(McpServerRegistryError::invalid_persisted_data)?;
 
     let Some(checked_at) = health_checked_at else {

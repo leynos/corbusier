@@ -14,6 +14,7 @@ use crate::message::{
 use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use std::str::FromStr;
 
 use super::{
     PgPool,
@@ -69,7 +70,7 @@ impl PostgresConversationRepository {
 }
 
 fn row_to_conversation(row: &ConversationRow) -> ConversationRepositoryResult<Conversation> {
-    let state = ConversationState::try_from(row.state.as_str())
+    let state = ConversationState::from_str(row.state.as_str())
         .map_err(|err| ConversationRepositoryError::persistence(std::io::Error::other(err)))?;
     Ok(Conversation::from_persisted(
         ConversationId::from_uuid(row.id),

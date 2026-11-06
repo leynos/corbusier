@@ -6,6 +6,7 @@ use crate::agent_backend::domain::{
 };
 use crate::agent_backend::ports::{TurnSessionRepositoryError, TurnSessionRepositoryResult};
 use chrono::{DateTime, Duration, Utc};
+use std::str::FromStr;
 
 use super::super::models::{AgentTurnSessionRow, NewAgentTurnSessionRow};
 
@@ -68,7 +69,7 @@ pub(crate) fn row_to_turn_session(
         turn_count,
     } = row;
 
-    let parsed_status = TurnSessionStatus::try_from(status.as_str())
+    let parsed_status = TurnSessionStatus::from_str(status.as_str())
         .map_err(|e| TurnSessionRepositoryError::invalid_persisted_data("status", e))?;
     let parsed_runtime_session_id = RuntimeSessionId::new(runtime_session_id)
         .map_err(|e| TurnSessionRepositoryError::invalid_persisted_data("runtime_session_id", e))?;

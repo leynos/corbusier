@@ -8,6 +8,7 @@ use crate::agent_backend::domain::{
 use mockable::DefaultClock;
 use rstest::rstest;
 use serde_json::{Value, json};
+use std::str::FromStr;
 
 /// Helper to create a test registration with sensible defaults.
 fn create_test_registration(
@@ -115,13 +116,13 @@ fn backend_name_normalized_length_boundary(
 #[case(BackendStatus::Inactive, "inactive")]
 fn backend_status_as_str_round_trip(#[case] status: BackendStatus, #[case] expected: &str) {
     assert_eq!(status.as_str(), expected);
-    let parsed = BackendStatus::try_from(expected).expect("should parse");
+    let parsed = BackendStatus::from_str(expected).expect("should parse");
     assert_eq!(parsed, status);
 }
 
 #[rstest]
 fn unknown_backend_status_is_rejected() {
-    let result = BackendStatus::try_from("unknown");
+    let result = BackendStatus::from_str("unknown");
     assert!(matches!(result, Err(ParseBackendStatusError(_))));
 }
 
@@ -220,7 +221,7 @@ fn capabilities_defaults_have_empty_content_types_and_no_window() {
 
     assert!(!caps.supports_streaming());
     assert!(!caps.supports_tool_calls());
-    assert!(caps.supported_content_types().is_empty());
+    assert_eq!(caps.supported_content_types(), [] as [String; 0]);
     assert!(caps.max_context_window().is_none());
 }
 

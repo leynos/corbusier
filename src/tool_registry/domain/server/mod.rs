@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use mockable::Clock;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Lifecycle state of a registered MCP server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -55,10 +56,10 @@ impl fmt::Display for McpServerLifecycleState {
     }
 }
 
-impl TryFrom<&str> for McpServerLifecycleState {
-    type Error = ParseMcpServerLifecycleStateError;
+impl FromStr for McpServerLifecycleState {
+    type Err = ParseMcpServerLifecycleStateError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "registered" => Ok(Self::Registered),

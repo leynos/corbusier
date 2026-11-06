@@ -28,7 +28,7 @@ fn handoff_metadata_new_sets_initiated_status(clock: DefaultClock, handoff_param
     assert_eq!(handoff.status, HandoffStatus::Initiated);
     assert!(handoff.target_session_id.is_none());
     assert!(handoff.completed_at.is_none());
-    assert!(handoff.triggering_tool_calls.is_empty());
+    assert_eq!(handoff.triggering_tool_calls, []);
 }
 
 #[rstest]

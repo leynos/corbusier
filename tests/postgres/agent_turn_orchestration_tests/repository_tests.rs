@@ -123,11 +123,11 @@ async fn postgres_arbitration_commits_reservation_before_runtime_creation(
         .ok_or_else(|| Box::new(std::io::Error::other("expected reservation row")) as BoxError)?;
     assert_eq!(persisted.id(), reservation.id());
     assert_eq!(persisted.status(), TurnSessionStatus::Reserved);
-    assert!(
+    assert_eq!(
         ctx.runtime
             .created_session_ids()
-            .map_err(|err| Box::new(err) as BoxError)?
-            .is_empty()
+            .map_err(|err| Box::new(err) as BoxError)?,
+        [] as [corbusier::agent_backend::domain::RuntimeSessionId; 0]
     );
     Ok(())
 }
@@ -228,11 +228,11 @@ async fn postgres_detects_concurrent_reservation_conflict_before_runtime_creatio
         .first()
         .ok_or_else(|| Box::new(std::io::Error::other("expected reservation row")) as BoxError)?;
     assert_eq!(persisted.status(), TurnSessionStatus::Reserved);
-    assert!(
+    assert_eq!(
         ctx.runtime
             .created_session_ids()
-            .map_err(|err| Box::new(err) as BoxError)?
-            .is_empty()
+            .map_err(|err| Box::new(err) as BoxError)?,
+        [] as [corbusier::agent_backend::domain::RuntimeSessionId; 0]
     );
     Ok(())
 }

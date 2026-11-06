@@ -3,6 +3,7 @@
 use super::{IssueProvider, RepositoryFullName, TaskDomainError};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Maximum length for a canonical reference stored in a `VARCHAR(255)` column.
 const MAX_CANONICAL_REF_LENGTH: usize = 255;
@@ -101,7 +102,7 @@ impl PullRequestRef {
         pull_request_number: u64,
     ) -> Result<Self, TaskDomainError> {
         let pr_ref = Self::new(
-            IssueProvider::try_from(provider)?,
+            IssueProvider::from_str(provider)?,
             RepositoryFullName::new(repository)?,
             PullRequestNumber::new(pull_request_number)?,
         );
@@ -172,10 +173,10 @@ impl fmt::Display for PullRequestRef {
     }
 }
 
-impl TryFrom<&str> for PullRequestRef {
-    type Error = TaskDomainError;
+impl FromStr for PullRequestRef {
+    type Err = TaskDomainError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::parse_canonical(value)
     }
 }

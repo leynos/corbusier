@@ -6,6 +6,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use super::handoff::ToolCallReference;
@@ -262,10 +263,10 @@ impl std::fmt::Display for ParseSnapshotTypeError {
 
 impl std::error::Error for ParseSnapshotTypeError {}
 
-impl TryFrom<&str> for SnapshotType {
-    type Error = ParseSnapshotTypeError;
+impl FromStr for SnapshotType {
+    type Err = ParseSnapshotTypeError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "session_start" => Ok(Self::SessionStart),
             "handoff_initiated" => Ok(Self::HandoffInitiated),
@@ -304,7 +305,7 @@ mod tests {
         assert_eq!(snapshot.session_id, session_id);
         assert_eq!(snapshot.sequence_range, range);
         assert_eq!(snapshot.message_summary.total(), 10);
-        assert!(snapshot.visible_tool_calls.is_empty());
+        assert_eq!(snapshot.visible_tool_calls, []);
         assert!(snapshot.token_estimate.is_none());
     }
 

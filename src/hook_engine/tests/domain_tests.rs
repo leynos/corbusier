@@ -12,6 +12,7 @@ use chrono::Utc;
 use rstest::rstest;
 use serde_json::json;
 use std::collections::HashSet;
+use std::str::FromStr;
 
 #[test]
 fn hook_id_rejects_empty() {
@@ -23,6 +24,51 @@ fn hook_id_rejects_empty() {
 fn hook_action_id_rejects_empty() {
     let result = HookActionId::new("");
     assert_eq!(result, Err(HookDomainError::EmptyHookActionId));
+}
+
+#[test]
+fn hook_id_parses_and_trims_from_a_string() {
+    assert_eq!(
+        HookId::from_str("  hook-1 "),
+        Ok(HookId::new("hook-1").expect("valid hook id"))
+    );
+}
+
+#[test]
+fn hook_id_from_str_rejects_empty() {
+    assert_eq!(HookId::from_str("  "), Err(HookDomainError::EmptyHookId));
+}
+
+#[test]
+fn hook_action_id_parses_and_trims_from_a_string() {
+    assert_eq!(
+        HookActionId::from_str(" action-1 "),
+        Ok(HookActionId::new("action-1").expect("valid action id"))
+    );
+}
+
+#[test]
+fn hook_action_id_from_str_rejects_empty() {
+    assert_eq!(
+        HookActionId::from_str(""),
+        Err(HookDomainError::EmptyHookActionId)
+    );
+}
+
+#[rstest]
+#[case("succeeded", ActionStatus::Succeeded)]
+#[case("failed", ActionStatus::Failed)]
+#[case("skipped", ActionStatus::Skipped)]
+fn action_status_parses_its_wire_names(#[case] text: &str, #[case] expected: ActionStatus) {
+    assert_eq!(ActionStatus::from_str(text), Ok(expected));
+}
+
+#[rstest]
+#[case("")]
+#[case("Succeeded")]
+#[case("unknown")]
+fn action_status_rejects_other_text(#[case] text: &str) {
+    assert!(ActionStatus::from_str(text).is_err());
 }
 
 #[test]

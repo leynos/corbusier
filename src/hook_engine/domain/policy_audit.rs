@@ -9,6 +9,7 @@ use crate::task::domain::TaskId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -70,10 +71,10 @@ impl PolicyAuditDecision {
     }
 }
 
-impl TryFrom<&str> for PolicyAuditDecision {
-    type Error = PolicyAuditProjectionError;
+impl FromStr for PolicyAuditDecision {
+    type Err = PolicyAuditProjectionError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "allow" => Ok(Self::Allow),
             "deny" => Ok(Self::Deny),
@@ -295,7 +296,7 @@ fn project_policy_audit_event(
                 "missing string field 'decision'",
             )
         })?;
-    let decision = PolicyAuditDecision::try_from(decision_raw)?;
+    let decision = PolicyAuditDecision::from_str(decision_raw)?;
     let violation = parse_violation(object, decision, action.action_id())?;
     Ok(PolicyAuditEvent {
         id: PolicyAuditEventId::new(),
