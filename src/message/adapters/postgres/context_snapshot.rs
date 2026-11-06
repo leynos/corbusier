@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use diesel::pg::Pg;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use std::str::FromStr;
 
 use super::blocking_helpers::{PgPool, get_conn_with, run_blocking_with};
 use super::tenant_tx::{FromTxError, TxError, with_tenant_read_tx, with_tenant_tx};
@@ -261,7 +262,7 @@ fn row_to_snapshot(row: ContextSnapshotRow) -> SnapshotResult<ContextWindowSnaps
         .map_err(SnapshotError::persistence)?;
 
     let snapshot_type =
-        SnapshotType::try_from(row.snapshot_type.as_str()).map_err(SnapshotError::persistence)?;
+        SnapshotType::from_str(row.snapshot_type.as_str()).map_err(SnapshotError::persistence)?;
 
     Ok(ContextWindowSnapshot {
         snapshot_id: row.id,

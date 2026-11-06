@@ -3,6 +3,7 @@
 use super::HookDomainError;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Unique identifier for a hook definition.
@@ -50,10 +51,10 @@ impl AsRef<str> for HookId {
     }
 }
 
-impl TryFrom<&str> for HookId {
-    type Error = HookDomainError;
+impl FromStr for HookId {
+    type Err = HookDomainError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::new(value)
     }
 }
@@ -123,10 +124,10 @@ impl AsRef<str> for HookActionId {
     }
 }
 
-impl TryFrom<&str> for HookActionId {
-    type Error = HookDomainError;
+impl FromStr for HookActionId {
+    type Err = HookDomainError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::new(value)
     }
 }

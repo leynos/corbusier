@@ -4,6 +4,7 @@ use super::ParseMcpServerHealthStatusError;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Health status of an MCP server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -35,10 +36,10 @@ impl fmt::Display for McpServerHealthStatus {
     }
 }
 
-impl TryFrom<&str> for McpServerHealthStatus {
-    type Error = ParseMcpServerHealthStatusError;
+impl FromStr for McpServerHealthStatus {
+    type Err = ParseMcpServerHealthStatusError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let normalized = value.trim().to_ascii_lowercase();
         match normalized.as_str() {
             "unknown" => Ok(Self::Unknown),

@@ -41,7 +41,7 @@ impl InMemoryContextSnapshotAdapter {
     /// Returns the number of stored snapshots.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.snapshots.read().map(|guard| guard.len()).unwrap_or(0)
+        self.snapshots.read().map_or(0, |guard| guard.len())
     }
 
     /// Returns `true` if no snapshots are stored.

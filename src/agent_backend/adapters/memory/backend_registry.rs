@@ -144,15 +144,14 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         let tenants = self.read_state()?;
         let active = tenants
             .get(&ctx.tenant_id())
-            .map(|state| {
+            .map_or_else(Default::default, |state| {
                 state
                     .backends
                     .values()
                     .filter(|b| b.status() == BackendStatus::Active)
                     .cloned()
                     .collect()
-            })
-            .unwrap_or_default();
+            });
         Ok(active)
     }
 
@@ -163,7 +162,8 @@ impl BackendRegistryRepository for InMemoryBackendRegistry {
         let tenants = self.read_state()?;
         Ok(tenants
             .get(&ctx.tenant_id())
-            .map(|state| state.backends.values().cloned().collect())
-            .unwrap_or_default())
+            .map_or_else(Default::default, |state| {
+                state.backends.values().cloned().collect()
+            }))
     }
 }

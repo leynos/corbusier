@@ -80,8 +80,7 @@ mod tests {
                     key.to_string_lossy().into_owned(),
                     value
                         .as_ref()
-                        .map(|v| v.to_string_lossy().into_owned())
-                        .unwrap_or_default(),
+                        .map_or_else(Default::default, |v| v.to_string_lossy().into_owned()),
                 )
             })
             .collect()

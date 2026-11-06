@@ -2,6 +2,7 @@
 
 use crate::message::domain::Role;
 use rstest::rstest;
+use std::str::FromStr;
 
 // ============================================================================
 // Role::as_str tests
@@ -26,7 +27,7 @@ fn role_as_str_returns_correct_string(#[case] role: Role, #[case] expected: &str
 #[case("tool", Role::Tool)]
 #[case("system", Role::System)]
 fn role_try_from_str_parses_valid_roles(#[case] input: &str, #[case] expected: Role) {
-    let result = Role::try_from(input);
+    let result = Role::from_str(input);
     assert_eq!(result, Ok(expected));
 }
 
@@ -44,13 +45,13 @@ fn role_try_from_str_parses_valid_roles(#[case] input: &str, #[case] expected: R
 #[case(" user")]
 #[case("user\n")]
 fn role_try_from_str_rejects_invalid_roles(#[case] input: &str) {
-    let result = Role::try_from(input);
+    let result = Role::from_str(input);
     assert!(result.is_err());
 }
 
 #[test]
 fn role_parse_error_display_includes_invalid_input() {
-    let result = Role::try_from("invalid_role");
+    let result = Role::from_str("invalid_role");
     let err = result.expect_err("should fail for invalid input");
     let display = format!("{err}");
     assert!(display.contains("invalid_role"));
@@ -68,7 +69,7 @@ fn role_parse_error_display_includes_invalid_input() {
 #[case(Role::System)]
 fn role_round_trip_as_str_and_try_from(#[case] role: Role) {
     let string = role.as_str();
-    let parsed = Role::try_from(string).expect("round-trip should succeed");
+    let parsed = Role::from_str(string).expect("round-trip should succeed");
     assert_eq!(parsed, role);
 }
 

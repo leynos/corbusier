@@ -32,7 +32,7 @@ impl InMemoryAgentSessionRepository {
     /// Returns the number of stored sessions.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.sessions.read().map(|guard| guard.len()).unwrap_or(0)
+        self.sessions.read().map_or(0, |guard| guard.len())
     }
 
     /// Returns `true` if no sessions are stored.

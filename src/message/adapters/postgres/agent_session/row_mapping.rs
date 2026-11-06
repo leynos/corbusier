@@ -6,6 +6,7 @@
 
 use diesel::prelude::*;
 use serde::Serialize;
+use std::str::FromStr;
 
 use crate::message::{
     adapters::models::{AgentSessionRow, NewAgentSession},
@@ -98,7 +99,7 @@ pub(super) fn row_to_session(row: AgentSessionRow) -> SessionResult<AgentSession
         .map(SequenceNumber::new);
 
     let state =
-        AgentSessionState::try_from(row.state.as_str()).map_err(SessionError::persistence)?;
+        AgentSessionState::from_str(row.state.as_str()).map_err(SessionError::persistence)?;
 
     Ok(AgentSession {
         session_id: AgentSessionId::from_uuid(row.id),

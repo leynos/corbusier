@@ -73,7 +73,7 @@ async fn execute_turn_propagates_session_creation_failure(
         .ok_or_else(|| eyre::eyre!("expected expired reservation session"))?;
     assert_eq!(reservation.status(), TurnSessionStatus::Expired);
     assert_eq!(reservation.turn_count(), 0);
-    assert!(context.runtime.created_session_ids()?.is_empty());
+    assert_eq!(context.runtime.created_session_ids()?, []);
     Ok(())
 }
 

@@ -47,7 +47,7 @@ impl InMemoryMessageRepository {
     /// the repository trait methods instead.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.messages.read().map(|guard| guard.len()).unwrap_or(0)
+        self.messages.read().map_or(0, |guard| guard.len())
     }
 
     /// Returns `true` if no messages are stored.

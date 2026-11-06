@@ -130,10 +130,10 @@ fn revert_from_handoff_obeys_handoff_id(
     let reverted = session.revert_from_handoff(id_to_revert);
 
     if use_matching_id {
-        assert!(reverted, "revert should succeed for the matching handoff",);
+        assert!(reverted, "revert should succeed for the matching handoff");
         assert_reverted_to_active(session);
     } else {
-        assert!(!reverted, "revert should fail for a different handoff id",);
+        assert!(!reverted, "revert should fail for a different handoff id");
         assert_still_handed_off(session, handoff_id);
     }
 }

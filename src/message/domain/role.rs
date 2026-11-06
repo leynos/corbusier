@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// Error returned when parsing an invalid role string.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,14 +100,14 @@ impl Role {
 /// ```
 /// use corbusier::message::domain::Role;
 ///
-/// assert!(Role::try_from("user").is_ok());
-/// assert!(Role::try_from("User").is_err()); // Case-sensitive
-/// assert!(Role::try_from("USER").is_err());
+/// assert!(Role::from_str("user").is_ok());
+/// assert!(Role::from_str("User").is_err()); // Case-sensitive
+/// assert!(Role::from_str("USER").is_err());
 /// ```
-impl TryFrom<&str> for Role {
-    type Error = ParseRoleError;
+impl FromStr for Role {
+    type Err = ParseRoleError;
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "user" => Ok(Self::User),
             "assistant" => Ok(Self::Assistant),

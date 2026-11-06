@@ -2,6 +2,7 @@
 
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
+use std::str::FromStr;
 
 use crate::context::UserId;
 
@@ -115,7 +116,7 @@ fn slug_serde_round_trip() {
 #[case(TenantStatus::Suspended, "suspended")]
 fn tenant_status_as_str_round_trip(#[case] status: TenantStatus, #[case] expected: &str) {
     assert_eq!(status.as_str(), expected);
-    let parsed = TenantStatus::try_from(expected).expect("should parse");
+    let parsed = TenantStatus::from_str(expected).expect("should parse");
     assert_eq!(parsed, status);
 }
 
@@ -127,7 +128,7 @@ fn tenant_status_display_matches_as_str() {
 
 #[rstest]
 fn unknown_tenant_status_is_rejected() {
-    let result = TenantStatus::try_from("unknown");
+    let result = TenantStatus::from_str("unknown");
     assert!(matches!(result, Err(ParseTenantStatusError(_))));
 }
 

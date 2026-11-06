@@ -18,6 +18,7 @@ use diesel::pg::Pg;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use std::str::FromStr;
 
 /// `PostgreSQL` connection pool type used by hook policy audit adapters.
 pub type HookPolicyAuditPgPool = Pool<ConnectionManager<PgConnection>>;
@@ -183,9 +184,9 @@ fn row_to_event(row: PolicyAuditEventRow) -> HookPolicyAuditResult<PolicyAuditEv
         .map_err(|err| HookPolicyAuditError::invalid_persisted_data(err.to_string()))?;
     let action_id = HookActionId::new(row.action_id)
         .map_err(|err| HookPolicyAuditError::invalid_persisted_data(err.to_string()))?;
-    let trigger_type = HookTriggerType::try_from(row.trigger_type.as_str())
+    let trigger_type = HookTriggerType::from_str(row.trigger_type.as_str())
         .map_err(|err| HookPolicyAuditError::invalid_persisted_data(err.to_string()))?;
-    let decision = PolicyAuditDecision::try_from(row.decision.as_str())
+    let decision = PolicyAuditDecision::from_str(row.decision.as_str())
         .map_err(|err| HookPolicyAuditError::invalid_persisted_data(err.to_string()))?;
     let violation = row
         .violation

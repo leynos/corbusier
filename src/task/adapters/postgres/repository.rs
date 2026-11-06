@@ -27,6 +27,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorInformation, DatabaseErrorKind, Error as DieselError};
+use std::str::FromStr;
 
 /// `PostgreSQL` connection pool type used by task adapters.
 pub type TaskPgPool = PgPool;
@@ -322,7 +323,7 @@ fn row_to_task(row: TaskRow) -> TaskRepositoryResult<Task> {
     let origin = serde_json::from_value::<TaskOrigin>(persisted_origin)
         .map_err(TaskRepositoryError::persistence)?;
     let state =
-        TaskState::try_from(persisted_state.as_str()).map_err(TaskRepositoryError::persistence)?;
+        TaskState::from_str(persisted_state.as_str()).map_err(TaskRepositoryError::persistence)?;
 
     let parsed_branch = branch_ref
         .map(|s| BranchRef::parse_canonical(&s))

@@ -83,7 +83,7 @@ async fn orchestrates_turn_and_reuses_session_before_expiry(
     assert!(!first.reused_session());
     assert!(second.reused_session());
     assert_eq!(first.session_id(), second.session_id());
-    assert!(second.tool_results().is_empty());
+    assert_eq!(second.tool_results(), []);
     Ok(())
 }
 
@@ -115,7 +115,10 @@ async fn reservation_is_persisted_before_runtime_session_creation(
         return Err(eyre::eyre!("expected reserved arbitration result"));
     };
     assert!(prior_expired.is_none());
-    assert!(context.runtime.created_session_ids()?.is_empty());
+    assert_eq!(
+        context.runtime.created_session_ids()?,
+        [] as [corbusier::agent_backend::domain::RuntimeSessionId; 0]
+    );
 
     let sessions = context.session_repository.all_sessions()?;
     assert_eq!(sessions.len(), 1);

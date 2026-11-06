@@ -1,6 +1,7 @@
 //! Turn-session lifecycle status values.
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use thiserror::Error;
 
 /// Lifecycle status of a turn orchestration session.
@@ -32,10 +33,10 @@ impl TurnSessionStatus {
 #[error("unknown turn session status: {0}")]
 pub struct ParseTurnSessionStatusError(pub String);
 
-impl TryFrom<&str> for TurnSessionStatus {
-    type Error = ParseTurnSessionStatusError;
+impl FromStr for TurnSessionStatus {
+    type Err = ParseTurnSessionStatusError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         parse_turn_session_status(value)
             .ok_or_else(|| ParseTurnSessionStatusError(value.to_owned()))
     }

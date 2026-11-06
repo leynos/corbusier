@@ -6,6 +6,7 @@ use crate::task::domain::{
 };
 use mockable::DefaultClock;
 use rstest::{fixture, rstest};
+use std::str::FromStr;
 
 #[fixture]
 fn clock() -> DefaultClock {
@@ -99,7 +100,7 @@ fn branch_ref_round_trips_through_display_and_try_from() {
     let canonical = original.to_string();
     assert_eq!(canonical, "github:owner/repo:feature/x");
 
-    let parsed = BranchRef::try_from(canonical.as_str()).expect("canonical should parse");
+    let parsed = BranchRef::from_str(canonical.as_str()).expect("canonical should parse");
     assert_eq!(parsed, original);
 }
 
@@ -153,7 +154,7 @@ fn pull_request_ref_round_trips_through_display_and_try_from() {
     let canonical = original.to_string();
     assert_eq!(canonical, "gitlab:team/project:99");
 
-    let parsed = PullRequestRef::try_from(canonical.as_str()).expect("canonical should parse");
+    let parsed = PullRequestRef::from_str(canonical.as_str()).expect("canonical should parse");
     assert_eq!(parsed, original);
 }
 

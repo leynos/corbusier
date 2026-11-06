@@ -115,7 +115,7 @@ async fn find_by_conversation_returns_empty_for_unknown_conversation(
         .await
         .expect("find_by_conversation");
 
-    assert!(messages.is_empty());
+    assert_eq!(messages, []);
 }
 
 #[rstest]

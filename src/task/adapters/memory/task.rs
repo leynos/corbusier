@@ -89,14 +89,11 @@ fn find_by_index(
     index: &HashMap<String, Vec<TaskId>>,
     key: &str,
 ) -> Vec<Task> {
-    index
-        .get(key)
-        .map(|ids| {
-            ids.iter()
-                .filter_map(|id| state.tasks.get(id).cloned())
-                .collect()
-        })
-        .unwrap_or_default()
+    index.get(key).map_or_else(Default::default, |ids| {
+        ids.iter()
+            .filter_map(|id| state.tasks.get(id).cloned())
+            .collect()
+    })
 }
 
 #[async_trait]
@@ -199,8 +196,9 @@ impl TaskRepository for InMemoryTaskRepository {
         let key = branch_ref.to_string();
         Ok(tenants
             .get(&ctx.tenant_id())
-            .map(|state| find_by_index(state, &state.branch_index, &key))
-            .unwrap_or_default())
+            .map_or_else(Default::default, |state| {
+                find_by_index(state, &state.branch_index, &key)
+            }))
     }
 
     async fn find_by_pull_request_ref(
@@ -212,7 +210,8 @@ impl TaskRepository for InMemoryTaskRepository {
         let key = pr_ref.to_string();
         Ok(tenants
             .get(&ctx.tenant_id())
-            .map(|state| find_by_index(state, &state.pull_request_index, &key))
-            .unwrap_or_default())
+            .map_or_else(Default::default, |state| {
+                find_by_index(state, &state.pull_request_index, &key)
+            }))
     }
 }

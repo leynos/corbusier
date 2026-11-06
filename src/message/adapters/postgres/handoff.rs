@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use mockable::DefaultClock;
+use std::str::FromStr;
 
 use crate::context::{RequestContext, TenantId};
 use crate::message::{
@@ -232,7 +233,7 @@ impl AgentHandoffPort for PostgresHandoffAdapter {
             let row = lock_handoff_row(conn, handoff_id, tenant_id)?;
 
             let status =
-                HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
+                HandoffStatus::from_str(row.status.as_str()).map_err(HandoffError::persistence)?;
 
             if status.is_terminal() {
                 return Err(HandoffError::invalid_transition(
@@ -338,7 +339,7 @@ fn row_to_handoff(row: HandoffRow) -> HandoffResult<HandoffMetadata> {
     let triggering_tool_calls: Vec<ToolCallReference> =
         serde_json::from_value(row.triggering_tool_calls).map_err(HandoffError::persistence)?;
 
-    let status = HandoffStatus::try_from(row.status.as_str()).map_err(HandoffError::persistence)?;
+    let status = HandoffStatus::from_str(row.status.as_str()).map_err(HandoffError::persistence)?;
 
     Ok(HandoffMetadata {
         handoff_id: HandoffId::from_uuid(row.id),

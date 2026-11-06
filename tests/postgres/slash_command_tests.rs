@@ -86,7 +86,7 @@ async fn slash_command_metadata_round_trip_postgres(
     assert_eq!(first_audit.tool_name, "review_service");
     assert_eq!(first_audit.status, ToolCallStatus::Queued);
     assert!(first_audit.call_id.starts_with("sc-0-"));
-    assert!(!first_audit.call_id.is_empty());
+    assert_ne!(first_audit.call_id, "");
 
     let deterministic_call_id = deterministic_rerun
         .tool_call_audits()
@@ -129,6 +129,9 @@ async fn slash_command_unknown_command_returns_error(
     ));
 
     let stored_messages = repo.find_by_conversation(&ctx, conversation_id).await?;
-    assert!(stored_messages.is_empty());
+    assert_eq!(
+        stored_messages,
+        [] as [corbusier::message::domain::Message; 0]
+    );
     Ok(())
 }
