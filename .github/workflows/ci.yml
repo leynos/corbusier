@@ -114,7 +114,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cargo/bin/pg_worker
-          key: pg-worker-0.4.0-${{ runner.os }}
+          key: pg-worker-0.7.0-${{ runner.os }}
       - name: Cache PostgreSQL binaries
         id: cache-pg-binaries
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -131,7 +131,7 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends tzdata
           if [ ! -f ~/.cargo/bin/pg_worker ]; then
-            cargo install pg-embed-setup-unpriv@0.4.0 --locked
+            cargo install pg-embed-setup-unpriv@0.7.0 --locked
           fi
       # The pull-request lane measures coverage for the ratchet alone and
       # never talks to CodeScene: coverage-main.yml uploads on push to main,

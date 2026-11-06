@@ -447,7 +447,7 @@ sites.
 ### PostgreSQL test cluster (`tests/postgres/cluster`)
 
 The PostgreSQL tests run on an embedded cluster provided by
-`pg-embed-setup-unpriv` 0.6.3 with the `diesel-support` and `async-api`
+`pg-embed-setup-unpriv` 0.7.0 with the `diesel-support` and `async-api`
 features; CI has no database service. Each test is its own process under
 nextest, and the suite shares one cluster across those processes: the first
 process runs `initdb`, and later processes find the initialized directory and
@@ -465,34 +465,22 @@ caller wins and nothing is pinned; a caller's `PG_RUNTIME_DIR` is kept. Remove
 the pinning only if the crate gains a supported way to share a cluster across
 processes or the suite stops using one process per test.
 
-After setup, `fs_utils::ensure_utc_timezone_file` restores a missing
-`share/timezone/UTC` alias from the equivalent `UCT` file. The installation is
-shared across test processes, so the repair copies into an exclusively created
-staging file in that directory, then publishes the completed file with a
-no-replace hard link. Before publication, the stage receives `UCT`'s
-permissions so the worker retains access even when the setup caller has a
-restrictive umask. An existing `UTC` always wins. Each attempt cleans up its
-staging file, and filesystem failures propagate to cluster startup.
-
-The in-process `setup_postgres` path repairs UTC after setup and before start.
-The root worker path, `ManagedCluster::start_via_worker`, requests worker
-setup, repairs the installation, and then requests worker start. Worker request
-execution belongs to `run_worker_operation` in `worker_helpers`; lifecycle
-ordering remains in `ManagedCluster`. Keep the staging and publication helpers
-private to `fs_utils`; their only permitted callers are the UTC repair and its
-tests. Other setup callers invoke `ensure_utc_timezone_file` as a whole.
-
-The UTC publication property tests use `proptest` against the real filesystem
-helper. They generate binary payloads up to 4 KiB, existing aliases,
-interrupted copies at varied offsets, and one to four competing attempts with
-successful and failed sources. Assertions require preservation of an existing
-alias, publication of one complete successful source, and removal of every
-stage. These generated tests sample native thread schedules; the deterministic
-publication-boundary regression separately holds a copy open and checks that
-`UTC` stays absent until completion. The generated tests do not exhaustively
-prove operating system scheduling or filesystem guarantees. Keep the generated
-reader private to the property-test module; it is a fault injector for this
-helper only.
+The cluster fixtures no longer repair the installed time-zone data.
+`postgresql_archive` 0.22.0 (through `postgresql_embedded` 0.22.0 and
+pg-embed-setup-unpriv 0.7.0) extracts the bundle's hard-linked
+`share/timezone/UTC` alias, which earlier releases skipped, so a connection
+that sets `TimeZone=UTC` works on a fresh installation. `timezone_tests` holds
+that as a regression test through the public cluster fixture. The in-process
+`setup_postgres` path sets up and starts the server; the root worker path,
+`ManagedCluster::start_via_worker`, requests worker setup, then worker start,
+and then reads the selected port. Worker request execution belongs to
+`run_worker_operation` in `worker_helpers`; lifecycle ordering remains in
+`ManagedCluster`. The CI jobs install the matching `pg_worker` from
+pg-embed-setup-unpriv 0.7.0. `postgresql_embedded` reuses an installation that
+already exists without extracting it again, so a developer machine that holds
+an installation made by an older release (one that skipped the `UTC` alias)
+must delete that installation directory once; fresh installations, as in CI,
+are complete.
 
 ## Dependency audit
 

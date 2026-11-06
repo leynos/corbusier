@@ -607,12 +607,13 @@ still running as `root`, follow these steps:
 ## Known issues and mitigations
 
 - **TimeZone errors**: PostgreSQL resolves timezone names from its installation
-  directory. Some embedded archives include the equivalent `UCT` zone but omit
-  the `UTC` alias, which Diesel requests when opening a connection. The test
-  harness restores the alias before starting the server. When running the
-  embedded server outside the harness, ensure its `share/timezone` directory
-  contains `UTC`; installing host `tzdata` alone does not repair a missing
-  alias in the embedded installation.
+  directory, and Diesel requests `UTC` when opening a connection. Archives
+  extracted by releases before `postgresql_archive` 0.22.0 skipped the bundle's
+  hard-linked `UTC` alias, which broke connections. With pg-embed-setup-unpriv
+  0.7.0 and `postgresql_embedded` 0.22.0 a fresh installation is complete. An
+  installation made earlier is reused as it is, so delete it once if its
+  `share/timezone` directory lacks `UTC`; installing host `tzdata` alone does
+  not repair the embedded installation.
 - **Download rate limits**: `postgresql_embedded` fetches binaries from the
   Theseus GitHub releases. Supply a `GITHUB_TOKEN` environment variable if you
   hit rate limits in CI.
