@@ -50,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@872f59f53717b5bebe8e24b2f4a7496b089a939a
+        uses: leynos/shared-actions/.github/actions/setup-rust@6f53870bc36cfac0c0c9893daaee77a5eb4327f4
         with:
           install-mold: 'true'
       - name: Refresh apt package index
@@ -90,7 +90,7 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
           GITHUB_TOKEN: ${{ github.token }}
-        uses: leynos/shared-actions/.github/actions/generate-coverage@872f59f53717b5bebe8e24b2f4a7496b089a939a
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6f53870bc36cfac0c0c9893daaee77a5eb4327f4
         with:
           output-path: lcov.info
           format: lcov
@@ -111,7 +111,7 @@ jobs:
         # a5765019 is the floor: from it the uploader selects the CodeScene
         # CLI from a committed manifest and refuses `installer-checksum`.
         # Earlier revisions install "latest", which no longer resolves.
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@872f59f53717b5bebe8e24b2f4a7496b089a939a
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@6f53870bc36cfac0c0c9893daaee77a5eb4327f4
         with:
           format: lcov
           # Stated rather than left to the action's default: this being the

@@ -23,7 +23,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@872f59f53717b5bebe8e24b2f4a7496b089a939a
+        uses: leynos/shared-actions/.github/actions/setup-rust@6f53870bc36cfac0c0c9893daaee77a5eb4327f4
         with:
           install-mold: 'true'
       - name: Install frontend dependencies
