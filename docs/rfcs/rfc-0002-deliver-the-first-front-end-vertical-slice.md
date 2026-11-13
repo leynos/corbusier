@@ -407,7 +407,7 @@ Use the shared dependency labels below to keep this step readable:
 
 - [ ] **4.4.1. Create the repository-owned `frontend-pwa/` workspace and narrow
   task route shell.** Requires 4.2.1. See
-  [RFC 0001](docs/rfcs/0001-adopt-corbusier-front-end-pwa.md) §5.1–§5.7.
+  [RFC 0001](rfc-0001-adopt-corbusier-front-end-pwa.md) §5.1–§5.7.
 
   - Import only the task create and task detail screens, shared providers,
     localization runtime, and design tokens needed for this slice.

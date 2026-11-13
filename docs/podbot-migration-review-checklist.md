@@ -9,12 +9,12 @@ migration.
 
 Review phase advancement against these documents together:
 
-- `docs/adr-001-runtime-boundary-between-corbusier-and-podbot.md`
-- `docs/adr-002-workspace-runtime-model-and-source-policy.md`
-- `docs/adr-003-mcp-wire-model-and-tool-plane-ownership.md`
-- `docs/adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md`
-- `docs/adr-005-hook-execution-contract-and-control-channel-semantics.md`
-- `docs/adr-010-migration-and-coexistence-strategy.md`
+- `docs/adrs/adr-0001-runtime-boundary-between-corbusier-and-podbot.md`
+- `docs/adrs/adr-0002-workspace-runtime-model-and-source-policy.md`
+- `docs/adrs/adr-0003-mcp-wire-model-and-tool-plane-ownership.md`
+- `docs/adrs/adr-0004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md`
+- `docs/adrs/adr-0005-hook-execution-contract-and-control-channel-semantics.md`
+- `docs/adrs/adr-0010-migration-and-coexistence-strategy.md`
 - `docs/corbusier-design.md`
 - `docs/roadmap.md`
 

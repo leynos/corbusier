@@ -215,7 +215,7 @@ does not describe these frontend-only APIs.
 `make frontend-lint` runs Biome and then Oxlint in `frontend-pwa`. Oxlint uses
 the recommended Unicorn profile and the pinned `ai-deslop` plugin with
 type-aware rules enabled. The exact versions and the one rule conflict are
-recorded in [ADR 013](adr-013-frontend-linting-strategy.md).
+recorded in [ADR 013](adrs/adr-0013-frontend-linting-strategy.md).
 
 Runtime schemas belong at input boundaries. Frontend transport responses and
 tooling configuration are parsed before callers rely on their shape; keep
@@ -300,7 +300,7 @@ own `RUSTFLAGS`) and for the release target (the coverage exclusion is checked
 in the workflow steps) on a Linux host, and the `setup-rust` steps of the CI
 workflows (each must pass `install-mold`), so a flag lost through a recipe or
 workflow edit fails there. The decision is recorded in
-[ADR 012](adr-012-rust-build-standard.md).
+[ADR 012](adrs/adr-0012-rust-build-standard.md).
 
 ### Development build footprint
 

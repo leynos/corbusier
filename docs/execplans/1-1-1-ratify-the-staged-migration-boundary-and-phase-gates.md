@@ -61,7 +61,7 @@ Observable success means:
 - Repository-facing documentation for this task must live in stable documents,
   not only in pull-request discussion:
   - update the relevant ADRs;
-  - update `docs/adr-010-migration-and-coexistence-strategy.md` with the
+  - update `docs/adrs/adr-0010-migration-and-coexistence-strategy.md` with the
     ratified phase-gate model;
   - update `docs/corbusier-design.md` with any binding governance decisions
     that later implementation work depends on;
@@ -267,12 +267,12 @@ how later items are allowed to land.
 Primary source documents:
 
 - `docs/roadmap.md` item `1.1.1`
-- `docs/adr-001-runtime-boundary-between-corbusier-and-podbot.md`
-- `docs/adr-002-workspace-runtime-model-and-source-policy.md`
-- `docs/adr-003-mcp-wire-model-and-tool-plane-ownership.md`
-- `docs/adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md`
-- `docs/adr-005-hook-execution-contract-and-control-channel-semantics.md`
-- `docs/adr-010-migration-and-coexistence-strategy.md`
+- `docs/adrs/adr-0001-runtime-boundary-between-corbusier-and-podbot.md`
+- `docs/adrs/adr-0002-workspace-runtime-model-and-source-policy.md`
+- `docs/adrs/adr-0003-mcp-wire-model-and-tool-plane-ownership.md`
+- `docs/adrs/adr-0004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md`
+- `docs/adrs/adr-0005-hook-execution-contract-and-control-channel-semantics.md`
+- `docs/adrs/adr-0010-migration-and-coexistence-strategy.md`
 - `docs/podbot-conformance-design-for-agents-mcp-wires-and-hooks.md`
 - upstream Podbot roadmap:
   `https://raw.githubusercontent.com/leynos/podbot/refs/heads/main/docs/podbot-roadmap.md`
