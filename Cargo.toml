@@ -69,9 +69,9 @@ postgresql_embedded = "0.22.0"
 actix-http = "3.12.1"
 corbusier = { path = ".", features = ["test-support"] }
 rstest = "0.27.0"
-rstest-bdd = "0.5.0"
+rstest-bdd = "0.6.0"
 toml = "1.1.8"
-rstest-bdd-macros = { version = "0.5.0", features = ["strict-compile-time-validation"] }
+rstest-bdd-macros = { version = "0.6.0", features = ["strict-compile-time-validation"] }
 mockall = "0.15.0"
 eyre = "0.6.12"
 once_cell = "1.20.3"
