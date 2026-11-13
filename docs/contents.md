@@ -34,31 +34,31 @@ the first stop when choosing which document to read or update.
 
 ## Decision records
 
-- [ADR 001: Runtime boundary between Corbusier and Podbot](adr-001-runtime-boundary-between-corbusier-and-podbot.md)
+- [ADR 001: Runtime boundary between Corbusier and Podbot](adrs/adr-0001-runtime-boundary-between-corbusier-and-podbot.md)
   records ownership of runtime responsibilities.
-- [ADR 002: Workspace runtime model and source policy](adr-002-workspace-runtime-model-and-source-policy.md)
+- [ADR 002: Workspace runtime model and source policy](adrs/adr-0002-workspace-runtime-model-and-source-policy.md)
   records workspace source and execution policy.
-- [ADR 003: MCP wire model and tool plane ownership](adr-003-mcp-wire-model-and-tool-plane-ownership.md)
+- [ADR 003: MCP wire model and tool plane ownership](adrs/adr-0003-mcp-wire-model-and-tool-plane-ownership.md)
   records MCP transport and tool-plane boundaries.
-- [ADR 004: Canonical MCP source taxonomy and legacy transport migration](adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md)
+- [ADR 004: Canonical MCP source taxonomy and legacy transport migration](adrs/adr-0004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md)
   records source taxonomy and migration handling.
-- [ADR 005: Hook execution contract and control channel semantics](adr-005-hook-execution-contract-and-control-channel-semantics.md)
+- [ADR 005: Hook execution contract and control channel semantics](adrs/adr-0005-hook-execution-contract-and-control-channel-semantics.md)
   records hook control-channel behaviour.
-- [ADR 006: Durable runtime state and audit model](adr-006-durable-runtime-state-and-audit-model.md)
+- [ADR 006: Durable runtime state and audit model](adrs/adr-0006-durable-runtime-state-and-audit-model.md)
   records persistence and audit expectations.
-- [ADR 007: Prompt, skill, and bundle document model](adr-007-prompt-skill-and-bundle-document-model.md)
+- [ADR 007: Prompt, skill, and bundle document model](adrs/adr-0007-prompt-skill-and-bundle-document-model.md)
   records document model ownership.
-- [ADR 008: Prompt validation semantics and capability dispositions](adr-008-prompt-validation-semantics-and-capability-dispositions.md)
+- [ADR 008: Prompt validation semantics and capability dispositions](adrs/adr-0008-prompt-validation-semantics-and-capability-dispositions.md)
   records validation and capability-disposition behaviour.
-- [ADR 009: Security and privilege boundary defaults](adr-009-security-and-privilege-boundary-defaults.md)
+- [ADR 009: Security and privilege boundary defaults](adrs/adr-0009-security-and-privilege-boundary-defaults.md)
   records default security boundaries.
-- [ADR 010: Migration and coexistence strategy](adr-010-migration-and-coexistence-strategy.md)
+- [ADR 010: Migration and coexistence strategy](adrs/adr-0010-migration-and-coexistence-strategy.md)
   records migration and coexistence policy.
-- [ADR 011: Corbusier and Frankie review adapter role segregation](adr-011-corbusier-frankie-review-adapter-role-segregation.md)
+- [ADR 011: Corbusier and Frankie review adapter role segregation](adrs/adr-0011-corbusier-frankie-review-adapter-role-segregation.md)
   records adapter responsibility boundaries.
-- [ADR 012: Rust build standard](adr-012-rust-build-standard.md) records the
-  development build flags and release-build boundary.
-- [ADR 013: Frontend linting strategy](adr-013-frontend-linting-strategy.md)
+- [ADR 012: Rust build standard](adrs/adr-0012-rust-build-standard.md) records
+  the development build flags and release-build boundary.
+- [ADR 013: Frontend linting strategy](adrs/adr-0013-frontend-linting-strategy.md)
   records frontend lint tools, selected rules, and the narrow plugin conflict.
 
 ## Guides and reference material

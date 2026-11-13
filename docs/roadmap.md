@@ -50,7 +50,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 
 - [x] 1.1.1 Ratify the staged migration boundary and phase gates. Requires
   the phase 1 hosting schema dependency and Podbot Step 4.5, "Normalized launch
-  contract". See adr-010-migration-and-coexistence-strategy.md §Decision
+  contract". See adrs/adr-0010-migration-and-coexistence-strategy.md §Decision
   Outcome / Proposed Direction, §Migration Plan, and
   `docs/podbot-migration-review-checklist.md`.
   - [x] Ratify ADRs 001 through 005 together, so no foundational migration
@@ -66,8 +66,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     dependencies, and each migration phase has explicit entry and exit gates.
 - [ ] 1.1.2 Establish the Podbot-hosted runtime seam. Requires 2.5.1, Podbot
   Step 4.5, "Normalized launch contract", and Podbot Step 4.6, "Hosted session
-  control plane". See adr-001-runtime-boundary-between-corbusier-and-podbot.md
-  §Decision Outcome / Proposed Direction and §Migration Plan.
+  control plane". See
+  adrs/adr-0001-runtime-boundary-between-corbusier-and-podbot.md §Decision
+  Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define a Corbusier port for the Podbot library API and route hosted
     sessions through that port instead of inline runtime ownership.
   - [ ] Define typed adapter errors, retries, and fake-runtime seams that
@@ -87,9 +88,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.2.1 Introduce the canonical workspace runtime record. Requires 2.5.2,
   the phase 1 hosting schema dependency, the phase 1 workspace strategy
   dependency, and Podbot Step 4.5, "Normalized launch contract". See
-  adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
-  Proposed Direction and adr-006-durable-runtime-state-and-audit-model.md
-  §Migration Plan.
+  adrs/adr-0002-workspace-runtime-model-and-source-policy.md §Decision Outcome
+  / Proposed Direction and
+  adrs/adr-0006-durable-runtime-state-and-audit-model.md §Migration Plan.
   - [ ] Persist stable workspace identifiers linked to tenant, task, and
     hosted-session context with explicit lifecycle states.
   - [ ] Record requested source type, access mode, and runtime identifiers
@@ -105,7 +106,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.2.2 Replace legacy transport labels with the canonical MCP source
   taxonomy. Requires 1.2.1, the phase 1 hosting schema dependency, and Podbot
   Step 4.7, "MCP wire provisioning and injection". See
-  adr-004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md
+  adrs/adr-0004-canonical-mcp-source-taxonomy-and-legacy-transport-migration.md
   §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define canonical source variants for local stdio, helper-container
     stdio, and direct Streamable HTTP sources in Corbusier's domain model.
@@ -123,9 +124,10 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   "Installation token acquisition", Podbot Step 3.3, "Token daemon", Podbot
   Step 3.4, "GIT_ASKPASS mechanism (Git credential helper variable)", and the
   phase 1 workspace strategy dependency. See
-  adr-002-workspace-runtime-model-and-source-policy.md §Decision Outcome /
-  Proposed Direction and adr-009-security-and-privilege-boundary-defaults.md
-  §Decision Outcome / Proposed Direction.
+  adrs/adr-0002-workspace-runtime-model-and-source-policy.md §Decision Outcome
+  / Proposed Direction and
+  adrs/adr-0009-security-and-privilege-boundary-defaults.md §Decision Outcome /
+  Proposed Direction.
   - [ ] Add canonical path resolution, allowed-root validation, and symlink
     escape protection for host mounts before Podbot is allowed to mount them.
   - [ ] Enforce explicit read-only or read-write access modes for clone-backed
@@ -145,7 +147,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.3.1 Move hosted MCP attachment onto Podbot-owned wire provisioning.
   Requires 1.1.2, 1.2.2, Podbot Step 2.5, "Protocol-safe execution (stdio
   proxy)", and the phase 1 hosting core dependencies. See
-  adr-003-mcp-wire-model-and-tool-plane-ownership.md §Decision Outcome /
+  adrs/adr-0003-mcp-wire-model-and-tool-plane-ownership.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Separate Corbusier's source catalogue from runtime wire attachment and
     request Podbot-managed wire sets for each hosted workspace.
@@ -162,8 +164,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.3.2 Replace inline hook assumptions with control-channel
   acknowledgement flow. Requires 1.1.2, Podbot Step 4.6, "Hosted session
   control plane", and the phase 1 hook-recovery dependencies. See
-  adr-005-hook-execution-contract-and-control-channel-semantics.md §Decision
-  Outcome / Proposed Direction and §Migration Plan.
+  adrs/adr-0005-hook-execution-contract-and-control-channel-semantics.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed hook request, acknowledgement, completion, timeout, and
     abort message shapes with stable correlation identifiers.
   - [ ] Suspend the hosted execution path until Corbusier replies with an
@@ -181,8 +183,9 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   control plane. Requires 1.3.1, Podbot Step 4.5, "Normalized launch contract",
   Podbot Step 4.6, "Hosted session control plane", Podbot Step 6.1, "Subcommand
   dispatch", and Podbot Step 6.5, "Host subcommand". See
-  adr-001-runtime-boundary-between-corbusier-and-podbot.md §Migration Plan and
-  adr-010-migration-and-coexistence-strategy.md §Podbot roadmap dependencies.
+  adrs/adr-0001-runtime-boundary-between-corbusier-and-podbot.md §Migration
+  Plan and adrs/adr-0010-migration-and-coexistence-strategy.md §Podbot roadmap
+  dependencies.
   - [ ] Route hosted launch requests through the same normalized command and
     library contract used by Podbot's `host` interface.
   - [ ] Ensure Corbusier-facing library and operator tooling consume one typed
@@ -199,8 +202,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.4.1 Persist hosted runtime entities with idempotent state machines.
   Requires 1.2.1, 1.3.1, 1.3.2, Podbot Step 4.6, "Hosted session control
   plane", and the phase 1 hook-recovery dependencies. See
-  adr-006-durable-runtime-state-and-audit-model.md §Decision Outcome / Proposed
-  Direction and §Migration Plan.
+  adrs/adr-0006-durable-runtime-state-and-audit-model.md §Decision Outcome /
+  Proposed Direction and §Migration Plan.
   - [ ] Persist hosted sessions, workspaces, wires, hook invocations,
     acknowledgements, and validation snapshots with explicit terminal and
     non-terminal states.
@@ -216,8 +219,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     task, and hosted session.
 - [ ] 1.4.2 Add retention, cleanup, and conformance gates for runtime state.
   Requires 1.4.1 and the phase 1 conformance dependencies. See
-  adr-006-durable-runtime-state-and-audit-model.md §Migration Plan and
-  adr-010-migration-and-coexistence-strategy.md §Migration Plan.
+  adrs/adr-0006-durable-runtime-state-and-audit-model.md §Migration Plan and
+  adrs/adr-0010-migration-and-coexistence-strategy.md §Migration Plan.
   - [ ] Move cleanup and retention jobs onto the hosted-session, workspace,
     wire, and hook entities introduced in 1.4.1.
   - [ ] Gate phase advancement on end-to-end orchestration, transport
@@ -237,7 +240,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   1.4.1, Podbot Step 4.5, "Normalized launch contract", Podbot Step 4.8,
   "Prompt, bundle, and validation surfaces", and Podbot Step 5.3, "Stabilize
   public library boundaries". See
-  adr-007-prompt-skill-and-bundle-document-model.md §Decision Outcome /
+  adrs/adr-0007-prompt-skill-and-bundle-document-model.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Define prompt document frontmatter, bundle manifest fields, namespaced
     extension fields, and attachment references.
@@ -255,8 +258,8 @@ Use the shared dependency labels below to keep phase 1 task text readable:
 - [ ] 1.5.2 Implement structured prompt validation with capability
   dispositions. Requires 1.5.1, the phase 1 prompt-validation dependencies, and
   Podbot Step 4.5, "Normalized launch contract". See
-  adr-008-prompt-validation-semantics-and-capability-dispositions.md §Decision
-  Outcome / Proposed Direction and §Migration Plan.
+  adrs/adr-0008-prompt-validation-semantics-and-capability-dispositions.md
+  §Decision Outcome / Proposed Direction and §Migration Plan.
   - [ ] Define typed validation request and response shapes, including the
     `native`, `host-enforced`, `translated`, `ignored`, and `rejected`
     dispositions.
@@ -277,7 +280,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   workspace strategy dependency, the phase 1 prompt-validation dependencies,
   Podbot Step 4.7, "MCP wire provisioning and injection", and Podbot Step 4.9,
   "Hook execution and orchestrator acknowledgement". See
-  adr-009-security-and-privilege-boundary-defaults.md §Decision Outcome /
+  adrs/adr-0009-security-and-privilege-boundary-defaults.md §Decision Outcome /
   Proposed Direction and §Migration Plan.
   - [ ] Define the default privilege matrix for hosted agents, hooks,
     helper-container sources, and delegated host capabilities.
@@ -299,7 +302,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
   Requires 1.1.1, 1.2.2, 1.3.1, 1.4.2, 1.5.2, 1.5.3, the phase 1 hosting schema
   dependency, the phase 1 hosting core dependencies, the phase 1
   prompt-validation dependencies, and the phase 1 hook-recovery dependencies.
-  See adr-010-migration-and-coexistence-strategy.md §Decision Outcome /
+  See adrs/adr-0010-migration-and-coexistence-strategy.md §Decision Outcome /
   Proposed Direction, §Migration Plan, and
   `docs/podbot-migration-review-checklist.md`.
   - [ ] Run warn-only validation where blocking behaviour would break active
@@ -316,7 +319,7 @@ Use the shared dependency labels below to keep phase 1 task text readable:
     documented order.
 - [ ] 1.6.2 Declare end-of-migration retirement criteria. Requires 1.6.1 and
   TBD (non-linear dependency on the final hosted cutover evidence bundle). See
-  adr-010-migration-and-coexistence-strategy.md §Migration Plan and
+  adrs/adr-0010-migration-and-coexistence-strategy.md §Migration Plan and
   §Outstanding Decisions.
   - [ ] Define the evidence bundle required to remove inline hosted runtime
     ownership, legacy routing, and legacy transport write paths.
@@ -572,7 +575,7 @@ enforcement.
   - [ ] Success criteria: tasks remain synchronized with VCS state transitions.
 - [ ] 4.1.2 Introduce the dedicated review bounded context and Frankie adapter
   ports. Requires 4.1.1 and
-  adr-011-corbusier-frankie-review-adapter-role-segregation.md. See
+  adrs/adr-0011-corbusier-frankie-review-adapter-role-segregation.md. See
   corbusier-design.md §2.1.4 and §6.3.2.
   - [ ] Define `ReviewIntakePort`, `ReviewContextPort`, and
     `ReviewActionPort`, keeping generic VCS ports focused on issue, branch, and
@@ -670,7 +673,7 @@ for Corbusier. Its outcome is a live browser path that can create a task from
 issue metadata, land on task detail, transition task state, and show branch or
 pull-request association against the current HTTP API surface. Detailed scope,
 acceptance criteria, and dependency rationale live in
-`docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`.
+`docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md`.
 
 Use the shared dependency labels below to keep this step readable:
 
@@ -688,34 +691,36 @@ Use the shared dependency labels below to keep this step readable:
 
 - [x] 4.4.1 Create the repository-owned `frontend-pwa/` workspace and narrow
   task route shell. Requires 4.2.1. See
-  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
+  `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.7 and
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §5.2.
 
 - [x] 4.4.2 Stabilize the slice transport contract and development auth seam.
   Requires 4.2.1 and the phase 4 actix-v2a core HTTP contract dependency. See
   `docs/corbusier-api-design.md` §HTTP API surface, pagination, SSE, and error
-  contracts and `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md`
-  §5.3–§5.4. Mark this item done only after code, documentation, `check-fmt`,
-  `typecheck`, `test`, and `lint` gates all pass.
+  contracts and
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §5.3–§5.4.
+  Mark this item done only after code, documentation, `check-fmt`, `typecheck`,
+  `test`, and `lint` gates all pass.
 
 - [ ] 4.4.3 Implement the live task create → detail → transition path in the
   progressive web app (PWA). Requires 4.4.1 and 4.4.2. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and §6.1.
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §5.1 and
+  §6.1.
 
 - [ ] 4.4.4 Add task branch and pull-request association actions to the detail
   view when the current HTTP surface supports them. Requires 4.4.3. See
   `docs/corbusier-api-design.md` §Endpoint inventory — Tasks and
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §6.1.
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §6.1.
 
 - [ ] 4.4.5 Prove the slice is independent of hosted-session and review-adapter
   services. Requires 4.4.3 and 4.4.4. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6 and
-  §6.2.
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §5.5–§5.6
+  and §6.2.
 
 - [ ] 4.4.6 Capture the lessons of the first slice before broadening the
   interface surface. Requires 4.4.5. See
-  `docs/rfcs/0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7, and
-  §10.
+  `docs/rfcs/rfc-0002-deliver-the-first-front-end-vertical-slice.md` §5.6, §7,
+  and §10.
 
 ### 4.5. Operator and developer user interfaces
 
@@ -996,7 +1001,7 @@ This phase extends the first vertical slice delivered in §4.4 by promoting the
 remaining Corbusier screen families from
 [`leynos/corbusier-mockup`](https://github.com/leynos/corbusier-mockup) into the
 `frontend-pwa/` workspace, replacing fixtures with live backend projections
-one family at a time. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md`
+one family at a time. See `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md`
 §5.7 and §7.
 
 Table 8.0.0: Phase 8 subphases and delivery goals.
@@ -1014,14 +1019,14 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 - [ ] 8.1.1 Promote all screen families from the mockup into `frontend-pwa/`
   with fixture adapters. Requires 4.4.1 and 4.4.6. See
-  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.3 and §5.7.
+  `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.1–§5.3 and §5.7.
   - [ ] Promote dashboard, task list, project, conversation, directive,
     suggestion, system, and settings screen skeletons with fixture-backed data
     using the data-model-driven card architecture described in
-    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.3.
+    `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.3.
   - [ ] Verify that each promoted screen meets the accessibility and Playwright
     end-to-end coverage requirements from
-    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §6.2.
+    `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §6.2.
   - [ ] Success criteria: all screen routes render without backend services;
     axe-core accessibility checks pass for each screen family.
 
@@ -1029,14 +1034,14 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 - [ ] 8.2.1 Connect task list views to live backend projections. Requires
   8.1.1, 4.4.2, 4.4.3, 6.2.3, and 6.1.2. See
-  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
+  `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.4 and
   `docs/corbusier-api-design.md` §Task domain.
   - [ ] Replace task list fixture with live paginated `TaskCardDto` projections
     using opaque keyset cursors and TanStack Query infinite loading. See
-    `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4.
+    `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.4.
   - [ ] Add task creation mutation with `Idempotency-Key` header, deterministic
     replay for identical retries, and explicit conflict reporting on payload
-    mismatch. See `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4.
+    mismatch. See `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.4.
   - [ ] Success criteria: task list pagination is end-to-end tested; idempotent
     mutations replay deterministically; absence of `next` link correctly
     signals end-of-list.
@@ -1081,7 +1086,7 @@ Table 8.0.0: Phase 8 subphases and delivery goals.
 
 - [ ] 8.5.1 Add SSE-backed cache invalidation to streaming screens. Requires
   8.2.1, 4.4.2, 4.4.6, 6.3.3, and 4.3.1. See
-  `docs/rfcs/0001-adopt-corbusier-front-end-pwa.md` §5.4 and
+  `docs/rfcs/rfc-0001-adopt-corbusier-front-end-pwa.md` §5.4 and
   `docs/corbusier-api-design.md` §SSE event stream and replay semantics.
   - [ ] Connect dashboard, task detail, and conversation screens to SSE streams
     with TanStack Query invalidation on relevant events.
