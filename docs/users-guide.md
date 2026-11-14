@@ -1002,6 +1002,7 @@ artefact links with the platform linker. A bare `cargo build --release` takes
 the configuration's flags unless `RUSTFLAGS` is assigned, for example
 `RUSTFLAGS="" cargo build --release`.
 
-Cranelift is the development-profile code generator, selected in
-`.cargo/config.toml`; coverage selects LLVM explicitly because instrumentation
-needs it. See [ADR 012](adrs/adr-0012-rust-build-standard.md) for the reasoning.
+LLVM is the default code generator; the Cranelift selection in
+`.cargo/config.toml` is disabled. Coverage selects LLVM explicitly because
+instrumentation needs it. See [ADR 012](adrs/adr-0012-rust-build-standard.md)
+for the reasoning.

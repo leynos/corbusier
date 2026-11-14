@@ -12,10 +12,10 @@
 # recipes set. Coverage and the release recipe and workflow assign `RUSTFLAGS`
 # without them on purpose. A direct `cargo build --release` keeps these flags
 # unless `RUSTFLAGS` is assigned.
-# The Cranelift codegen backend is the development-profile default: the
-# repository's whole suite passes under it (see "Cranelift" in
-# docs/developers-guide.md). Coverage selects LLVM explicitly, since
-# instrumentation needs it, and release builds use the release profile.
+# LLVM is the default codegen backend; the Cranelift selection below is
+# disabled (see "Cranelift" in docs/developers-guide.md). Coverage selects LLVM
+# explicitly, since instrumentation needs it, and release builds use the
+# release profile.
 [unstable]
 codegen-backend = true
 # Native Cargo metadata setting for dated nightlies from 2026-07-31 (rule
@@ -32,7 +32,8 @@ rustflags = ["-Zthreads=8"]
 rustflags = ["-Zthreads=8", "-Clink-arg=-fuse-ld=mold"]
 
 [profile.dev]
-codegen-backend = "cranelift"
+# Cranelift disabled estate-wide on 14 November 2026 (concordat ADR; review 14 May 2027). Uncomment to opt back in.
+# codegen-backend = "cranelift"
 opt-level = 1          # default is 0; 1 shrinks a bit without killing compile times
 # `incremental` and `debug` live in Cargo.toml `[profile.dev]` (rule
 # `rust-dev-build-footprint`, DF-001 and DF-002); this table keeps only the
