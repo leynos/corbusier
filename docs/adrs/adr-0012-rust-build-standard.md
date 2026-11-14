@@ -2,6 +2,12 @@
 
 ## Status
 
+Superseded in part on 2026-11-14 by
+[concordat ADR-0004](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
+Cranelift is no longer the development-profile code generator: LLVM is the
+default, and Cranelift is disabled and opt-in only, with review due 14 May
+2027. See the addendum below.
+
 Accepted on 8 October 2026. Development, test, lint and typecheck builds use
 the parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the `mold` linker,
 while coverage and release builds stay off the fast flags.
