@@ -22,15 +22,15 @@ pub const SELECTED: bool = false;
 /// The root manifest, which Cargo also reads for a development-profile backend.
 const MANIFEST: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
 
-/// Returns whether a table leaves the development backend unset or selects LLVM, counting quoted
-/// keys as the bare key.
+/// Returns whether a configuration leaves the development backend unset or selects LLVM, counting
+/// basic- and literal-quoted keys and values as their bare forms.
 fn dev_backend_is_unset_or_llvm(config: &str) -> bool {
     entries(config)
         .iter()
         .filter(|(table, key, _)| {
-            table == "profile.dev" && key.trim_matches('"') == "codegen-backend"
+            table == "profile.dev" && key.trim_matches(['"', '\'']) == "codegen-backend"
         })
-        .all(|(_, _, value)| value == "\"llvm\"")
+        .all(|(_, _, value)| value.trim_matches(['"', '\'']) == "llvm")
 }
 
 /// The component a toolchain must ship for the backend.
