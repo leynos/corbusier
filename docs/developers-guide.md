@@ -332,9 +332,9 @@ persistent change: uncommenting it also needs `SELECTED` set to `true` in
 `tests/build_standard_support/cranelift.rs`. The `[unstable] codegen-backend`
 key, the component and the `cranelift: 'true'` Whitaker input stay. Cranelift
 does not unwind, so no test may rely on a caught panic under it. An inherited
-`CARGO_PROFILE_DEV_CODEGEN_BACKEND` can still select Cranelift. Coverage
-selects LLVM explicitly (`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`), because
-instrumentation needs it.
+`CARGO_PROFILE_DEV_CODEGEN_BACKEND` can still select Cranelift for ordinary
+builds. The coverage action clears it and `CARGO_PROFILE_TEST_CODEGEN_BACKEND`,
+and forces LLVM when Cranelift is selected, because instrumentation needs LLVM.
 
 ## Frontend task slice APIs
 

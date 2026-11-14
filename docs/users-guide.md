@@ -1006,5 +1006,6 @@ LLVM is the default code generator, and Cranelift is disabled and opt-in only:
 the Cranelift selection in `.cargo/config.toml` is commented out. Review is due
 14 May 2027 under
 [concordat ADR-0004](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
-Coverage selects LLVM explicitly because instrumentation needs it. See
+The coverage action clears inherited backend overrides and forces LLVM when
+Cranelift is selected, because instrumentation needs LLVM. See
 [ADR 012](adrs/adr-0012-rust-build-standard.md) for the reasoning.
