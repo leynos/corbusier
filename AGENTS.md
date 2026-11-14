@@ -230,9 +230,10 @@ project:
     ```
 
     building documentation, linting every target with all features enabled,
-    and running the Whitaker Dylint suite. Documentation warnings, Clippy
-    warnings, and Whitaker findings fail the command. The spelling gate runs
-    last; see [Spelling](#spelling).
+    and running the Whitaker Dylint suite. Clippy warnings and Whitaker
+    findings fail the command. Rustdoc warnings fail it only when
+    `RUSTDOC_FLAGS` sets them, and that variable is empty by default. The
+    spelling gate runs last; see [Spelling](#spelling).
 
     `make interrogate` needs `uv` and fails on any Python definition under
     `scripts` and `tests` that lacks a docstring. It also fails on any `MISSED`
@@ -384,9 +385,11 @@ project:
   the environment via `Command::env`/`Command::env_clear`, because the mutation
   is confined to the child process. A test manipulating the environment
   in-process does not qualify, whatever layer it claims to occupy.
-- **Local form:** The repository's accepted local form for integration-test
-  fixtures that must change process environment variables is `EnvVarGuard` in
-  `tests/test_helpers/mod.rs`; new code should inject the environment instead.
+- **Local form:** This repository enables only mockable's `clock` feature, so
+  `MockEnv` (behind the `mock` feature) is unavailable; integration-test
+  fixtures that must change process environment variables use `EnvVarGuard` in
+  `tests/test_helpers/mod.rs`, and new code should inject the environment
+  instead.
 
 ### Dependency management
 
