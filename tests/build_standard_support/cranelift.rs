@@ -14,7 +14,24 @@ use super::ci_steps::{Workflow, cranelift_workflow_problems, whitaker_cranelift_
 use super::config::{CONFIG, Problems, TOOLCHAIN};
 
 /// Whether this repository selects Cranelift for the development profile.
-pub const SELECTED: bool = true;
+///
+/// Disabled estate-wide on 14 November 2026 (review 14 May 2027). Uncommenting the selection in
+/// `.cargo/config.toml` is a persistent opt-in that needs this set to `true`.
+pub const SELECTED: bool = false;
+
+/// The root manifest, which Cargo also reads for a development-profile backend.
+const MANIFEST: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
+
+/// Returns whether a configuration leaves the development backend unset or selects LLVM, counting
+/// basic- and literal-quoted keys and values as their bare forms.
+fn dev_backend_is_unset_or_llvm(config: &str) -> bool {
+    entries(config)
+        .iter()
+        .filter(|(table, key, _)| {
+            table == "profile.dev" && key.trim_matches(['"', '\'']) == "codegen-backend"
+        })
+        .all(|(_, _, value)| value.trim_matches(['"', '\'']) == "llvm")
+}
 
 /// The component a toolchain must ship for the backend.
 const COMPONENT: &str = "rustc-codegen-cranelift-preview";
@@ -192,7 +209,17 @@ fn the_repository_selects_cranelift_as_recorded() -> Result<(), String> {
 #[test]
 fn a_cranelift_repository_declares_everything_the_backend_needs() -> Result<(), String> {
     if !SELECTED {
-        return Ok(());
+        // The support for an opt-in stays: the unstable key, the component and the Whitaker input.
+        if !holds(CONFIG, "unstable", "codegen-backend", "true") {
+            return Err("[unstable] does not set codegen-backend = true".to_owned());
+        }
+        if !(dev_backend_is_unset_or_llvm(CONFIG) && dev_backend_is_unset_or_llvm(MANIFEST)) {
+            return Err(
+                "[profile.dev] must leave the codegen backend unset or select LLVM".to_owned(),
+            );
+        }
+        none_of(&toolchain_problems(TOOLCHAIN))?;
+        return none_of(&cranelift_workflow_problems());
     }
     none_of(&config_problems(CONFIG))?;
     none_of(&toolchain_problems(TOOLCHAIN))?;

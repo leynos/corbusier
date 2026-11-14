@@ -59,3 +59,11 @@ the workflows, so a flag lost through a recipe or workflow edit fails there.
 - A change to a recipe or workflow step that assigns `RUSTFLAGS` must restate
   the flags, and the contract says which clause fails when it does not.
 - Re-measure the suite under Cranelift on the next toolchain bump.
+
+## Addendum (2026-11-14)
+
+The user abandoned Cranelift for now. The `[profile.dev]` selection in
+`.cargo/config.toml` is commented out, so LLVM is the default backend; the
+unstable key, the component and the `cranelift: 'true'` Whitaker input stay for
+an opt-in. This supersedes the Cranelift selection above; the estate standard
+is LLVM, with review due 14 May 2027.
