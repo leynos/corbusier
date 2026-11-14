@@ -323,12 +323,12 @@ moved with it. Types that convert from owned `String` values keep
 
 ### Cranelift
 
-The estate standard is LLVM, which is the default backend here; review is due
-14 May 2027 under the
-[estate ADR](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
+LLVM is the default codegen backend here, and Cranelift is disabled and opt-in
+only. Review is due 14 May 2027 under the
+[concordat ADR-0004](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
 The `[profile.dev] codegen-backend = "cranelift"` selection in
-`.cargo/config.toml` is commented out. Uncommenting it is a persistent opt-in
-that also needs `SELECTED` set to `true` in
+`.cargo/config.toml` is commented out, so it is disabled. Opting in is a
+persistent change: uncommenting it also needs `SELECTED` set to `true` in
 `tests/build_standard_support/cranelift.rs`. The `[unstable] codegen-backend`
 key, the component and the `cranelift: 'true'` Whitaker input stay. Cranelift
 does not unwind, so no test may rely on a caught panic under it. An inherited
