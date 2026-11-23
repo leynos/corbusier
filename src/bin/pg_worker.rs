@@ -263,6 +263,10 @@ fn read_config_file(path: &Utf8Path) -> Result<Vec<u8>, BoxError> {
 }
 
 #[cfg(unix)]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the single-threaded worker process sets the dropped user's identity; production code, not a test"
+)]
 fn drop_privileges_if_root(username: &str) -> Result<(), WorkerError> {
     if !Uid::effective().is_root() {
         return Ok(());
@@ -298,6 +302,10 @@ fn build_runtime() -> Result<tokio::runtime::Runtime, WorkerError> {
 }
 
 #[cfg(unix)]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the single-threaded worker process applies its environment before starting PostgreSQL; production code, not a test"
+)]
 fn apply_worker_environment(environment: &[(String, Option<PlainSecret>)]) {
     for (key, value) in environment {
         match value {
