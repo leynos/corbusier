@@ -27,12 +27,12 @@
 # expires-at: 2027-02-23
 # justification: cookie 0.16.2, fixed in 0.18.3. Every actix-web 4.x release
 #   pins cookie 0.16, and it reaches this workspace through the default
-#   actix-web features declared both by this workspace and by actix-v2a, so no
-#   lockfile move or in-major bump reaches the patched line. Review on
-#   2027-02-23 or when actix-web 5 ships, whichever comes first. Removing the
-#   entry needs both declarations to drop the default `cookies` feature (if
-#   neither needs it): actix-v2a is tracked in leynos/actix-v2a#206, and this
-#   workspace's own `actix-web` dependency must follow.
+#   actix-web features declared by actix-v2a (this workspace's own `actix-web`
+#   dependency has dropped the `cookies` feature, since nothing here uses
+#   cookies), so no lockfile move or in-major bump reaches the patched line.
+#   Review on 2027-02-23 or when actix-web 5 ships, whichever comes first.
+#   Removing the entry needs actix-v2a to drop the default `cookies` feature
+#   (if it does not need it); that is tracked in leynos/actix-v2a#206.
 
 [advisories]
 ignore = ["RUSTSEC-2026-0258", "RUSTSEC-2026-0594"]
