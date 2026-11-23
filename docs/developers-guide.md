@@ -446,6 +446,26 @@ Using `BearerToken` rather than a bare `&str` reduces string-argument
 saturation and makes the intended role of each parameter unambiguous at call
 sites.
 
+### Process-wide environment and working directory
+
+Rust tests must not change the process-wide environment or working directory,
+because that forces the runner to serialize them. `clippy.toml` disallows
+`std::env::set_var`, `std::env::remove_var` and `std::env::set_current_dir`.
+Inject an environment object, or isolate the change to a subprocess
+(`Command::env`, `Command::current_dir`).
+
+Two kinds of call site carry
+`#[expect(clippy::disallowed_methods, reason = ..)]` instead. Never use
+`allow`: an `expect` reports itself once its site is gone.
+
+- The test environment guard in `tests/test_helpers/mod.rs` is a
+  mutex-serialized exception that goes when the tests migrate to an injected
+  environment; that work is tracked in
+  <https://github.com/leynos/corbusier/issues/176>.
+- The `pg_worker` binary sets its own environment (the dropped user's identity
+  and the PostgreSQL settings) before it starts PostgreSQL. That is
+  single-threaded production code, not a test, and it stays by design.
+
 ### PostgreSQL test cluster (`tests/postgres/cluster`)
 
 The PostgreSQL tests run on an embedded cluster provided by
