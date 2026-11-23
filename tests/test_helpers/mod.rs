@@ -18,7 +18,7 @@ impl EnvVarGuard {
     /// Sets multiple environment variables for the guard lifetime.
     #[expect(
         clippy::disallowed_methods,
-        reason = "mutex-serialized test environment guard; migrate to an injected environment or a subprocess"
+        reason = "mutex-serialized test environment guard; FIXME: migrate to an injected environment or a subprocess, https://github.com/leynos/corbusier/issues/176"
     )]
     pub fn set_many(changes: &[(OsString, Option<OsString>)]) -> Self {
         let lock = env_lock();
@@ -45,7 +45,7 @@ impl EnvVarGuard {
 impl Drop for EnvVarGuard {
     #[expect(
         clippy::disallowed_methods,
-        reason = "restores the variables set by `set_many`; goes with it when the tests migrate"
+        reason = "restores the variables set by `set_many`; FIXME: goes with it when the tests migrate, https://github.com/leynos/corbusier/issues/176"
     )]
     fn drop(&mut self) {
         for (key, value) in self.previous.drain(..) {
