@@ -271,10 +271,17 @@ mod tests {
         // is exercised on its own to prove it reads the injected value.
         let located = locate_pg_worker_in_path(&|key| lookup(&env, key))
             .expect("expected worker path from the injected PATH");
-        assert_eq!(located, path_dir.join("pg_worker"));
+        assert_eq!(
+            located,
+            path_dir.join("pg_worker"),
+            "the PATH step should find the fixture worker in the injected PATH"
+        );
         // Full discovery with the executable placed where no worker sits beside
-        // it, so every earlier step finds nothing and the injected `PATH` decides.
+        // it (`no-worker/pg_worker` does not exist; the fixture is one level
+        // up), so every earlier step finds nothing and the injected `PATH`
+        // decides.
         let lonely_exe = std::path::PathBuf::from(path_dir.as_str())
+            .join("no-worker")
             .join("deps")
             .join("test_binary");
         let full = locate_pg_worker_path_from(&|key| lookup(&env, key), Some(&lonely_exe));
