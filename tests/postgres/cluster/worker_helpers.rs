@@ -2,6 +2,7 @@
 
 use super::BoxError;
 use super::fs_utils::open_parent_dir;
+use crate::worker_locator::EnvReader;
 use camino::{Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
 use cap_std::fs::Permissions;
@@ -20,8 +21,9 @@ use std::time::Duration;
 
 static WORKER_CACHE: OnceLock<Mutex<HashMap<Utf8PathBuf, Utf8PathBuf>>> = OnceLock::new();
 
-pub(super) fn locate_pg_worker_path() -> Option<Utf8PathBuf> {
-    crate::test_helpers::locate_pg_worker_path()
+/// Locates `pg_worker`, reading the caller's variables through `read_env`.
+pub(super) fn locate_pg_worker_path_with(read_env: EnvReader<'_>) -> Option<Utf8PathBuf> {
+    crate::worker_locator::locate_pg_worker_path_with(read_env)
 }
 
 pub(super) fn prepare_pg_worker(worker: &Utf8Path) -> Result<Utf8PathBuf, BoxError> {
@@ -157,8 +159,7 @@ fn write_worker_wrapper(
 mod tests {
     //! Tests for `pg_worker` discovery and preparation helpers.
 
-    use super::{locate_pg_worker_path, prepare_pg_worker};
-    use crate::test_helpers::EnvVarGuard;
+    use super::{locate_pg_worker_path_with, prepare_pg_worker};
     use camino::{Utf8Path, Utf8PathBuf};
     use cap_std::ambient_authority;
     #[cfg(unix)]
@@ -232,25 +233,27 @@ mod tests {
         let _path_worker =
             write_worker_script(&path_dir, "pg_worker").expect("failed to write PATH worker");
 
-        let guard = EnvVarGuard::set_many(&[
+        let env = [
             (
-                OsString::from("CARGO_BIN_EXE_pg_worker"),
-                Some(OsString::from(env_worker.as_str())),
+                "CARGO_BIN_EXE_pg_worker",
+                OsString::from(env_worker.as_str()),
             ),
-            (
-                OsString::from("PATH"),
-                Some(OsString::from(path_dir.as_str())),
-            ),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-        ]);
+            ("PATH", OsString::from(path_dir.as_str())),
+        ];
 
-        let located =
-            locate_pg_worker_path().expect("expected worker path from CARGO_BIN_EXE_pg_worker");
+        let located = locate_pg_worker_path_with(&|key| lookup(&env, key))
+            .expect("expected worker path from CARGO_BIN_EXE_pg_worker");
         assert_eq!(
             located, env_worker,
             "CARGO_BIN_EXE_pg_worker should take precedence over PATH discovery",
         );
-        drop(guard);
+    }
+
+    /// The value `env` holds for `key`; the injected environment of these tests.
+    fn lookup(env: &[(&str, OsString)], key: &str) -> Option<OsString> {
+        env.iter()
+            .find(|(name, _)| *name == key)
+            .map(|(_, value)| value.clone())
     }
 
     #[test]
@@ -260,22 +263,14 @@ mod tests {
         let _path_worker =
             write_worker_script(&path_dir, "pg_worker").expect("failed to write PATH worker");
 
-        let guard = EnvVarGuard::set_many(&[
-            (OsString::from("CARGO_BIN_EXE_pg_worker"), None),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-            (
-                OsString::from("PATH"),
-                Some(OsString::from(path_dir.as_str())),
-            ),
-        ]);
+        let env = [("PATH", OsString::from(path_dir.as_str()))];
 
-        let located =
-            locate_pg_worker_path().expect("expected worker path from fallback discovery");
+        let located = locate_pg_worker_path_with(&|key| lookup(&env, key))
+            .expect("expected worker path from fallback discovery");
         assert!(
             located.is_file(),
             "expected fallback to locate a worker binary, got {located}"
         );
-        drop(guard);
     }
 
     #[test]

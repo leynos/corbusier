@@ -51,8 +51,7 @@ mod tests {
     //! Tests for the pinned shared install and data directories.
 
     use super::{shared_directory_changes, shared_directory_root};
-    use crate::postgres::cluster::env_utils::worker_env_changes;
-    use crate::test_helpers::EnvVarGuard;
+    use crate::postgres::cluster::env_utils::worker_env_changes_with;
     use nix::unistd::Uid;
     use rstest::rstest;
     use std::ffi::OsString;
@@ -128,11 +127,9 @@ mod tests {
             return;
         }
         let data = caller_set.then(|| OsString::from("/elsewhere/data"));
-        let _env = EnvVarGuard::set_many(&[
-            (OsString::from("PG_DATA_DIR"), data),
-            (OsString::from("PG_RUNTIME_DIR"), None),
-        ]);
-        let (changes, _port_guard) = worker_env_changes().expect("the entry point succeeds");
+        let (changes, _port_guard) =
+            worker_env_changes_with(&|key| (key == "PG_DATA_DIR").then(|| data.clone()).flatten())
+                .expect("the entry point succeeds");
         let root = expected_root();
         if caller_set {
             assert_eq!(value_of(&changes, "PG_DATA_DIR"), None);
