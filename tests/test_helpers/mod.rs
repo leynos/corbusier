@@ -4,8 +4,6 @@ use std::env;
 use std::ffi::OsString;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-pub use crate::worker_locator::locate_pg_worker_path;
-
 static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 /// Guard that applies a scoped environment variable update.
@@ -18,7 +16,7 @@ impl EnvVarGuard {
     /// Sets multiple environment variables for the guard lifetime.
     #[expect(
         clippy::disallowed_methods,
-        reason = "mutex-serialized test environment guard; FIXME: migrate to an injected environment or a subprocess, https://github.com/leynos/corbusier/issues/176"
+        reason = "mutex-serialized guard for the shared-cluster harness only: it starts PostgreSQL in the test process, which reads PG_* from the process environment, until pg-embed-setup-unpriv takes an injected environment (https://github.com/leynos/pg-embed-setup-unpriv/issues/441); every test of the environment helpers injects a reader instead (https://github.com/leynos/corbusier/issues/176)"
     )]
     pub fn set_many(changes: &[(OsString, Option<OsString>)]) -> Self {
         let lock = env_lock();
@@ -45,7 +43,7 @@ impl EnvVarGuard {
 impl Drop for EnvVarGuard {
     #[expect(
         clippy::disallowed_methods,
-        reason = "restores the variables set by `set_many`; FIXME: goes with it when the tests migrate, https://github.com/leynos/corbusier/issues/176"
+        reason = "restores the variables set by `set_many`; goes with it when pg-embed-setup-unpriv takes an injected environment, https://github.com/leynos/pg-embed-setup-unpriv/issues/441"
     )]
     fn drop(&mut self) {
         for (key, value) in self.previous.drain(..) {

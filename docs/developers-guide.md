@@ -459,8 +459,19 @@ Two kinds of call site carry
 `allow`: an `expect` reports itself once its site is gone.
 
 - The test environment guard in `tests/test_helpers/mod.rs` is a
-  mutex-serialized exception that goes when the tests migrate to an injected
-  environment; that work is tracked in
+  mutex-serialized exception for the shared-cluster harness alone
+  (`ManagedCluster::new`, `start_in_process` and `drop_privileges_if_root` in
+  `tests/postgres/cluster`). The tests of the worker, port and shared-directory
+  helpers now inject an environment reader (`worker_locator::EnvReader`) and no
+  longer change the process environment. The harness still has to: it starts
+  PostgreSQL inside the test process, and `pg-embed-setup-unpriv` 0.7 reads
+  `PG_*` and `PG_EMBEDDED_WORKER` from the process environment while doing so.
+  The mutex serializes only the guard's own writers, not every reader of the
+  environment, so this is a temporary trade-off and not a safety guarantee. The
+  guard goes when the cluster API takes an injected environment
+  (<https://github.com/leynos/pg-embed-setup-unpriv/issues/441>); that issue
+  notes in-process paths may then still need a worker or a documented writer.
+  The remaining work is tracked in
   <https://github.com/leynos/corbusier/issues/176>.
 - The `pg_worker` binary sets its own environment (the dropped user's identity
   and the PostgreSQL settings) before it starts PostgreSQL. That is

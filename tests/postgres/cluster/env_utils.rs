@@ -2,8 +2,9 @@
 
 use super::BoxError;
 use super::shared_dir::{shared_directory_changes, shared_directory_root};
-use super::worker_helpers::{locate_pg_worker_path, prepare_pg_worker};
+use super::worker_helpers::{locate_pg_worker_path_with, prepare_pg_worker};
 use crate::test_helpers::EnvVarGuard;
+use crate::worker_locator::{EnvReader, process_env};
 use camino::{Utf8Path, Utf8PathBuf};
 use nix::unistd::{Uid, User, initgroups, setgid, setuid};
 use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
@@ -29,13 +30,23 @@ pub(super) fn env_vars_to_os(
 /// The per-user shared install and data directories are added to whatever the privilege-aware
 /// worker and port logic returns, unless the caller already chose a data directory.
 pub(super) fn worker_env_changes() -> Result<WorkerEnvChanges, BoxError> {
+    worker_env_changes_with(&process_env)
+}
+
+/// `worker_env_changes`, reading the caller's variables through `read_env`.
+///
+/// Tests inject an environment here instead of changing the process's own.
+pub(super) fn worker_env_changes_with(
+    read_env: EnvReader<'_>,
+) -> Result<WorkerEnvChanges, BoxError> {
     let (mut changes, port_guard) = worker_env_changes_impl(
         detect_execution_privileges,
-        locate_pg_worker_path,
+        || locate_pg_worker_path_with(read_env),
         prepare_pg_worker,
+        read_env,
     )?;
     let root = shared_directory_root(&std::env::temp_dir(), Uid::effective().as_raw());
-    changes.extend(shared_directory_changes(&root, |key| std::env::var_os(key)));
+    changes.extend(shared_directory_changes(&root, read_env));
     Ok((changes, port_guard))
 }
 
@@ -88,18 +99,20 @@ pub(super) fn drop_privileges_if_root(
 }
 
 /// The privilege-aware part of `worker_env_changes`, with its three environment-touching
-/// steps injected so tests can drive root and non-root without being either.
+/// steps and the environment reader injected so tests can drive root and non-root, and
+/// any preset variables, without being either or changing the process environment.
 fn worker_env_changes_impl<D, L, P>(
     detect_privileges: D,
     locate_worker: L,
     prepare_worker: P,
+    read_env: EnvReader<'_>,
 ) -> Result<WorkerEnvChanges, BoxError>
 where
     D: Fn() -> ExecutionPrivileges,
     L: Fn() -> Option<Utf8PathBuf>,
     P: Fn(&Utf8Path) -> Result<Utf8PathBuf, BoxError>,
 {
-    let port_override = resolve_pg_port()?;
+    let port_override = resolve_pg_port(read_env)?;
 
     let mut changes = Vec::new();
     let port_guard = if let Some((port, listener)) = port_override {
@@ -113,7 +126,7 @@ where
         return Ok((changes, port_guard));
     }
 
-    if std::env::var_os("PG_EMBEDDED_WORKER").is_some() {
+    if read_env("PG_EMBEDDED_WORKER").is_some() {
         return Ok((changes, port_guard));
     }
 
@@ -134,8 +147,8 @@ where
 
 /// Reserves a free port for the cluster unless the caller set `PG_PORT`; the returned
 /// listener keeps the port bound until the bootstrap has read it.
-fn resolve_pg_port() -> Result<Option<(OsString, TcpListener)>, BoxError> {
-    if std::env::var_os("PG_PORT").is_some() {
+fn resolve_pg_port(read_env: EnvReader<'_>) -> Result<Option<(OsString, TcpListener)>, BoxError> {
+    if read_env("PG_PORT").is_some() {
         return Ok(None);
     }
 
@@ -153,11 +166,24 @@ mod tests {
     //! Tests for worker environment changes and PG port handling.
 
     use super::worker_env_changes_impl;
-    use crate::test_helpers::EnvVarGuard;
     use camino::Utf8PathBuf;
     use pg_embedded_setup_unpriv::ExecutionPrivileges;
     use std::ffi::OsString;
     use std::io;
+
+    /// An injected environment holding exactly `vars`.
+    fn environment(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
+        let owned: Vec<(String, OsString)> = vars
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), OsString::from(*value)))
+            .collect();
+        move |key| {
+            owned
+                .iter()
+                .find(|(name, _)| name == key)
+                .map(|(_, value)| value.clone())
+        }
+    }
 
     /// A worker path that does not exist, unique per call, so no test finds a real binary.
     fn dummy_worker_path() -> Utf8PathBuf {
@@ -169,15 +195,11 @@ mod tests {
     /// A `PG_PORT` the caller set is preserved: no port is reserved and none is emitted.
     #[test]
     fn preserves_existing_pg_port() {
-        let guard = EnvVarGuard::set_many(&[
-            (OsString::from("PG_PORT"), Some(OsString::from("54321"))),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-        ]);
-
         let (changes, _listener) = worker_env_changes_impl(
             || ExecutionPrivileges::Unprivileged,
             || None,
             |_| Ok(dummy_worker_path()),
+            &environment(&[("PG_PORT", "54321")]),
         )
         .expect("worker env changes failed");
 
@@ -187,21 +209,16 @@ mod tests {
             !has_pg_port,
             "expected no PG_PORT override when PG_PORT is already set",
         );
-        drop(guard);
     }
 
     /// An unprivileged run emits no worker, because it starts the server in process.
     #[test]
     fn non_root_does_not_emit_pg_embedded_worker() {
-        let guard = EnvVarGuard::set_many(&[
-            (OsString::from("PG_PORT"), None),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-        ]);
-
         let (changes, _listener) = worker_env_changes_impl(
             || ExecutionPrivileges::Unprivileged,
             || Some(dummy_worker_path()),
             |_| Ok(dummy_worker_path()),
+            &environment(&[]),
         )
         .expect("worker env changes failed");
 
@@ -211,22 +228,17 @@ mod tests {
             !has_worker,
             "expected no PG_EMBEDDED_WORKER change for non-root execution",
         );
-        drop(guard);
     }
 
     /// A root run with no discoverable worker fails with `NotFound` rather than starting
     /// without one.
     #[test]
     fn root_without_worker_yields_not_found() {
-        let guard = EnvVarGuard::set_many(&[
-            (OsString::from("PG_PORT"), None),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-        ]);
-
         let result = worker_env_changes_impl(
             || ExecutionPrivileges::Root,
             || None,
             |_| Ok(dummy_worker_path()),
+            &environment(&[]),
         );
 
         let error = result
@@ -237,16 +249,11 @@ mod tests {
             .expect("expected io::Error for missing pg_worker");
 
         assert_eq!(io_err.kind(), io::ErrorKind::NotFound);
-        drop(guard);
     }
 
     /// A root run with a discoverable worker emits its prepared path as `PG_EMBEDDED_WORKER`.
     #[test]
     fn root_sets_pg_embedded_worker_when_discoverable() {
-        let guard = EnvVarGuard::set_many(&[
-            (OsString::from("PG_PORT"), None),
-            (OsString::from("PG_EMBEDDED_WORKER"), None),
-        ]);
         let expected_path = dummy_worker_path();
         let expected_os = OsString::from(expected_path.as_str());
 
@@ -254,6 +261,7 @@ mod tests {
             || ExecutionPrivileges::Root,
             || Some(expected_path.clone()),
             |_| Ok(expected_path.clone()),
+            &environment(&[]),
         )
         .expect("worker env changes failed");
 
@@ -265,6 +273,5 @@ mod tests {
             .expect("expected PG_EMBEDDED_WORKER to be set");
 
         assert_eq!(worker_value, expected_os);
-        drop(guard);
     }
 }
