@@ -12,9 +12,7 @@ string key and YAML 1.1's boolean ``True``, refuses a workflow declaring both,
 and refuses any other shape, so a workflow cannot escape a clause by spelling
 its triggers unexpectedly. ``jobs`` and ``steps`` return the mapping jobs and
 steps in document order, and ``calls`` returns the jobs that are themselves
-workflow calls followed by every step. ``concurrency_rules`` and
-``concurrency_test`` use ``triggers``; ``shared_actions_pin`` uses ``calls``,
-``jobs`` and ``steps``.
+workflow calls followed by every step. ``shared_actions_pin`` uses ``calls``, ``jobs`` and ``steps``.
 
 The CV-005 CodeScene contract does not use this module: it runs from the shared
 contract library through ``make test-workflow-contracts``.
