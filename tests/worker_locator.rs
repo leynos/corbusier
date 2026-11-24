@@ -29,11 +29,24 @@ const fn pg_worker_binary_name() -> &'static str {
 /// through `read_env`.
 #[must_use]
 pub fn locate_pg_worker_path_with(read_env: EnvReader<'_>) -> Option<Utf8PathBuf> {
+    locate_pg_worker_path_from(read_env, env::current_exe().ok().as_deref())
+}
+
+/// Locates the `pg_worker` binary as the running test executable `exe` would.
+///
+/// `exe` names where the worker is looked for beside the build output (a
+/// `target/<profile>/deps/<test>` path finds `target/<profile>/pg_worker`), so
+/// a test can pass a path that has no worker nearby and reach the later steps.
+#[must_use]
+pub fn locate_pg_worker_path_from(
+    read_env: EnvReader<'_>,
+    exe: Option<&std::path::Path>,
+) -> Option<Utf8PathBuf> {
     read_env("CARGO_BIN_EXE_pg_worker")
         .and_then(|path| utf8_path_from_os(path.as_os_str()))
         .or_else(|| locate_pg_worker_from_env(read_env))
         .or_else(|| locate_pg_worker_in_cargo_bin(read_env))
-        .or_else(locate_pg_worker_near_target)
+        .or_else(|| exe.and_then(locate_pg_worker_near_target))
         .or_else(|| locate_pg_worker_in_path(read_env))
 }
 
@@ -47,8 +60,7 @@ fn locate_pg_worker_in_cargo_bin(read_env: EnvReader<'_>) -> Option<Utf8PathBuf>
     worker_path.is_file().then_some(worker_path)
 }
 
-fn locate_pg_worker_near_target() -> Option<Utf8PathBuf> {
-    let exe_path = env::current_exe().ok()?;
+fn locate_pg_worker_near_target(exe_path: &std::path::Path) -> Option<Utf8PathBuf> {
     let exe_path_utf8 = utf8_path_from_os(exe_path.as_os_str())?;
     let deps_dir = exe_path_utf8.parent()?;
     let target_dir = deps_dir.parent()?;

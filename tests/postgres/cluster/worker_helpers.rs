@@ -160,7 +160,7 @@ mod tests {
     //! Tests for `pg_worker` discovery and preparation helpers.
 
     use super::{locate_pg_worker_path_with, prepare_pg_worker};
-    use crate::worker_locator::locate_pg_worker_in_path;
+    use crate::worker_locator::{locate_pg_worker_in_path, locate_pg_worker_path_from};
     use camino::{Utf8Path, Utf8PathBuf};
     use cap_std::ambient_authority;
     #[cfg(unix)]
@@ -272,9 +272,16 @@ mod tests {
         let located = locate_pg_worker_in_path(&|key| lookup(&env, key))
             .expect("expected worker path from the injected PATH");
         assert_eq!(located, path_dir.join("pg_worker"));
-        assert!(
-            locate_pg_worker_path_with(&|key| lookup(&env, key)).is_some(),
-            "expected full discovery to find a worker too"
+        // Full discovery with the executable placed where no worker sits beside
+        // it, so every earlier step finds nothing and the injected `PATH` decides.
+        let lonely_exe = std::path::PathBuf::from(path_dir.as_str())
+            .join("deps")
+            .join("test_binary");
+        let full = locate_pg_worker_path_from(&|key| lookup(&env, key), Some(&lonely_exe));
+        assert_eq!(
+            full,
+            Some(path_dir.join("pg_worker")),
+            "full discovery should reach the injected PATH and find the fixture worker"
         );
     }
 
