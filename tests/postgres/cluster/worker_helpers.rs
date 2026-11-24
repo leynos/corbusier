@@ -160,6 +160,7 @@ mod tests {
     //! Tests for `pg_worker` discovery and preparation helpers.
 
     use super::{locate_pg_worker_path_with, prepare_pg_worker};
+    use crate::worker_locator::locate_pg_worker_in_path;
     use camino::{Utf8Path, Utf8PathBuf};
     use cap_std::ambient_authority;
     #[cfg(unix)]
@@ -265,11 +266,15 @@ mod tests {
 
         let env = [("PATH", OsString::from(path_dir.as_str()))];
 
-        let located = locate_pg_worker_path_with(&|key| lookup(&env, key))
-            .expect("expected worker path from fallback discovery");
+        // The full discovery checks the test executable's own directory before
+        // `PATH`, which an injected environment cannot hide, so the `PATH` step
+        // is exercised on its own to prove it reads the injected value.
+        let located = locate_pg_worker_in_path(&|key| lookup(&env, key))
+            .expect("expected worker path from the injected PATH");
+        assert_eq!(located, path_dir.join("pg_worker"));
         assert!(
-            located.is_file(),
-            "expected fallback to locate a worker binary, got {located}"
+            locate_pg_worker_path_with(&|key| lookup(&env, key)).is_some(),
+            "expected full discovery to find a worker too"
         );
     }
 

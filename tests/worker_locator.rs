@@ -56,7 +56,12 @@ fn locate_pg_worker_near_target() -> Option<Utf8PathBuf> {
     worker_path.is_file().then_some(worker_path)
 }
 
-fn locate_pg_worker_in_path(read_env: EnvReader<'_>) -> Option<Utf8PathBuf> {
+/// Searches the injected `PATH` for `pg_worker`, the last step of discovery.
+///
+/// Public so a test can reach this step alone: the steps before it consult the
+/// test executable's own directory, which an injected environment cannot hide.
+#[must_use]
+pub fn locate_pg_worker_in_path(read_env: EnvReader<'_>) -> Option<Utf8PathBuf> {
     let path = read_env("PATH")?;
     for path_entry in env::split_paths(&path) {
         let Some(path_dir) = utf8_path_from_os(path_entry.as_os_str()) else {
