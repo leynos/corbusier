@@ -2,8 +2,8 @@
 
 use crate::context::RequestContext;
 use crate::hook_engine::domain::{
-    ActionResult, HookDefinition, HookExecutionInput, HookExecutionResult, HookTriggerContext,
-    HookTriggerType, project_policy_audit_events,
+    ActionResult, HookDefinition, HookExecutionId, HookExecutionInput, HookExecutionResult,
+    HookTriggerContext, HookTriggerType, project_policy_audit_events,
 };
 use crate::hook_engine::ports::{
     HookActionExecutor, HookDefinitionRepository, HookEngine, HookEngineResult,
@@ -14,6 +14,14 @@ use mockable::Clock;
 use std::sync::Arc;
 
 const SUPPORTED_TRIGGERS: [HookTriggerType; 14] = HookTriggerType::all();
+
+/// The request, definition and trigger one hook execution runs against.
+#[derive(Clone, Copy)]
+struct Invocation<'a> {
+    ctx: &'a RequestContext,
+    definition: &'a HookDefinition,
+    context: &'a HookTriggerContext,
+}
 
 /// Hook execution orchestration service.
 #[derive(Clone)]
@@ -111,6 +119,91 @@ where
         }
         Ok(())
     }
+
+    /// Reserves a pending execution record for a definition and trigger.
+    async fn reserve_pending_execution(
+        &self,
+        call: Invocation<'_>,
+        execution_id: HookExecutionId,
+    ) -> HookEngineResult<PendingExecutionReservation> {
+        let Invocation {
+            ctx,
+            definition,
+            context,
+        } = call;
+        let reservation = self
+            .execution_log
+            .store_pending(
+                ctx,
+                PendingExecutionRecord {
+                    execution_id,
+                    hook_id: definition.id().clone(),
+                    trigger_context_id: context.id(),
+                    trigger_type: context.trigger_type(),
+                    executed_at: self.clock.utc(),
+                },
+            )
+            .await?;
+        Ok(reservation)
+    }
+
+    /// Returns the stored result of an execution another caller reserved,
+    /// re-emitting its policy audit events.
+    async fn replay_reserved_execution(
+        &self,
+        call: Invocation<'_>,
+        existing_execution_id: HookExecutionId,
+    ) -> HookEngineResult<HookExecutionResult> {
+        let Invocation {
+            ctx,
+            definition,
+            context,
+        } = call;
+        let existing_result = self
+            .execution_log
+            .find_by_trigger_context(ctx, context.id())
+            .await?
+            .into_iter()
+            .find(|result| {
+                result.execution_id() == existing_execution_id
+                    && result.hook_id() == definition.id()
+            })
+            .ok_or_else(|| {
+                HookExecutionLogError::invalid_persisted_data(format!(
+                    "missing reserved hook execution for {existing_execution_id}"
+                ))
+            })?;
+        self.persist_policy_audit_events(ctx, &existing_result, context)
+            .await?;
+        Ok(existing_result)
+    }
+
+    /// Runs a definition's actions, then persists its audit events and result.
+    async fn run_definition(
+        &self,
+        call: Invocation<'_>,
+        execution_id: HookExecutionId,
+    ) -> HookEngineResult<HookExecutionResult> {
+        let Invocation {
+            ctx,
+            definition,
+            context,
+        } = call;
+        let action_results = self.execute_actions(definition, context).await?;
+        let result = HookExecutionResult::new(HookExecutionInput {
+            execution_id,
+            hook_id: definition.id().clone(),
+            trigger_context_id: context.id(),
+            trigger_type: context.trigger_type(),
+            predicate_data: definition.predicate().data().clone(),
+            action_results,
+            executed_at: self.clock.utc(),
+        });
+        self.persist_policy_audit_events(ctx, &result, context)
+            .await?;
+        self.execution_log.update_result(ctx, &result).await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -135,53 +228,22 @@ where
 
         let mut results = Vec::with_capacity(definitions.len());
         for definition in definitions {
-            let execution_id = crate::hook_engine::domain::HookExecutionId::new();
-            let reservation = self
-                .execution_log
-                .store_pending(
-                    ctx,
-                    PendingExecutionRecord {
-                        execution_id,
-                        hook_id: definition.id().clone(),
-                        trigger_context_id: context.id(),
-                        trigger_type: context.trigger_type(),
-                        executed_at: self.clock.utc(),
-                    },
-                )
-                .await?;
-            if let PendingExecutionReservation::AlreadyExists(existing_execution_id) = reservation {
-                let existing_result = self
-                    .execution_log
-                    .find_by_trigger_context(ctx, context.id())
-                    .await?
-                    .into_iter()
-                    .find(|result| {
-                        result.execution_id() == existing_execution_id
-                            && result.hook_id() == definition.id()
-                    })
-                    .ok_or_else(|| {
-                        HookExecutionLogError::invalid_persisted_data(format!(
-                            "missing reserved hook execution for {existing_execution_id}"
-                        ))
-                    })?;
-                self.persist_policy_audit_events(ctx, &existing_result, &context)
-                    .await?;
-                results.push(existing_result);
-                continue;
-            }
-            let action_results = self.execute_actions(&definition, &context).await?;
-            let result = HookExecutionResult::new(HookExecutionInput {
-                execution_id,
-                hook_id: definition.id().clone(),
-                trigger_context_id: context.id(),
-                trigger_type: context.trigger_type(),
-                predicate_data: definition.predicate().data().clone(),
-                action_results,
-                executed_at: self.clock.utc(),
-            });
-            self.persist_policy_audit_events(ctx, &result, &context)
-                .await?;
-            self.execution_log.update_result(ctx, &result).await?;
+            let execution_id = HookExecutionId::new();
+            let call = Invocation {
+                ctx,
+                definition: &definition,
+                context: &context,
+            };
+            let reservation = self.reserve_pending_execution(call, execution_id).await?;
+            let result = match reservation {
+                PendingExecutionReservation::AlreadyExists(existing_execution_id) => {
+                    self.replay_reserved_execution(call, existing_execution_id)
+                        .await?
+                }
+                PendingExecutionReservation::Created(_) => {
+                    self.run_definition(call, execution_id).await?
+                }
+            };
             results.push(result);
         }
         Ok(results)
