@@ -17,10 +17,6 @@ pub(crate) fn map_conversation_repository_error(
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "Simple match arms on error variants"
-)]
 pub(crate) fn map_message_repository_error(error: RepositoryError) -> ApiError {
     match error {
         RepositoryError::ConversationNotFound(conversation_id) => {
